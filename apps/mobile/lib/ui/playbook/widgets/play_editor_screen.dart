@@ -11,6 +11,7 @@ import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/play_editor_viewmodel.dart';
 import 'play_canvas.dart';
+import 'playbook_parts.dart';
 
 class PlayEditorScreen extends StatefulWidget {
   const PlayEditorScreen({super.key, required this.viewModel});
@@ -33,6 +34,9 @@ class _PlayEditorScreenState extends State<PlayEditorScreen>
 
   /// True while showing a playback frame instead of the selected step.
   bool _timeline = false;
+
+  /// Set once a whiteboard has been sent to its own screen.
+  bool _redirected = false;
   double _speed = 1;
 
   double get _t => _anim.value * vm.stepCount;
@@ -149,6 +153,17 @@ class _PlayEditorScreenState extends State<PlayEditorScreen>
             appBar: AppBar(),
             body: ErrorView(error: vm.load.result, onRetry: vm.load.execute),
           );
+        }
+        // A saved whiteboard (an old link or notification) opens on the
+        // whiteboard instead.
+        if (vm.play.isWhiteboard) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && !_redirected) {
+              _redirected = true;
+              context.replace(Routes.whiteboard(vm.teamId, vm.play.id));
+            }
+          });
+          return Scaffold(appBar: AppBar(), body: const LoadingView());
         }
         final editable = vm.canEdit;
         return PopScope(
@@ -361,113 +376,6 @@ class _PlayTitle extends StatelessWidget {
   }
 }
 
-/// A bar under the app bar or over the bottom edge: card fill with a
-/// hairline between it and the field.
-class _Bar extends StatelessWidget {
-  const _Bar({required this.child, this.top = false});
-
-  final Widget child;
-
-  /// True for a bar at the bottom (the line goes on top).
-  final bool top;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    final line = BorderSide(color: c.border);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: c.card,
-        border: Border(
-          top: top ? line : BorderSide.none,
-          bottom: top ? BorderSide.none : line,
-        ),
-      ),
-      child: Material(type: MaterialType.transparency, child: child),
-    );
-  }
-}
-
-/// A square tool button: icon over a short label, turf when selected.
-class _ToolTile extends StatelessWidget {
-  const _ToolTile({
-    required this.icon,
-    required this.label,
-    required this.tooltip,
-    required this.onPressed,
-    this.selected = false,
-    this.iconColor,
-  });
-
-  final IconData icon;
-  final String label;
-  final String tooltip;
-  final VoidCallback? onPressed;
-  final bool selected;
-  final Color? iconColor;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    final enabled = onPressed != null;
-    final fg = selected ? c.accentInk : (enabled ? c.ink2 : c.muted);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2),
-      child: Tooltip(
-        message: tooltip,
-        excludeFromSemantics: true,
-        child: Semantics(
-          button: true,
-          selected: selected,
-          enabled: enabled,
-          label: tooltip,
-          onTap: onPressed,
-          excludeSemantics: true,
-          child: Opacity(
-            opacity: enabled ? 1 : 0.45,
-            child: Material(
-              color: selected ? c.accentSoft : c.card,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(controlRadius),
-                side: BorderSide(
-                  color: selected ? c.accent : c.border,
-                  width: selected ? 2 : 1,
-                ),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: onPressed,
-                child: SizedBox(
-                  width: 54,
-                  height: 54,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(icon, size: 20, color: iconColor ?? fg),
-                      const SizedBox(height: 3),
-                      Text(
-                        label,
-                        maxLines: 1,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: selected
-                              ? FontWeight.w700
-                              : FontWeight.w600,
-                          color: fg,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _Toolbar extends StatelessWidget {
   const _Toolbar({required this.viewModel});
 
@@ -497,14 +405,14 @@ class _Toolbar extends StatelessWidget {
     final vm = viewModel;
     final c = AppColors.of(context);
     if (!vm.editingSetup) return _StepToolbar(viewModel: vm);
-    return _Bar(
+    return PlaybookBar(
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         child: Row(
           children: [
             for (final (tool, icon, label, tooltip) in _tools)
-              _ToolTile(
+              ToolTile(
                 icon: icon,
                 label: label,
                 tooltip: tooltip,
@@ -521,19 +429,17 @@ class _Toolbar extends StatelessWidget {
               height: 36,
               child: VerticalDivider(width: 16, color: c.border2),
             ),
-            _ToolTile(
+            ToolTile(
               icon: Icons.delete_outline,
               label: 'Delete',
               tooltip: 'Delete selected',
               onPressed: vm.selectedId == null ? null : vm.deleteSelected,
             ),
-            _ToolTile(
+            ToolTile(
               icon: Icons.layers_clear_outlined,
               label: 'Clear',
               tooltip: 'Clear field',
-              onPressed: vm.play.elements.isEmpty && vm.play.arrows.isEmpty
-                  ? null
-                  : vm.clearDiagram,
+              onPressed: vm.hasDiagram ? vm.clearDiagram : null,
             ),
           ],
         ),
@@ -553,19 +459,19 @@ class _StepToolbar extends StatelessWidget {
     final vm = viewModel;
     final c = AppColors.of(context);
     final selected = vm.selectedId;
-    return _Bar(
+    return PlaybookBar(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         child: Row(
           children: [
-            _ToolTile(
+            ToolTile(
               icon: Icons.open_with,
               label: 'Move',
               tooltip: 'Record movement',
               selected: vm.tool == EditorTool.select,
               onPressed: () => vm.setTool(EditorTool.select),
             ),
-            _ToolTile(
+            ToolTile(
               icon: Icons.auto_fix_normal_outlined,
               label: 'Erase',
               tooltip: 'Erase movement',
@@ -711,7 +617,7 @@ class _Timeline extends StatelessWidget {
       fontWeight: FontWeight.w700,
       color: c.ink2,
     );
-    return _Bar(
+    return PlaybookBar(
       top: true,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),

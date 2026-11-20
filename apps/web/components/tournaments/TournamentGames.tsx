@@ -33,6 +33,7 @@ import {
   pointDiff,
 } from "@stall10/shared";
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import { Dialog } from "@/components/Dialog";
 import { dayKey, useRenderZone } from "@/lib/renderZone";
 import { type TournamentState, divisionPath, useAction } from "./useTournament";
 
@@ -102,9 +103,11 @@ function actionFor(s: TournamentState, g: EngineGame): Action {
 }
 const badge: Record<Exclude<Action, null>, string> = { report: "Report score", confirm: "Confirm score", awaiting: "Waiting for the other captain" };
 
-function ScoreForm({ s, g, mode, onDone }: { s: TournamentState; g: EngineGame; mode: "report" | "final"; onDone: () => void }) {
-  const [a, setA] = useState(String(g.scoreA ?? g.report?.scoreA ?? ""));
-  const [b, setB] = useState(String(g.scoreB ?? g.report?.scoreB ?? ""));
+/** [g]'s score form; it starts from the game's score, its report, else its running score. [onSent] (else [onDone]) once it's sent. */
+function ScoreForm({ s, g, mode, onDone, onSent }: { s: TournamentState; g: EngineGame; mode: "report" | "final"; onDone: () => void; onSent?: () => void }) {
+  const running = s.liveOf(g);
+  const [a, setA] = useState(String(g.scoreA ?? g.report?.scoreA ?? running?.scoreA ?? ""));
+  const [b, setB] = useState(String(g.scoreB ?? g.report?.scoreB ?? running?.scoreB ?? ""));
   const { busy, error, setError, run } = useAction();
   const url = `${divisionPath(s.id, s.divisionId ?? "")}/games/${encodeURIComponent(g.id)}`;
   async function submit(e: FormEvent) {
@@ -114,7 +117,7 @@ function ScoreForm({ s, g, mode, onDone }: { s: TournamentState; g: EngineGame; 
     const why = scoreError(scoreA, scoreB);
     if (why) return setError(why);
     const r = mode === "report" ? await run(`${url}/report`, "POST", { scoreA, scoreB }) : await run(`${url}/score`, "PUT", { scoreA, scoreB });
-    if (r.ok) onDone();
+    if (r.ok) (onSent ?? onDone)();
   }
   return (
     <form className="settings-form hosted-score-form" onSubmit={submit}>
@@ -150,8 +153,11 @@ function ScoreForm({ s, g, mode, onDone }: { s: TournamentState; g: EngineGame; 
 export function GameCard({ s, g, focus = false }: { s: TournamentState; g: EngineGame; focus?: boolean }) {
   const zone = useRenderZone();
   const [open, setOpen] = useState<"report" | "final" | null>(null);
+  const [keeping, setKeeping] = useState(false);
   const { busy, error, run } = useAction();
   const action = actionFor(s, g);
+  const live = s.liveOf(g);
+  const canKeep = action !== "confirm" && s.canKeepLive(g);
   const ref = useRef<HTMLDivElement>(null);
   const focused = useRef(false);
   useEffect(() => {
@@ -171,7 +177,7 @@ export function GameCard({ s, g, focus = false }: { s: TournamentState; g: Engin
       <div className={`hosted-side${winner ? (won ? " hosted-winner" : " hosted-loser") : ""}`}>
         {(a ? g.teamA : g.teamB) ? <TeamMark name={name} /> : <span className="hosted-mark hosted-mark-tbd" aria-hidden />}
         <span className="hosted-side-name">{name}</span>
-        <b className="hosted-score">{isDone(g) ? (a ? g.scoreA : g.scoreB) : ""}</b>
+        <b className="hosted-score">{isDone(g) ? (a ? g.scoreA : g.scoreB) : live ? (a ? live.scoreA : live.scoreB) : ""}</b>
       </div>
     );
   };
@@ -185,12 +191,16 @@ export function GameCard({ s, g, focus = false }: { s: TournamentState; g: Engin
           Game {g.order + 1} · {g.label}
           {g.startsAt ? ` · ${timeLabel(g.startsAt, zone)}` : ""} · Field {g.field}
         </small>
-        {action ? <span className={`pill ${due ? "hosted-pill-due" : "pill-soft"}`}>{badge[action]}</span> : isDone(g) && <span className="pill pill-soft">Final</span>}
+        <span className="hosted-game-pills">
+          {live && <LivePill />}
+          {action ? <span className={`pill ${due ? "hosted-pill-due" : "pill-soft"}`}>{badge[action]}</span> : isDone(g) && <span className="pill pill-soft">Final</span>}
+        </span>
       </div>
       <div className="hosted-game-teams">
         {side(true)}
         {side(false)}
       </div>
+      {live && <small className="muted">Live score. It isn&apos;t final until it&apos;s reported.</small>}
       {skipped && <small className="muted">Not needed: the winners&apos; bracket champion won the final.</small>}
       {r && !isDone(g) && (
         <small className="muted">
@@ -200,8 +210,13 @@ export function GameCard({ s, g, focus = false }: { s: TournamentState; g: Engin
       {open ? (
         <ScoreForm s={s} g={g} mode={open} onDone={() => setOpen(null)} />
       ) : (
-        (action || canSet) && (
+        (action || canSet || canKeep) && (
           <div className="home-actions hosted-game-actions">
+            {canKeep && (
+              <button type="button" className="btn btn-small btn-primary" onClick={() => setKeeping(true)}>
+                {live ? "Update live score" : "Start game"}
+              </button>
+            )}
             {action === "report" && (
               <button type="button" className="btn btn-small hosted-btn-due" onClick={() => setOpen("report")}>
                 Report score
@@ -226,7 +241,114 @@ export function GameCard({ s, g, focus = false }: { s: TournamentState; g: Engin
         )
       )}
       {error && <p className="form-error">{error}</p>}
+      {keeping && <LiveScoreDialog s={s} g={g} onClose={() => setKeeping(false)} />}
     </div>
+  );
+}
+
+/** The red LIVE pill, only while a game is being played. */
+export function LivePill() {
+  return (
+    <span className="hosted-live-pill hosted-live-small">
+      <i aria-hidden />
+      LIVE
+    </span>
+  );
+}
+
+/**
+ * A game's running score while it's played (LiveScoreSheet in the app),
+ * kept by its teams' captains or the host: Start game, then +1 for
+ * whoever scores and − to undo. Everyone following sees it. It isn't
+ * the final: Report final score (a captain) or Set final score (the host)
+ * opens the score form, filled in from it.
+ */
+function LiveScoreDialog({ s, g: initial, onClose }: { s: TournamentState; g: EngineGame; onClose: () => void }) {
+  // The game as the page has it now (its listener keeps it current).
+  const g = s.games.find((x) => x.id === initial.id) ?? initial;
+  const [finalMode, setFinalMode] = useState<"report" | "final" | null>(null);
+  const live = s.liveOf(g);
+  const canKeep = s.canKeepLive(g);
+  const action = actionFor(s, g);
+  const captain = action === "report";
+  const host = !captain && s.manager && hasTeams(g) && !laterGamesPlayed(g, s.games);
+  const { error, stopping, setLive, stopLive, setError } = s.live;
+  const nameA = slotLabel(s, g, true);
+  const nameB = slotLabel(s, g, false);
+  // Closing it clears a send's error.
+  useEffect(() => () => setError(null), [setError]);
+  const bump = (teamA: boolean, by: number) => {
+    const a = live?.scoreA ?? 0;
+    const b = live?.scoreB ?? 0;
+    setLive(g.id, teamA ? a + by : a, teamA ? b : b + by);
+  };
+  async function stop() {
+    if (!window.confirm("Stop the live score?\n\nThe running score comes off for everyone. Start again any time.")) return;
+    await stopLive(g.id);
+  }
+  const whyNot = !hasTeams(g)
+    ? "Teams are decided by earlier games."
+    : s.t?.status === "finished"
+      ? "This event is over."
+      : "Live scores are kept on the day the game is played.";
+  const stepper = (a: boolean) => {
+    const name = a ? nameA : nameB;
+    const score = live ? (a ? live.scoreA : live.scoreB) : null;
+    const on = canKeep && !!live;
+    return (
+      <div className="live-step">
+        <TeamMark name={name} />
+        <span className="live-step-name">{name}</span>
+        <button type="button" className="btn live-step-btn" aria-label={`Undo a point for ${name}`} title={`Undo a point for ${name}`} disabled={!on || (score ?? 0) <= 0} onClick={() => bump(a, -1)}>
+          −
+        </button>
+        <b className="live-step-score">{score ?? "–"}</b>
+        <button type="button" className="btn btn-primary live-step-btn live-step-plus" aria-label={`Point for ${name}`} disabled={!on || (score ?? 0) >= 99} onClick={() => bump(a, 1)}>
+          +1
+        </button>
+      </div>
+    );
+  };
+  return (
+    <Dialog label="Live score" onClose={onClose} className="card live-dialog" dismissOnBackdrop>
+      <div className="live-dialog-head">
+        <h2 className="card-title">Live score</h2>
+        {live && <LivePill />}
+      </div>
+      <small className="muted">{[`Game ${g.order + 1}`, g.label, `Field ${g.field}`, s.division ? scoreLabel(s.division.settings) : null].filter(Boolean).join(" · ")}</small>
+      {finalMode ? (
+        <ScoreForm s={s} g={g} mode={finalMode} onDone={() => setFinalMode(null)} onSent={onClose} />
+      ) : (
+        <>
+          <div className="live-steps" aria-live="polite">
+            {stepper(true)}
+            {stepper(false)}
+          </div>
+          {!live && (
+            <button type="button" className="btn btn-primary" disabled={!canKeep || stopping} onClick={() => setLive(g.id, 0, 0)}>
+              Start game
+            </button>
+          )}
+          <p className="muted small live-note">{!canKeep && !live ? whyNot : "Everyone following sees this score. It isn't final until the score is reported and confirmed."}</p>
+          {error && <p className="form-error">{error}</p>}
+          {(captain || host) && (
+            <button type="button" className="btn hosted-btn-due" disabled={stopping} onClick={() => setFinalMode(captain ? "report" : "final")}>
+              {captain ? "Report final score" : "Set final score"}
+            </button>
+          )}
+          {live && canKeep && (
+            <button type="button" className="text-btn live-stop" disabled={stopping} onClick={() => void stop()}>
+              Stop live score
+            </button>
+          )}
+          <div className="form-actions">
+            <button type="button" className="btn btn-small" onClick={onClose}>
+              Done
+            </button>
+          </div>
+        </>
+      )}
+    </Dialog>
   );
 }
 

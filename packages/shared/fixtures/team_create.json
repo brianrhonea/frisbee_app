@@ -19,6 +19,12 @@
         "division": "mixed",
         "level": "club",
         "city": "Austin",
+        "sections": {
+          "playbook": false,
+          "videos": false,
+          "stats": false,
+          "meetings": false
+        },
         "ownerId": "u1",
         "members": {
           "u1": "owner"
@@ -149,6 +155,12 @@
         "level": "league",
         "city": "",
         "leagueId": "league1",
+        "sections": {
+          "playbook": false,
+          "videos": false,
+          "stats": false,
+          "meetings": false
+        },
         "ownerId": "u2",
         "members": {
           "u2": "owner"

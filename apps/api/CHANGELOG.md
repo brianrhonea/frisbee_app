@@ -7,6 +7,35 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.34.0 — 2026-11-20
+
+Redesign features, with app 0.0.37 and web 0.46.0. Details in
+`docs/product-spec.md` §8.1 items 26–34.
+
+**Added**
+- Live running scores: `POST`/`DELETE
+  /v1/tournaments/:id/divisions/:divisionId/games/:gameId/live`
+  (either team's captain or the host's event managers, on the game's
+  day, scheduled games only). Public games carry `live`; public list
+  cards carry `liveGames` (updated in the last 3 hours).
+- `PUT /v1/teams/:id/sections` (owner): Playbook, Videos, Stats,
+  Meetings switches; new teams start with them off.
+- `PUT /v1/teams/:id/public-page` (manageTeam): `publicPage: false` on
+  the team and its listing; off, outsiders get the card only and its
+  hosted events and rankings leave the public lists.
+- Team rooms: `PUT|DELETE .../messages/:id/pin` (up to 10 a room, swap
+  on the 11th) and `POST .../event-shares` (event card messages).
+- `GET /v1/me/export`: the caller's own data as a JSON attachment, once
+  per 10 minutes (`limits/{uid}.exportedAt`).
+- `spots` on public tournament list cards (each division's cap less its
+  accepted teams) while registration is open.
+
+**Changed**
+- RSVPs to team events and meetings take an optional `note` (140
+  characters; left out keeps it, taking the answer back removes it).
+- Plays take `kind` (`play` | `whiteboard`) and `drawings`; a save that
+  leaves them out keeps the stored ones.
+
 ## 0.33.0 — 2026-11-19
 
 **Added**

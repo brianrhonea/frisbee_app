@@ -174,6 +174,42 @@ Map<String, dynamic> communityFields({
       }
     : {};
 
+/// A team's sections its owner switches on or off (`sections` on the team
+/// doc; optionalTeamSections in packages/shared/src/team.ts). Feed,
+/// Schedule, Chat and Roster are always there. Teams made before the
+/// switches store nothing, which reads as on; new teams start with every
+/// one off ([newTeamSections]). Communities store none.
+enum OptionalSection {
+  playbook('Playbook', 'Plays drawn on a field for the team to study'),
+  videos('Videos', 'Game film and highlights, in folders'),
+  stats('Stats', 'Keep stats point by point, with season totals'),
+  meetings('Meetings', 'Video calls for the team, or some of it');
+
+  const OptionalSection(this.label, this.description);
+  final String label;
+
+  /// One line for the switch in Settings › Sections.
+  final String description;
+
+  /// "Playbook, Videos, Stats or Meetings".
+  static String get listed {
+    final names = [for (final s in values) s.label];
+    return '${names.sublist(0, names.length - 1).join(', ')} or ${names.last}';
+  }
+}
+
+/// What a new team (not a community) stores: every optional section off.
+Map<String, bool> newTeamSections() => {
+  for (final s in OptionalSection.values) s.name: false,
+};
+
+/// The sections stored as off in a team doc's `sections` map.
+Set<OptionalSection> sectionsOffIn(Object? raw) => {
+  if (raw is Map)
+    for (final s in OptionalSection.values)
+      if (raw[s.name] == false) s,
+};
+
 enum Division {
   mixed('Mixed'),
   open('Open'),
@@ -222,7 +258,22 @@ class Team {
     this.orgRoles = const {},
     this.official = false,
     this.leagueId,
+    this.sectionsOff = const {},
+    this.publicPage = true,
   });
+
+  /// The "Public team page" switch (`publicPage`, publicPageOn in
+  /// packages/shared): on unless stored as false. Off, people outside the
+  /// team see only its card (name, division, level and city), as a private
+  /// group's. Admins (manageTeam) switch it through the API.
+  final bool publicPage;
+
+  /// Optional sections the owner has turned off. Empty for teams made
+  /// before the switches (everything on) and for communities.
+  final Set<OptionalSection> sectionsOff;
+
+  /// Whether the team shows [section] ([OptionalSection]).
+  bool hasSection(OptionalSection section) => !sectionsOff.contains(section);
 
   /// The league (a hosted event's id) this team was made for: drafted by
   /// the league, or started to reserve a spot in it. A league team is just
@@ -505,6 +556,8 @@ class Team {
       },
       official: map['official'] == true,
       leagueId: map['leagueId'] as String?,
+      sectionsOff: sectionsOffIn(map['sections']),
+      publicPage: map['publicPage'] != false,
     );
   }
 
@@ -544,6 +597,8 @@ class Team {
     bool? orgLinked,
     Set<String>? orgMembers,
     Map<String, String>? orgRoles,
+    Set<OptionalSection>? sectionsOff,
+    bool? publicPage,
   }) => Team(
     id: id,
     name: name ?? this.name,
@@ -570,6 +625,8 @@ class Team {
     orgRoles: orgRoles ?? this.orgRoles,
     official: official,
     leagueId: leagueId,
+    sectionsOff: sectionsOff ?? this.sectionsOff,
+    publicPage: publicPage ?? this.publicPage,
   );
 }
 
@@ -756,6 +813,7 @@ class TeamListing {
     this.requiresApproval = false,
     this.location,
     this.official = false,
+    this.publicPage = true,
   });
 
   factory TeamListing.of(Team team) => TeamListing(
@@ -769,7 +827,11 @@ class TeamListing {
     requiresApproval: team.requiresApproval,
     location: team.location,
     official: team.official,
+    publicPage: team.publicPage,
   );
+
+  /// Copied from [Team.publicPage]: false when outsiders see only this.
+  final bool publicPage;
 
   final String id;
   final String name;
@@ -817,6 +879,7 @@ class TeamListing {
       description == team.description &&
       requiresApproval == team.requiresApproval &&
       official == team.official &&
+      publicPage == team.publicPage &&
       location == (team.isPrivateGroup ? null : team.location);
 
   factory TeamListing.fromMap(String id, Map<String, dynamic> map) =>
@@ -835,6 +898,7 @@ class TeamListing {
         requiresApproval: map['requiresApproval'] as bool? ?? false,
         location: GroupLocation.fromMap(map['location']),
         official: map['official'] == true,
+        publicPage: map['publicPage'] != false,
       );
 
   Map<String, dynamic> toMap() => {
@@ -850,8 +914,15 @@ class TeamListing {
       location: isPrivateGroup ? null : location,
     ),
     if (official) 'official': true,
+    // Only when off, as the API's listingFor writes it.
+    if (!publicPage && kind == TeamKind.team) 'publicPage': false,
     'keywords': searchKeywords('$name $city'),
   };
+
+  /// Outsiders see only this card: a private group, or a team whose
+  /// public page is off. Its location, events, posts and roster are for
+  /// members.
+  bool get hidesPage => isPrivateGroup || !publicPage;
 }
 
 /// Someone asking to join a group that requires approval

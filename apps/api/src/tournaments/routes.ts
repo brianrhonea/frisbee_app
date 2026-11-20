@@ -1,5 +1,6 @@
 // Hosted tournaments and leagues over HTTP (TournamentService), as the
 // signed-in caller, under the hub's write limit.
+import { liveLimits } from "@stall10/shared";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { type Caller, requireCaller } from "../auth.js";
 import { hubLimits } from "../hub/routes.js";
@@ -12,6 +13,9 @@ import type { TournamentService } from "./service.js";
  * ids and sources, a 60-character label), past the API's 64 KB default.
  */
 const scheduleBodyLimit = 2 * 1024 * 1024;
+
+/** Running-score updates per caller per minute (liveLimits.perMinute). */
+const liveLimit = { max: liveLimits.perMinute, windowMs: 60_000 };
 
 export function tournamentRoutes(app: FastifyInstance, svc: TournamentService, limiter: MemoryRateLimiter) {
   const caller = (req: FastifyRequest): Caller => {
@@ -65,6 +69,21 @@ export function tournamentRoutes(app: FastifyInstance, svc: TournamentService, l
   });
   app.post<G>(`${game}/confirm`, async (req, reply) => {
     await svc.confirm(caller(req), req.params.id, req.params.divisionId, req.params.gameId, req.body);
+    return reply.code(204).send();
+  });
+  // The running score: its own bucket, so a busy point-by-point game
+  // doesn't use up the caller's other writes.
+  const liveCaller = (req: FastifyRequest): Caller => {
+    const c = requireCaller(req);
+    limited(limiter, `live:${c.uid}`, liveLimit);
+    return c;
+  };
+  app.post<G>(`${game}/live`, async (req, reply) => {
+    await svc.setLive(liveCaller(req), req.params.id, req.params.divisionId, req.params.gameId, req.body);
+    return reply.code(204).send();
+  });
+  app.delete<G>(`${game}/live`, async (req, reply) => {
+    await svc.clearLive(liveCaller(req), req.params.id, req.params.divisionId, req.params.gameId);
     return reply.code(204).send();
   });
   app.put<G>(`${game}/score`, async (req, reply) => {

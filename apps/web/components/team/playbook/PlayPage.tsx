@@ -1,6 +1,8 @@
 "use client";
 import { type PlayDoc, playCategoryLabels } from "@stall10/shared";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { useLiveDoc } from "@/lib/live";
 import { useTeamHub } from "../TeamContext";
 import { MembersOnlySection } from "../TeamNav";
@@ -16,6 +18,12 @@ export function PlayPage({ playId }: { playId: string }) {
   const member = viewer.state === "member";
   const play = useLiveDoc<PlayDoc>(member && !isNew ? `teams/${teamId}/plays/${playId}` : null);
   const editor = member && viewer.can("manageTeam");
+  const router = useRouter();
+  // A saved whiteboard opens on the whiteboard, not in the play editor.
+  const whiteboard = play.data?.kind === "whiteboard";
+  useEffect(() => {
+    if (whiteboard) router.replace(`/teams/${encodeURIComponent(teamId)}/whiteboards/${encodeURIComponent(playId)}`);
+  }, [whiteboard, router, teamId, playId]);
   const back = (
     <Link href={`/teams/${encodeURIComponent(teamId)}/playbook`} className="text-btn">
       ← Playbook
@@ -36,6 +44,7 @@ export function PlayPage({ playId }: { playId: string }) {
   if (play.error) return <p className="form-error">{play.error}</p>;
   if (play.data === undefined) return <p className="muted" aria-busy="true">Loading…</p>;
   if (play.data === null) return <p className="empty">That play was deleted. {back}</p>;
+  if (whiteboard) return <p className="muted" aria-busy="true">Opening the whiteboard…</p>;
   return (
     <div className="stack">
       {back}

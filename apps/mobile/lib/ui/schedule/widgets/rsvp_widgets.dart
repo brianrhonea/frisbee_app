@@ -111,11 +111,18 @@ class RsvpChoice<T> extends StatelessWidget {
 /// answers (ink) and no reply yet (muted).
 enum RsvpTone { yes, other, none }
 
-/// One group of names in [RsvpResponses], e.g. "Going" and who.
-typedef RsvpGroup = ({String label, List<String> names, RsvpTone tone});
+/// One group of people in [RsvpResponses], e.g. "Going" and who, with
+/// their notes.
+typedef RsvpGroup = ({String label, List<Responder> people, RsvpTone tone});
 
-/// Who answered what: each group's label and count, then every name. The
-/// first "yes" group leads with a few initials.
+/// [names] as people without notes, e.g. those who haven't answered.
+List<Responder> withoutNotes(List<String> names) => [
+  for (final n in names) (name: n, note: ''),
+];
+
+/// Who answered what: each group's label and count, then every name, each
+/// followed by its note in quotes. The first "yes" group leads with a few
+/// initials.
 class RsvpResponses extends StatelessWidget {
   const RsvpResponses({super.key, required this.groups});
 
@@ -145,15 +152,33 @@ class RsvpResponses extends StatelessWidget {
       RsvpTone.other => (c.ink2, c.ink2),
       RsvpTone.none => (c.muted, c.muted),
     };
-    final names = Text(
-      g.names.isEmpty ? 'Nobody yet.' : g.names.join(', '),
+    final people = g.people;
+    final names = Text.rich(
+      TextSpan(
+        children: people.isEmpty
+            ? [const TextSpan(text: 'Nobody yet.')]
+            : [
+                for (final (i, p) in people.indexed) ...[
+                  if (i > 0) const TextSpan(text: ', '),
+                  TextSpan(text: p.name),
+                  if (p.note.isNotEmpty)
+                    TextSpan(
+                      text: ' “${p.note}”',
+                      style: TextStyle(
+                        color: c.muted,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                ],
+              ],
+      ),
       style: TextStyle(fontSize: 13, height: 1.4, color: nameColor),
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '${g.label} (${g.names.length})',
+          '${g.label} (${people.length})',
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w700,
@@ -161,10 +186,10 @@ class RsvpResponses extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        if (g.tone == RsvpTone.yes && g.names.isNotEmpty)
+        if (g.tone == RsvpTone.yes && people.isNotEmpty)
           Row(
             children: [
-              _Faces(names: g.names.take(4).toList()),
+              _Faces(names: [for (final p in people.take(4)) p.name]),
               const SizedBox(width: 10),
               Expanded(child: names),
             ],
@@ -172,6 +197,85 @@ class RsvpResponses extends StatelessWidget {
         else
           names,
       ],
+    );
+  }
+}
+
+/// "Add a note (optional)" under an answer: a short line ("Late 15 min")
+/// saved with Save or the keyboard's done key. Shows [note], the saved
+/// one, until the user edits it. [onSave] null disables it (e.g. while
+/// saving).
+class RsvpNoteField extends StatefulWidget {
+  const RsvpNoteField({super.key, required this.note, required this.onSave});
+
+  final String note;
+  final ValueChanged<String>? onSave;
+
+  @override
+  State<RsvpNoteField> createState() => _RsvpNoteFieldState();
+}
+
+class _RsvpNoteFieldState extends State<RsvpNoteField> {
+  late final _text = TextEditingController(text: widget.note);
+
+  @override
+  void initState() {
+    super.initState();
+    _text.addListener(_changed);
+  }
+
+  void _changed() => setState(() {});
+
+  @override
+  void didUpdateWidget(RsvpNoteField old) {
+    super.didUpdateWidget(old);
+    // A newly saved note replaces the text (as cleaned) unless the user
+    // is mid-edit.
+    final typed = cleanRsvpNote(_text.text);
+    if (widget.note != old.note &&
+        (typed == old.note || typed == widget.note)) {
+      _text.text = widget.note;
+    }
+  }
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  bool get _dirty => cleanRsvpNote(_text.text) != widget.note;
+
+  void _save() {
+    if (!_dirty) return;
+    widget.onSave?.call(_text.text);
+    FocusScope.of(context).unfocus();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return TextField(
+      controller: _text,
+      enabled: widget.onSave != null,
+      maxLength: rsvpNoteMax,
+      maxLines: 1,
+      textInputAction: TextInputAction.done,
+      onSubmitted: (_) => _save(),
+      style: TextStyle(fontSize: 14, color: c.ink),
+      decoration: InputDecoration(
+        hintText: 'Add a note (optional)',
+        isDense: true,
+        prefixIcon: Icon(Icons.edit_note, size: 20, color: c.muted),
+        // The count only once it's close to the limit.
+        counterText: _text.text.length > rsvpNoteMax - 20 ? null : '',
+        suffixIcon: _dirty
+            ? TextButton(
+                onPressed: widget.onSave == null ? null : _save,
+                child: const Text('Save'),
+              )
+            : null,
+      ),
     );
   }
 }

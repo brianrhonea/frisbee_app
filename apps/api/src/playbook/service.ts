@@ -1,6 +1,8 @@
 // A team's plays (teams/{id}/plays): the plays rule ported. Members who
 // manage the team save and delete them; every field is checked whole
-// (savePlayRequestSchema), and updatedBy is the caller.
+// (savePlayRequestSchema), and updatedBy is the caller. A saved whiteboard
+// is a play with kind "whiteboard"; a save that leaves out kind or drawings
+// keeps the stored ones.
 import { type SavePlayInput, savePlayRequestSchema } from "@stall10/shared";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { type Caller, requireCaller } from "../auth.js";
@@ -13,8 +15,13 @@ import { can, isMember } from "../teams/access.js";
 
 const denied = () => new ApiError("permission_denied", "Only the team's admins can change the playbook.");
 
-/** The play as stored (Play.toMap), with who saved it. */
-function playFields(p: SavePlayInput, uid: string) {
+/** The play as stored (Play.toMap), with who saved it. [kept] is the stored play, for the fields the save left out. */
+function playFields(p: SavePlayInput, uid: string, kept?: Record<string, unknown>) {
+  const kind = p.kind ?? (kept?.kind === "whiteboard" ? "whiteboard" : undefined);
+  const drawings =
+    p.drawings?.map((d) => ({ id: d.id, color: d.color, points: d.points.map((q) => ({ x: q.x, y: q.y })) })) ??
+    (Array.isArray(kept?.drawings) ? kept.drawings : undefined);
+  if (kind === "whiteboard" && p.steps.length > 0) throw new ApiError("invalid_argument", "A whiteboard has no steps.");
   return {
     name: p.name,
     category: p.category,
@@ -26,6 +33,9 @@ function playFields(p: SavePlayInput, uid: string) {
       note: s.note,
       paths: Object.fromEntries(Object.entries(s.paths).map(([id, pts]) => [id, pts.map((q) => ({ x: q.x, y: q.y }))])),
     })),
+    // Like the app, only when set: a plain play keeps its original fields.
+    ...(kind === "whiteboard" && { kind }),
+    ...(drawings && drawings.length > 0 ? { drawings } : {}),
     updatedAt: serverTime,
     updatedBy: uid,
   };
@@ -58,8 +68,9 @@ export class PlaybookService {
     const play = parseBody(savePlayRequestSchema, body);
     await this.store.transact(async (tx) => {
       await this.editor(tx, teamId, caller);
-      if (!(await tx.get(`teams/${teamId}/plays/${id}`))) throw new ApiError("not_found", "That play doesn't exist.");
-      tx.set(`teams/${teamId}/plays/${id}`, playFields(play, caller.uid));
+      const stored = await tx.get(`teams/${teamId}/plays/${id}`);
+      if (!stored) throw new ApiError("not_found", "That play doesn't exist.");
+      tx.set(`teams/${teamId}/plays/${id}`, playFields(play, caller.uid, stored));
     });
   }
 

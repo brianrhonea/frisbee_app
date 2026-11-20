@@ -9,7 +9,7 @@
 // calendar API checks: the rules never let clients read its events, so the
 // copy mustn't show them to anyone else.
 import { isPrivateGroup } from "../browse/model.js";
-import { teamEventTypes } from "@stall10/shared";
+import { publicPageOn, teamEventTypes } from "@stall10/shared";
 import type { Caller } from "../auth.js";
 import { editableEventsPath } from "../calendar/service.js";
 import { ApiError } from "../errors.js";
@@ -42,6 +42,10 @@ export async function sharedEvent(
     // A private group's events stay with its members (both apps hide sharing there).
     if (isPrivateGroup(team)) {
       throw new ApiError("failed_precondition", "Events of a community that approves who joins stay with its members.");
+    }
+    // So do a team's whose public page is off (both apps hide sharing there too).
+    if (!publicPageOn(team)) {
+      throw new ApiError("failed_precondition", "This team's page is private, so its events stay with its members.");
     }
     teamName = clipText(team.name, 100) || null;
     event = await store.get(`teams/${teamId}/events/${eventId}`);

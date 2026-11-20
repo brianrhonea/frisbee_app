@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../data/repositories/discover/discover_repository.dart';
 import '../domain/models/hosted_tournament.dart' show HostedType;
 import '../ui/core/ui/view_model_host.dart';
 import '../ui/tournaments/view_models/hosted_tournament_form_viewmodel.dart';
@@ -29,6 +30,7 @@ List<GoRoute> hostedTournamentRoutes() => [
       create: (c) => HostedTournamentsViewModel(
         tournamentRepository: c.read(),
         authRepository: c.read(),
+        discoverRepository: c.read<DiscoverRepository?>(),
       ),
       builder: (_, vm) => FindTournamentsScreen(viewModel: vm),
     ),

@@ -586,6 +586,35 @@ class TeamRepositoryFirebase implements TeamRepository {
   });
 
   @override
+  Future<Result<void>> setSections(
+    String teamId,
+    Map<OptionalSection, bool> changes,
+  ) => guard(() async {
+    final body = {for (final e in changes.entries) e.key.name: e.value};
+    if (_membersApi case final api?) {
+      await api.put('/v1/teams/$teamId/sections', body);
+      return;
+    }
+    await _teams.doc(teamId).update({
+      for (final e in body.entries) 'sections.${e.key}': e.value,
+    });
+  });
+
+  @override
+  Future<Result<void>> setPublicPage(String teamId, bool on) => guard(() async {
+    // The rules let no client write it: the API keeps the team doc and
+    // its listing in step (setPublicPage in apps/api).
+    final api = _api;
+    if (api == null) {
+      throw const ApiException(
+        'unavailable',
+        "Couldn't reach the server. Try again later.",
+      );
+    }
+    await api.put('/v1/teams/$teamId/public-page', {'public': on});
+  });
+
+  @override
   Future<Result<List<TeamListing>>> searchTeams(
     String query,
   ) => guard(() async {
@@ -1048,7 +1077,8 @@ class TeamRepositoryFirebase implements TeamRepository {
 }
 
 /// Every document a new team starts with, by path: the team (its creator
-/// the sole owner), its directory listing, General and the default voice
+/// the sole owner, Playbook, Videos, Stats and Meetings off until they turn
+/// them on), its directory listing, General and the default voice
 /// channels. [createdAt] is each timestamp (the server's time when
 /// writing). The API writes the same documents (apps/api/src/teams/
 /// documents.ts); test/data/new_team_docs_test.dart and the API's tests
@@ -1061,6 +1091,7 @@ Map<String, Map<String, dynamic>> newTeamDocs(
 }) => {
   'teams/$teamId': {
     ...team.toMap(),
+    if (team.kind == TeamKind.team) 'sections': newTeamSections(),
     'ownerId': owner.uid,
     'members': {owner.uid: TeamRole.owner.name},
     'memberIds': [owner.uid],

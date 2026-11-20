@@ -22,6 +22,7 @@ import type { Doc } from "@/lib/live";
 import { FindTournaments, TournamentFinder } from "./TournamentLists";
 import { TournamentPage, TournamentView } from "./TournamentPage";
 import type { TournamentState } from "./useTournament";
+import { noLiveControls, serverLive } from "./useLiveScores";
 import { JoinToTakePart } from "./VisitorParts";
 import "./tournaments.css";
 
@@ -103,6 +104,9 @@ function usePublicTournamentState(page: PublicHostedPage, news: PublicTeamPost[]
     const entries: Array<Doc<EntryDoc>> = page.entries.map((e) => ({ ...e, captainIds: [] }));
     const division = divisions.find((d) => d.id === page.divisionId) ?? null;
     const games: EngineGame[] = page.games.map((g) => engineGame(g.id, g));
+    const liveById = new Map(page.games.map((g) => [g.id, g.live as unknown]));
+    // Read-only: the server's running scores while they're fresh.
+    const liveOf = (g: EngineGame) => (g.status === "scheduled" ? serverLive(g, liveById.get(g.id), Date.now()) : null);
     const entryOf = (teamId: string) => entries.find((e) => e.id === teamId) ?? null;
     return {
       id: p.id,
@@ -139,6 +143,10 @@ function usePublicTournamentState(page: PublicHostedPage, news: PublicTeamPost[]
       teamName: (teamId: string | null | undefined) => (teamId ? (page.names[teamId] ?? "Team") : "TBD"),
       captainOf: new Set<string>(),
       myUpcoming: [],
+      liveOf,
+      liveGames: games.filter((g) => liveOf(g) !== null),
+      canKeepLive: () => false,
+      live: noLiveControls,
     };
   }, [page, news, next, select]);
 }

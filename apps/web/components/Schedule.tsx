@@ -11,15 +11,18 @@ import {
   calendarWindowDays,
   type EventType,
   eventTypeLabels,
+  monthGrid,
+  sameDay,
   type ScheduleFilter,
   type ScheduleItem,
   scheduleFilters,
+  scheduleOnDay,
   scheduleTeamLabel,
   shareRoleLabels,
   upcomingSchedule,
 } from "@stall10/shared";
 import Link from "next/link";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { colorOf, downloadIcs, loadHidden, saveHidden } from "@/lib/calendar";
 import { callApi, problem } from "@/lib/client";
 import { type Doc, useLiveQueries } from "@/lib/live";
@@ -72,14 +75,17 @@ const teamColor = "var(--team)";
 function TeamFeed({
   team,
   uid,
+  lookBack = lookBackDays,
   onData,
 }: {
   team: Doc<TeamDoc>;
   uid: string;
+  /** Days before today to read from: further back for a past month in the month view. */
+  lookBack?: number;
   onData: (teamId: string, data: TeamFeedData | null) => void;
 }) {
   const member = memberViewer(team, uid);
-  const ev = teamEventQueries(member, false, lookBackDays);
+  const ev = teamEventQueries(member, false, lookBack);
   const events = useLiveQueries<TeamEventDoc>(`teams/${team.id}/events`, ev.queries, ev.key);
   const mq = teamMeetingQueries(member);
   const meetings = useLiveQueries<MeetingData>(`teams/${team.id}/meetings`, mq.queries, mq.key);
@@ -122,14 +128,32 @@ export function Schedule() {
     });
   }, []);
 
+  // List or Month (the app's Week / Month), kept in this browser; the
+  // month shown and the day picked in it.
+  const [view, setView] = useState<ScheduleView>("list");
+  const [month, setMonth] = useState(() => firstOfMonth(new Date()));
+  const [picked, setPicked] = useState(() => startOfToday());
+  useEffect(() => setView(loadView()), []);
+  const monthView = view === "month";
+  const grid = monthGrid(month);
+  // Calendars are read for the list's window, or the month's whole grid.
+  const rangeFrom = monthView ? grid[0].getTime() : startOfToday().getTime() - dayMs;
+  const rangeTo = monthView ? grid[grid.length - 1].getTime() + dayMs : rangeFrom + (calendarWindowDays - 1) * dayMs;
+  // Team events are read from a week back, or from the grid's first day for a past month.
+  const feedLookBack = monthView
+    ? Math.max(lookBackDays, Math.ceil((startOfToday().getTime() - grid[0].getTime()) / dayMs))
+    : lookBackDays;
+
   useEffect(() => setHidden(loadHidden()), []);
 
+  // Paging months fast can overlap loads: only the latest one's answer counts.
+  const loadSeq = useRef(0);
   const load = useCallback(async () => {
     if (!user) return;
-    const from = startOfToday().getTime() - dayMs;
+    const seq = ++loadSeq.current;
     const qs = new URLSearchParams({
-      from: new Date(from).toISOString(),
-      to: new Date(from + (calendarWindowDays - 1) * dayMs).toISOString(),
+      from: new Date(rangeFrom).toISOString(),
+      to: new Date(rangeTo).toISOString(),
     });
     try {
       const [c, i, e] = await Promise.all([
@@ -137,12 +161,14 @@ export function Schedule() {
         callApi<CalendarInvitesResponse>(user, "/v1/me/calendar-invites"),
         callApi<CalendarEventsResponse>(user, `/v1/me/calendar-events?${qs}`),
       ]);
+      if (seq !== loadSeq.current) return;
       setData({ calendars: c.calendars, invites: i.invites, events: e.events });
       setError(null);
     } catch (err) {
+      if (seq !== loadSeq.current) return;
       setError(problem(err));
     }
-  }, [user]);
+  }, [user, rangeFrom, rangeTo]);
 
   useEffect(() => {
     void load();
@@ -175,7 +201,8 @@ export function Schedule() {
       ...(feeds[t.id]?.events ?? []).map(
         (e): Row => ({ kind: "event", key: `${t.id}/${e.id}`, teamId: t.id, startsAt: e.startsAt, endsAt: e.endsAt, team: t, event: e }),
       ),
-      ...scheduleMeetings(feeds[t.id]?.meetings, false).map(
+      // The month shows past days too: every meeting that hasn't ended, as the app's MySchedule.
+      ...[...scheduleMeetings(feeds[t.id]?.meetings, false), ...(monthView ? scheduleMeetings(feeds[t.id]?.meetings, true) : [])].map(
         (m): Row => ({
           kind: "meeting",
           key: `${t.id}/meeting-${m.id}`,
@@ -192,7 +219,141 @@ export function Schedule() {
   // Team entries stop where the calendars' window does, so the list has one horizon.
   const windowEnd = startOfToday().getTime() - dayMs + (calendarWindowDays - 1) * dayMs;
   const upcoming = upcomingSchedule(rows, { now: Date.now(), until: windowEnd, filter, hiddenCalendars: hidden });
+  // The month view: each day's entries (the app's eventsOn), the picked day's listed below the grid.
+  const onDay = (d: Date) => scheduleOnDay(rows, d, { filter, hiddenCalendars: hidden });
+  const dayRows = onDay(picked);
+  const monthCount = grid.filter((d) => d.getMonth() === month.getMonth()).reduce((n, d) => n + onDay(d).length, 0);
+  /** The dots on a day: team, personal, and one still to answer (DayMarks in the app). */
+  function marksOn(d: Date) {
+    const items = onDay(d);
+    return {
+      team: items.some((x) => x.kind !== "calendar"),
+      personal: items.some((x) => x.kind === "calendar"),
+      needs: items.some((x) =>
+        x.kind === "event"
+          ? needsRsvp(x.event.rsvps?.[me.uid], x.event.startsAt, x.event.endsAt)
+          : x.kind === "meeting" && needsRsvp(meetingAnswer(x.meeting.rsvps?.[me.uid]), x.meeting.startsAt, x.meeting.endsAt),
+      ),
+    };
+  }
+  function chooseView(v: ScheduleView) {
+    setView(v);
+    saveView(v);
+  }
+  function moveMonth(by: number) {
+    const next = new Date(month.getFullYear(), month.getMonth() + by, 1);
+    setMonth(next);
+    // Today when it's in that month, otherwise the 1st.
+    setPicked(sameMonth(next, new Date()) ? startOfToday() : next);
+  }
+  function pickDay(d: Date) {
+    setPicked(d);
+    if (!sameMonth(d, month)) setMonth(firstOfMonth(d));
+  }
+  function goToToday() {
+    setMonth(firstOfMonth(new Date()));
+    setPicked(startOfToday());
+  }
+  const atToday = sameMonth(month, new Date()) && sameDay(picked, new Date());
 
+  /** One entry on the list or under the month's picked day. */
+  function renderRow(x: Row) {
+    if (x.kind === "event") {
+      const e = x.event;
+      const label = eventTypeLabels[e.type as EventType] ?? "Event";
+      const answer = e.rsvps?.[me.uid];
+      const needs = needsRsvp(answer, e.startsAt, e.endsAt);
+      return (
+        <li key={x.key} className={`sched-row${needs ? " needs" : ""}`}>
+          <RowTime startsAt={e.startsAt} endsAt={e.endsAt} label={label} />
+          <span className="sched-main">
+            <b className="sched-title">
+              <Link href={`${teamBase(x.team.id)}/schedule?event=${encodeURIComponent(e.id)}`}>{e.title || label}</Link>
+            </b>
+            <small className="sched-meta">
+              <span className="cal-dot" style={{ background: teamColor }} aria-hidden />
+              {scheduleTeamLabel(x.team.name, teams.length)} · {label}
+              {e.location ? ` · ${e.location}` : ""}
+            </small>
+            {memberViewer(x.team, me.uid).can("manageEvents") && (
+              <span className="event-actions">
+                <button type="button" className="text-btn danger" onClick={() => void removeTeamEvent(x.team, e)}>
+                  Delete
+                </button>
+              </span>
+            )}
+          </span>
+          <RsvpPill answer={answer} type={e.type} needs={needs} />
+        </li>
+      );
+    }
+    if (x.kind === "meeting") {
+      const m = x.meeting;
+      const answer = meetingAnswer(m.rsvps?.[me.uid]);
+      const needs = needsRsvp(answer, m.startsAt, m.endsAt);
+      return (
+        <li key={x.key} className={`sched-row${needs ? " needs" : ""}`}>
+          <RowTime startsAt={m.startsAt} endsAt={m.endsAt} label="Meeting" />
+          <span className="sched-main">
+            <b className="sched-title">
+              <Link href={meetingHref(x.team.id, m.id)}>{m.title || "Meeting"}</Link>
+            </b>
+            <small className="sched-meta">
+              <span className="cal-dot" style={{ background: teamColor }} aria-hidden />
+              {scheduleTeamLabel(x.team.name, teams.length)} · Meeting ·{" "}
+              <span className={x.live ? "schedule-meeting-live" : ""}>{x.live ? "Live now" : "Video meeting"}</span>
+            </small>
+          </span>
+          <RsvpPill answer={answer} needs={needs} />
+        </li>
+      );
+    }
+    const e = x.event;
+    const cal = byId.get(e.calendarId);
+    return (
+      <li key={x.key} className="sched-row">
+        <RowTime startsAt={e.startsAt} endsAt={e.endsAt} label={eventTypeLabels[e.type]} />
+        <span className="sched-main">
+          <b className="sched-title">{e.title}</b>
+          <small className="sched-meta">
+            <span className="cal-dot" style={{ background: colorOf(cal?.color) }} aria-hidden />
+            {cal ? (cal.role === "owner" ? cal.name : `${cal.name} · ${cal.owner.name}`) : "Personal"} ·{" "}
+            {eventTypeLabels[e.type]}
+            {e.location ? ` · ${e.location}` : ""}
+          </small>
+          {e.notes && <small className="muted sched-notes">{e.notes}</small>}
+          <span className="event-actions">
+            {canEdit(cal) && (
+              <>
+                <button type="button" className="text-btn" onClick={() => setEditing(e)}>
+                  Edit
+                </button>
+                <button type="button" className="text-btn" onClick={() => void remove(e)}>
+                  Delete
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              className="text-btn"
+              onClick={() =>
+                downloadIcs({
+                  uid: `${e.calendarId}-${e.id}@stall10.app`,
+                  title: e.title,
+                  startsAt: e.startsAt,
+                  endsAt: e.endsAt,
+                  location: e.location,
+                  description: e.notes,
+                })
+              }
+            >
+              Add to calendar
+            </button>
+          </span>
+        </span>
+      </li>
+    );
+  }
   /** Team events can be deleted from here by the team's event managers, as the app's swipe does. */
   async function removeTeamEvent(team: Doc<TeamDoc>, e: Doc<TeamEventDoc>) {
     if (!window.confirm("Delete this event for everyone?")) return;
@@ -221,12 +382,19 @@ export function Schedule() {
   return (
     <div className="stack schedule-page">
       {teams.map((t) => (
-        <TeamFeed key={t.id} team={t} uid={me.uid} onData={onFeed} />
+        <TeamFeed key={t.id} team={t} uid={me.uid} lookBack={feedLookBack} onData={onFeed} />
       ))}
       {data && data.invites.length > 0 && <Invites invites={data.invites} onAnswered={load} />}
       <div className="card sched-card">
         <div className="card-head">
-          <h2 className="card-title">Upcoming</h2>
+          <h2 className="card-title">{monthView ? "Month" : "Upcoming"}</h2>
+          <div className="segmented schedule-view" role="tablist" aria-label="View">
+            {scheduleViews.map(([v, label]) => (
+              <button key={v} type="button" role="tab" aria-selected={view === v} className={view === v ? "on" : ""} onClick={() => chooseView(v)}>
+                {label}
+              </button>
+            ))}
+          </div>
           {!editing && writable.length > 0 && (
             <button type="button" className="btn btn-primary btn-small" onClick={() => setEditing({})}>
               Add event
@@ -266,7 +434,61 @@ export function Schedule() {
             </button>
           </p>
         )}
-        {!data && !error ? (
+        {monthView ? (
+          <>
+            <div className="sched-month-head">
+              <button type="button" className="btn btn-small btn-quiet" aria-label="Previous month" onClick={() => moveMonth(-1)}>
+                ‹
+              </button>
+              <p>
+                <b>{month.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</b>
+                <small className="muted">{monthCount === 1 ? "1 event" : `${monthCount} events`}</small>
+              </p>
+              <button type="button" className="btn btn-small btn-quiet" aria-label="Next month" onClick={() => moveMonth(1)}>
+                ›
+              </button>
+              {!atToday && (
+                <button type="button" className="text-btn" onClick={goToToday}>
+                  Today
+                </button>
+              )}
+            </div>
+            <div className="sched-month" role="grid" aria-label={month.toLocaleDateString(undefined, { month: "long", year: "numeric" })}>
+              {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
+                <span key={i} className="sched-month-dow" aria-hidden>
+                  {d}
+                </span>
+              ))}
+              {grid.map((d) => {
+                const marks = marksOn(d);
+                const today = sameDay(d, new Date());
+                const on = sameDay(d, picked);
+                return (
+                  <button
+                    key={d.getTime()}
+                    type="button"
+                    role="gridcell"
+                    aria-selected={on}
+                    aria-label={d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
+                    className={`sched-month-day${d.getMonth() === month.getMonth() ? "" : " out"}${today ? " today" : ""}${on ? " on" : ""}`}
+                    onClick={() => pickDay(d)}
+                  >
+                    <b>{d.getDate()}</b>
+                    <span className="sched-month-dots" aria-hidden>
+                      {marks.team && <i style={{ background: teamColor }} />}
+                      {marks.personal && <i style={{ background: "var(--personal)" }} />}
+                      {marks.needs && <i style={{ background: "var(--disc)" }} />}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <section className="sched-day" aria-label={dayLabelOf(picked)}>
+              <h3 className="sched-day-head">{dayLabelOf(picked)}</h3>
+              {dayRows.length === 0 ? <p className="muted small">Nothing scheduled</p> : <ul className="sched-list">{dayRows.map(renderRow)}</ul>}
+            </section>
+          </>
+        ) : !data && !error ? (
           <p className="muted">Loading…</p>
         ) : data && upcoming.length === 0 ? (
           <p className="muted small">
@@ -282,103 +504,7 @@ export function Schedule() {
               <section key={day} className="sched-day" aria-label={day}>
                 <h3 className="sched-day-head">{day}</h3>
                 <ul className="sched-list">
-                  {items.map((x) => {
-                    if (x.kind === "event") {
-                      const e = x.event;
-                      const label = eventTypeLabels[e.type as EventType] ?? "Event";
-                      const answer = e.rsvps?.[me.uid];
-                      const needs = needsRsvp(answer, e.startsAt, e.endsAt);
-                      return (
-                        <li key={x.key} className={`sched-row${needs ? " needs" : ""}`}>
-                          <RowTime startsAt={e.startsAt} endsAt={e.endsAt} label={label} />
-                          <span className="sched-main">
-                            <b className="sched-title">
-                              <Link href={`${teamBase(x.team.id)}/schedule?event=${encodeURIComponent(e.id)}`}>{e.title || label}</Link>
-                            </b>
-                            <small className="sched-meta">
-                              <span className="cal-dot" style={{ background: teamColor }} aria-hidden />
-                              {scheduleTeamLabel(x.team.name, teams.length)} · {label}
-                              {e.location ? ` · ${e.location}` : ""}
-                            </small>
-                            {memberViewer(x.team, me.uid).can("manageEvents") && (
-                              <span className="event-actions">
-                                <button type="button" className="text-btn danger" onClick={() => void removeTeamEvent(x.team, e)}>
-                                  Delete
-                                </button>
-                              </span>
-                            )}
-                          </span>
-                          <RsvpPill answer={answer} type={e.type} needs={needs} />
-                        </li>
-                      );
-                    }
-                    if (x.kind === "meeting") {
-                      const m = x.meeting;
-                      const answer = meetingAnswer(m.rsvps?.[me.uid]);
-                      const needs = needsRsvp(answer, m.startsAt, m.endsAt);
-                      return (
-                        <li key={x.key} className={`sched-row${needs ? " needs" : ""}`}>
-                          <RowTime startsAt={m.startsAt} endsAt={m.endsAt} label="Meeting" />
-                          <span className="sched-main">
-                            <b className="sched-title">
-                              <Link href={meetingHref(x.team.id, m.id)}>{m.title || "Meeting"}</Link>
-                            </b>
-                            <small className="sched-meta">
-                              <span className="cal-dot" style={{ background: teamColor }} aria-hidden />
-                              {scheduleTeamLabel(x.team.name, teams.length)} · Meeting ·{" "}
-                              <span className={x.live ? "schedule-meeting-live" : ""}>{x.live ? "Live now" : "Video meeting"}</span>
-                            </small>
-                          </span>
-                          <RsvpPill answer={answer} needs={needs} />
-                        </li>
-                      );
-                    }
-                    const e = x.event;
-                    const cal = byId.get(e.calendarId);
-                    return (
-                      <li key={x.key} className="sched-row">
-                        <RowTime startsAt={e.startsAt} endsAt={e.endsAt} label={eventTypeLabels[e.type]} />
-                        <span className="sched-main">
-                          <b className="sched-title">{e.title}</b>
-                          <small className="sched-meta">
-                            <span className="cal-dot" style={{ background: colorOf(cal?.color) }} aria-hidden />
-                            {cal ? (cal.role === "owner" ? cal.name : `${cal.name} · ${cal.owner.name}`) : "Personal"} ·{" "}
-                            {eventTypeLabels[e.type]}
-                            {e.location ? ` · ${e.location}` : ""}
-                          </small>
-                          {e.notes && <small className="muted sched-notes">{e.notes}</small>}
-                          <span className="event-actions">
-                            {canEdit(cal) && (
-                              <>
-                                <button type="button" className="text-btn" onClick={() => setEditing(e)}>
-                                  Edit
-                                </button>
-                                <button type="button" className="text-btn" onClick={() => void remove(e)}>
-                                  Delete
-                                </button>
-                              </>
-                            )}
-                            <button
-                              type="button"
-                              className="text-btn"
-                              onClick={() =>
-                                downloadIcs({
-                                  uid: `${e.calendarId}-${e.id}@stall10.app`,
-                                  title: e.title,
-                                  startsAt: e.startsAt,
-                                  endsAt: e.endsAt,
-                                  location: e.location,
-                                  description: e.notes,
-                                })
-                              }
-                            >
-                              Add to calendar
-                            </button>
-                          </span>
-                        </span>
-                      </li>
-                    );
-                  })}
+                  {items.map(renderRow)}
                 </ul>
               </section>
             ))}
@@ -425,6 +551,40 @@ export function Schedule() {
       )}
     </div>
   );
+}
+
+/** List or Month: how My schedule shows its days (the app's Week / Month). */
+type ScheduleView = "list" | "month";
+const scheduleViews: ReadonlyArray<readonly [ScheduleView, string]> = [
+  ["list", "List"],
+  ["month", "Month"],
+];
+const viewKey = "stall10.schedule.view";
+
+/** The view last picked in this browser (List when none, or storage is off). */
+function loadView(): ScheduleView {
+  try {
+    return localStorage.getItem(viewKey) === "month" ? "month" : "list";
+  } catch {
+    return "list";
+  }
+}
+
+function saveView(v: ScheduleView) {
+  try {
+    localStorage.setItem(viewKey, v);
+  } catch {
+    // The list next time; nothing else depends on it.
+  }
+}
+
+const firstOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
+const sameMonth = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+
+/** The picked day's heading under the month: "Thursday, Nov 19", with Today when it is. */
+function dayLabelOf(d: Date): string {
+  const label = d.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+  return sameDay(d, new Date()) ? `Today · ${label}` : label;
 }
 
 /** "Today", "Tomorrow" or "Sat, Nov 21": a day's heading on the list. */

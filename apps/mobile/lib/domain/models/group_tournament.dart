@@ -479,6 +479,51 @@ class ScoreReport {
   };
 }
 
+/// A game's running score while it's played (`games/{id}.live`, kept by
+/// the API's `POST .../games/:gameId/live`; LiveScoreDoc in
+/// packages/shared/src/tournaments.ts). Never the final: the game stays
+/// scheduled until its score is reported and confirmed.
+class LiveScore {
+  const LiveScore({
+    required this.scoreA,
+    required this.scoreB,
+    this.startedAt,
+    this.updatedAt,
+    this.by,
+  });
+
+  final int scoreA;
+  final int scoreB;
+  final DateTime? startedAt;
+  final DateTime? updatedAt;
+
+  /// Who updated it last (a uid).
+  final String? by;
+
+  /// A running score not updated for this long no longer shows as live
+  /// (liveLimits.staleAfterMs).
+  static const staleAfter = Duration(hours: 3);
+
+  /// How early before its start, and how long after, a game can take one
+  /// (liveLimits.earlyMs, lateMs).
+  static const earlyBy = Duration(hours: 2);
+  static const lateBy = Duration(hours: 24);
+
+  static LiveScore? fromMap(Object? raw) {
+    if (raw is! Map) return null;
+    final a = raw['scoreA'];
+    final b = raw['scoreB'];
+    if (a is! num || b is! num) return null;
+    return LiveScore(
+      scoreA: a.toInt(),
+      scoreB: b.toInt(),
+      startedAt: parseDate(raw['startedAt']),
+      updatedAt: parseDate(raw['updatedAt']),
+      by: raw['by'] as String?,
+    );
+  }
+}
+
 /// One game on the tournament schedule.
 class GroupGame {
   const GroupGame({
@@ -500,6 +545,7 @@ class GroupGame {
     this.report,
     this.ifNeeded = false,
     this.place,
+    this.live,
   });
 
   final String id;
@@ -534,6 +580,30 @@ class GroupGame {
   /// final, 3 for "3rd place"); the loser takes the next.
   final int? place;
 
+  /// The running score, as stored; see [liveAt] for whether it's live.
+  /// Read only: [toMap] leaves it out (only the API writes it).
+  final LiveScore? live;
+
+  /// The running score if the game is being played at [now]: still
+  /// scheduled, updated within [LiveScore.staleAfter] (isLiveGame in
+  /// packages/shared).
+  LiveScore? liveAt(DateTime now) {
+    final l = live;
+    final at = l?.updatedAt;
+    if (status != GameStatus.scheduled || l == null || at == null) return null;
+    return now.difference(at) <= LiveScore.staleAfter ? l : null;
+  }
+
+  /// Whether the game can take a running score at [now]: from
+  /// [LiveScore.earlyBy] before its start to [LiveScore.lateBy] after
+  /// (inLiveWindow in packages/shared); games without a time can.
+  bool inLiveWindow(DateTime now) {
+    final at = startsAt;
+    if (at == null) return true;
+    return !now.isBefore(at.subtract(LiveScore.earlyBy)) &&
+        !now.isAfter(at.add(LiveScore.lateBy));
+  }
+
   bool get isDone => status == GameStatus.done;
   bool get hasTeams => teamA != null && teamB != null;
   bool involves(String? teamId) =>
@@ -553,6 +623,7 @@ class GroupGame {
     int? Function()? scoreA,
     int? Function()? scoreB,
     ScoreReport? Function()? report,
+    LiveScore? Function()? live,
   }) => GroupGame(
     id: id,
     order: order ?? this.order,
@@ -572,6 +643,7 @@ class GroupGame {
     report: report != null ? report() : this.report,
     ifNeeded: ifNeeded,
     place: place,
+    live: live != null ? live() : this.live,
   );
 
   factory GroupGame.fromMap(String id, Map<String, dynamic> map) => GroupGame(
@@ -593,6 +665,7 @@ class GroupGame {
     report: ScoreReport.fromMap(map['report']),
     ifNeeded: map['ifNeeded'] as bool? ?? false,
     place: (map['place'] as num?)?.toInt(),
+    live: LiveScore.fromMap(map['live']),
   );
 
   Map<String, dynamic> toMap() => {

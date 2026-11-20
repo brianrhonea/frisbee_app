@@ -3,6 +3,7 @@ import {
   chatReactionRequestSchema,
   eventReactionRequestSchema,
   eventVotesRequestSchema,
+  nextRsvpNotes,
   rsvpRequestSchema,
   type SaveTeamEventResult,
   type SaveTeamPostResult,
@@ -10,6 +11,7 @@ import {
   saveTeamEventRequestSchema,
   saveTeamPostRequestSchema,
   sendChatMessageRequestSchema,
+  sharedEventPreview,
   teamPostImagesMax,
   teamPostTournamentKeyMax,
 } from "@stall10/shared";
@@ -285,10 +287,12 @@ export class HubService {
   }
 
   async setRsvp(caller: Caller, rawTeam: unknown, rawEvent: unknown, body: unknown): Promise<void> {
-    const { status } = parseBody(rsvpRequestSchema, body);
+    const { status, note } = parseBody(rsvpRequestSchema, body);
     const uid = caller.uid;
     await this.respond(caller, rawTeam, rawEvent, (event) => ({
       rsvps: status ? { ...mapOf(event.rsvps), [uid]: status } : without(event.rsvps, uid),
+      // The note goes with the answer: left out keeps it, taking the answer back drops it.
+      rsvpNotes: nextRsvpNotes(event.rsvpNotes, uid, status !== null, note),
       // Only those going react or vote.
       ...(status !== "going" && { reactions: without(event.reactions, uid), votes: without(event.votes, uid) }),
     }));
@@ -350,7 +354,8 @@ export class HubService {
         id: req.replyTo,
         authorId: clip(String(quoted.authorId ?? ""), 128),
         authorName: clip(String(quoted.authorName ?? ""), 80),
-        text: clip(String(quoted.text ?? ""), 200),
+        // A shared event has no text: quote its card's title (F3).
+        text: clip(String(quoted.text ?? "") || (quoted.event ? sharedEventPreview(String(mapOf(quoted.event).title ?? "")) : ""), 200),
       };
     }
     const me = await authorOf(this.store, this.users, caller);
@@ -430,6 +435,9 @@ export class HubService {
         ((can(team, uid, "moderate") || can(team, uid, "manageChats")) && reads);
       if (!allowed) throw reads ? denied("You can only delete your own messages.") : noRoom();
       tx.delete(p.message(teamId, roomId, id));
+      // Its pin goes with it (F2).
+      const pins = strings(room.pins);
+      if (pins.includes(id)) tx.update(p.room(teamId, roomId), { pins: pins.filter((x) => x !== id) });
       return message;
     });
     if (message) {

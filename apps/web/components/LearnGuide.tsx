@@ -1,24 +1,14 @@
 import Link from "next/link";
+import { LearnToc } from "./LearnProgress";
 
 // The beginner's guide (app/learn), for everyone: a server component, so
 // visitors and search engines get the words in the page.
 // A beginner's summary in our own words, not an official rule book; keep it
 // that way (no copied rule text). Reviewed by: [pending].
 
-const sections = [
-  ["basics", "The basics"],
-  ["field", "The field"],
-  ["pull", "Starting a point"],
-  ["moving", "Moving the disc"],
-  ["stall", "The stall count"],
-  ["scoring", "Scoring and winning"],
-  ["turnovers", "Turnovers"],
-  ["defense", "Defense"],
-  ["spirit", "Fouls and spirit of the game"],
-  ["divisions", "Divisions and mixed"],
-  ["words", "Words you'll hear"],
-  ["start", "Getting started"],
-] as const;
+// The sections' ids, titles and order are packages/shared's learnLessons
+// (the app's learnSections has the same); the contents (LearnToc) tick
+// lessons read on this device.
 
 const glossary: Array<[string, string]> = [
   ["Handler", "A player who mostly throws, setting up the offense near the disc."],
@@ -38,20 +28,8 @@ const glossary: Array<[string, string]> = [
 export function LearnGuide() {
   return (
     <>
-      <nav className="card learn-toc" aria-label="On this page">
-        <ol>
-          {sections.map(([id, label], i) => (
-            <li key={id}>
-              <a href={`#${id}`}>
-                <span className="learn-num" aria-hidden="true">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <span>{label}</span>
-              </a>
-            </li>
-          ))}
-        </ol>
-      </nav>
+      <LearnToc />
+
 
       <article className="learn-body">
         <section id="basics">

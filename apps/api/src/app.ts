@@ -36,6 +36,9 @@ import { BrowseService } from "./browse/service.js";
 import type { MeRepository } from "./me/repository.js";
 import { meRoutes } from "./me/routes.js";
 import { MeService } from "./me/service.js";
+import type { ExportRepository } from "./export/repository.js";
+import { exportRoutes } from "./export/routes.js";
+import { ExportService } from "./export/service.js";
 import type { RateLimiter } from "./limits/limiter.js";
 import { type LoggerOptions, traceLoggerFactory } from "./logging.js";
 import type { HeicDecoder } from "./media/image.js";
@@ -43,6 +46,8 @@ import { uploadRoutes } from "./media/routes.js";
 import { type TranscodeQueue, UploadService } from "./media/service.js";
 import type { MediaStorage } from "./media/storage.js";
 import { followRoutes } from "./follows/routes.js";
+import { ChatExtrasService } from "./hub/chat_extras.js";
+import { chatExtrasRoutes } from "./hub/chat_extras_routes.js";
 import { hubRoutes } from "./hub/routes.js";
 import { HubService } from "./hub/service.js";
 import { MemoryRateLimiter } from "./limits/memory.js";
@@ -75,6 +80,8 @@ export interface AppDeps {
   /** The website's public reads (`/v1/public/*`); off when not given. */
   /** The signed-in member's dashboard (`/v1/me/home`); off when not given. */
   me?: { repo: MeRepository; imageUrl: (path: string) => string };
+  /** "Download your data" (`GET /v1/me/export`); with [store], else off. */
+  exports?: ExportRepository;
   browse?: {
     repo: BrowseRepository;
     limiter: RateLimiter;
@@ -194,12 +201,14 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     const queries = deps.queries ?? listDocQueries(deps.store);
     teamDeletionRoutes(app, new TeamDeletion(deps.store, deps.teams, deps.media, queries));
     if (personal) personalRoutes(app, personal);
+    if (deps.exports) exportRoutes(app, new ExportService(deps.exports, deps.store, deps.users, personal, deps.now));
     const reads = deps.writeLimits !== false ? writes : undefined;
     rosterRoutes(app, new RosterService(deps.store, deps.browse?.photoBuckets ?? []), reads);
     postRoutes(app, new PostService(deps.store, deps.users, deps.now), revalidate, reads);
     postEditorRoutes(app, new PostEditor(deps.store, deps.users, deps.media, deps.now), revalidate);
     followRoutes(app, new FollowService(deps.store, deps.users, deps.now));
     hubRoutes(app, new HubService(deps.store, deps.users, deps.media, deps.now), writes);
+    chatExtrasRoutes(app, new ChatExtrasService(deps.store, deps.users, deps.now), writes);
     const chats = new ChatAdmin(deps.store, deps.teams, deps.media);
     chatAdminRoutes(app, chats, writes);
     discordRoutes(app, new DiscordService(deps.store, chats), writes);
@@ -209,7 +218,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     draftRoutes(app, new DraftService(deps.store, deps.draftQueries ?? listDraftQueries(deps.store)), writes);
     statsRoutes(app, new StatsService(deps.store, queries), writes);
     groupTournamentRoutes(app, new GroupTournamentService(deps.store, deps.teams, queries), writes);
-    tournamentRoutes(app, new TournamentService(deps.store, queries), writes);
+    tournamentRoutes(app, new TournamentService(deps.store, queries, deps.now), writes);
     conversationRoutes(app, new ConversationService(deps.store, deps.users, deps.media, deps.now), writes);
     if (deps.calendar) {
       calendarRoutes(app, new CalendarService(deps.store, deps.calendar, deps.now), {

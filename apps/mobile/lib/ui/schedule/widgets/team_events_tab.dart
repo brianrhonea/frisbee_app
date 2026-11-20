@@ -41,8 +41,13 @@ class _TeamEventsTabState extends State<TeamEventsTab> {
   TeamDetailViewModel get vm => widget.viewModel;
 
   /// Events and meetings are added from the same button. Their editors pick
-  /// the date on a calendar.
+  /// the date on a calendar. With Meetings off (Settings › Sections), New
+  /// adds an event straight away.
   Future<void> _add() async {
+    if (!vm.meetingsOn) {
+      await showEventEditor(context, teamId: vm.teamId);
+      return;
+    }
     final route = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -99,6 +104,8 @@ class _TeamEventsTabState extends State<TeamEventsTab> {
   Widget build(BuildContext context) {
     final upcoming = vm.upcomingEvents;
     final past = vm.pastEvents;
+    // Members only, once the team is loaded and has Meetings on.
+    final showMeetings = vm.myRole != null && vm.meetingsOn;
     return Scaffold(
       body: Align(
         alignment: Alignment.topCenter,
@@ -109,14 +116,27 @@ class _TeamEventsTabState extends State<TeamEventsTab> {
             children: [
               // In the list rather than floating, so it never covers an
               // event.
-              if (vm.canEdit)
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: FilledButton.icon(
-                    onPressed: _add,
-                    icon: const Icon(Icons.add),
-                    label: const Text('New'),
-                  ),
+              // The Meetings list (F17), when the team has Meetings on.
+              if (vm.canEdit || showMeetings)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    if (showMeetings)
+                      TextButton.icon(
+                        onPressed: () =>
+                            context.push(Routes.teamMeetings(vm.teamId)),
+                        icon: const Icon(Icons.videocam_outlined, size: 18),
+                        label: const Text('Meetings'),
+                      ),
+                    if (vm.canEdit) ...[
+                      const SizedBox(width: 8),
+                      FilledButton.icon(
+                        onPressed: _add,
+                        icon: const Icon(Icons.add),
+                        label: const Text('New'),
+                      ),
+                    ],
+                  ],
                 ),
               if (upcoming.isEmpty)
                 Padding(

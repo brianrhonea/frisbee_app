@@ -15,6 +15,7 @@ import { membersInOrder } from "./TeamBanner";
 import { type TeamViewer, useTeamHub } from "./TeamContext";
 import { type TeamPostView, TeamPostCard } from "./TeamPostCard";
 import { TeamPostComposer } from "./TeamPostComposer";
+import { SectionsHint } from "./SectionsHint";
 import { DateTile } from "./DateTile";
 import { needsRsvp, RsvpPill } from "../RsvpPill";
 import { useTeamEvents, useYouthOutsiderPublic, youthVisitorNote } from "./TeamSchedule";
@@ -30,9 +31,10 @@ const leads = new Set(["owner", "coach", "captain"]);
  * them.
  */
 export function TeamFeed({ publicPosts, publicEvents }: { publicPosts: PublicTeamPost[]; publicEvents: PublicEvent[] }) {
-  const { teamId, name, privateGroup, youth, viewer } = useTeamHub();
+  const { teamId, name, privateGroup, privatePage, youth, viewer } = useTeamHub();
   const member = viewer.state === "member";
-  const outsiderYouth = youth && viewer.state === "outsider";
+  // A youth team's public posts and events, live, for someone signed in who isn't on it (not while its page is off).
+  const outsiderYouth = youth && !privatePage && viewer.state === "outsider";
   const outsider = useYouthOutsiderPublic(teamId, outsiderYouth, { posts: true, eventLimit: 4 });
   const live = useLiveQuery<TeamPostView>(
     member ? `teams/${teamId}/posts` : null,
@@ -44,7 +46,7 @@ export function TeamFeed({ publicPosts, publicEvents }: { publicPosts: PublicTea
   const tournamentDay = useTournamentDays(member ? user?.uid : null, teamId)[0];
   const posts: TeamPostView[] = member ? (live.data ?? []) : outsiderYouth ? (outsider.posts.data ?? []) : publicPosts;
   const upcoming = (member ? (events.data ?? []) : outsiderYouth ? (outsider.events.data ?? []) : publicEvents).slice(0, 4);
-  const hidden = !member && privateGroup;
+  const hidden = !member && (privateGroup || privatePage);
   // Signed out: a youth team's card only.
   const youthHidden = youth && viewer.state === "visitor";
   const admin = viewer.state === "member" && viewer.can("manageTeam");
@@ -53,13 +55,18 @@ export function TeamFeed({ publicPosts, publicEvents }: { publicPosts: PublicTea
   return (
     <div className="hub-feed">
       <section className="stack">
+        <SectionsHint />
         {admin && <TeamPostComposer teamId={teamId} />}
         {viewer.state === "loading" || (member && !live.data && !live.error) ? (
           <Loading label="Loading posts…" />
         ) : live.error ? (
           <ErrorNote>{live.error}</ErrorNote>
         ) : hidden ? (
-          <EmptyState>Only members see this community&apos;s posts and events.</EmptyState>
+          <EmptyState>
+            {privatePage
+              ? "This team's page is private. Its events, posts and roster are only visible to members."
+              : "Only members see this community's posts and events."}
+          </EmptyState>
         ) : youthHidden ? (
           <EmptyState>{youthVisitorNote}</EmptyState>
         ) : outsiderYouth && outsider.posts.error ? (
@@ -136,6 +143,8 @@ export function TeamFeed({ publicPosts, publicEvents }: { publicPosts: PublicTea
 export function rosterCardText(v: {
   state: TeamViewer["state"];
   privateGroup: boolean;
+  /** The team's public page is off: like a private group, members only. */
+  privatePage?: boolean;
   youth: boolean;
   publicRoster: boolean;
 }): string | null {
@@ -144,7 +153,7 @@ export function rosterCardText(v: {
       return v.publicRoster ? "See who's on the team." : null;
     case "outsider":
     case "error":
-      return v.privateGroup || v.youth ? null : "See who's on it and open their profiles.";
+      return v.privateGroup || v.privatePage || v.youth ? null : "See who's on it and open their profiles.";
     default:
       return null;
   }
@@ -156,10 +165,10 @@ export function rosterCardText(v: {
  * else who may open it, a link to the roster (rosterCardText).
  */
 function MemberPreview() {
-  const { teamId, kind, privateGroup, youth, publicRoster, viewer } = useTeamHub();
+  const { teamId, kind, privateGroup, privatePage, youth, publicRoster, viewer } = useTeamHub();
   const roster = `/teams/${teamId}/roster`;
   if (viewer.state !== "member") {
-    const text = rosterCardText({ state: viewer.state, privateGroup, youth, publicRoster });
+    const text = rosterCardText({ state: viewer.state, privateGroup, privatePage, youth, publicRoster });
     if (!text) return null;
     return (
       <div className="card">

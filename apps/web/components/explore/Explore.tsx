@@ -10,7 +10,21 @@
 // public team events from `/v1/public/events`. Members search players and
 // teams through `/v1/public/search` with their token and read tournaments
 // live, as the app's ExploreViewModel does.
-import { type EventsPage, hostedType, orderedRankingKeys, parseRankingKey, type PublicHostedCard, type PublicListing, type PublicProfile, rankingsHref, type SearchPage, type TeamSearchPage } from "@stall10/shared";
+import {
+  type EventsPage,
+  hostedType,
+  isLiveGame,
+  orderedRankingKeys,
+  parseRankingKey,
+  type PublicHostedCard,
+  type PublicHostedList,
+  type PublicListing,
+  type PublicLiveGame,
+  type PublicProfile,
+  rankingsHref,
+  type SearchPage,
+  type TeamSearchPage,
+} from "@stall10/shared";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -110,7 +124,7 @@ export function Discover({
         events={publicEvents ?? null}
         mine={mine.data ?? []}
       />
-      <LiveNow list={filter === null || filter === "tournaments" || filter === "leagues" ? hostedFor(hosted ?? [], filter) : []} />
+      <LiveNow list={filter === null || filter === "tournaments" || filter === "leagues" ? hostedFor(hosted ?? [], filter) : []} initial={tournaments} />
       <ComingUp only={filter} hosted={hosted} error={hostedError} events={publicEvents} />
       {user ? <RankingsPreview mine={mine.data ?? []} /> : <RankingsLink />}
       <RecentResults />
@@ -407,9 +421,57 @@ function TeamEventRow({ e }: { e: PublicTeamEvent }) {
   );
 }
 
-/** Hosted tournaments and leagues being played right now, with a link to each one's scores; hidden when none are. */
-function LiveNow({ list }: { list: CardTournament[] | undefined }) {
+/** Live games a Live now card lists before "+N more live". */
+const liveShown = 3;
+/** How often Live now rereads the running scores while something is live. */
+const liveRefreshMs = 60_000;
+
+/**
+ * Each live event's games being played now (card.liveGames of
+ * `GET /v1/public/tournaments`), by event id: the server's list first,
+ * then reread each minute while any event is live (members' list is
+ * live from Firestore, without the games).
+ */
+function useLiveGames(initial: PublicHostedCard[] | null, anyLive: boolean): Map<string, PublicLiveGame[]> {
+  const { user } = useAuth();
+  const [cards, setCards] = useState<PublicHostedCard[] | null>(initial);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => setCards(initial), [initial]);
+  useEffect(() => {
+    if (!anyLive || user === undefined) return;
+    let on = true;
+    const read = () =>
+      getPublicApi<PublicHostedList>(user, "/v1/public/tournaments").then(
+        (l) => {
+          if (!on) return;
+          setCards(l.tournaments);
+          setNow(Date.now());
+        },
+        () => {},
+      );
+    // Members' first read (the server's page is up to a minute old), then every minute.
+    if (user) void read();
+    const timer = setInterval(() => void read(), liveRefreshMs);
+    return () => {
+      on = false;
+      clearInterval(timer);
+    };
+  }, [anyLive, user]);
+  return useMemo(() => {
+    const m = new Map<string, PublicLiveGame[]>();
+    for (const c of cards ?? []) {
+      // Still fresh (isLiveGame) at the time it was read or since.
+      const games = (c.liveGames ?? []).filter((g) => isLiveGame({ status: "scheduled", live: { scoreA: g.scoreA, scoreB: g.scoreB, updatedAt: g.updatedAt } }, now));
+      if (games.length > 0) m.set(c.id, games);
+    }
+    return m;
+  }, [cards, now]);
+}
+
+/** Hosted tournaments and leagues being played right now, with their live games and a link to each one's scores; hidden when none are. */
+function LiveNow({ list, initial }: { list: CardTournament[] | undefined; initial: PublicHostedCard[] | null }) {
   const live = (list ?? []).filter((t) => t.status === "live");
+  const games = useLiveGames(initial, live.length > 0);
   if (live.length === 0) return null;
   return (
     <section className="card explore-live" aria-labelledby="live-now-title">
@@ -418,9 +480,30 @@ function LiveNow({ list }: { list: CardTournament[] | undefined }) {
         Live now
       </h2>
       <div className="stack explore-list">
-        {live.map((t) => (
-          <TournamentCard key={t.id} t={t} />
-        ))}
+        {live.map((t) => {
+          const rows = games.get(t.id) ?? [];
+          return (
+            <div key={t.id} className="explore-live-event">
+              <TournamentCard t={t} />
+              {rows.length > 0 && (
+                <ul className="explore-live-games">
+                  {rows.slice(0, liveShown).map((g) => (
+                    <li key={`${g.divisionId}/${g.gameId}`}>
+                      <span className="live-dot live-dot-small" aria-hidden="true" />
+                      <span className="explore-live-name explore-live-a">{g.nameA}</span>
+                      <b className="explore-live-score">
+                        {g.scoreA}–{g.scoreB}
+                      </b>
+                      <span className="explore-live-name">{g.nameB}</span>
+                      <small>· Field {g.field}</small>
+                    </li>
+                  ))}
+                  {rows.length > liveShown && <li className="explore-live-more">+{rows.length - liveShown} more live</li>}
+                </ul>
+              )}
+            </div>
+          );
+        })}
       </div>
     </section>
   );

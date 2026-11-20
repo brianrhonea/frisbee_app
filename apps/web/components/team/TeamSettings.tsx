@@ -1,5 +1,14 @@
 "use client";
-import { competitionLevels, type EditTeamRequest } from "@stall10/shared";
+import {
+  competitionLevels,
+  type EditTeamRequest,
+  optionalTeamSections,
+  publicPageDescription,
+  publicPageOn,
+  sectionOn,
+  type SetPublicPageRequest,
+  type SetTeamSectionsRequest,
+} from "@stall10/shared";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { callApi } from "@/lib/client";
@@ -13,6 +22,7 @@ import { TeamRoles } from "./TeamRoles";
 import { DiscordImport } from "./DiscordImport";
 import { TeamCommunity } from "./CommunityAdmin";
 import { MembersOnlySection } from "./TeamNav";
+import { optionalSectionInfo } from "./SectionGate";
 
 /** The team doc's editable details (Team.toEditableMap in the app). */
 interface Details {
@@ -28,7 +38,7 @@ const levelLabels: Record<string, string> = { club: "Club", college: "College", 
 
 /**
  * A team's or group's settings, for its members: details (manageTeam),
- * the invite dialog, join requests and who has which role (manageMembers),
+ * a team's sections (Settings › Sections; the owner switches them), the invite dialog, join requests and who has which role (manageMembers),
  * handing it to someone else (the owner), and leaving.
  */
 export function TeamSettings() {
@@ -39,6 +49,9 @@ export function TeamSettings() {
   return (
     <div className="stack settings-stack">
       {viewer.can("manageTeam") && <DetailsForm />}
+      {/* A league team has only its chat and members (TeamSection.forKind in the app). */}
+      {kind === "team" && !viewer.team.leagueId && <SectionsCard />}
+      {kind === "team" && !viewer.team.leagueId && <PublicPageCard />}
       {viewer.can("manageMembers") && <InviteCard />}
       {invite.hasRequests && <JoinRequests teamId={teamId} requests={invite.requests} />}
       {viewer.can("manageMembers") && <MemberRoles />}
@@ -147,6 +160,90 @@ function DetailsForm() {
         </button>
       </div>
     </form>
+  );
+}
+
+/**
+ * Settings › Sections (team_settings_screen.dart): a switch for each of
+ * Playbook, Videos, Stats and Meetings. Everyone on the team sees them;
+ * only the owner can switch (`PUT /v1/teams/:id/sections`). The live team
+ * doc shows the result.
+ */
+function SectionsCard() {
+  const { teamId, viewer } = useTeamHub();
+  const { act, busy, error } = useAct();
+  // The switch in flight, until the live team doc shows it.
+  const [pending, setPending] = useState<{ section: string; on: boolean } | null>(null);
+  if (viewer.state !== "member") return null;
+  const owner = viewer.tier === "owner";
+  return (
+    <section className="card settings-form team-sections" id="sections">
+      <h2 className="card-title">Sections</h2>
+      {optionalTeamSections.map((s) => (
+        <label key={s} className={`switch-row${owner ? "" : " switch-row-locked"}`}>
+          <span>
+            <b>{optionalSectionInfo[s].label}</b>
+            <small className="muted">{optionalSectionInfo[s].description}</small>
+          </span>
+          <input
+            type="checkbox"
+            role="switch"
+            checked={pending?.section === s ? pending.on : sectionOn(viewer.team, s)}
+            disabled={!owner || busy}
+            onChange={(e) => {
+              const body: SetTeamSectionsRequest = { [s]: e.target.checked };
+              setPending({ section: s, on: e.target.checked });
+              void act(`/v1/teams/${encodeURIComponent(teamId)}/sections`, "PUT", body).finally(() => setPending(null));
+            }}
+          />
+        </label>
+      ))}
+      <p className="muted small">
+        {owner
+          ? "Feed, Schedule, Chat and Roster are always on. Turned-off sections are hidden from everyone on the team; turning one back on brings back what it had."
+          : "Only the owner can turn sections on or off."}
+      </p>
+      <Status error={error} ok={null} />
+    </section>
+  );
+}
+
+/**
+ * Settings › Visibility (team_settings_screen.dart): the "Public team
+ * page" switch. Everyone on the team sees it; admins (manageTeam) switch
+ * it (`PUT /v1/teams/:id/public-page`), which rewrites the listing too.
+ * The live team doc shows the result.
+ */
+function PublicPageCard() {
+  const { teamId, viewer } = useTeamHub();
+  const { act, busy, error } = useAct();
+  // The switch in flight, until the live team doc shows it.
+  const [pending, setPending] = useState<boolean | null>(null);
+  if (viewer.state !== "member") return null;
+  const admin = viewer.can("manageTeam");
+  return (
+    <section className="card settings-form team-sections team-visibility" id="visibility">
+      <h2 className="card-title">Visibility</h2>
+      <label className={`switch-row${admin ? "" : " switch-row-locked"}`}>
+        <span>
+          <b>Public team page</b>
+          <small className="muted">{publicPageDescription}</small>
+        </span>
+        <input
+          type="checkbox"
+          role="switch"
+          checked={pending ?? publicPageOn(viewer.team)}
+          disabled={!admin || busy}
+          onChange={(e) => {
+            const body: SetPublicPageRequest = { public: e.target.checked };
+            setPending(e.target.checked);
+            void act(`/v1/teams/${encodeURIComponent(teamId)}/public-page`, "PUT", body).finally(() => setPending(null));
+          }}
+        />
+      </label>
+      {!admin && <p className="muted small">Only the team&apos;s admins can change this.</p>}
+      <Status error={error} ok={null} />
+    </section>
   );
 }
 

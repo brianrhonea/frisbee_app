@@ -264,12 +264,17 @@ class HostedGameRow extends StatelessWidget {
     this.skipped = false,
     this.action,
     this.waiting = false,
+    this.live,
     this.onTap,
   });
 
   final GroupGame game;
   final String nameA;
   final String nameB;
+
+  /// The running score while it's played: a red Live pill and the score
+  /// (in place of the action pill; the row still opens the game).
+  final LiveScore? live;
 
   /// Position on the schedule, shown as "Game 5".
   final int? number;
@@ -369,7 +374,17 @@ class HostedGameRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              if (action != null)
+              if (live case final l?) ...[
+                const LivePill(),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    ScoreText('${l.scoreA}', size: 20),
+                    ScoreText('${l.scoreB}', size: 20),
+                  ],
+                ),
+              ] else if (action != null)
                 NeedsYouPill(action!)
               else if (g.isDone)
                 Column(

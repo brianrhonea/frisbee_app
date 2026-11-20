@@ -168,10 +168,24 @@ class EventRepositoryFirebase implements EventRepository {
   ) => guard(
     () => _events(teamId).doc(eventId).update({
       FieldPath(['rsvps', uid]): status?.name ?? FieldValue.delete(),
+      // The note goes with the answer (firestore.rules validRsvpNote).
+      if (status == null) FieldPath(['rsvpNotes', uid]): FieldValue.delete(),
       if (status != RsvpStatus.going) ...{
         FieldPath(['reactions', uid]): FieldValue.delete(),
         FieldPath(['votes', uid]): FieldValue.delete(),
       },
+    }),
+  );
+
+  @override
+  Future<Result<void>> setRsvpNote(
+    String teamId,
+    String eventId,
+    String uid,
+    String note,
+  ) => guard(
+    () => _events(teamId).doc(eventId).update({
+      FieldPath(['rsvpNotes', uid]): note.isEmpty ? FieldValue.delete() : note,
     }),
   );
 

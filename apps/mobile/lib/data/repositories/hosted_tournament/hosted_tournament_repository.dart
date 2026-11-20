@@ -206,6 +206,36 @@ abstract class HostedTournamentRepository {
     required List<SlotFill> fills,
   });
 
+  /// Whether running scores can be kept from this build: they go through
+  /// the API only (no direct Firestore write), so not without one.
+  bool get canKeepLiveScores;
+
+  /// Sets a game's running score while it's played ([scoreA]–[scoreB];
+  /// 0–0 starts it). Not the final: the game stays scheduled. For either
+  /// team's captains and the host's managers, on the game's day.
+  Future<Result<void>> setLiveScore(
+    String tournamentId,
+    String divisionId,
+    String gameId, {
+    required int scoreA,
+    required int scoreB,
+  });
+
+  /// Takes a game's running score off (started by mistake).
+  Future<Result<void>> clearLiveScore(
+    String tournamentId,
+    String divisionId,
+    String gameId,
+  );
+
+  /// The division's games whose running score was updated in the last
+  /// [LiveScore.staleAfter] (the caller checks [GroupGame.liveAt]), for
+  /// Discover's "Live now".
+  Stream<List<GroupGame>> watchLiveGames(
+    String tournamentId,
+    String divisionId,
+  );
+
   Future<Result<void>> applyFills(
     String tournamentId,
     String divisionId,

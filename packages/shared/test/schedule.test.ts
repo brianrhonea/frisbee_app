@@ -6,9 +6,12 @@
 // end.
 import { describe, expect, it } from "vitest";
 import {
+  monthGrid,
+  sameDay,
   scheduleEntryOver,
   scheduleFilterMatches,
   type ScheduleItem,
+  scheduleOnDay,
   scheduleTeamLabel,
   upcomingSchedule,
 } from "../src/schedule.js";
@@ -79,5 +82,36 @@ describe("scheduleTeamLabel", () => {
     expect(scheduleTeamLabel("Ring", 1)).toBe("Team");
     expect(scheduleTeamLabel("Ring", 2)).toBe("Ring");
     expect(scheduleTeamLabel(undefined, 3)).toBe("Team");
+  });
+});
+
+describe("month view", () => {
+  it("monthGrid runs Monday to Sunday around the month", () => {
+    const nov = monthGrid(new Date(2026, 10, 1));
+    expect(nov[0]).toEqual(new Date(2026, 9, 26));
+    expect(nov[nov.length - 1]).toEqual(new Date(2026, 11, 6));
+    expect(nov).toHaveLength(42);
+    // February 2027 starts on a Monday and ends on a Sunday: four weeks.
+    const feb = monthGrid(new Date(2027, 1, 15));
+    expect(feb[0]).toEqual(new Date(2027, 1, 1));
+    expect(feb).toHaveLength(28);
+    expect(feb.every((d) => d.getHours() === 0)).toBe(true);
+  });
+
+  it("scheduleOnDay keeps a day's entries, finished or not, filtered and once each", () => {
+    const at = (d: number, h: number) => new Date(2026, 10, d, h).toISOString();
+    const items: ScheduleItem[] = [
+      { key: "b", startsAt: at(19, 18), teamId: "t1" },
+      { key: "a", startsAt: at(19, 7) },
+      { key: "a", startsAt: at(19, 7) },
+      { key: "hidden", startsAt: at(19, 9), calendarId: "c2" },
+      { key: "other-day", startsAt: at(20, 9) },
+      { key: "no-start", startsAt: null },
+    ];
+    const day = new Date(2026, 10, 19);
+    expect(scheduleOnDay(items, day, { hiddenCalendars: ["c2"] }).map((i) => i.key)).toEqual(["a", "b"]);
+    expect(scheduleOnDay(items, day, { filter: "team" }).map((i) => i.key)).toEqual(["b"]);
+    expect(scheduleOnDay(items, day, { filter: "personal" }).map((i) => i.key)).toEqual(["a", "hidden"]);
+    expect(sameDay(new Date(2026, 10, 19, 23, 59), day)).toBe(true);
   });
 });

@@ -535,7 +535,8 @@ export const postRemoved = onDocumentDeleted("posts/{postId}", async (event) => 
 
 /**
  * A team or group post: followers of the team, or of the tournament it's
- * about. Members-only posts go only to followers who are members.
+ * about. Members-only posts go only to followers who are members, and so
+ * do public ones while the team's public page is off.
  */
 export const teamPost = onDocumentCreated("teams/{teamId}/posts/{postId}", async (event) => {
   const post = event.data?.data();
@@ -547,7 +548,11 @@ export const teamPost = onDocumentCreated("teams/{teamId}/posts/{postId}", async
   await deliver(
     getFirestore(),
     getMessaging(),
-    postRecipients(followers, String(post.authorId ?? ""), post.public === true ? undefined : team.memberIds ?? []),
+    postRecipients(
+      followers,
+      String(post.authorId ?? ""),
+      post.public === true && team.publicPage !== false ? undefined : team.memberIds ?? [],
+    ),
     teamPostNotice({ teamId, teamName: teamName(team), post }),
   );
 });

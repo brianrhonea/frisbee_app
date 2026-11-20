@@ -1,13 +1,13 @@
 // API-only visibility checks for the visitor (`/v1/public/*`) answers, on
 // top of browse/model.ts (which stays a byte-for-byte copy of the
 // `browse` Cloud Functions' file; see test/server_copies.test.ts).
-import { isYouthTeam, leagueTeamPrefix } from "@stall10/shared";
+import { isYouthTeam, leagueTeamPrefix, publicPageOn } from "@stall10/shared";
 import { isPrivateGroup } from "./model.js";
 
 type Data = Record<string, unknown>;
 
 /** The team-doc fields these checks read (a field mask: never the member maps). */
-export const hostFields = ["kind", "requiresApproval", "level"] as const;
+export const hostFields = ["kind", "requiresApproval", "level", "publicPage"] as const;
 
 const kindOf = (d: Data): string => (typeof d.kind === "string" ? d.kind : "team");
 
@@ -15,11 +15,13 @@ const kindOf = (d: Data): string => (typeof d.kind === "string" ? d.kind : "team
  * Whether a team or group keeps its posts, events and hosted events from
  * visitors: a private group by its directory listing OR its team doc, a
  * listing that disagrees with the team doc about its kind or approval, or
- * either document missing. The listing alone could be stale.
+ * either document missing. The listing alone could be stale. A team whose
+ * "Public team page" is off (publicPageOn false on either) counts too.
  */
 export function isPrivateHost(listing: Data | undefined | null, team: Data | undefined | null): boolean {
   if (!listing || !team) return true;
   if (isPrivateGroup(listing) || isPrivateGroup(team)) return true;
+  if (!publicPageOn(listing) || !publicPageOn(team)) return true;
   return kindOf(listing) !== kindOf(team) || (listing.requiresApproval === true) !== (team.requiresApproval === true);
 }
 

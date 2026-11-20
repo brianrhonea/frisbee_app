@@ -1,5 +1,7 @@
 // A team's plays (teams/{id}/plays, Play in the app): pieces on a field,
-// arrows for cuts and throws, and animation steps. Points are 0–1 in both
+// arrows for cuts and throws, animation steps and freehand pen strokes
+// (drawings). A saved whiteboard is a play with kind "whiteboard" and no
+// steps. Points are 0–1 in both
 // axes: x across the 40-yard width, y along the 110-yard length.
 import { z } from "zod";
 
@@ -11,6 +13,12 @@ export const playElementKinds = ["offense", "defense", "disc", "cone"] as const;
 export type PlayElementKind = (typeof playElementKinds)[number];
 export const playArrowKinds = ["cut", "throw_"] as const;
 export type PlayArrowKind = (typeof playArrowKinds)[number];
+/** "whiteboard": a saved sketch, listed under the playbook's Whiteboard switch. Missing means "play". */
+export const playKinds = ["play", "whiteboard"] as const;
+export type PlayKind = (typeof playKinds)[number];
+/** Pen colours by name; each platform draws its own shade (FieldColors in the app). */
+export const drawingColors = ["ink", "turf", "amber", "white"] as const;
+export type DrawingColor = (typeof drawingColors)[number];
 
 /** The rules' limits, and the app's path cap (_maxPathPoints). */
 export const playLimits = {
@@ -23,6 +31,8 @@ export const playLimits = {
   pathPoints: 48,
   label: 20,
   stepNote: 200,
+  drawings: 100,
+  drawingPoints: 200,
 } as const;
 
 /** Field size in yards (FieldGeometry). */
@@ -48,6 +58,14 @@ export const playArrowSchema = z.strictObject({
 });
 export type PlayArrow = z.output<typeof playArrowSchema>;
 
+/** A freehand pen stroke (PlayDrawing). */
+export const playDrawingSchema = z.strictObject({
+  id: itemId,
+  color: z.enum(drawingColors),
+  points: z.array(fieldPointSchema).min(2).max(playLimits.drawingPoints),
+});
+export type PlayDrawing = z.output<typeof playDrawingSchema>;
+
 export const playStepSchema = z.strictObject({
   id: itemId,
   note: z.string().max(playLimits.stepNote).default(""),
@@ -67,8 +85,14 @@ export const savePlayRequestSchema = z
     elements: z.array(playElementSchema).max(playLimits.elements),
     arrows: z.array(playArrowSchema).max(playLimits.arrows).default([]),
     steps: z.array(playStepSchema).max(playLimits.steps).default([]),
+    // Optional, not defaulted: a save that leaves them out keeps what the
+    // play already has (an older client mustn't turn a whiteboard into a
+    // play or drop its strokes).
+    kind: z.enum(playKinds).optional(),
+    drawings: z.array(playDrawingSchema).max(playLimits.drawings).optional(),
   })
   .superRefine((p, ctx) => {
+    if (p.kind === "whiteboard" && p.steps.length > 0) ctx.addIssue({ code: "custom", path: ["steps"], message: "A whiteboard has no steps." });
     const ids = new Set(p.elements.map((e) => e.id));
     if (ids.size !== p.elements.length) ctx.addIssue({ code: "custom", path: ["elements"], message: "Each piece needs its own id." });
     for (const [i, s] of p.steps.entries()) {
@@ -87,6 +111,9 @@ export interface PlayDoc {
   elements?: PlayElement[];
   arrows?: PlayArrow[];
   steps?: PlayStep[];
+  /** Missing means "play". */
+  kind?: PlayKind;
+  drawings?: PlayDrawing[];
   updatedAt?: string;
   updatedBy?: string;
 }

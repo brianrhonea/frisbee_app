@@ -19,3 +19,11 @@
 .tournament-day .btn { background: var(--board-2); color: var(--on-board); border-color: transparent; }
 .tournament-day .btn.tournament-day-due { background: var(--disc); color: var(--on-disc); }
 .tournament-day > .home-actions { display: flex; }
+/* A game being played (F1): LIVE NOW and the running score from the team's side. */
+.tournament-day-live {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--on-board); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em;
+}
+.tournament-day-headline { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-width: 0; }
+.tournament-day-headline .tournament-day-vs { min-width: 0; overflow-wrap: anywhere; }
+.tournament-day-score { flex: none; font-family: var(--font-score); font-size: 1.75rem; font-weight: 800; line-height: 1; }

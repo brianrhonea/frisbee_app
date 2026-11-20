@@ -11,10 +11,11 @@ import { downloadIcs } from "@/lib/calendar";
 import { callApi } from "@/lib/client";
 import { type Doc, useLiveDoc, useLiveQueries, useLiveQuery } from "@/lib/live";
 import { type Meeting, meetingHref, meetingsHref, useTeamMeetings } from "./meetings/model";
-import { type TeamViewer, useTeamHub } from "./TeamContext";
+import { type TeamViewer, useTeamHub, viewerSectionOn } from "./TeamContext";
 import { TeamEventEditor } from "./TeamEventEditor";
 import { DateTile, isToday } from "./DateTile";
 import { needsRsvp, RsvpPill } from "../RsvpPill";
+import { NoteQuote, RsvpNoteField } from "../RsvpNote";
 import "./team_schedule_meetings.css";
 import { startOfToday } from "@/lib/dates";
 import { validId } from "@/lib/text";
@@ -24,6 +25,8 @@ import { EmptyState, Loading } from "../StatusViews";
 export interface TeamEventDoc extends PublicEvent {
   poll?: { question?: string; options?: Array<{ id: string; text: string }>; multiple?: boolean };
   rsvps?: Record<string, string>;
+  /** uid → a short note on their answer ("Late 15 min"), only while they have one. */
+  rsvpNotes?: Record<string, string>;
   votes?: Record<string, string[]>;
   reactions?: Record<string, string[]>;
   public?: boolean;
@@ -154,12 +157,12 @@ const entryStart = (x: Entry) => (x.kind === "event" ? x.event.startsAt : x.meet
 
 /** The schedule: events and meetings down the left, the open event (?event=) beside them; a meeting opens its own page. */
 export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) {
-  const { teamId, kind, privateGroup, youth, viewer } = useTeamHub();
+  const { teamId, kind, privateGroup, privatePage, youth, viewer } = useTeamHub();
   const params = useSearchParams();
   const pathname = usePathname();
   const past = params.get("when") === "past";
-  // A youth team's upcoming public events, live, for someone signed in who isn't on it.
-  const outsiderYouth = youth && viewer.state === "outsider";
+  // A youth team's upcoming public events, live, for someone signed in who isn't on it (not while its page is off).
+  const outsiderYouth = youth && !privatePage && viewer.state === "outsider";
   const outsider = useYouthOutsiderPublic(teamId, outsiderYouth && !past, { posts: false, eventLimit: upcomingEventCap });
   // Pages of the past shown; back to one on switching tabs.
   const [pastPages, setPastPages] = useState({ past, n: 1 });
@@ -178,6 +181,9 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
   if (viewer.state === "loading") return <Loading />;
   if (!member && privateGroup) {
     return <EmptyState>Only members see this community&apos;s events.</EmptyState>;
+  }
+  if (!member && privatePage) {
+    return <EmptyState>This team&apos;s page is private. Only members see its events.</EmptyState>;
   }
   // Signed out: a youth team's card only.
   if (youth && viewer.state === "visitor") return <EmptyState>{youthVisitorNote}</EmptyState>;
@@ -218,10 +224,12 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
                 <button type="button" className="btn btn-primary btn-small" onClick={() => setEditing("new")}>
                   New event
                 </button>
-                {/* The app's New → Meeting; the API lets the same admins schedule meetings. */}
-                <Link className="btn btn-small btn-quiet" href={`${meetingsHref(teamId)}/new`}>
-                  New meeting
-                </Link>
+                {/* The app's New → Meeting; the API lets the same admins schedule meetings. With Meetings off (Settings › Sections) New adds an event only. */}
+                {viewerSectionOn(viewer, "meetings") && (
+                  <Link className="btn btn-small btn-quiet" href={`${meetingsHref(teamId)}/new`}>
+                    New meeting
+                  </Link>
+                )}
               </p>
             )}
           </div>
@@ -467,6 +475,14 @@ function EventDetail({ event, onEdit }: { event: Doc<TeamEventDoc>; onEdit?: () 
               </button>
             ))}
           </div>
+          {/* A note goes with an answer, and goes when it's taken back. */}
+          {mine && (
+            <RsvpNoteField
+              note={event.rsvpNotes?.[member.uid] ?? ""}
+              disabled={busy}
+              onSave={(note) => send("/rsvp", "PUT", { status: mine, note })}
+            />
+          )}
           </div>
           {going && (
             <p className="reaction-picker" role="group" aria-label="React">
@@ -505,7 +521,10 @@ function EventDetail({ event, onEdit }: { event: Doc<TeamEventDoc>; onEdit?: () 
                 </h3>
                 <ul>
                   {who.map((u) => (
-                    <li key={u}>{name(u)}</li>
+                    <li key={u}>
+                      {name(u)}
+                      {event.rsvps?.[u] && <NoteQuote note={event.rsvpNotes?.[u]} />}
+                    </li>
                   ))}
                 </ul>
               </div>

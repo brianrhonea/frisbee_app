@@ -14,8 +14,8 @@ import '../view_models/schedule_viewmodel.dart';
 import 'event_editor_screen.dart';
 import 'schedule_widgets.dart';
 
-/// A week of personal and team events, day by day: the Events tab's
-/// schedule.
+/// Personal and team events a week at a time, day by day, or a month at
+/// a time with the picked day's events below: the Schedule tab.
 class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({
     super.key,
@@ -100,7 +100,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         actions: [
           ListenableBuilder(
             listenable: vm,
-            builder: (context, _) => vm.isCurrentWeek
+            builder: (context, _) => vm.showsToday
                 ? const SizedBox.shrink()
                 : TextButton(
                     onPressed: vm.goToToday,
@@ -130,12 +130,25 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         listenable: vm,
         builder: (context, _) {
           if (!vm.loaded) return const LoadingView();
+          final month = vm.view == ScheduleView.month;
           return ConstrainedContent(
             maxWidth: 720,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _WeekHeader(viewModel: vm, onPickDay: _pickDay),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  child: _Segments<ScheduleView>(
+                    values: ScheduleView.values,
+                    selected: vm.view,
+                    label: (v) => v.label,
+                    onSelect: vm.setView,
+                  ),
+                ),
+                if (month)
+                  _MonthHeader(viewModel: vm)
+                else
+                  _WeekHeader(viewModel: vm, onPickDay: _pickDay),
                 Expanded(
                   // Team and personal events are live; pulling down
                   // reloads the other calendars and invites.
@@ -149,13 +162,20 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                         children: [
                           for (final invite in vm.invites)
                             _InviteCard(invite: invite, viewModel: vm),
-                          for (var i = 0; i < 7; i++)
+                          if (month)
                             _DaySection(
-                              key: _dayKeys[i],
-                              day: vm.days[i],
+                              day: vm.selectedDay,
                               viewModel: vm,
                               onSwiped: _onSwiped,
-                            ),
+                            )
+                          else
+                            for (var i = 0; i < 7; i++)
+                              _DaySection(
+                                key: _dayKeys[i],
+                                day: vm.days[i],
+                                viewModel: vm,
+                                onSwiped: _onSwiped,
+                              ),
                         ],
                       ),
                     ),
@@ -247,6 +267,273 @@ class _WeekHeader extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           _FilterTabs(selected: vm.filter, onSelect: vm.setFilter),
+        ],
+      ),
+    );
+  }
+}
+
+/// The month view's header: the month with its count and arrows, the
+/// grid of days with dots for what's on (team blue, personal magenta,
+/// amber when one needs an answer; today in turf), and the filter.
+class _MonthHeader extends StatelessWidget {
+  const _MonthHeader({required this.viewModel});
+
+  final ScheduleViewModel viewModel;
+
+  static const _weekdays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = viewModel;
+    final c = AppColors.of(context);
+    final days = vm.monthDays;
+    final count = vm.monthCount;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              IconButton(
+                tooltip: 'Previous month',
+                icon: const Icon(Icons.chevron_left),
+                onPressed: vm.previousMonth,
+              ),
+              Expanded(
+                child: Column(
+                  children: [
+                    Text(
+                      DateFormat.yMMMM().format(vm.monthStart),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: c.ink,
+                      ),
+                    ),
+                    Text(
+                      count == 1 ? '1 event' : '$count events',
+                      style: TextStyle(fontSize: 12, color: c.muted),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Next month',
+                icon: const Icon(Icons.chevron_right),
+                onPressed: vm.nextMonth,
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(6, 8, 6, 6),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      for (final d in _weekdays)
+                        Expanded(
+                          child: Text(
+                            d,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: c.muted,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  for (var w = 0; w < days.length ~/ 7; w++)
+                    Row(
+                      children: [
+                        for (final day in days.sublist(w * 7, w * 7 + 7))
+                          Expanded(
+                            child: _MonthDayCell(
+                              day: day,
+                              inMonth: day.month == vm.monthStart.month,
+                              isToday: day == vm.today,
+                              selected: day == vm.selectedDay,
+                              marks: vm.marksOn(day),
+                              onTap: () => vm.selectDay(day),
+                            ),
+                          ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _FilterTabs(selected: vm.filter, onSelect: vm.setFilter),
+        ],
+      ),
+    );
+  }
+}
+
+/// One day in the month grid: its number (turf on today, outlined when
+/// picked, faint outside the month) over its dots.
+class _MonthDayCell extends StatelessWidget {
+  const _MonthDayCell({
+    required this.day,
+    required this.inMonth,
+    required this.isToday,
+    required this.selected,
+    required this.marks,
+    required this.onTap,
+  });
+
+  final DateTime day;
+  final bool inMonth;
+  final bool isToday;
+  final bool selected;
+  final DayMarks marks;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final dots = [
+      if (marks.team) c.team,
+      if (marks.personal) c.personal,
+      if (marks.needsRsvp) c.highlight,
+    ];
+    final fg = isToday
+        ? c.onAccent
+        : selected
+        ? c.accentInk
+        : inMonth
+        ? c.ink
+        : c.muted.withValues(alpha: 0.6);
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: DateFormat.MMMMEEEEd().format(day),
+      excludeSemantics: true,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: SizedBox(
+          height: 46,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: isToday
+                      ? c.accent
+                      : selected
+                      ? c.accentSoft
+                      : Colors.transparent,
+                  shape: BoxShape.circle,
+                  border: selected && !isToday
+                      ? Border.all(color: c.accent, width: 1.5)
+                      : null,
+                ),
+                child: Text(
+                  '${day.day}',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: isToday || selected
+                        ? FontWeight.w800
+                        : FontWeight.w600,
+                    color: fg,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 3),
+              SizedBox(
+                height: 5,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    for (final (i, color) in dots.indexed) ...[
+                      if (i > 0) const SizedBox(width: 3),
+                      Container(
+                        width: 5,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Week / Month as a segmented track.
+class _Segments<T> extends StatelessWidget {
+  const _Segments({
+    required this.values,
+    required this.selected,
+    required this.label,
+    required this.onSelect,
+  });
+
+  final List<T> values;
+  final T selected;
+  final String Function(T) label;
+  final ValueChanged<T> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: c.field,
+        borderRadius: BorderRadius.circular(controlRadius),
+      ),
+      child: Row(
+        children: [
+          for (final v in values)
+            Expanded(
+              child: Semantics(
+                selected: v == selected,
+                button: true,
+                child: Material(
+                  color: v == selected ? c.card : Colors.transparent,
+                  borderRadius: BorderRadius.circular(controlRadius - 2),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(controlRadius - 2),
+                    onTap: () => onSelect(v),
+                    child: SizedBox(
+                      height: 34,
+                      child: Center(
+                        child: Text(
+                          label(v),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: v == selected
+                                ? FontWeight.w700
+                                : FontWeight.w600,
+                            color: v == selected ? c.ink : c.muted,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

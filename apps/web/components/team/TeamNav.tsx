@@ -1,5 +1,5 @@
 "use client";
-import { type EnteredTournamentDoc, hasTournamentAhead } from "@stall10/shared";
+import { type EnteredTournamentDoc, hasTournamentAhead, type OptionalTeamSection } from "@stall10/shared";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -7,7 +7,7 @@ import { callApi, problem } from "@/lib/client";
 import { useLiveDoc, useLiveQuery } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
 import { ErrorNote, Loading } from "../StatusViews";
-import { useTeamHub } from "./TeamContext";
+import { useTeamHub, viewerSectionOn } from "./TeamContext";
 
 type Kind = "team" | "community" | "organization";
 
@@ -17,6 +17,8 @@ export interface HubSection {
   label: string;
   /** Detail pages under another path (a play under /plays) that light up this tab. */
   also?: string[];
+  /** The switch in Settings › Sections it follows, if any (optionalTeamSections). */
+  optional?: OptionalTeamSection;
 }
 
 /**
@@ -28,23 +30,30 @@ export interface HubSection {
  * in the app). Settings is the gear in the header. A team with a
  * tournament ahead ([tournamentsAhead], hasTournamentAhead in
  * packages/shared) has Tournaments as a tab of its own after Chat, out of
- * More.
+ * More. A section the owner turned off (Settings › Sections; [sectionOn],
+ * sectionOn in packages/shared) has no tab or More entry.
  */
 export function hubSections(
   kind: Kind,
   member: boolean,
-  { tournamentsAhead = false }: { tournamentsAhead?: boolean } = {},
+  { tournamentsAhead = false, sectionOn = () => true }: { tournamentsAhead?: boolean; sectionOn?: (s: OptionalTeamSection) => boolean } = {},
 ): { tabs: HubSection[]; more: HubSection[] } {
+  const all = allHubSections(kind, member, tournamentsAhead);
+  const shown = (s: HubSection) => !s.optional || sectionOn(s.optional);
+  return { tabs: all.tabs.filter(shown), more: all.more.filter(shown) };
+}
+
+function allHubSections(kind: Kind, member: boolean, tournamentsAhead: boolean): { tabs: HubSection[]; more: HubSection[] } {
   const feed: HubSection = { sub: "", label: "Feed" };
   const schedule: HubSection = { sub: "/schedule", label: "Schedule" };
   const chat: HubSection = { sub: "/chat", label: "Chat" };
   const roster: HubSection = { sub: "/roster", label: kind === "team" ? "Roster" : "Members" };
   const teams: HubSection = { sub: "/teams", label: "Teams" };
-  const playbook: HubSection = { sub: "/playbook", label: "Playbook", also: ["/plays"] };
-  const stats: HubSection = { sub: "/stats", label: "Stats" };
-  const videos: HubSection = { sub: "/videos", label: "Videos" };
+  const playbook: HubSection = { sub: "/playbook", label: "Playbook", also: ["/plays", "/whiteboards"], optional: "playbook" };
+  const stats: HubSection = { sub: "/stats", label: "Stats", optional: "stats" };
+  const videos: HubSection = { sub: "/videos", label: "Videos", optional: "videos" };
   const tournaments: HubSection = { sub: "/tournaments", label: "Tournaments" };
-  const meetings: HubSection = { sub: "/meetings", label: "Meetings" };
+  const meetings: HubSection = { sub: "/meetings", label: "Meetings", optional: "meetings" };
   const org = kind === "organization";
   if (!member) return { tabs: [feed, schedule, roster, ...(org ? [teams] : [])], more: [] };
   if (kind === "team") {
@@ -77,7 +86,7 @@ export function TeamNav() {
   // Only members may read a team's entries; the rule is shared with the app.
   const entered = useLiveQuery<EnteredTournamentDoc>(user && member && kind === "team" ? `teams/${teamId}/tournamentEntries` : null, [], teamId);
   const tournamentsAhead = hasTournamentAhead(entered.data ?? [], new Date());
-  const { tabs, more } = hubSections(kind, member, { tournamentsAhead });
+  const { tabs, more } = hubSections(kind, member, { tournamentsAhead, sectionOn: (s) => viewerSectionOn(viewer, s) });
   const scroller = useScrollEdges<HTMLElement>();
 
   return (

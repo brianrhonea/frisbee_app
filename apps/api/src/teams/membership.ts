@@ -16,6 +16,8 @@ import {
   rolesData,
   saveRolesRequestSchema,
   setMemberRoleRequestSchema,
+  setPublicPageRequestSchema,
+  setTeamSectionsRequestSchema,
   setStatKeeperRequestSchema,
   type TeamKind,
   type Division,
@@ -43,6 +45,8 @@ import {
   nounOf,
   removeMember,
   requirePermission,
+  setPublicPage,
+  setSections,
   setStatKeeper,
   strings,
   transferOwnership,
@@ -357,6 +361,26 @@ export class MembershipService {
     await this.store.transact(async (tx) => {
       const team = await this.team(tx, teamId);
       const update = editDetails(team, caller.uid, input);
+      tx.update(p.team(teamId), update);
+      tx.set(p.listing(teamId), listingFor({ ...team, ...update }));
+    });
+  }
+
+  /** setSections(): the owner switches the team's optional sections. */
+  async setSections(caller: Caller, teamId: string, body: unknown): Promise<void> {
+    const input = parseBody(setTeamSectionsRequestSchema, body);
+    await this.store.transact(async (tx) => {
+      const team = await this.team(tx, teamId);
+      tx.update(p.team(teamId), setSections(team, caller.uid, input));
+    });
+  }
+
+  /** setPublicPage(): an admin switches the team's public page, its listing with it. */
+  async setPublicPage(caller: Caller, teamId: string, body: unknown): Promise<void> {
+    const input = parseBody(setPublicPageRequestSchema, body);
+    await this.store.transact(async (tx) => {
+      const team = await this.team(tx, teamId);
+      const update = setPublicPage(team, caller.uid, input.public);
       tx.update(p.team(teamId), update);
       tx.set(p.listing(teamId), listingFor({ ...team, ...update }));
     });

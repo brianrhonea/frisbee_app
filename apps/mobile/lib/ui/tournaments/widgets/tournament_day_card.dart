@@ -28,15 +28,28 @@ class TournamentDayCard extends StatelessWidget {
     final c = AppColors.of(context);
     final d = day.day;
     final t = day.tournament;
-    final next = d.next;
     final last = d.last;
+    // The game being played, with its running score from this team's side
+    // (in place of the next game: an earlier one may still need a score).
+    final playing = day.liveGame;
+    final live = playing?.liveAt(day.now);
+    final next = playing == null
+        ? d.next
+        : TeamGame(game: playing, teamId: day.team.id);
+    final mineA = playing?.teamA == day.team.id;
+    final liveFor = live == null ? null : (mineA ? live.scoreA : live.scoreB);
+    final liveAgainst = live == null
+        ? null
+        : (mineA ? live.scoreB : live.scoreA);
     void open({String? tab}) => context.push(
       Routes.tournament(t.id, division: day.divisionId, tab: tab),
     );
 
     final when = switch (d.phase) {
       TournamentDayPhase.tomorrow => 'Tomorrow',
-      TournamentDayPhase.today when t.status == HostedStatus.live => 'Live',
+      TournamentDayPhase.today
+          when t.status == HostedStatus.live || live != null =>
+        'Live',
       TournamentDayPhase.today => 'Today',
     };
     final String headline;
@@ -121,7 +134,24 @@ class TournamentDayCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (next != null)
+                if (live != null)
+                  Row(
+                    key: const Key('day-live'),
+                    children: [
+                      const LiveDot(size: 7),
+                      const SizedBox(width: 6),
+                      Text(
+                        'LIVE NOW',
+                        style: TextStyle(
+                          color: c.onFeature,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ],
+                  )
+                else if (next != null)
                   Text(
                     (d.phase == TournamentDayPhase.tomorrow
                             ? 'First game'
@@ -134,14 +164,26 @@ class TournamentDayCard extends StatelessWidget {
                       letterSpacing: 0.8,
                     ),
                   ),
-                Text(
-                  headline,
-                  style: TextStyle(
-                    color: c.onFeature,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 17,
-                    letterSpacing: -0.3,
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        headline,
+                        style: TextStyle(
+                          color: c.onFeature,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 17,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                    ),
+                    if (live != null)
+                      ScoreText(
+                        '$liveFor–$liveAgainst',
+                        size: 26,
+                        color: c.onFeature,
+                      ),
+                  ],
                 ),
                 if (detail != null)
                   Text(

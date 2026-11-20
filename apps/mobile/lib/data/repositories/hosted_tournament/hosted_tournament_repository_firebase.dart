@@ -8,21 +8,35 @@ import '../../../domain/models/hosted_tournament.dart';
 import '../../../domain/models/live_draft.dart';
 import '../../../domain/tournament_engine/progress.dart';
 import '../../../utils/result.dart';
+import '../../services/api_client.dart';
 import '../../services/callable_client.dart';
 import '../../services/firestore_utils.dart';
 import 'hosted_tournament_repository.dart';
 
 /// `tournaments/{id}` with `divisions/{divisionId}/games`, `entries` and
 /// `payments` subcollections. firestore.rules checks who writes what.
+/// Running scores go through the API ([api]) only.
 class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
   HostedTournamentRepositoryFirebase({
     FirebaseFirestore? firestore,
     CallableClient? functions,
+    ApiClient? api,
   }) : _db = firestore ?? FirebaseFirestore.instance,
-       _functions = functions;
+       _functions = functions,
+       _api = api;
 
   final FirebaseFirestore _db;
   final CallableClient? _functions;
+  final ApiClient? _api;
+
+  static const _noApi = 'Live scores need a connection to Stall 10.';
+
+  ApiClient get _client =>
+      _api ?? (throw const ApiException('unavailable', _noApi));
+
+  static String _gamePath(String t, String d, String g) =>
+      '/v1/tournaments/${Uri.encodeComponent(t)}/divisions/'
+      '${Uri.encodeComponent(d)}/games/${Uri.encodeComponent(g)}';
 
   CollectionReference<Map<String, dynamic>> get _tournaments =>
       _db.collection('tournaments');
@@ -262,6 +276,52 @@ class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
           Map<String, DraftDetail>?,
           Map<String, DraftDetail>?
         >.fromHandlers(handleError: (e, s, sink) => sink.add(null)),
+      );
+
+  @override
+  bool get canKeepLiveScores => _api != null;
+
+  @override
+  Future<Result<void>> setLiveScore(
+    String tournamentId,
+    String divisionId,
+    String gameId, {
+    required int scoreA,
+    required int scoreB,
+  }) => guard(
+    () => _client.post('${_gamePath(tournamentId, divisionId, gameId)}/live', {
+      'scoreA': scoreA,
+      'scoreB': scoreB,
+    }),
+  );
+
+  @override
+  Future<Result<void>> clearLiveScore(
+    String tournamentId,
+    String divisionId,
+    String gameId,
+  ) => guard(
+    () => _client.delete('${_gamePath(tournamentId, divisionId, gameId)}/live'),
+  );
+
+  @override
+  Stream<List<GroupGame>> watchLiveGames(
+    String tournamentId,
+    String divisionId,
+  ) => _games(tournamentId, divisionId)
+      .where(
+        'live.updatedAt',
+        isGreaterThanOrEqualTo: Timestamp.fromDate(
+          DateTime.now().subtract(LiveScore.staleAfter),
+        ),
+      )
+      .limit(64)
+      .snapshots()
+      .map(
+        (snap) => [
+          for (final d in snap.docs)
+            GroupGame.fromMap(d.id, plainData(d.data())),
+        ],
       );
 
   @override

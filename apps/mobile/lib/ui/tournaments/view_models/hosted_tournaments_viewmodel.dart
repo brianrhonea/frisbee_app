@@ -3,10 +3,13 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/auth/auth_repository.dart';
+import '../../../data/repositories/discover/discover_repository.dart';
 import '../../../data/repositories/hosted_tournament/hosted_tournament_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
+import '../../../domain/models/discover.dart';
 import '../../../domain/models/hosted_tournament.dart';
 import '../../../domain/models/team.dart';
+import '../../../utils/result.dart';
 
 /// A list of hosted tournaments: one host's (its Tournaments section,
 /// drafts included for its managers) or, with no [hostId], every
@@ -17,8 +20,10 @@ class HostedTournamentsViewModel extends ChangeNotifier {
     required HostedTournamentRepository tournamentRepository,
     TeamRepository? teamRepository,
     required AuthRepository authRepository,
+    DiscoverRepository? discoverRepository,
   }) : _repo = tournamentRepository,
        _uid = authRepository.currentUser?.uid ?? '' {
+    if (discoverRepository != null) _loadSpots(discoverRepository);
     final id = hostId;
     if (id == null) {
       _listen(_repo.watchUpcoming());
@@ -39,6 +44,22 @@ class HostedTournamentsViewModel extends ChangeNotifier {
   StreamSubscription<List<HostedTournament>>? _sub;
   StreamSubscription<List<EnteredTournament>>? _enteredSub;
   List<EnteredTournament> _entered = const [];
+  Map<String, TournamentSpots> _spots = const {};
+  bool _disposed = false;
+
+  /// Team spots left in [tournamentId] while registration is open (from
+  /// the API's public list, as the website shows them); null when it
+  /// shows none, or without the API.
+  TournamentSpots? spotsOf(String tournamentId) => _spots[tournamentId];
+
+  Future<void> _loadSpots(DiscoverRepository repo) async {
+    // No spots is fine: the cards just don't say.
+    if (await repo.tournamentSpots() case Ok(:final value)) {
+      if (_disposed || value.isEmpty) return;
+      _spots = value;
+      notifyListeners();
+    }
+  }
 
   /// Tournaments this team plays in (or has applied to, or been invited
   /// to), for its members. Empty for groups, and for everyone else.
@@ -200,6 +221,7 @@ class HostedTournamentsViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _hostSub?.cancel();
     _sub?.cancel();
     _enteredSub?.cancel();

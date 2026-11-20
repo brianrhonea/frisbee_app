@@ -19,6 +19,7 @@ class TeamTournamentDay {
     required this.now,
     this.names = const {},
     this.isCaptain = false,
+    this.liveGame,
   });
 
   final Team team;
@@ -34,6 +35,11 @@ class TeamTournamentDay {
 
   /// The user captains [team] in this division: they report its scores.
   final bool isCaptain;
+
+  /// The team's game being played now ([GroupGame.liveAt] at [now]), if
+  /// any: not always [TournamentDay.next], since an earlier game may
+  /// still wait for its score.
+  final GroupGame? liveGame;
 
   String nameOf(String? teamId) =>
       teamId == null ? 'TBD' : names[teamId] ?? 'TBD';
@@ -184,6 +190,9 @@ class TournamentDays extends ChangeNotifier {
           now: now,
           names: f.names,
           isCaptain: division?.captains[f.teamId]?.contains(uid) ?? false,
+          liveGame: f.games
+              .where((g) => g.involves(f.teamId) && g.liveAt(now) != null)
+              .firstOrNull,
         ),
       );
     }

@@ -12,6 +12,8 @@ import {
   engineGame,
   type GameDoc,
   type HostedStatus,
+  isLiveGame,
+  liveScoreOf,
   type TournamentDay,
   type TournamentDoc,
   tournamentDay,
@@ -38,6 +40,13 @@ export interface TeamTournamentDay {
   isCaptain: boolean;
   /** When [day] was worked out, for "Tomorrow" and weekday labels. */
   now: Date;
+  /**
+   * The team's game being played now (isLiveGame at [now]) and its
+   * running score, if any: not always day.next, since an earlier game may
+   * still wait for its score.
+   */
+  liveGame: EngineGame | null;
+  live: { scoreA: number; scoreB: number } | null;
 }
 
 export const nameOf = (d: TeamTournamentDay, teamId: string | null | undefined) => (teamId ? (d.names[teamId] ?? "TBD") : "TBD");
@@ -69,6 +78,8 @@ interface Follow {
   entries?: Array<EntryDoc & { id: string }>;
   divisions?: Array<DivisionDoc & { id: string }>;
   games?: EngineGame[];
+  /** Each game's stored running score (engineGame leaves it out). */
+  lives?: Record<string, unknown>;
 }
 
 /**
@@ -145,11 +156,14 @@ export function useTournamentDays(uid: string | null | undefined, teamId?: strin
             gamesOf = division;
             stopGames?.();
             stopGames = null;
-            set(key, { games: [] });
+            set(key, { games: [], lives: {} });
             if (!division) return;
             stopGames = onSnapshot(
               query(collection(db, `${base}/divisions/${division}/games`), orderBy("order")),
-              (g) => set(key, { games: g.docs.map((d) => engineGame(d.id, plain(d.data()) as GameDoc)) }),
+              (g) => {
+                const docs = g.docs.map((d) => ({ id: d.id, data: plain(d.data()) as GameDoc }));
+                set(key, { games: docs.map((d) => engineGame(d.id, d.data)), lives: Object.fromEntries(docs.map((d) => [d.id, d.data.live])) });
+              },
               () => {},
             );
           },
@@ -170,6 +184,9 @@ export function useTournamentDays(uid: string | null | undefined, teamId?: strin
       const d = tournamentDay(f.games ?? [], team, now, t.status === "live");
       if (!d) continue;
       const division = f.divisions?.find((x) => x.id === entry.divisionId);
+      const lives = f.lives ?? {};
+      const liveGame = (f.games ?? []).find((g) => (g.teamA === team || g.teamB === team) && isLiveGame({ status: g.status, live: lives[g.id] }, now)) ?? null;
+      const l = liveGame ? liveScoreOf(lives[liveGame.id]) : null;
       out.push({
         teamId: team,
         teamName: teams.find((x) => x.id === team)?.name ?? entry.teamName,
@@ -181,6 +198,8 @@ export function useTournamentDays(uid: string | null | undefined, teamId?: strin
         names: Object.fromEntries((f.entries ?? []).map((e) => [e.id, e.teamName])),
         isCaptain: !!uid && (division?.captains?.[team] ?? []).includes(uid),
         now,
+        liveGame,
+        live: l ? { scoreA: l.scoreA, scoreB: l.scoreB } : null,
       });
     }
     const far = Number.MAX_SAFE_INTEGER;

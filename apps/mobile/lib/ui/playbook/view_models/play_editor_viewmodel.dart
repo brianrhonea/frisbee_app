@@ -17,6 +17,7 @@ typedef _Snapshot = ({
   List<PlayElement> elements,
   List<PlayArrow> arrows,
   List<PlayStep> steps,
+  List<PlayDrawing> drawings,
 });
 
 /// A movement path drawn behind the elements in a step view.
@@ -271,11 +272,13 @@ class PlayEditorViewModel extends ChangeNotifier {
     }
     final hasElement = _play.elements.any((e) => e.id == id);
     final hasArrow = _play.arrows.any((a) => a.id == id);
-    if (!hasElement && !hasArrow) return;
+    final hasDrawing = _play.drawings.any((d) => d.id == id);
+    if (!hasElement && !hasArrow && !hasDrawing) return;
     _pushHistory();
     _play = _play.copyWith(
       elements: _play.elements.where((e) => e.id != id).toList(),
       arrows: _play.arrows.where((a) => a.id != id).toList(),
+      drawings: _play.drawings.where((d) => d.id != id).toList(),
       steps: [
         for (final st in _play.steps)
           st.copyWith(paths: {...st.paths}..remove(id)),
@@ -369,6 +372,12 @@ class PlayEditorViewModel extends ChangeNotifier {
     arrows: t == 0 ? _play.arrows : const [],
   );
 
+  /// Whether the field has anything to clear.
+  bool get hasDiagram =>
+      _play.elements.isNotEmpty ||
+      _play.arrows.isNotEmpty ||
+      _play.drawings.isNotEmpty;
+
   /// Movement paths of steps[index] (0-based).
   List<Trail> trailsFor(int index) {
     if (index < 0 || index >= stepCount) return const [];
@@ -401,12 +410,13 @@ class PlayEditorViewModel extends ChangeNotifier {
   }
 
   void clearDiagram() {
-    if (_play.elements.isEmpty && _play.arrows.isEmpty) return;
+    if (!hasDiagram) return;
     _pushHistory();
     _play = _play.copyWith(
       elements: const [],
       arrows: const [],
       steps: const [],
+      drawings: const [],
     );
     _selectedId = null;
     _step = 0;
@@ -425,8 +435,12 @@ class PlayEditorViewModel extends ChangeNotifier {
     _restore(_redo.removeLast());
   }
 
-  _Snapshot _snapshot() =>
-      (elements: _play.elements, arrows: _play.arrows, steps: _play.steps);
+  _Snapshot _snapshot() => (
+    elements: _play.elements,
+    arrows: _play.arrows,
+    steps: _play.steps,
+    drawings: _play.drawings,
+  );
 
   void _pushHistory() {
     _undo.add(_snapshot());
@@ -439,6 +453,7 @@ class PlayEditorViewModel extends ChangeNotifier {
       elements: s.elements,
       arrows: s.arrows,
       steps: s.steps,
+      drawings: s.drawings,
     );
     _selectedId = null;
     _step = _step.clamp(0, stepCount);

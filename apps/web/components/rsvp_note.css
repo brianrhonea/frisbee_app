@@ -1,0 +1,10 @@
+/* A note on an RSVP (RsvpNote.tsx; F7): the field under the answer, and
+   the note in quotes after a name in the responses. Site tokens only. */
+.rsvp-note-field { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0 0; }
+.rsvp-note-field input {
+  flex: 1; min-width: 0; height: 40px; padding: 0 12px; border-radius: var(--radius-control);
+  border: 1px solid var(--line); background: var(--card); color: var(--ink); font: inherit; font-size: 0.9rem;
+}
+.rsvp-note-field input::placeholder { color: var(--muted); }
+.rsvp-note-count { flex-basis: 100%; text-align: right; font-size: 0.75rem; }
+.rsvp-note { color: var(--muted); font-style: italic; }

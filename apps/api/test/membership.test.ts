@@ -555,6 +555,93 @@ describe("edit details (editDetails) and the listing", () => {
   });
 });
 
+describe("sections (setSections)", () => {
+  const put = (body: object, by = "owner") => s.call("PUT", "/v1/teams/t1/sections", by, body);
+
+  it("the owner turns a section on, keeping the others as they were", async () => {
+    s.store.put(T, seedTeam({ sections: { playbook: false, videos: false, stats: false, meetings: false } }));
+    expect((await put({ playbook: true })).statusCode).toBe(200);
+    expect(team().sections).toEqual({ playbook: true, videos: false, stats: false, meetings: false });
+    expect((await put({ stats: true, meetings: true })).statusCode).toBe(200);
+    expect(team().sections).toEqual({ playbook: true, videos: false, stats: true, meetings: true });
+  });
+
+  it("a team from before the switches (nothing stored) can turn one off", async () => {
+    s.store.put(T, seedTeam());
+    expect((await put({ videos: false })).statusCode).toBe(200);
+    expect(team().sections).toEqual({ videos: false });
+  });
+
+  it("the owner only", async () => {
+    s.store.put(T, seedTeam());
+    expect((await put({ playbook: true }, "coach")).statusCode).toBe(403);
+    expect((await put({ playbook: true }, "p1")).statusCode).toBe(403);
+    expect((await put({ playbook: true }, "stranger")).statusCode).toBe(403);
+  });
+
+  it("only the four optional sections, and at least one", async () => {
+    s.store.put(T, seedTeam());
+    expect((await put({ chat: false })).statusCode).toBe(400);
+    expect((await put({ playbook: "yes" })).statusCode).toBe(400);
+    expect((await put({})).statusCode).toBe(400);
+  });
+
+  it("groups and communities have none to switch", async () => {
+    s.store.put(T, group());
+    expect((await put({ playbook: true })).statusCode).toBe(412);
+  });
+
+  it("a missing team is not found", async () => {
+    expect((await put({ playbook: true })).statusCode).toBe(404);
+  });
+});
+
+describe("public team page (setPublicPage)", () => {
+  const put = (body: object, by = "owner") => s.call("PUT", "/v1/teams/t1/public-page", by, body);
+  const listing = () => s.store.doc("teamDirectory/t1")!;
+
+  it("an admin turns it off and on, the listing with it", async () => {
+    s.store.put(T, seedTeam());
+    expect((await put({ public: false }, "coach")).statusCode).toBe(200);
+    expect(team().publicPage).toBe(false);
+    expect(listing()).toMatchObject({ name: "The Haze", city: "Austin", publicPage: false });
+    expect((await put({ public: true })).statusCode).toBe(200);
+    // On is the default: nothing stored.
+    expect("publicPage" in team()).toBe(false);
+    expect("publicPage" in listing()).toBe(false);
+  });
+
+  it("a member granted manageTeam may; players, other managers and outsiders can't", async () => {
+    s.store.put(T, seedTeam({ memberPerms: { mgr: ["manageMembers"], p1: ["manageTeam"] } }));
+    expect((await put({ public: false }, "p1")).statusCode).toBe(200);
+    for (const by of ["mgr", "old", "stranger"]) expect((await put({ public: true }, by)).statusCode).toBe(403);
+    expect(team().publicPage).toBe(false);
+  });
+
+  it("editing the details keeps it off in the listing", async () => {
+    s.store.put(T, seedTeam({ publicPage: false }));
+    s.store.put("teamDirectory/t1", { name: "The Haze", publicPage: false });
+    expect((await s.call("PATCH", "/v1/teams/t1", "owner", { name: "The Haze", level: "club", city: "Dallas" })).statusCode).toBe(200);
+    expect(listing()).toMatchObject({ city: "Dallas", publicPage: false });
+  });
+
+  it("only a boolean", async () => {
+    s.store.put(T, seedTeam());
+    expect((await put({ public: "no" })).statusCode).toBe(400);
+    expect((await put({})).statusCode).toBe(400);
+    expect((await put({ public: false, extra: 1 })).statusCode).toBe(400);
+  });
+
+  it("groups and communities use approval instead", async () => {
+    s.store.put(T, group());
+    expect((await put({ public: false })).statusCode).toBe(412);
+  });
+
+  it("a missing team is not found", async () => {
+    expect((await put({ public: false })).statusCode).toBe(404);
+  });
+});
+
 describe("invite codes (inviteCodes create)", () => {
   const mint = (body: object, by = "owner") => s.call("POST", "/v1/invite-codes", by, body);
 
@@ -717,6 +804,8 @@ describe("communities", () => {
         memberNames: { owner: "Olive O" },
         orgId: "org1",
         orgName: "St. Mary's",
+        // A new team starts simple: the optional sections off.
+        sections: { playbook: false, videos: false, stats: false, meetings: false },
       });
       expect(s.store.doc(`teamDirectory/${id}`)).toBeDefined();
       expect(s.store.doc(`teams/${id}/chats/general`)).toBeDefined();

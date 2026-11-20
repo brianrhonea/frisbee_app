@@ -6,6 +6,7 @@
 // in step, and in step with the meetings rules in firestore.rules.
 import { z } from "zod";
 import { isoDateTime } from "./dates.js";
+import { rsvpNoteSchema } from "./hub.js";
 import { audienceTier } from "./membership.js";
 
 // ---- Who may see and join (model.ts) -------------------------------------
@@ -208,8 +209,11 @@ export const saveMeetingRequestSchema = z
   });
 export type SaveMeetingRequest = z.input<typeof saveMeetingRequestSchema>;
 
-/** `PUT .../meetings/:meetingId/rsvp`: null takes the answer back (respond). */
-export const meetingRsvpRequestSchema = z.strictObject({ answer: z.enum(meetingRsvps).nullable() });
+/**
+ * `PUT .../meetings/:meetingId/rsvp`: null takes the answer back (respond)
+ * and its note; [note] as on a team event's RSVP (`rsvpNoteSchema`).
+ */
+export const meetingRsvpRequestSchema = z.strictObject({ answer: z.enum(meetingRsvps).nullable(), note: rsvpNoteSchema });
 
 /** `PUT .../meetings/:meetingId/requests/:userId/decision`: an admin lets them in or turns them away. */
 export const meetingJoinDecisionRequestSchema = z.strictObject({ admit: z.boolean() });

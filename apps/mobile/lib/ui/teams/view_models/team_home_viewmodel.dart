@@ -6,6 +6,7 @@ import '../../../data/repositories/hosted_tournament/hosted_tournament_repositor
 import '../../../data/repositories/hosted_tournament/tournament_days.dart';
 import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/event/event_repository.dart';
+import '../../../data/repositories/team/team_hints_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
 import '../../../data/repositories/team_post/team_post_repository.dart';
 import '../../../data/services/file_picker_service.dart';
@@ -44,8 +45,10 @@ class TeamHomeViewModel extends ChangeNotifier {
     NotificationRepository? notificationRepository,
     GroupTournamentRepository? groupTournamentRepository,
     HostedTournamentRepository? tournamentRepository,
+    TeamHintsRepository? hints,
     DateTime Function()? clock,
   }) : _teams = teamRepository,
+       _hints = hints ?? TeamHintsRepositoryMemory(),
        _events = eventRepository,
        _posts = teamPostRepository,
        _auth = authRepository,
@@ -83,6 +86,11 @@ class TeamHomeViewModel extends ChangeNotifier {
           },
         );
     _watchTeam();
+    _hints.sectionsHintDismissed(teamId).then((d) {
+      if (_disposed) return;
+      _hintDismissed = d;
+      notifyListeners();
+    });
     final me = authRepository.currentUser?.uid ?? '';
     if (tournamentRepository != null && me.isNotEmpty) {
       _days = TournamentDays(
@@ -120,6 +128,32 @@ class TeamHomeViewModel extends ChangeNotifier {
   /// can open and follow one they aren't playing in.
   List<TournamentListing> get tournamentListings => _tournamentListings;
   final DateTime Function() _clock;
+  final TeamHintsRepository _hints;
+  bool _disposed = false;
+
+  /// Null until read from the device.
+  bool? _hintDismissed;
+
+  /// How long a team counts as brand new, for the sections hint.
+  static const newTeamFor = Duration(days: 30);
+
+  /// The one-time hint for the owner of a brand-new team that still has
+  /// every optional section off: they're in Settings › Sections.
+  bool get showSectionsHint {
+    final t = _team;
+    if (t == null || _hintDismissed != false || !isOwner) return false;
+    if (t.kind != TeamKind.team || t.isLeagueTeam) return false;
+    if (OptionalSection.values.any(t.hasSection)) return false;
+    final made = t.createdAt;
+    return made == null || _clock().difference(made) < newTeamFor;
+  }
+
+  void dismissSectionsHint() {
+    _hintDismissed = true;
+    notifyListeners();
+    _hints.dismissSectionsHint(teamId);
+  }
+
   final _downloads = <String, Future<Result<Uint8List>>>{};
 
   late final StreamSubscription<TeamListing?> _listingSub;
@@ -326,8 +360,9 @@ class TeamHomeViewModel extends ChangeNotifier {
   /// A community group rather than a team.
   bool get isGroup => summary?.isCommunity ?? false;
 
-  /// A private group the user isn't in: only its listing is visible.
-  bool get isPrivateToMe => !isMember && (summary?.isPrivateGroup ?? false);
+  /// A private group the user isn't in, or a team whose public page is
+  /// off: only its listing is visible.
+  bool get isPrivateToMe => !isMember && (summary?.hidesPage ?? false);
 
   /// A youth team the user isn't on: its roster is for its members only
   /// (the API refuses anyone else), so the page says so in its place.
@@ -479,6 +514,7 @@ class TeamHomeViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _listingSub.cancel();
     _listingsSub?.cancel();
     _requestSub?.cancel();

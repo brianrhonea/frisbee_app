@@ -1,0 +1,33 @@
+{
+  "about": "TournamentSpots.label: what a tournament card says while registration is open, from the team spots left of the cap.",
+  "cases": [
+    {
+      "name": "room",
+      "left": 5,
+      "cap": 16,
+      "label": "5 spots left",
+      "full": false
+    },
+    {
+      "name": "one left",
+      "left": 1,
+      "cap": 8,
+      "label": "1 spot left",
+      "full": false
+    },
+    {
+      "name": "full",
+      "left": 0,
+      "cap": 8,
+      "label": "Full · waitlist",
+      "full": true
+    },
+    {
+      "name": "over full",
+      "left": -1,
+      "cap": 4,
+      "label": "Full · waitlist",
+      "full": true
+    }
+  ]
+}

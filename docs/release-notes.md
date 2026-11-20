@@ -10,6 +10,37 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.37
+
+**Live scores**
+- Captains can keep a game's score as it's played. Everyone following
+  the tournament sees it live on the game, the schedule and Discover.
+  It's never the final score: that's still reported as before.
+
+**Teams**
+- New teams start simple: Feed, Schedule, Chat and Roster. The owner
+  can turn on Playbook, Videos, Stats and Meetings in Settings ›
+  Sections. Existing teams keep everything.
+- Admins can make the team page private to outsiders with the "Public
+  team page" switch in Settings › Visibility.
+- Chat: pin important messages to the top of a room, and share an
+  event into chat so people can RSVP right there.
+- A team's Meetings page lists upcoming and past meetings.
+
+**Playbook**
+- New Whiteboard: sketch on a blank field with a pen, players, disc and
+  cones, then save it or throw it away.
+
+**Schedule**
+- Add a short note to your RSVP, like "Late 15 min".
+- A month view, with dots on days that have something on.
+
+**Discover and more**
+- Pickup games and public team events are listed in Discover.
+- Tournaments show how many spots are left.
+- The Learn guide shows how many lessons you've read.
+- Download a copy of your data from Settings › Account.
+
 ## 0.0.36
 
 **Find your way faster**

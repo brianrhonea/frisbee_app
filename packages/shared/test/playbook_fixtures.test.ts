@@ -2,7 +2,7 @@
 // against playbook.ts, on the vectors in fixtures/playbook (written by
 // apps/mobile/test/shared_fixtures/playbook_fixtures_test.dart).
 import { describe, expect, it } from "vitest";
-import { type FieldPoint, pathIn, type PlayDoc, pointAlong, positionsAfter, positionsAt } from "../src/index.js";
+import { type FieldPoint, pathIn, type PlayDoc, pointAlong, positionsAfter, positionsAt, savePlayRequestSchema } from "../src/index.js";
 import { fixture } from "./shared_fixtures.js";
 
 type Positions = Record<string, FieldPoint>;
@@ -30,4 +30,13 @@ describe("points along a path match the app (fixtures/playbook/point_along.json)
       expect(c.points.map(({ f }) => ({ f, point: pointAlong(c.path, f) }))).toEqual(c.points);
     },
   );
+});
+
+describe("the app's stored plays pass the save schema (fixtures/playbook/play_docs.json)", () => {
+  it.each(fixture<{ id: string; doc: PlayDoc & Record<string, unknown> }>("playbook/play_docs.json").cases)("$id", ({ doc }) => {
+    const parsed = savePlayRequestSchema.parse(doc);
+    expect(parsed.kind).toEqual(doc.kind);
+    expect(parsed.drawings).toEqual(doc.drawings);
+    expect(parsed.elements).toEqual(doc.elements);
+  });
 });

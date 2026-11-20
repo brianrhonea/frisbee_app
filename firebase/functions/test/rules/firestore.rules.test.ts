@@ -142,6 +142,61 @@ describe("team create", () => {
   it("rejects a team that keeps an invite code on the team doc", async () => {
     await assertFails(setDoc(doc(db(OUTSIDER), "teams", "t2"), newTeam({ inviteCode: "ZZZ999" })));
   });
+
+  it("a new team stores its sections off (the app's newTeamDocs); only the four, as bools", async () => {
+    const off = { playbook: false, videos: false, stats: false, meetings: false };
+    await assertSucceeds(setDoc(doc(db(OUTSIDER), "teams", "t2"), newTeam({ sections: off })));
+    await assertFails(setDoc(doc(db(OUTSIDER), "teams", "t3"), newTeam({ sections: { ...off, chat: false } })));
+    await assertFails(setDoc(doc(db(OUTSIDER), "teams", "t3"), newTeam({ sections: { playbook: "no" } })));
+    await assertFails(setDoc(doc(db(OUTSIDER), "teams", "t3"), newTeam({ sections: true })));
+    // Groups have none.
+    await assertFails(
+      setDoc(
+        doc(db(OUTSIDER), "teams", "g1"),
+        newTeam({ kind: "community", description: "", requiresApproval: false, location: null, sections: off }),
+      ),
+    );
+  });
+});
+
+describe("team sections (setSections)", () => {
+  it("the owner switches a section on or off, and nothing else in the same write", async () => {
+    await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), { "sections.playbook": true }));
+    await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), { sections: { playbook: true, videos: false } }));
+    // (Playbook is on by now, so turning it off is a real change.)
+    await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { "sections.playbook": false, city: "Austin" }));
+  });
+
+  it("only the four optional sections, as bools", async () => {
+    await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { "sections.chat": false }));
+    await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { "sections.stats": "on" }));
+  });
+
+  it("nobody but the owner", async () => {
+    for (const uid of [COACH, CAPTAIN, PLAYER, OUTSIDER]) {
+      await assertFails(updateDoc(doc(db(uid), "teams", TEAM), { "sections.playbook": true }));
+    }
+  });
+
+  it("groups have no sections to switch", async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "teams", "g1"), {
+        name: "Group",
+        division: "mixed",
+        level: "pickup",
+        city: "",
+        kind: "community",
+        description: "",
+        requiresApproval: false,
+        location: null,
+        ownerId: OWNER,
+        members: { [OWNER]: "owner" },
+        memberIds: [OWNER],
+        memberNames: { [OWNER]: "O" },
+      }),
+    );
+    await assertFails(updateDoc(doc(db(OWNER), "teams", "g1"), { "sections.playbook": true }));
+  });
 });
 
 describe("team read", () => {
@@ -1054,6 +1109,21 @@ describe("roster and plays", () => {
     await assertFails(setDoc(doc(db(PLAYER), "teams", TEAM, "plays", "p2"), play(PLAYER)));
   });
 
+  it("whiteboards and pen strokes: coaches save them, within the caps", async () => {
+    const ref = (id: string, uid = COACH) => doc(db(uid), "teams", TEAM, "plays", id);
+    const stroke = { id: "k1", color: "turf", points: [{ x: 0.1, y: 0.1 }, { x: 0.3, y: 0.4 }] };
+    const board = (uid: string) => ({ ...play(uid), kind: "whiteboard", steps: [], drawings: [stroke] });
+    await assertSucceeds(setDoc(ref("w1"), board(COACH)));
+    await assertSucceeds(setDoc(ref("w2"), { ...play(COACH), drawings: [stroke] }));
+    await assertFails(setDoc(ref("w3", PLAYER), board(PLAYER)));
+    await assertFails(setDoc(ref("w4"), { ...board(COACH), kind: "sketch" }));
+    await assertFails(setDoc(ref("w5"), { ...board(COACH), steps: [{ id: "s1", note: "", paths: {} }] }));
+    await assertFails(setDoc(ref("w6"), { ...board(COACH), drawings: "lines" }));
+    await assertFails(
+      setDoc(ref("w7"), { ...board(COACH), drawings: Array.from({ length: 101 }, (_, i) => ({ ...stroke, id: `k${i}` })) }),
+    );
+  });
+
   it("players can read plays, outsiders cannot", async () => {
     await env.withSecurityRulesDisabled((ctx) =>
       setDoc(doc(ctx.firestore(), "teams", TEAM, "plays", "p1"), play(COACH)),
@@ -1225,6 +1295,39 @@ describe("events", () => {
         [`reactions.${PLAYER}`]: deleteField(),
         [`votes.${PLAYER}`]: deleteField(),
       }),
+    );
+  });
+
+  it("members add a short note to their own answer, dropped with it", async () => {
+    // Seeded events have no rsvpNotes, as older ones don't.
+    await seed();
+    await assertSucceeds(updateDoc(ev(PLAYER), { [`rsvps.${PLAYER}`]: "going", [`rsvpNotes.${PLAYER}`]: "Late 15 min" }));
+    await assertSucceeds(updateDoc(ev(PLAYER), { [`rsvps.${PLAYER}`]: "maybe" }));
+    await assertSucceeds(updateDoc(ev(PLAYER), { [`rsvpNotes.${PLAYER}`]: "x".repeat(140) }));
+    await assertFails(updateDoc(ev(PLAYER), { [`rsvpNotes.${PLAYER}`]: "x".repeat(141) }));
+    await assertFails(updateDoc(ev(PLAYER), { [`rsvpNotes.${PLAYER}`]: "" }));
+    await assertFails(updateDoc(ev(PLAYER), { [`rsvpNotes.${PLAYER}`]: 3 }));
+    await assertFails(updateDoc(ev(PLAYER), { [`rsvpNotes.${COACH}`]: "Not mine" }));
+    await assertFails(updateDoc(ev(PLAYER), { rsvpNotes: "flat" }));
+    // Taking the answer back must take the note too.
+    await assertFails(updateDoc(ev(PLAYER), { [`rsvps.${PLAYER}`]: deleteField() }));
+    // The app always deletes both; fine on an event that never had notes.
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "teams", TEAM, "events", "e2"), event(COACH, { rsvps: { [PLAYER]: "going" } })),
+    );
+    await assertSucceeds(
+      updateDoc(doc(db(PLAYER), "teams", TEAM, "events", "e2"), {
+        [`rsvps.${PLAYER}`]: deleteField(),
+        [`rsvpNotes.${PLAYER}`]: deleteField(),
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(ev(PLAYER), { [`rsvps.${PLAYER}`]: deleteField(), [`rsvpNotes.${PLAYER}`]: deleteField() }),
+    );
+    // No answer, no note; outsiders can't add one.
+    await assertFails(updateDoc(ev(PLAYER), { [`rsvpNotes.${PLAYER}`]: "Maybe later" }));
+    await assertFails(
+      updateDoc(ev(OUTSIDER), { [`rsvps.${OUTSIDER}`]: "going", [`rsvpNotes.${OUTSIDER}`]: "Hi" }),
     );
   });
 
@@ -1696,6 +1799,49 @@ describe("team directory", () => {
     );
     await assertFails(deleteDoc(ref(COACH)));
     await assertSucceeds(deleteDoc(ref(OWNER)));
+  });
+});
+
+describe("public team page switch (publicPage)", () => {
+  const listing = (extra: Record<string, unknown> = {}) => ({
+    name: "Team",
+    division: "mixed",
+    level: "college",
+    city: "",
+    keywords: ["t", "te", "tea", "team"],
+    ...extra,
+  });
+  const turnOff = () =>
+    env.withSecurityRulesDisabled((ctx) => updateDoc(doc(ctx.firestore(), "teams", TEAM), { publicPage: false }));
+  const event = (uid: string) => doc(db(uid), "teams", TEAM, "publicEvents", "e1");
+  const post = (uid: string) => doc(db(uid), "teams", TEAM, "posts", "p1");
+
+  it("outsiders read public events and posts only while the page is on; members always", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "teams", TEAM, "publicEvents", "e1"), { title: "Open tryouts" });
+      await setDoc(doc(ctx.firestore(), "teams", TEAM, "posts", "p1"), { title: "Hello", public: true });
+    });
+    await assertSucceeds(getDoc(event(OUTSIDER)));
+    await assertSucceeds(getDoc(post(OUTSIDER)));
+    await turnOff();
+    await assertFails(getDoc(event(OUTSIDER)));
+    await assertFails(getDoc(post(OUTSIDER)));
+    await assertFails(getDocs(collection(db(OUTSIDER), "teams", TEAM, "publicEvents")));
+    await assertSucceeds(getDoc(event(PLAYER)));
+    await assertSucceeds(getDoc(post(PLAYER)));
+  });
+
+  it("only the API switches it: no member writes it on the team doc", async () => {
+    await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { publicPage: false }));
+    await assertFails(updateDoc(doc(db(COACH), "teams", TEAM), { name: "Team", publicPage: false }));
+  });
+
+  it("the listing says what the team doc says", async () => {
+    await assertFails(setDoc(doc(db(COACH), "teamDirectory", TEAM), listing({ publicPage: false })));
+    await assertSucceeds(setDoc(doc(db(COACH), "teamDirectory", TEAM), listing()));
+    await turnOff();
+    await assertFails(setDoc(doc(db(COACH), "teamDirectory", TEAM), listing()));
+    await assertSucceeds(setDoc(doc(db(COACH), "teamDirectory", TEAM), listing({ publicPage: false })));
   });
 });
 
@@ -2767,6 +2913,23 @@ describe("meetings", () => {
     await assertFails(updateDoc(ref(STATS), { [`rsvps.${COACH}`]: "attending" }));
     await assertFails(updateDoc(ref(PLAYER), { [`rsvps.${PLAYER}`]: "attending" }));
     await assertFails(updateDoc(ref(STATS), { title: "Mine now" }));
+  });
+
+  it("invitees add a short note to their own answer, dropped with it", async () => {
+    // The app always deletes both; fine on a meeting that never had notes.
+    await seed({ rsvps: { [STATS]: "attending" } });
+    await assertSucceeds(
+      updateDoc(ref(STATS), { [`rsvps.${STATS}`]: deleteField(), [`rsvpNotes.${STATS}`]: deleteField() }),
+    );
+    await seed();
+    await assertSucceeds(updateDoc(ref(STATS), { [`rsvps.${STATS}`]: "attending", [`rsvpNotes.${STATS}`]: "Joining late" }));
+    await assertFails(updateDoc(ref(STATS), { [`rsvpNotes.${STATS}`]: "y".repeat(141) }));
+    await assertFails(updateDoc(ref(STATS), { [`rsvpNotes.${COACH}`]: "Not mine" }));
+    await assertFails(updateDoc(ref(STATS), { [`rsvps.${STATS}`]: deleteField() }));
+    await assertSucceeds(
+      updateDoc(ref(STATS), { [`rsvps.${STATS}`]: deleteField(), [`rsvpNotes.${STATS}`]: deleteField() }),
+    );
+    await assertFails(updateDoc(ref(STATS), { [`rsvpNotes.${STATS}`]: "No answer" }));
   });
 
   it("admins start and end meetings; invitees can't", async () => {
@@ -4177,6 +4340,29 @@ describe("hosted tournaments", () => {
     await assertSucceeds(updateDoc(gameRef("cap2", "g1"), { status: "done", scoreA: 15, scoreB: 10, report: null }));
     await assertSucceeds(updateDoc(gameRef(DIRECTOR, "g1"), { scoreA: 15, scoreB: 12 }));
     await assertFails(updateDoc(gameRef(DIRECTOR, "g1"), { scoreA: 12, scoreB: 12 }));
+  });
+
+  it("the running score (live) is the API's: clients can't set or change it, managers may drop it", async () => {
+    await seed();
+    const live = { scoreA: 7, scoreB: 5, startedAt: new Date(), updatedAt: new Date(), by: CAPTAIN };
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "tournaments", T, "divisions", DIV, "games", "g1"), game({ live })),
+    );
+    // Anyone signed in who can see the game reads it.
+    await assertSucceeds(getDoc(gameRef(PLAYER, "g1")));
+    // No captain, manager or member writes it.
+    await assertFails(updateDoc(gameRef(CAPTAIN, "g1"), { live: { ...live, scoreA: 8 } }));
+    await assertFails(updateDoc(gameRef(CAPTAIN, "g1"), { live: { ...live, scoreA: 8 }, report: { scoreA: 15, scoreB: 10, byTeam: TEAM }, status: "reported" }));
+    await assertFails(updateDoc(gameRef(DIRECTOR, "g1"), { live: { ...live, scoreA: 8 } }));
+    await assertFails(updateDoc(gameRef(PLAYER, "g1"), { live: deleteField() }));
+    await assertFails(setDoc(gameRef(DIRECTOR, "g2"), game({ live })));
+    // With it there, the final still goes through as before.
+    await assertSucceeds(updateDoc(gameRef(CAPTAIN, "g1"), { report: { scoreA: 15, scoreB: 10, byTeam: TEAM }, status: "reported" }));
+    await assertSucceeds(updateDoc(gameRef("cap2", "g1"), { status: "done", scoreA: 15, scoreB: 10, report: null }));
+    await assertSucceeds(updateDoc(gameRef(DIRECTOR, "g1"), { scoreA: 15, scoreB: 12 }));
+    // Managers may drop it (a rewritten schedule replaces the game).
+    await assertSucceeds(updateDoc(gameRef(DIRECTOR, "g1"), { live: deleteField() }));
+    await assertSucceeds(setDoc(gameRef(DIRECTOR, "g1"), game()));
   });
 
   it("a captain of a finished game moves its winner on", async () => {

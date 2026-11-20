@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../domain/models/outbox.dart';
 import '../../../data/repositories/chat/chat_repository.dart';
+import '../../../data/services/api_client.dart';
 import '../../../data/repositories/notification/notification_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
 import '../../../domain/models/app_user.dart';
@@ -37,6 +38,13 @@ class ChatRoomViewModel extends MessageThreadViewModel {
         muted: !muted,
       ),
     );
+    togglePin = Command1<void, ChatMessage>(_togglePin);
+    replacePin = Command1<void, (ChatMessage, String)>(
+      (a) => _chats.pinMessage(teamId, roomId, a.$1.id, unpin: a.$2),
+    );
+    shareEvent = Command1<void, String>(
+      (eventId) => _chats.shareEvent(teamId, roomId, eventId),
+    );
     _subs = [
       notificationRepository.watchPreferences(uid).listen((p) {
         _prefs = p;
@@ -54,6 +62,11 @@ class ChatRoomViewModel extends MessageThreadViewModel {
         _markRead();
         notifyListeners();
       }, onError: _onError),
+      // Pins are read like messages, so only by those who can read the room.
+      _chats.watchPins(teamId, roomId).listen((p) {
+        _pins = p;
+        notifyListeners();
+      }, onError: (_) {}),
     ];
     startMessages();
   }
@@ -120,6 +133,57 @@ class ChatRoomViewModel extends MessageThreadViewModel {
   /// Members who can manage chats change the room's name and access.
   bool get canManage => _team?.has(uid, TeamPermission.manageChats) ?? false;
 
+  // Pins (redesign F2) ------------------------------------------------------
+
+  List<ChatMessage> _pins = const [];
+
+  /// The room's pinned messages, newest pin first.
+  List<ChatMessage> get pins => _pins;
+
+  /// The pin shown in the strip at the top: the newest.
+  ChatMessage? get latestPin => _pins.firstOrNull;
+
+  /// The owner, and chat managers who can read the room, pin messages
+  /// (through the API, so not in builds without it).
+  bool get canPin =>
+      _chats.canUseChatExtras &&
+      access.canRead &&
+      (_team?.has(uid, TeamPermission.manageChats) ?? false);
+
+  /// From the live pins only: older pages of messages aren't live.
+  bool isPinned(ChatMessage m) => _pins.any((p) => p.id == m.id);
+
+  /// Pins [m], or unpins it if it's pinned. A full room fails with
+  /// [PinsFullException]: the view asks which pin to take down
+  /// ([replacePin]).
+  late final Command1<void, ChatMessage> togglePin;
+
+  /// Pins the message in place of the pin with the given id.
+  late final Command1<void, (ChatMessage, String)> replacePin;
+
+  Future<Result<void>> _togglePin(ChatMessage m) async {
+    if (isPinned(m)) return _chats.unpinMessage(teamId, roomId, m.id);
+    if (_pins.length >= chatPinsMax) return Result.error(PinsFullException(m));
+    final result = await _chats.pinMessage(teamId, roomId, m.id);
+    // The server counted pins this listener hadn't seen yet.
+    if (result case Error(error: ApiException(code: 'failed_precondition'))) {
+      return Result.error(PinsFullException(m));
+    }
+    return result;
+  }
+
+  // Event cards (redesign F3) -----------------------------------------------
+
+  /// Whoever can post here and create the team's events shares an
+  /// upcoming one as a card (through the API).
+  bool get canShareEvents =>
+      _chats.canUseChatExtras &&
+      access.canWrite &&
+      (_team?.has(uid, TeamPermission.manageEvents) ?? false);
+
+  /// Posts the team event with this id into the room as a card.
+  late final Command1<void, String> shareEvent;
+
   @override
   OutboxKind get outboxKind => OutboxKind.teamChat;
 
@@ -185,6 +249,20 @@ class ChatRoomViewModel extends MessageThreadViewModel {
       s.cancel();
     }
     toggleMuted.dispose();
+    togglePin.dispose();
+    replacePin.dispose();
+    shareEvent.dispose();
     super.dispose();
   }
+}
+
+/// Pinning [message] needs one of the room's [chatPinsMax] pins taken down.
+class PinsFullException implements Exception {
+  const PinsFullException(this.message);
+
+  final ChatMessage message;
+
+  @override
+  String toString() =>
+      'This room has $chatPinsMax pinned messages. Unpin one first.';
 }

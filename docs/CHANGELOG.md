@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.37  | 2026-11-20 | `feature/redesign`                      |                     |
 | 0.0.36  | 2026-11-20 | `feature/redesign`                      |                     |
 | 0.0.35  | 2026-11-19 | `feature/redesign`                      |                     |
 | 0.0.34  | 2026-11-19 | `feature/team-first`                    |                     |
@@ -49,6 +50,43 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.37 — Redesign features, first batch (redesign 4)
+
+With web 0.46.0 and API 0.34.0. Details and tests per feature in
+`docs/product-spec.md` §8.1 items 26–34. Needs the dev deploy of
+Firestore + Storage rules, the API, and functions groups
+`notifications`, `browse`, `tournaments`, `account`.
+
+- Live running scores (F1): captains and event managers keep a game's
+  running score ("Live score" sheet: Start game, +1, undo, Report/Set
+  final, Stop live score). LIVE pill and score on games, the navy
+  header, the tournament-day card and Discover's "Live now". Data
+  `games/{id}.live`, API-only.
+- New teams start simple (F21): Playbook, Videos, Stats and Meetings
+  start off (`sections` on the team; missing reads as on); Settings ›
+  Sections; a hint for a new team's owner.
+- Playbook whiteboard (F31): Plays | Whiteboard switch; sketch with pen,
+  players, disc and cones; save as a play or a whiteboard
+  (`kind: "whiteboard"`, `drawings`). Plays keep pen strokes.
+- Note on an RSVP (F7): up to 140 characters on event and meeting
+  answers (`rsvpNotes`), shown in Responses / Invited; rules
+  `validRsvpNote`; account deletion removes them.
+- Schedule month view (F16): Week / Month switch with day dots.
+- Meetings list (F17): Upcoming / Past, Live now, Needs RSVP;
+  `/team-meetings/:teamId` now opens it.
+- Team rooms (F2, F3): pinned messages (up to 10 a room, "Pinned"
+  strip) and event cards shared into chat with RSVP buttons. API-only.
+- Public team page switch (F12): Settings › Visibility; off, outsiders
+  see only the team's card. Team Settings now open to admins (Sections
+  stay the owner's).
+- Download your data (F14): Settings › Account › Your data
+  (`GET /v1/me/export`, once per 10 minutes), via the share sheet.
+- Learn progress (F9): "N of 12 read", kept on the device.
+- Spots left (F10): "N spots left" / "Full · waitlist" on tournament
+  and league cards while registration is open.
+- Discover lists public team events and pickup games (F29), as the
+  website does.
 
 ## 0.0.36 — Navigation and every screen restyled (redesign 2–3)
 

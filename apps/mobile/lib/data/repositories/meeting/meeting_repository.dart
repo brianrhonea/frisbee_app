@@ -25,12 +25,23 @@ abstract class MeetingRepository {
   /// Deletes the meeting, its chat and its join requests.
   Future<Result<void>> deleteMeeting(String teamId, String meetingId);
 
-  /// Sets [uid]'s answer, or clears it when [answer] is null.
+  /// Sets [uid]'s answer, or clears it (and its note) when [answer] is
+  /// null.
   Future<Result<void>> setRsvp(
     String teamId,
     String meetingId,
     String uid,
     MeetingRsvp? answer,
+  );
+
+  /// Sets [uid]'s note on their answer, or removes it when [note] is
+  /// empty. [note] is already cleaned (`cleanRsvpNote`); [uid] must have
+  /// answered.
+  Future<Result<void>> setRsvpNote(
+    String teamId,
+    String meetingId,
+    String uid,
+    String note,
   );
 
   /// Opens the meeting so invitees can join. Admins only.

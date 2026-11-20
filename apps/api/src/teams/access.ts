@@ -6,14 +6,16 @@
 import {
   type EditTeamInput,
   type GroupLocation,
+  optionalTeamSections,
   roleLimits,
   searchKeywords,
+  type SetTeamSectionsRequest,
   type TeamKind,
   type TeamPermission,
   teamTiers,
 } from "@stall10/shared";
 import { ApiError } from "../errors.js";
-import type { Data } from "../store.js";
+import { type Data, deleteField } from "../store.js";
 
 // ---- Reading a team doc (no prototype keys: a uid can be "constructor") ----
 
@@ -209,6 +211,8 @@ export function listingFor(t: Data): Data {
     listing.location = isPrivateGroup(t) ? null : locationOf(t.location);
   }
   if (t.official === true) listing.official = true;
+  // Only when off (setPublicPage): the clients read it to show outsiders the card only.
+  if (kind === "team" && t.publicPage === false) listing.publicPage = false;
   listing.keywords = searchKeywords(`${name} ${city}`);
   return listing;
 }
@@ -233,4 +237,38 @@ export function editDetails(t: Data, caller: string, e: EditTeamInput): Data {
     throw new ApiError("invalid_argument", "Only groups have a description, approval setting or location.");
   }
   return update;
+}
+
+// ---- setSections ----------------------------------------------------------
+
+/**
+ * setSections(): the owner of a team (not a group or community) switches
+ * its optional sections (Playbook, Videos, Stats, Meetings) on or off.
+ * Only those keys are kept; ones left out keep what they had.
+ */
+export function setSections(t: Data, caller: string, e: SetTeamSectionsRequest): Data {
+  if (isGroup(t)) throw new ApiError("failed_precondition", `A ${nounOf(t)} has no sections to switch.`);
+  if (!isOwner(t, caller)) throw denied("Only the owner can turn sections on or off.");
+  const before = mapOf(t.sections);
+  const sections: Record<string, boolean> = {};
+  for (const s of optionalTeamSections) {
+    const next = e[s] ?? own(before, s);
+    if (typeof next === "boolean") sections[s] = next;
+  }
+  return { sections };
+}
+
+// ---- setPublicPage --------------------------------------------------------
+
+/**
+ * The "Public team page" switch (publicPageOn in packages/shared): an admin
+ * (manageTeam, as editDetails) of a team, not a group (groups use
+ * requiresApproval). Stored only when off; on removes the field, so teams
+ * from before the switch read as public. The listing is rewritten with it
+ * (listingFor), in the same transaction.
+ */
+export function setPublicPage(t: Data, caller: string, on: boolean): Data {
+  if (isGroup(t)) throw new ApiError("failed_precondition", `A ${nounOf(t)} is made private by approving who joins.`);
+  requirePermission(t, caller, "manageTeam", "Only the team's admins can change who sees its page.");
+  return { publicPage: on ? deleteField : false };
 }

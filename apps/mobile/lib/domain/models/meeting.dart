@@ -45,6 +45,7 @@ class TeamMeeting {
     this.startedAt,
     this.endedAt,
     this.rsvps = const {},
+    this.rsvpNotes = const {},
     this.createdBy,
   });
 
@@ -65,6 +66,10 @@ class TeamMeeting {
 
   /// uid → answer; each invitee writes only their own.
   final Map<String, MeetingRsvp> rsvps;
+
+  /// uid -> a short note on their answer, as on events
+  /// ([TeamEvent.rsvpNotes]).
+  final Map<String, String> rsvpNotes;
   final String? createdBy;
 
   /// Most people a meeting can invite one by one; firestore.rules agrees.
@@ -75,6 +80,10 @@ class TeamMeeting {
   bool get isEnded => status == MeetingStatus.ended;
 
   MeetingRsvp? rsvpOf(String uid) => rsvps[uid];
+
+  /// [uid]'s note on their answer; empty when none.
+  String noteOf(String uid) =>
+      rsvps.containsKey(uid) ? rsvpNotes[uid] ?? '' : '';
 
   /// Whether member [uid] of [team] can see the meeting and RSVP.
   bool canSee(Team team, String uid) {
@@ -125,6 +134,7 @@ class TeamMeeting {
     location: isLive ? 'Live now' : 'Video meeting',
     notes: notes,
     rsvps: {for (final e in rsvps.entries) e.key: e.value.asEventRsvp},
+    rsvpNotes: rsvpNotes,
     createdBy: createdBy,
   );
 
@@ -150,6 +160,7 @@ class TeamMeeting {
     startedAt: startedAt,
     endedAt: endedAt,
     rsvps: rsvps,
+    rsvpNotes: rsvpNotes,
     createdBy: createdBy,
   );
 
@@ -184,6 +195,7 @@ class TeamMeeting {
                 MeetingRsvp.attending,
               ),
         },
+        rsvpNotes: rsvpNotesFrom(map['rsvpNotes']),
         createdBy: map['createdBy'] as String?,
       );
 

@@ -23,6 +23,12 @@
       "city": "New York",
       "orgId": "org1",
       "orgName": "St. Mary’s High",
+      "sections": {
+        "playbook": false,
+        "videos": false,
+        "stats": false,
+        "meetings": false
+      },
       "ownerId": "u5",
       "members": {
         "u5": "owner"

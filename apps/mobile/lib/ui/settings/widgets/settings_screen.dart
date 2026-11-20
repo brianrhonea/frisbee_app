@@ -22,6 +22,7 @@ import '../../core/ui/layout.dart' show PersonAvatar;
 import '../../profile/view_models/profile_viewmodel.dart';
 import '../../profile/widgets/delete_account_dialog.dart';
 import 'change_password_dialog.dart';
+import 'download_data_group.dart';
 import 'settings_widgets.dart';
 
 /// Names for the appearance choices.
@@ -461,11 +462,19 @@ class PrivacySettingsScreen extends StatelessWidget {
   }
 }
 
-/// Account: name, username, email, and deleting the account.
+/// Account: name, username, email, downloading your data, and deleting
+/// the account.
 class AccountSettingsScreen extends StatelessWidget {
-  const AccountSettingsScreen({super.key, required this.viewModel});
+  const AccountSettingsScreen({
+    super.key,
+    required this.viewModel,
+    this.shareFile = shareDataFile,
+  });
 
   final ProfileViewModel viewModel;
+
+  /// Hands "Download your data"'s file to the user (the share sheet).
+  final ShareDataFile shareFile;
 
   Future<void> _editName(BuildContext context) async {
     final controller = TextEditingController(text: viewModel.user?.displayName);
@@ -572,6 +581,7 @@ class AccountSettingsScreen extends StatelessWidget {
                     ),
                 ],
               ),
+              DownloadDataGroup(viewModel: vm, share: shareFile),
               const SizedBox(height: 26),
               const SettingsHeading('Delete account'),
               Card(

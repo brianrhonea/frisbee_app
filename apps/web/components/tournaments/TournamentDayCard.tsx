@@ -29,8 +29,14 @@ export function TournamentDayCard({ day: d, showTeam = true }: { day: TeamTourna
     if (days === 1) return `Tomorrow ${time(at)}`;
     return `${at.toLocaleDateString("en-US", { weekday: "short", timeZone: zone })} ${time(at)}`;
   };
-  const { next, last } = d.day;
-  const label = d.day.phase === "tomorrow" ? "Tomorrow" : d.status === "live" ? "Live" : "Today";
+  const { last } = d.day;
+  // The game being played, with its running score from this team's side
+  // (in place of the next game: an earlier one may still need a score).
+  const playing = d.liveGame;
+  const live = playing ? d.live : null;
+  const mineA = playing?.teamA === d.teamId;
+  const next = playing ? { game: playing, opponent: (mineA ? playing.teamB : playing.teamA) ?? null } : d.day.next;
+  const label = d.day.phase === "tomorrow" ? "Tomorrow" : d.status === "live" || live ? "Live" : "Today";
   const record = [
     d.day.wins + d.day.losses > 0 ? `${d.day.wins}–${d.day.losses}` : null,
     d.day.poolPlace != null ? `${ordinal(d.day.poolPlace)} in Pool ${d.day.pool}` : null,
@@ -50,8 +56,22 @@ export function TournamentDayCard({ day: d, showTeam = true }: { day: TeamTourna
       </Link>
       {next ? (
         <div>
-          <small className="muted">{d.day.phase === "tomorrow" ? "First game" : "Next game"}</small>
-          <b className="tournament-day-vs">{next.opponent ? `vs ${nameOf(d, next.opponent)}` : next.game.label}</b>
+          {live ? (
+            <small className="tournament-day-live">
+              <span className="tournament-day-dot" aria-hidden />
+              LIVE NOW
+            </small>
+          ) : (
+            <small className="muted">{d.day.phase === "tomorrow" ? "First game" : "Next game"}</small>
+          )}
+          <span className="tournament-day-headline">
+            <b className="tournament-day-vs">{next.opponent ? `vs ${nameOf(d, next.opponent)}` : next.game.label}</b>
+            {live && (
+              <b className="tournament-day-score" aria-label={`${mineA ? live.scoreA : live.scoreB} to ${mineA ? live.scoreB : live.scoreA}`}>
+                {mineA ? live.scoreA : live.scoreB}–{mineA ? live.scoreB : live.scoreA}
+              </b>
+            )}
+          </span>
           <span className="small">
             {[
               next.game.startsAt ? when(next.game.startsAt) : null,

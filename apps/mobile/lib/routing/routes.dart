@@ -147,6 +147,13 @@ abstract final class Routes {
       '/teams/$teamId/chats/$roomId/settings';
   static String play(String teamId, String playId) =>
       '/teams/$teamId/plays/$playId';
+
+  /// The playbook's whiteboard: a blank one, or a saved sketch. Push it, so
+  /// back returns to the playbook.
+  static String newWhiteboard(String teamId) =>
+      '/teams/$teamId/whiteboards/new';
+  static String whiteboard(String teamId, String playId) =>
+      '/teams/$teamId/whiteboards/$playId';
   // Event pages sit outside the tab shell so they open over whatever tab
   // they're pushed from, and back returns there. Open them with
   // `context.push`, not `go`.
@@ -236,6 +243,9 @@ abstract final class Routes {
 
   // Team meetings, over the shell like events; use `context.push`.
   static const teamMeetingsPath = '/team-meetings';
+
+  /// The team's Meetings list (live, upcoming and past).
+  static String teamMeetings(String teamId) => '$teamMeetingsPath/$teamId';
   static String newMeeting(String teamId, {DateTime? day}) => Uri(
     path: '$teamMeetingsPath/$teamId/new',
     queryParameters: day == null

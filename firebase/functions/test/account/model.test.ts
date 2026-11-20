@@ -50,6 +50,8 @@ describe("eventResponsesOf", () => {
     const event = { rsvps: { me: "going", you: "maybe" }, reactions: { you: ["fire"] }, votes: { me: [0] } };
     expect(eventResponsesOf(event, "me")).toEqual(["rsvps", "votes"]);
     expect(eventResponsesOf({ rsvps: {} }, "me")).toEqual([]);
+    // RSVP notes go too, on events and meetings.
+    expect(eventResponsesOf({ rsvps: { me: "attending" }, rsvpNotes: { me: "Late" } }, "me")).toEqual(["rsvps", "rsvpNotes"]);
     expect(eventResponsesOf({}, "me")).toEqual([]);
   });
 });

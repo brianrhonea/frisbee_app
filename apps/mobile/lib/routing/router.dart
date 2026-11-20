@@ -21,9 +21,11 @@ import '../ui/chat/widgets/chat_room_settings_screen.dart';
 import '../ui/meetings/view_models/meeting_detail_viewmodel.dart';
 import '../ui/meetings/view_models/meeting_editor_viewmodel.dart';
 import '../ui/meetings/view_models/meeting_room_viewmodel.dart';
+import '../ui/meetings/view_models/meetings_list_viewmodel.dart';
 import '../ui/meetings/widgets/meeting_detail_screen.dart';
 import '../ui/meetings/widgets/meeting_editor_screen.dart';
 import '../ui/meetings/widgets/meeting_room_screen.dart';
+import '../ui/meetings/widgets/meetings_list_screen.dart';
 import '../ui/messages/view_models/direct_chat_viewmodel.dart';
 import '../ui/messages/view_models/group_members_viewmodel.dart';
 import '../ui/messages/view_models/inbox_viewmodel.dart';
@@ -35,11 +37,12 @@ import '../ui/core/ui/view_model_host.dart';
 import '../ui/core/ui/slide_over_page.dart';
 import '../ui/notifications/widgets/follow_requests_screen.dart';
 import '../ui/settings/widgets/settings_screen.dart';
-import '../ui/learn/widgets/learn_screen.dart';
 import '../ui/shell/view_models/shell_viewmodel.dart';
 import '../ui/shell/widgets/app_shell.dart';
 import '../ui/playbook/view_models/play_editor_viewmodel.dart';
+import '../ui/playbook/view_models/whiteboard_viewmodel.dart';
 import '../ui/playbook/widgets/play_editor_screen.dart';
+import '../ui/playbook/widgets/whiteboard_screen.dart';
 import '../ui/notifications/view_models/notification_settings_viewmodel.dart';
 import '../ui/notifications/view_models/notifications_viewmodel.dart';
 import '../ui/notifications/widgets/notification_settings_screen.dart';
@@ -179,7 +182,7 @@ GoRouter router(
         builder: (_, vm) => RecordWorkoutScreen(viewModel: vm),
       ),
     ),
-    GoRoute(path: Routes.learn, builder: (_, _) => const LearnScreen()),
+    GoRoute(path: Routes.learn, builder: (_, _) => learnPage()),
     // Settings, from the gear on the user's profile: slides over the page
     // (a panel on wide screens), and its sections slide over it.
     GoRoute(
@@ -455,10 +458,19 @@ GoRouter router(
     // Routes.teamMeetingsPath).
     GoRoute(
       path: '${Routes.teamMeetingsPath}/:teamId',
-      redirect: (_, state) {
+      // The team's Meetings list (F17).
+      builder: (_, state) {
         final teamId = state.pathParameters['teamId']!;
-        final base = '${Routes.teamMeetingsPath}/$teamId';
-        return state.uri.path == base ? Routes.teamEvents(teamId) : null;
+        return ViewModelHost(
+          key: ValueKey('meetings-$teamId'),
+          create: (c) => MeetingsListViewModel(
+            teamId: teamId,
+            meetingRepository: c.read(),
+            teamRepository: c.read(),
+            authRepository: c.read(),
+          ),
+          builder: (_, vm) => MeetingsListScreen(viewModel: vm),
+        );
       },
       routes: [
         GoRoute(
@@ -847,6 +859,25 @@ GoRouter router(
                             authRepository: c.read(),
                           ),
                           builder: (_, vm) => PlayEditorScreen(viewModel: vm),
+                        );
+                      },
+                    ),
+                    GoRoute(
+                      path: 'whiteboards/:playId',
+                      parentNavigatorKey: _rootKey,
+                      builder: (_, state) {
+                        final teamId = state.pathParameters['teamId']!;
+                        final playId = state.pathParameters['playId']!;
+                        return ViewModelHost(
+                          key: ValueKey('whiteboard-$teamId-$playId'),
+                          create: (c) => WhiteboardViewModel(
+                            teamId: teamId,
+                            playId: playId == 'new' ? null : playId,
+                            playRepository: c.read(),
+                            teamRepository: c.read(),
+                            authRepository: c.read(),
+                          ),
+                          builder: (_, vm) => WhiteboardScreen(viewModel: vm),
                         );
                       },
                     ),

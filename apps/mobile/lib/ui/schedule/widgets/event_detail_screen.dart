@@ -91,6 +91,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
   late final List<Command<void>> _commands = [
     vm.setRsvp,
+    vm.saveNote,
     vm.toggleReaction,
     vm.vote,
     vm.deleteEvent,
@@ -507,13 +508,26 @@ class _RsvpSection extends StatelessWidget {
       title: 'Are you in?',
       action: vm.needsRsvp ? const NeedsYouPill('Needs RSVP') : null,
       padding: const EdgeInsets.all(14),
-      child: RsvpChoice<RsvpStatus>(
-        options: [
-          for (final s in RsvpStatus.values)
-            (value: s, label: s.labelFor(type), count: r[s]!.length),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          RsvpChoice<RsvpStatus>(
+            options: [
+              for (final s in RsvpStatus.values)
+                (value: s, label: s.labelFor(type), count: r[s]!.length),
+            ],
+            selected: vm.myRsvp,
+            onChanged: vm.setRsvp.running ? null : vm.setRsvp.execute,
+          ),
+          // A note goes with an answer, and goes when it's taken back.
+          if (vm.myRsvp != null) ...[
+            const SizedBox(height: 10),
+            RsvpNoteField(
+              note: vm.myNote,
+              onSave: vm.saveNote.running ? null : vm.saveNote.execute,
+            ),
+          ],
         ],
-        selected: vm.myRsvp,
-        onChanged: vm.setRsvp.running ? null : vm.setRsvp.execute,
       ),
     );
   }
@@ -691,7 +705,7 @@ class _Responses extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final r = viewModel.responses;
+    final r = viewModel.responders;
     final type = viewModel.event?.type ?? EventType.other;
     return SectionCard(
       title: 'Responses',
@@ -701,10 +715,14 @@ class _Responses extends StatelessWidget {
           for (final s in RsvpStatus.values)
             (
               label: s.labelFor(type),
-              names: r[s]!,
+              people: r[s]!,
               tone: s == RsvpStatus.going ? RsvpTone.yes : RsvpTone.other,
             ),
-          (label: 'No reply', names: viewModel.noResponse, tone: RsvpTone.none),
+          (
+            label: 'No reply',
+            people: withoutNotes(viewModel.noResponse),
+            tone: RsvpTone.none,
+          ),
         ],
       ),
     );

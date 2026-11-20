@@ -176,6 +176,29 @@ export function leagueGameEvent(args: {
   };
 }
 
+/**
+ * Whether a game write changed nothing but its running score (`live`,
+ * kept by the API while the game is played, point by point): nothing a
+ * team's schedule shows, so the trigger can skip it.
+ */
+export function onlyLiveChanged(before: Data | undefined, after: Data | undefined): boolean {
+  if (!before || !after) return false;
+  const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
+  keys.delete("live");
+  for (const k of keys) {
+    const a = before[k];
+    const b = after[k];
+    const ma = millisOrNull(a);
+    const mb = millisOrNull(b);
+    if (ma !== null || mb !== null) {
+      if (ma !== mb) return false;
+    } else if (JSON.stringify(a) !== JSON.stringify(b)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /** Which fields of an event differ from what the game now says. */
 export function changedGameEvent(current: Data | undefined, wanted: Data): Data | null {
   if (!current) return wanted;

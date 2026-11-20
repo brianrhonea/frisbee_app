@@ -7,11 +7,13 @@ import { audienceLine, type Meeting, meetingHref, meetingsHref, roomHref, useTea
 import "./meetings.css";
 import { DateTile } from "../DateTile";
 import { startOfToday } from "@/lib/dates";
+import { meetingAnswer, needsRsvp, RsvpPill } from "../../RsvpPill";
 
 /**
  * The team's video meetings (/teams/:id/meetings): live ones first, then
- * what's coming up, past ones on request. Admins schedule them. The app
- * lists them on the team's schedule beside events.
+ * what's coming up, past ones on request. Admins schedule them. Rows
+ * show the member's answer, with "Needs RSVP" while it's theirs to give
+ * (the app's MeetingsListScreen, which also lists them on the schedule).
  */
 export function MeetingsList() {
   const { teamId, viewer } = useTeamHub();
@@ -24,6 +26,7 @@ export function MeetingsList() {
   if (!meetings.data) return <p className="muted" aria-busy="true">Loading meetings…</p>;
 
   const admin = viewer.can("manageEvents");
+  const uid = viewer.uid;
   const today = startOfToday().getTime();
   const isPast = (m: Meeting) => m.status === "ended" || (m.status !== "live" && Date.parse(m.startsAt ?? "") < today);
   const live = meetings.data.filter((m) => m.status === "live");
@@ -51,7 +54,7 @@ export function MeetingsList() {
       {!past && live.length > 0 && (
         <section className="card">
           <h2 className="card-title">Live now</h2>
-          <MeetingRows teamId={teamId} meetings={live} live />
+          <MeetingRows teamId={teamId} uid={uid} meetings={live} live />
         </section>
       )}
       <section className="card">
@@ -59,35 +62,45 @@ export function MeetingsList() {
         {shown.length === 0 ? (
           <p className="empty">{past ? "No past meetings." : admin ? "No meetings scheduled. Schedule one for film, planning or a chat." : "No meetings scheduled."}</p>
         ) : (
-          <MeetingRows teamId={teamId} meetings={shown} />
+          <MeetingRows teamId={teamId} uid={uid} meetings={shown} />
         )}
       </section>
     </div>
   );
 }
 
-function MeetingRows({ teamId, meetings, live = false }: { teamId: string; meetings: Meeting[]; live?: boolean }) {
+function MeetingRows({ teamId, uid, meetings, live = false }: { teamId: string; uid: string; meetings: Meeting[]; live?: boolean }) {
   return (
     <ul className="meeting-rows">
-      {meetings.map((m) => (
+      {meetings.map((m) => {
+        const answer = meetingAnswer(m.rsvps?.[uid]);
+        const ended = m.status === "ended";
+        const going = Object.values(m.rsvps ?? {}).filter((a) => a === "attending").length;
+        return (
         <li key={m.id} className="meeting-row">
           <Link href={meetingHref(teamId, m.id)} className="meeting-row-main">
             <DateTile startsAt={m.startsAt} />
             <span className="meeting-row-text">
-            <b>{m.title || "Meeting"}</b>
+            <b>
+              {m.title || "Meeting"}
+              {m.status === "live" && <span className="meeting-badge live">Live</span>}
+            </b>
             <small className="muted">
               {whenLine(m)} · {audienceLine(m)}
-              {m.status === "ended" ? " · Ended" : ""}
+              {ended ? " · Ended" : going > 0 ? ` · ${going} going` : ""}
             </small>
             </span>
           </Link>
-          {live && (
+          {live ? (
             <Link className="btn btn-primary btn-small" href={roomHref(teamId, m.id)}>
               Join
             </Link>
+          ) : (
+            !ended && <RsvpPill answer={answer} needs={needsRsvp(answer, m.startsAt, m.endsAt)} />
           )}
         </li>
-      ))}
+        );
+      })}
     </ul>
   );
 }

@@ -30,6 +30,10 @@ import '../data/repositories/ranking/ranking_repository_firebase.dart';
 import '../data/repositories/meeting/meeting_repository.dart';
 import '../data/repositories/meeting/meeting_repository_firebase.dart';
 import '../data/repositories/meeting/meeting_settings_repository.dart';
+import '../data/repositories/schedule/schedule_settings_repository.dart';
+import '../data/repositories/team/team_hints_repository.dart';
+import '../data/repositories/discover/discover_repository.dart';
+import '../data/repositories/learn/learn_progress_repository.dart';
 import '../data/repositories/notification/notification_repository.dart';
 import '../data/repositories/notification/notification_repository_firebase.dart';
 import '../data/repositories/draft/message_draft_repository.dart';
@@ -197,6 +201,7 @@ List<SingleChildWidget> get firebaseProviders => [
   Provider<HostedTournamentRepository>(
     create: (context) => HostedTournamentRepositoryFirebase(
       functions: context.read<CallableClient>(),
+      api: context.read<ApiClient?>(),
     ),
   ),
   Provider<RankingRepository>(create: (_) => RankingRepositoryFirebase()),
@@ -205,6 +210,7 @@ List<SingleChildWidget> get firebaseProviders => [
     create: (context) => ChatRepositoryFirebase(
       attachments: context.read<AttachmentStorage>(),
       outbox: context.read<OutboxRepository>(),
+      api: context.read<ApiClient?>(),
     ),
   ),
   Provider<DirectMessageRepository>(
@@ -234,6 +240,16 @@ List<SingleChildWidget> get firebaseProviders => [
   ),
   Provider<MeetingMediaService>(create: (_) => LiveKitMediaService()),
   Provider(create: (_) => MeetingPresence()),
+  Provider<TeamHintsRepository>(create: (_) => TeamHintsRepositoryPrefs()),
+  Provider<LearnProgressRepository>(
+    create: (_) => LearnProgressRepositoryPrefs(),
+  ),
+  Provider<DiscoverRepository>(
+    create: (context) => DiscoverRepositoryApi(api: context.read<ApiClient?>()),
+  ),
+  Provider<ScheduleSettingsRepository>(
+    create: (_) => ScheduleSettingsRepositoryPrefs(),
+  ),
   Provider<MeetingSettingsRepository>(
     create: (_) => MeetingSettingsRepositoryPrefs(SharedPreferencesService()),
   ),

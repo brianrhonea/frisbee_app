@@ -574,8 +574,204 @@ everything the app does on the website alone, styled like the website
    you hosting?" / "Host as" (Tournament · League · Hat); [x] RSVP counts
    on each answer, "Needs RSVP", "Directions", "Notes"; [x] compact team
    header with initials and Message; [x] Light / Dark / System on both.
-   Each platform keeps its own layout. Not yet on the app: public pickup
-   games on Discover (F29).
+   Each platform keeps its own layout.
+26. Playbook whiteboard (F31): [x] app; [x] website. A "Plays |
+    Whiteboard" switch on the playbook; the whiteboard is a field to
+    sketch on (pen in white, navy, turf or amber; offense, defense,
+    disc and cones to drop and drag; erase, undo, clear). Anyone who
+    sees the playbook can sketch; those who can edit plays save it as a
+    play (pieces as the setup, strokes kept) or as a whiteboard (a play
+    doc with `kind: "whiteboard"`, no steps), listed under the switch.
+    Leaving with an unsaved sketch asks "Discard sketch?". Plays keep
+    pen strokes (`drawings`, painted under arrows; the play editor
+    erases and clears them). Data: `playDrawingSchema`, `playKinds`,
+    `drawingColors`, `playLimits.drawings`/`drawingPoints` in
+    `@stall10/shared`; vectors `fixtures/playbook/play_docs.json`. Web:
+    `/teams/:id/playbook?view=whiteboard`, `/teams/:id/whiteboards/new`
+    and `/whiteboards/:playId` (notifications' `webRoute` opens them),
+    logic in `components/team/playbook/whiteboard_state.ts` (no web
+    unit-test runner yet). Tests: app
+    `test/ui/whiteboard_viewmodel_test.dart`,
+    `test/ui/whiteboard_test.dart`; shared `routes.test.ts`.
+27. New teams start simple (F21): [x] app; [x] website. A new team
+    (not a community) stores `sections: {playbook, videos, stats,
+    meetings}` all false, so it starts with Feed, Schedule, Chat and
+    Roster (Tournaments under More); a missing map or key reads as on, so
+    older teams keep everything. The owner turns them on in Settings ›
+    Sections (a switch each, with a one-line description); an off section
+    has no tab or More row, and with Meetings off, New on the schedule
+    adds an event straight away. A brand-new team's owner sees a
+    dismissible hint. Data: `optionalTeamSections`, `newTeamSections`,
+    `sectionOn`, `setTeamSectionsRequestSchema` in `@stall10/shared`;
+    `PUT /v1/teams/:id/sections` (owner only; rules `setSections`);
+    vectors `fixtures/team_create.json`. Tests: app
+    `test/ui/team_sections_test.dart`; API `documents.test.ts`,
+    `membership.test.ts`; rules "team sections".
+28. Live running scores (F1; app 0.0.37, web 0.46.0, api 0.34.0):
+    [x] app; [x] website. While a game is played, either team's captain
+    or the host's event managers keep its running score on the game's
+    day (from 2 hours before its start to 24 hours after; not on a draft
+    or finished event, a game without both teams, or one already
+    reported or final): app a "Live score" sheet, website a "Live score"
+    dialog, both with "Start game" (0–0), "+1" and an undo per team, the
+    score big in the scoreboard face, "Report final score" (a captain) or
+    "Set final score" (the host) opening the usual score form filled in
+    from the running score, and "Stop live score" ("Stop the live
+    score?"). Taps show at once and are sent in the background (absolute
+    scores, latest wins, one request at a time); a failed send goes back
+    to the server's score and shows the API's message. It's never the
+    final: the game stays scheduled and the final is still reported and
+    confirmed (or set by the host). [x] Everyone following sees it on
+    both: a red LIVE pill and the score on the game (with "Live score.
+    It isn't final until it's reported."), "Start game" / "Update live
+    score" on the game for those who keep it, the navy header's "nameA
+    7–5 nameB · +N more live" (the viewer's own game first), the
+    tournament-day card's "LIVE NOW" with the score from the team's side
+    (the team's live game in place of its next), and Discover's Live now
+    cards ("nameA 9–7 nameB · Field 3", up to three, then "+N more
+    live"). Visitors read it from the public page and list
+    (`game.live`, `card.liveGames`). A game is live while it's scheduled
+    and its running score was updated in the last 3 hours. Data:
+    `games/{id}.live`, written only by the API (`POST`/`DELETE
+    /v1/tournaments/:id/divisions/:divisionId/games/:gameId/live`);
+    `liveScoreRequestSchema`, `liveLimits`, `isLiveGame`, `inLiveWindow`
+    in `@stall10/shared`. Tests: app `test/ui/live_scores_test.dart`;
+    API `tournaments.test.ts`, `public_tournaments.test.ts` (the website
+    has no test runner; its rules are the shared ones).
+29. Note on an RSVP (F7): [x] app; [x] website. With an answer to a
+    team event (Going / Maybe / Can't go) or a meeting (Attending / Not
+    attending), a member can add a short note under it ("Add a note
+    (optional)", Save or Enter; e.g. "Late 15 min"): one line, up to 140
+    characters, control characters stripped and spaces trimmed; empty
+    removes it. Changing the answer keeps the note; taking the answer
+    back removes it. The note shows in quotes after the person's name in
+    Responses (events) and Invited (meetings), to whoever sees those.
+    Data: `rsvpNotes` (uid → note) on `teams/{id}/events/{id}` and
+    `teams/{id}/meetings/{id}`; `rsvpNoteMax`, `cleanRsvpNote`,
+    `rsvpNoteSchema`, `nextRsvpNotes` in `@stall10/shared` (the app's
+    `cleanRsvpNote` matches); `note` on `PUT .../events/:id/rsvp` and
+    `PUT .../meetings/:id/rsvp` (left out keeps it); rules
+    `validRsvpNote` for the app's direct writes; account deletion
+    removes the user's notes. Tests: app `schedule_viewmodels_test.dart`,
+    `meetings_viewmodels_test.dart`, `meetings_screens_test.dart`; API
+    `hub.test.ts`, `meetings.test.ts`; shared `rsvp_notes.test.ts`;
+    rules "a short note to their own answer"; functions
+    `account/model.test.ts`.
+30. Schedule month view (F16): [x] app; [x] website. The personal
+    Schedule has a Week / Month switch on the app (Week is the week
+    strip) and List / Month on the website (List is the upcoming list),
+    remembered on the device (app preferences; browser storage). Month
+    is a calendar grid, Monday first, of the whole weeks around the
+    month (`monthGrid` on both), each day with dots: team blue,
+    personal magenta, amber when something on it still needs an RSVP;
+    today in turf, the picked day outlined. Arrows move a month (today
+    picked in this month, else the 1st), Today comes back, and a day
+    from the next or previous month opens it. The picked day's entries
+    are listed below with the usual rows, through the All / Team /
+    Personal filter (`scheduleOnDay` in `@stall10/shared`, the app's
+    `eventsOn`). The month reads its own range (calendars for the grid;
+    on the website team events from the grid's first day). No data
+    changes. Tests: app `test/ui/schedule_month_test.dart`; shared
+    `schedule.test.ts`.
+31. Meetings list (F17): [x] app; [x] website. A team's Meetings page:
+    Upcoming / Past switch; "Live now" first with Join; Coming up
+    soonest first (a meeting earlier today that hasn't started stays
+    here); Past (ended, or started before today) newest first. Rows have
+    the date tile, title (Live pill when live), when and who's invited
+    (and "N going"), and the member's answer, with "Needs RSVP" in amber
+    while it's theirs to give. Admins get "New meeting". App: More ›
+    Meetings and "Meetings" on the team's schedule
+    (`/team-meetings/:teamId`, which used to redirect to the schedule),
+    only with Meetings on (Settings › Sections); website: the Meetings
+    tab. Tests: app `test/ui/meetings_list_test.dart`,
+    `event_navigation_test.dart` ("More opens the team's Meetings
+    list").
+32. Pinned messages and event cards in team rooms (F2, F3): [x] app;
+    [x] website. **Pins:** the owner and chat managers who can read a
+    room pin and unpin a message (app: its long-press sheet; website:
+    Pin / Unpin in its actions). A "Pinned" strip under the room's header
+    shows the newest pin; a tap or click lists every pin with its whole
+    text (opening it in context isn't cheap in a paged thread), with
+    Unpin for those who pin. At most 10 a room: pinning an 11th asks
+    which pin to take down and swaps them in one write. A deleted
+    message's pin goes with it (clients list pins with a query on the
+    messages, `orderBy pinnedAt`; the room's `pins` ids, kept for the
+    limit, drop deleted ones). Team rooms only, not direct messages.
+    **Event cards:** someone who can post in the room and add the team's
+    events picks "Share an event" in the composer's attach menu and an
+    upcoming event; it posts a message carrying `event: {id, title}`,
+    shown as a card: date tile, title, time and place, the member's
+    answer and Going count, and Going / Maybe / Can't go (the event's
+    own RSVP path; amber "RSVP needed" while unanswered; picking the
+    current answer takes it back). A deleted event, or one the reader
+    can't see, shows "Event no longer available". A community shares
+    only events for everyone. The push says "<name> shared an event:
+    <title>". Both are API-only from the start (`PUT|DELETE
+    .../messages/:id/pin`, `POST .../event-shares`; firestore.rules
+    already keeps clients from setting these fields), so the app needs
+    `API_BASE_URL` for them. Chat polls are not built (backlog). Tests:
+    API `test/chat_extras.test.ts`; functions
+    `test/notifications/model.test.ts`; app `test/ui/chat_extras_test.dart`.
+    The website's side is checked by typecheck and by hand.
+33. Public team page switch and Download your data (F12, F14): [x] app;
+    [x] website. **Public team page:** team Settings › Visibility has a
+    "Public team page" switch (teams only; groups use "Approve who
+    joins"). Everyone on the team sees it; admins (manageTeam, as for
+    the details) switch it through `PUT /v1/teams/:id/public-page`, which
+    writes `publicPage: false` on the team doc and its listing (on
+    removes it; missing reads as on). Off, people outside the team see
+    only its card, as a private group's: no public posts, events or
+    roster (signed-out or signed in), no shared event posts, and its
+    hosted events and rankings drop out of the public lists; search
+    still finds it by name. It only hides more: youth rosters stay
+    private either way. The app now shows team Settings to admins, not
+    only the owner (Sections stay the owner's). **Download your data:**
+    Settings › Account › Your data fetches `GET /v1/me/export`, a JSON
+    file of the caller's account, profile, personal details, settings,
+    follows, posts, comments, messages they sent, conversations (who's
+    in them), teams with their own role, their RSVPs and answers,
+    personal events and roster spots; never other people's messages,
+    answers or details. Once every 10 minutes. App: the share sheet
+    (Files, Drive, mail); website: a file download. Blocked accounts
+    (F11) aren't built: there's no blocking yet. Tests: API
+    `test/data_export.test.ts`, `membership.test.ts` (public page),
+    `browse.test.ts`, `roster.test.ts`, `post_tags_events.test.ts`;
+    rules `firestore.rules.test.ts`, `storage.rules.test.ts`; app
+    `test/ui/team_public_page_test.dart`, `download_data_test.dart`,
+    `team_sections_test.dart`. The website's side is checked by
+    typecheck and by hand.
+34. Discovery: Learn progress, spots left, public pickup games (F9, F10,
+    F29): [x] app; [x] website. **Learn progress:** the guide's contents
+    show "N of 12 read" and a tick on each lesson read, with a neutral
+    "Mark all unread". A lesson counts as read once the end of it has
+    stayed on screen for 2 seconds (`learnReadAfterMs`). The lessons
+    (ids, titles, order) are `learnLessons` in
+    `packages/shared/src/discover.ts`; the app's `learnSections` match
+    (vectors `fixtures/discover/learn.json`). Kept on the device only
+    (localStorage `learn.read`; the app's shared preferences), not
+    synced between devices. **Spots left:** tournament and league cards
+    (Discover, Tournaments, a host's Tournaments section, visitors' list)
+    say "N spots left" (turf) or "Full · waitlist" (neutral) while
+    registration is open, for events that take teams (hat tournaments'
+    players aren't capped): each division's cap less its accepted
+    teams. `GET /v1/public/tournaments` works it out (`spots`, from the
+    divisions); members' live lists read it from there (one cached
+    read). Without the API (app builds with no `API_BASE_URL`), or for
+    a private group's event (not in the public list), no line shows.
+    Home has no tournament list (only tournament-day cards), so nothing
+    there. **Public pickup games:** the app's Discover now lists public
+    team events from `GET /v1/public/events` as the website does: every
+    one under All ("Team events"), pickup games under Pickup ("Pickup
+    games"), and in search results ("Events" / "Pickup games"). Rows:
+    date, title, team or community with a dot (turf for pickup, team
+    blue otherwise), when and where, and type. A row opens the event for
+    the team's members, else the team or community's page (only members
+    read events), as the website links the team. Not on the app: the
+    website's week strip and community (group) tournaments in that list.
+    Tests: shared `test/discover_fixtures.test.ts`; API
+    `public_tournaments.test.ts` (spots); app `test/ui/learn_test.dart`,
+    `discover_public_test.dart`, `test/shared_fixtures/discover_fixtures_test.dart`.
+    The website's side is checked by typecheck and by hand.
 
 Out of scope: payments, meeting recording, USA Ultimate data.
 

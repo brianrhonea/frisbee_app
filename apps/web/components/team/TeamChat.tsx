@@ -17,7 +17,8 @@ import { PendingMessages } from "../PendingMessages";
 import { type Doc, useLiveDoc, useLiveQueries, useLiveQuery } from "@/lib/live";
 import { usePagedMessages, useThreadScroll } from "@/lib/messages";
 import { ChatManager, type ManagedFolder, type ManagedRoom } from "./ChatManager";
-import { useTeamHub } from "./TeamContext";
+import { ChatEventCard, PinnedStrip, ShareEventDialog, usePinActions, useRoomPins } from "./ChatExtras";
+import { type TeamViewer, useTeamHub } from "./TeamContext";
 import { MembersOnlySection } from "./TeamNav";
 import { VoiceRoom } from "./meetings/VoiceRoom";
 import { useVoice } from "../voice/VoiceProvider";
@@ -33,6 +34,10 @@ interface Message {
   createdAt?: string;
   replyTo?: { authorName?: string; text?: string };
   reactions?: Record<string, string>;
+  /** A shared team event, shown as a card (F3). */
+  event?: { id?: string; title?: string };
+  /** Pinned to the room (F2). */
+  pinnedAt?: string;
 }
 
 /** Messages per page, live and older (MessageThreadViewModel.pageSize). */
@@ -159,6 +164,9 @@ export function TeamChat() {
                 (open.writeUsers ?? []).includes(member.uid)
               }
               canModerate={member.tier === "owner" || member.can("moderate") || member.can("manageChats")}
+              canPin={member.tier === "owner" || member.can("manageChats")}
+              canShareEvents={member.can("manageEvents")}
+              viewer={member}
             />
           )
         ) : (
@@ -176,6 +184,9 @@ function Thread({
   me,
   canWrite,
   canModerate,
+  canPin,
+  canShareEvents,
+  viewer,
 }: {
   teamId: string;
   roomId: string;
@@ -183,8 +194,18 @@ function Thread({
   me: string;
   canWrite: boolean;
   canModerate: boolean;
+  /** The owner and chat managers pin messages (F2). */
+  canPin: boolean;
+  /** Members who add the team's events share them here as cards (F3). */
+  canShareEvents: boolean;
+  viewer: TeamViewer;
 }) {
   const [replyTo, setReplyTo] = useState<Doc<Message> | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const pins = useRoomPins<Message>(teamId, roomId);
+  const pinActions = usePinActions(teamId, roomId);
+  // From the live pins only: older pages of messages aren't live.
+  const pinned = new Set((pins.data ?? []).map((p) => p.id));
   const base = `/v1/teams/${encodeURIComponent(teamId)}/chats/${encodeURIComponent(roomId)}/messages`;
   const messages = usePagedMessages<Message>(`teams/${teamId}/chats/${roomId}/messages`, pageSize);
   const body = useRef<HTMLDivElement>(null);
@@ -199,6 +220,7 @@ function Thread({
           <MuteButton target={{ teamId, roomId }} />
         </span>
       </header>
+      <PinnedStrip pins={pins.data ?? []} canPin={canPin} actions={pinActions} />
       <div className="thread-body" aria-live="polite" ref={body} onScroll={loadAtTop(messages)}>
         <OlderMessages paged={messages} />
         {messages.error ? (
@@ -226,6 +248,7 @@ function Thread({
                   {!grouped && (
                     <p className="message-meta">
                       <b>{m.authorName || "Member"}</b> <LocalTime iso={m.createdAt} style="relative" />
+                      {pinned.has(m.id) && <span className="message-pinned">📌 Pinned</span>}
                     </p>
                   )}
                   {m.replyTo && (
@@ -234,6 +257,7 @@ function Thread({
                     </p>
                   )}
                   {m.text && <p className="message-text">{m.text}</p>}
+                  {m.event?.id && <ChatEventCard teamId={teamId} eventId={m.event.id} uid={me} />}
                   {(m.attachments ?? []).map((a) => (
                     <ChatAttachment key={a.path} file={a} />
                   ))}
@@ -253,6 +277,13 @@ function Thread({
                   canDelete={m.authorId === me || canModerate}
                   onReply={canWrite ? () => setReplyTo(m) : undefined}
                   onDeleted={() => messages.removed(m.id)}
+                  extra={
+                    canPin && m.createdAt ? (
+                      <button type="button" className="text-btn" onClick={() => void (pinned.has(m.id) ? pinActions.unpin(m.id) : pinActions.pin(m.id))}>
+                        {pinned.has(m.id) ? "Unpin" : "Pin"}
+                      </button>
+                    ) : undefined
+                  }
                 />
               </div>
             );
@@ -269,10 +300,12 @@ function Thread({
           onClearReply={() => setReplyTo(null)}
           draftKey={`chat_${teamId}_${roomId}`}
           outbox={{ kind: "teamChat", target: `${teamId}/${roomId}` }}
+          onShareEvent={canShareEvents ? () => setSharing(true) : undefined}
         />
       ) : (
         <footer className="thread-foot muted small">You can read this room but not post in it.</footer>
       )}
+      {sharing && <ShareEventDialog teamId={teamId} roomId={roomId} viewer={viewer} onClose={() => setSharing(false)} />}
     </div>
   );
 }

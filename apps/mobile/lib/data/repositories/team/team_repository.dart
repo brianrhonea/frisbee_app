@@ -63,6 +63,17 @@ abstract class TeamRepository {
   /// Saves the team's details and its public directory listing.
   Future<Result<void>> updateTeam(Team team);
 
+  /// Owner only: switches [changes]' optional sections on (true) or off
+  /// (false); the others keep what they have.
+  Future<Result<void>> setSections(
+    String teamId,
+    Map<OptionalSection, bool> changes,
+  );
+
+  /// Admins (manageTeam) only: turns the team's public page on or off
+  /// ([Team.publicPage]), its listing with it. Through the API only.
+  Future<Result<void>> setPublicPage(String teamId, bool on);
+
   /// Teams in the public directory whose name or city words start with the
   /// words of [query].
   Future<Result<List<TeamListing>>> searchTeams(String query);

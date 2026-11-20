@@ -55,8 +55,12 @@ class EventEditorViewModel extends ChangeNotifier {
   final DateTime? _initialDay;
 
   /// A new event can be posted for followers, unless it's on a private
-  /// group's schedule (members only).
-  bool get canShare => isNew && _posts != null && !isPrivateGroup;
+  /// group's schedule (members only) or a team's whose public page is off.
+  bool get canShare =>
+      isNew &&
+      _posts != null &&
+      !isPrivateGroup &&
+      (scheduleTeam?.publicPage ?? true);
 
   String? _shareMessage;
 

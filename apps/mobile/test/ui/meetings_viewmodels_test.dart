@@ -387,6 +387,28 @@ void main() {
       expect(vm.canEdit, isFalse);
       vm.dispose();
     });
+
+    test('notes on answers show for invitees and go with the answer', () async {
+      final vm = MeetingDetailViewModel(
+        teamId: 't1',
+        meetingId: 'm1',
+        meetingRepository: meetings,
+        teamRepository: teams,
+        authRepository: FakeAuthRepository(user: player),
+      );
+      await pumpEventQueue();
+      await vm.saveNote.execute('Early');
+      expect(vm.saveNote.error, isTrue);
+      await vm.setRsvp.execute(MeetingRsvp.attending);
+      await vm.saveNote.execute(' Joining late ');
+      await pumpEventQueue();
+      expect(vm.myNote, 'Joining late');
+      expect(vm.responders[MeetingRsvp.attending]!.single.note, 'Joining late');
+      await vm.setRsvp.execute(null);
+      await pumpEventQueue();
+      expect(vm.myNote, isEmpty);
+      vm.dispose();
+    });
   });
 
   group('schedules', () {

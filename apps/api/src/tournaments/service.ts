@@ -26,6 +26,9 @@ import {
   gamesToPlay,
   hostedStatuses,
   type HostedStatus,
+  inLiveWindow,
+  liveScoreOf,
+  liveScoreRequestSchema,
   inviteRequestSchema,
   isDone,
   laterGamesPlayed,
@@ -49,7 +52,7 @@ import type { Caller } from "../auth.js";
 import { ApiError, parseBody } from "../errors.js";
 import { docIdParam, storedId } from "../ids.js";
 import type { DocQueries } from "../queries.js";
-import { type Data, type DocStore, serverTime, type Tx } from "../store.js";
+import { type Data, type DocStore, deleteField, serverTime, type Tx } from "../store.js";
 import { can, kindOf, mapOf, strings } from "../teams/access.js";
 
 
@@ -160,6 +163,7 @@ export class TournamentService {
   constructor(
     private readonly store: DocStore,
     private readonly queries: DocQueries,
+    private readonly now: () => number = Date.now,
   ) {}
 
   // ---- Who's who -----------------------------------------------------------
@@ -804,6 +808,72 @@ export class TournamentService {
       const done: EngineGame = { ...g, status: "done", scoreA: s.scoreA, scoreB: s.scoreB, report: null };
       tx.update(p.game(id, divId, gameId), { status: "done", scoreA: s.scoreA, scoreB: s.scoreB, report: null });
       for (const f of fillsAfter(done, games, true)) tx.update(p.game(id, divId, f.gameId), fillUpdate(f));
+    });
+  }
+
+  /**
+   * The checks for a running score on [g] (setLive, clearLive): the event
+   * is under way (not a draft or finished), the game has both teams and is
+   * still scheduled (no score reported or final), and the caller is one of
+   * its teams' captains (who report its score) or one of the host's event
+   * managers. Returns the captain's team, or null for a manager.
+   */
+  private liveCheck(t: Data, manager: boolean, d: Data | null, g: Data | null, uid: string): string | null {
+    if (!d || !g) throw new ApiError("not_found", "That game doesn't exist.");
+    const status = statusOf(t);
+    if (status === "draft" || status === "finished") throw new ApiError("failed_precondition", "This event isn't being played.");
+    if (g.teamA == null || g.teamB == null) throw new ApiError("failed_precondition", "Teams are decided by earlier games.");
+    if (g.status === "done") throw new ApiError("failed_precondition", "That game is final.");
+    if (g.status === "reported") throw new ApiError("failed_precondition", "A final score is already reported for this game.");
+    const byTeam = this.captainOf(d, g.teamA as string, uid)
+      ? (g.teamA as string)
+      : this.captainOf(d, g.teamB as string, uid)
+        ? (g.teamB as string)
+        : null;
+    if (!byTeam && !manager) throw new ApiError("permission_denied", "Only the teams' captains and the host keep the live score.");
+    return byTeam;
+  }
+
+  /**
+   * setLive(): the running score while the game is played ([body]
+   * {scoreA, scoreB}, 0–0 to start it). Not the final: the game stays
+   * scheduled and the final is still reported and confirmed. Only from
+   * liveLimits.earlyMs before the game's start to liveLimits.lateMs after.
+   * The first live game makes a scheduled event live.
+   */
+  async setLive(caller: Caller, rawId: unknown, rawDiv: unknown, rawGame: unknown, body: unknown): Promise<void> {
+    const id = docIdParam(rawId);
+    const divId = docIdParam(rawDiv);
+    const gameId = docIdParam(rawGame);
+    const s = parseBody(liveScoreRequestSchema, body);
+    await this.store.transact(async (tx) => {
+      const { t, manager } = await this.visible(tx, id, caller.uid);
+      const d = await tx.get(p.division(id, divId));
+      const g = await tx.get(p.game(id, divId, gameId));
+      this.liveCheck(t, manager, d, g, caller.uid);
+      const startsAt = engineGame(gameId, g).startsAt;
+      if (!inLiveWindow(startsAt, this.now())) {
+        throw new ApiError("failed_precondition", "Live scores are kept on the day the game is played.");
+      }
+      const was = liveScoreOf(g!.live);
+      tx.update(p.game(id, divId, gameId), {
+        live: { scoreA: s.scoreA, scoreB: s.scoreB, startedAt: was?.startedAt ?? serverTime, updatedAt: serverTime, by: caller.uid },
+      });
+      if (statusOf(t) === "scheduled") tx.update(p.tournament(id), { status: "live" });
+    });
+  }
+
+  /** clearLive(): takes the running score off (a game started by mistake); the same people as setLive. */
+  async clearLive(caller: Caller, rawId: unknown, rawDiv: unknown, rawGame: unknown): Promise<void> {
+    const id = docIdParam(rawId);
+    const divId = docIdParam(rawDiv);
+    const gameId = docIdParam(rawGame);
+    await this.store.transact(async (tx) => {
+      const { t, manager } = await this.visible(tx, id, caller.uid);
+      const d = await tx.get(p.division(id, divId));
+      const g = await tx.get(p.game(id, divId, gameId));
+      this.liveCheck(t, manager, d, g, caller.uid);
+      if (g!.live !== undefined) tx.update(p.game(id, divId, gameId), { live: deleteField });
     });
   }
 

@@ -18,6 +18,7 @@ import 'package:frisbee_app/data/repositories/stats/stats_repository.dart';
 import 'package:frisbee_app/data/repositories/team/team_repository.dart';
 import 'package:frisbee_app/data/repositories/team_post/team_post_repository.dart';
 import 'package:frisbee_app/data/repositories/theme/theme_repository.dart';
+import 'package:frisbee_app/data/services/api_client.dart';
 import 'package:frisbee_app/data/services/file_picker_service.dart';
 import 'package:frisbee_app/data/services/image_compressor.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
@@ -206,6 +207,21 @@ class FakeAuthRepository extends AuthRepository {
     _signedOutNotice = 'Account deleted successfully';
     setUser(null);
   });
+
+  /// What [exportData] answers; set an exception to fail it.
+  Object exportResult = '{\n  "format": "stall10-data-export"\n}';
+
+  /// How many times [exportData] ran.
+  int exports = 0;
+
+  @override
+  Future<Result<String>> exportData() async {
+    exports++;
+    return switch (exportResult) {
+      final Exception e => Result.error(e),
+      final Object s => Result.ok('$s'),
+    };
+  }
 
   /// What [reauthMethod] says; password by default.
   SignInMethod? method = SignInMethod.password;
@@ -542,6 +558,10 @@ class FakeTeamRepository implements TeamRepository {
       orgId: team.orgId,
       orgName: team.orgName,
       leagueId: team.leagueId,
+      // As newTeamDocs: a new team starts with its optional sections off.
+      sectionsOff: team.kind == TeamKind.team
+          ? OptionalSection.values.toSet()
+          : const {},
     );
     if (team.kind.isGroupLike) {
       listings[id] = team.listing(id);
@@ -696,6 +716,45 @@ class FakeTeamRepository implements TeamRepository {
     }
     teams[team.id] = team;
     listings[team.id] = TeamListing.of(team);
+    _emit();
+    return const Result.ok(null);
+  }
+
+  /// Every [setSections] call, in order.
+  final sectionChanges = <Map<OptionalSection, bool>>[];
+
+  @override
+  Future<Result<void>> setSections(
+    String teamId,
+    Map<OptionalSection, bool> changes,
+  ) async {
+    final t = teams[teamId];
+    if (t == null) return Result.error(Exception('No such team.'));
+    sectionChanges.add(changes);
+    teams[teamId] = t.copyWith(
+      sectionsOff: {
+        for (final s in OptionalSection.values)
+          if (changes[s] == false ||
+              (changes[s] == null && t.sectionsOff.contains(s)))
+            s,
+      },
+    );
+    _emit();
+    return const Result.ok(null);
+  }
+
+  /// Every [setPublicPage] call, in order.
+  final publicPageChanges = <bool>[];
+
+  @override
+  Future<Result<void>> setPublicPage(String teamId, bool on) async {
+    final t = teams[teamId];
+    if (t == null) return Result.error(Exception('No such team.'));
+    publicPageChanges.add(on);
+    teams[teamId] = t.copyWith(publicPage: on);
+    if (listings.containsKey(teamId)) {
+      listings[teamId] = TeamListing.of(teams[teamId]!);
+    }
     _emit();
     return const Result.ok(null);
   }
@@ -1131,6 +1190,7 @@ class FakeEventRepository implements EventRepository {
   TeamEvent _with(
     String eventId, {
     Map<String, RsvpStatus>? rsvps,
+    Map<String, String>? rsvpNotes,
     Map<String, Set<Reaction>>? reactions,
     Map<String, List<String>>? votes,
   }) {
@@ -1145,6 +1205,7 @@ class FakeEventRepository implements EventRepository {
       notes: e.notes,
       poll: e.poll,
       rsvps: rsvps ?? e.rsvps,
+      rsvpNotes: rsvpNotes ?? e.rsvpNotes,
       reactions: reactions ?? e.reactions,
       votes: votes ?? e.votes,
       createdBy: e.createdBy,
@@ -1165,9 +1226,33 @@ class FakeEventRepository implements EventRepository {
     events[eventId] = _with(
       eventId,
       rsvps: rsvps,
+      rsvpNotes: status == null ? ({...e.rsvpNotes}..remove(uid)) : null,
       reactions: going ? null : ({...e.reactions}..remove(uid)),
       votes: going ? null : ({...e.votes}..remove(uid)),
     );
+    emit();
+    return const Result.ok(null);
+  }
+
+  /// Notes saved with [setRsvpNote], as (eventId, uid, note).
+  final noteWrites = <(String, String, String)>[];
+
+  /// When set, [setRsvpNote] fails as the rules would deny it.
+  bool failNotes = false;
+
+  @override
+  Future<Result<void>> setRsvpNote(
+    String teamId,
+    String eventId,
+    String uid,
+    String note,
+  ) async {
+    if (failNotes) return Result.error(Exception('permission-denied'));
+    noteWrites.add((eventId, uid, note));
+    final e = events[eventId]!;
+    final notes = {...e.rsvpNotes};
+    note.isEmpty ? notes.remove(uid) : notes[uid] = note;
+    events[eventId] = _with(eventId, rsvpNotes: notes);
     emit();
     return const Result.ok(null);
   }
@@ -1556,6 +1641,79 @@ class FakeChatRepository implements ChatRepository {
   @override
   Future<Result<String>> attachmentUrl(ChatAttachment a) async =>
       Result.ok('https://files.test/${a.path}');
+
+  // Pins and event cards (redesign F2, F3), as the API keeps them.
+
+  /// Whether this build "has the API"; pins and event shares need it.
+  bool hasApi = true;
+
+  @override
+  bool get canUseChatExtras => hasApi;
+
+  /// Room id → pinned message ids, newest first.
+  final pinned = <String, List<String>>{};
+
+  /// (roomId, eventId) for each shareEvent call.
+  final shared = <(String, String)>[];
+
+  @override
+  Stream<List<ChatMessage>> watchPins(String teamId, String roomId) => _watch(
+    () => [
+      for (final id in pinned[roomId] ?? const <String>[])
+        ?messages[roomId]?.where((m) => m.id == id).firstOrNull,
+    ],
+  );
+
+  @override
+  Future<Result<void>> pinMessage(
+    String teamId,
+    String roomId,
+    String messageId, {
+    String? unpin,
+  }) async {
+    final pins = (pinned[roomId] ?? const <String>[])
+        .where((id) => id != messageId && id != unpin)
+        .toList();
+    if (pins.length >= chatPinsMax) {
+      return Result.error(
+        const ApiException('failed_precondition', 'Unpin one first.'),
+      );
+    }
+    pinned[roomId] = [messageId, ...pins];
+    emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> unpinMessage(
+    String teamId,
+    String roomId,
+    String messageId,
+  ) async {
+    pinned[roomId]?.remove(messageId);
+    emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> shareEvent(
+    String teamId,
+    String roomId,
+    String eventId,
+  ) async {
+    shared.add((roomId, eventId));
+    (messages[roomId] ??= []).add(
+      ChatMessage(
+        id: 'share${shared.length}',
+        authorId: 'u1',
+        authorName: 'Test User',
+        createdAt: DateTime(2026, 11, 1),
+        event: ChatEventRef(id: eventId, title: eventId),
+      ),
+    );
+    emit();
+    return const Result.ok(null);
+  }
 }
 
 class FakeFilePickerService implements FilePickerService {

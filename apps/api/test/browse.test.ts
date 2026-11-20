@@ -9,7 +9,7 @@ import { FakeStore, FakeTeamRepository, FakeUsers, FakeVerifier } from "./fakes.
 const now = Date.parse("2026-11-11T12:00:00Z");
 const iso = (ms: number) => new Date(ms).toISOString();
 
-const pickHost = (d: Data): Data => Object.fromEntries(["kind", "requiresApproval", "level"].filter((k) => d[k] !== undefined).map((k) => [k, d[k]]));
+const pickHost = (d: Data): Data => Object.fromEntries(["kind", "requiresApproval", "level", "publicPage"].filter((k) => d[k] !== undefined).map((k) => [k, d[k]]));
 
 class FakeBrowse implements BrowseRepository {
   postsList: Doc[] = [];
@@ -223,6 +223,28 @@ describe("public reads", () => {
     t.repo.tournaments = [{ id: "s_1", data: { groupId: "stale", name: "Cup" } }];
     const events = (await t.get("/v1/public/events")).json();
     expect(events).toEqual({ events: [], tournaments: [] });
+  });
+
+  it("shows a team whose public page is off as its card only, by either document", async () => {
+    t.repo.listed("off", { name: "Off", level: "club", publicPage: false, keywords: ["off"] });
+    // The listing is stale: the team doc says off.
+    t.repo.listed("stale", { name: "Stale", level: "club", keywords: ["off"] }, { level: "club", publicPage: false });
+    for (const id of ["off", "stale"]) {
+      t.repo.teamPosts.set(id, [{ id: "tp", data: { title: "hi", public: true } }]);
+      t.repo.teamEvents.set(id, [{ id: "e", data: { title: "practice" } }]);
+      const body = (await t.get(`/v1/public/teams/${id}`)).json();
+      expect(body.posts, id).toEqual([]);
+      expect(body.events, id).toEqual([]);
+      expect(body.team, id).toMatchObject({ id, level: "club", publicPage: false });
+    }
+    t.repo.events = ["off", "stale"].map((id) => ({ id: `e_${id}`, teamId: id, data: { title: "x" } }));
+    expect((await t.get("/v1/public/events")).json().events).toEqual([]);
+    // Still found by name, as its card.
+    const found = (await t.get("/v1/public/teams?q=off")).json().teams;
+    expect(found.map((x: Data) => [x.id, x.publicPage])).toEqual([
+      ["off", false],
+      ["stale", false],
+    ]);
   });
 
   it("shows visitors a youth team's card only: no posts, events or location", async () => {
@@ -598,6 +620,13 @@ describe("visitor access to events, the team finder and rosters", () => {
       expect(res.statusCode, id).toBe(404);
       expect(res.body).not.toContain("Pat Public");
     }
+  });
+
+  it("refuses a team whose public page is off, by its doc or its listing", async () => {
+    seedTeam("off", { name: "Off", level: "club", publicPage: false });
+    seedTeam("doc", { name: "Doc", level: "club", publicPage: false }, { name: "Doc", level: "club" });
+    seedTeam("listing", { name: "Listing", level: "club" }, { name: "Listing", level: "club", publicPage: false });
+    for (const id of ["off", "doc", "listing"]) expect((await t.get(`/v1/public/teams/${id}/roster`)).statusCode, id).toBe(404);
   });
 
   it("refuses when the team doc and its listing disagree", async () => {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../domain/models/discover.dart';
 import '../../../domain/models/hosted_tournament.dart';
 import '../../../routing/routes.dart';
 import '../../core/themes/theme.dart';
@@ -12,6 +13,8 @@ import '../../core/ui/tone.dart';
 import '../view_models/hosted_tournaments_viewmodel.dart';
 import 'hosted_status_badge.dart';
 import 'hosted_tournament_screen.dart';
+import 'spots_left.dart';
+
 import 'tournament_parts.dart';
 
 /// "All" and each status the list has, when it has more than one.
@@ -50,10 +53,14 @@ class HostedTournamentCard extends StatelessWidget {
     super.key,
     required this.tournament,
     this.showHost = true,
+    this.spots,
   });
 
   final HostedTournament tournament;
   final bool showHost;
+
+  /// Team spots left; shown only while registration is open.
+  final TournamentSpots? spots;
 
   @override
   Widget build(BuildContext context) {
@@ -78,6 +85,9 @@ class HostedTournamentCard extends StatelessWidget {
           ].join(' · '),
         ],
         trailing: HostedStatusBadge(status: t.status),
+        below: spots == null || t.status != HostedStatus.registration
+            ? null
+            : SpotsLeft(spots: spots!),
         onTap: () => context.push(Routes.tournament(t.id)),
       ),
     );
@@ -142,7 +152,11 @@ class HostedTournamentsSection extends StatelessWidget {
                     ),
                   ),
                 for (final t in vm.tournaments)
-                  HostedTournamentCard(tournament: t, showHost: false),
+                  HostedTournamentCard(
+                    tournament: t,
+                    showHost: false,
+                    spots: vm.spotsOf(t.id),
+                  ),
                 ...footer,
               ],
             ),
@@ -238,7 +252,7 @@ class FindTournamentsScreen extends StatelessWidget {
                     ),
                   ),
                 for (final t in vm.tournaments)
-                  HostedTournamentCard(tournament: t),
+                  HostedTournamentCard(tournament: t, spots: vm.spotsOf(t.id)),
               ],
             ),
           );
@@ -271,6 +285,7 @@ class _EventRow extends StatelessWidget {
     this.endsOn,
     this.official = false,
     this.trailing,
+    this.below,
   });
 
   final DateTime? startsOn;
@@ -279,6 +294,9 @@ class _EventRow extends StatelessWidget {
   final bool official;
   final List<String> lines;
   final Widget? trailing;
+
+  /// Under the lines (spots left).
+  final Widget? below;
   final VoidCallback onTap;
 
   @override
@@ -337,6 +355,7 @@ class _EventRow extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(fontSize: 12.5, color: c.muted),
                         ),
+                    ?below,
                   ],
                 ),
               ),

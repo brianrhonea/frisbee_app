@@ -222,6 +222,50 @@ void main() {
     expect(meetings.meetings['m1']!.rsvpOf('p1'), MeetingRsvp.attending);
   });
 
+  testWidgets('a note on the answer saves and shows in Invited', (
+    tester,
+  ) async {
+    final vm = MeetingDetailViewModel(
+      teamId: 't1',
+      meetingId: 'm1',
+      meetingRepository: meetings,
+      teamRepository: teams,
+      authRepository: FakeAuthRepository(user: player),
+    );
+    addTearDown(vm.dispose);
+    await pump(
+      tester,
+      MeetingDetailScreen(viewModel: vm),
+      const Size(390, 900),
+    );
+    // Only once there's an answer.
+    expect(find.text('Add a note (optional)'), findsNothing);
+    await tester.tap(find.text('Attending'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Joining late');
+    await tester.pump();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(meetings.meetings['m1']!.noteOf('p1'), 'Joining late');
+    // In quotes after their name, in Invited (built lazily further down).
+    final quoted = find.textContaining(
+      '\u201CJoining late\u201D',
+      findRichText: true,
+      skipOffstage: false,
+    );
+    await tester.ensureVisible(quoted);
+    await tester.pumpAndSettle();
+    expect(quoted, findsOneWidget);
+    // Taking the answer back takes the note too.
+    final answer = find.text('Attending', skipOffstage: false).first;
+    await tester.ensureVisible(answer);
+    await tester.pumpAndSettle();
+    await tester.tap(answer);
+    await tester.pumpAndSettle();
+    expect(meetings.meetings['m1']!.noteOf('p1'), isEmpty);
+    expect(find.text('Add a note (optional)'), findsNothing);
+  });
+
   testWidgets('editor schedules a meeting for picked people', (tester) async {
     final vm = MeetingEditorViewModel(
       teamId: 't1',

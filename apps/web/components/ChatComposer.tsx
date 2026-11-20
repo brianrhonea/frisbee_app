@@ -1,6 +1,6 @@
 "use client";
 import { chatAttachmentsMax, chatReactionChoices, chatTextMax, formatFileSize } from "@stall10/shared";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import type { OutboxKind } from "@stall10/shared";
 import { callApi } from "@/lib/client";
 import { queuedNotice, submitOutbox } from "@/lib/outbox";
@@ -26,6 +26,7 @@ export function ChatComposer({
   onTyping,
   draftKey,
   outbox,
+  onShareEvent,
 }: {
   path: string;
   /** Where this thread's messages wait while Stall 10 can't be reached (the app's OutboxKind and target). */
@@ -38,6 +39,8 @@ export function ChatComposer({
   onTyping?: (typing: boolean) => void;
   /** Where this thread's unsent text is kept (`dm_<id>`, `chat_<team>_<room>`). */
   draftKey?: string;
+  /** "Share an event" beside files in the attach menu (team rooms, F3); none hides the menu. */
+  onShareEvent?: () => void;
 }) {
   const { user } = useAuth();
   const [text, setText] = useState("");
@@ -46,6 +49,7 @@ export function ChatComposer({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [attachMenu, setAttachMenu] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   /** Files removed while still uploading: deleted once their upload finishes. */
   const dropped = useRef(new Set<string>());
@@ -172,9 +176,49 @@ export function ChatComposer({
             e.target.value = "";
           }}
         />
-        <button type="button" className="icon-btn" aria-label="Attach files" title="Attach photos, videos or files" onClick={() => input.current?.click()}>
-          📎
-        </button>
+        {onShareEvent ? (
+          <span className="attach-menu">
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label="Attach"
+              aria-haspopup="menu"
+              aria-expanded={attachMenu}
+              title="Attach files or share an event"
+              onClick={() => setAttachMenu(!attachMenu)}
+            >
+              📎
+            </button>
+            {attachMenu && (
+              <span className="attach-menu-list" role="menu">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setAttachMenu(false);
+                    input.current?.click();
+                  }}
+                >
+                  Photo, video or file
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setAttachMenu(false);
+                    onShareEvent();
+                  }}
+                >
+                  Share an event
+                </button>
+              </span>
+            )}
+          </span>
+        ) : (
+          <button type="button" className="icon-btn" aria-label="Attach files" title="Attach photos, videos or files" onClick={() => input.current?.click()}>
+            📎
+          </button>
+        )}
         <textarea
           aria-label={placeholder}
           placeholder={placeholder}
@@ -213,11 +257,14 @@ export function MessageActions({
   canDelete,
   onReply,
   onDeleted,
+  extra,
 }: {
   path: string;
   mine: string | null;
   canDelete: boolean;
   onReply?: () => void;
+  /** More actions before Delete, e.g. a team room's Pin (F2). */
+  extra?: ReactNode;
   /** Told once the message is deleted (older pages aren't live). */
   onDeleted?: () => void;
 }) {
@@ -263,6 +310,7 @@ export function MessageActions({
           ))}
         </span>
       )}
+      {extra}
       {canDelete && (
         <button
           type="button"

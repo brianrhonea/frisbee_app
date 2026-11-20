@@ -150,6 +150,8 @@ export interface PublicListing {
   description?: string;
   requiresApproval?: boolean;
   location?: { address: string; lat: number; lng: number } | null;
+  /** Present (false) when the team's "Public team page" is off (publicPageOn in team.ts): its card only. */
+  publicPage?: false;
 }
 
 export interface PublicTeamPost {

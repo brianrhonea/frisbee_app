@@ -622,6 +622,102 @@ describe("scores (report, confirm, advance, managers)", () => {
   });
 });
 
+describe("live running scores (setLive, clearLive)", () => {
+  async function live() {
+    const t = await accepted([["red", "cap"], ["blue", "bcap"], ["green", "gcap"]]);
+    await call("PUT", `/v1/tournaments/${t.id}/divisions/${t.div}/schedule`, { games: plan(["red", "blue", "green"], "singleElim") });
+    expect((await call("PUT", `/v1/tournaments/${t.id}/status`, { status: "scheduled" })).status).toBe(204);
+    const path = (id: string) => `tournaments/${t.id}/divisions/${t.div}/games/${id}`;
+    const g = (id: string) => store.doc(path(id)) as Record<string, unknown>;
+    // Played today: g001 (blue v green) starts now.
+    for (const id of ["g001", "g002"]) store.put(path(id), { ...g(id), startsAt: new Date(now) });
+    const url = (id: string) => `/v1/tournaments/${t.id}/divisions/${t.div}/games/${id}/live`;
+    return { ...t, g, path, url };
+  }
+
+  it("either team's captain or a host manager; not other captains, members or outsiders", async () => {
+    const b = await live();
+    for (const uid of ["cap", "fan", "stranger"]) {
+      expect((await call("POST", b.url("g001"), { scoreA: 1, scoreB: 0 }, uid)).status).toBe(403);
+    }
+    expect(b.g("g001").live).toBeUndefined();
+    expect((await call("POST", b.url("g001"), { scoreA: 0, scoreB: 0 }, "bcap")).status).toBe(204);
+    expect(b.g("g001").live).toEqual({ scoreA: 0, scoreB: 0, startedAt: new Date(now), updatedAt: new Date(now), by: "bcap" });
+    expect((await call("POST", b.url("g001"), { scoreA: 1, scoreB: 0 }, "gcap")).status).toBe(204);
+    expect((await call("POST", b.url("g001"), { scoreA: 2, scoreB: 0 }, "mgr")).status).toBe(204);
+    expect(b.g("g001").live).toMatchObject({ scoreA: 2, scoreB: 0, by: "mgr" });
+  });
+
+  it("is never the final: the game stays scheduled, nothing moves on, the final is still reported and confirmed", async () => {
+    const b = await live();
+    await call("POST", b.url("g001"), { scoreA: 7, scoreB: 5 }, "bcap");
+    expect(b.g("g001")).toMatchObject({ status: "scheduled", scoreA: null, scoreB: null, report: null });
+    expect(b.g("g002").teamB).toBeNull();
+    const game = `/v1/tournaments/${b.id}/divisions/${b.div}/games/g001`;
+    expect((await call("POST", `${game}/report`, { scoreA: 15, scoreB: 10 }, "bcap")).status).toBe(204);
+    expect((await call("POST", `${game}/confirm`, { scoreA: 15, scoreB: 10 }, "gcap")).status).toBe(204);
+    expect(b.g("g001")).toMatchObject({ status: "done", scoreA: 15, scoreB: 10 });
+    expect(b.g("g002").teamB).toBe("blue");
+  });
+
+  it("scores are whole numbers 0-99 (ties fine); only the two scores", async () => {
+    const b = await live();
+    for (const body of [{ scoreA: -1, scoreB: 0 }, { scoreA: 100, scoreB: 0 }, { scoreA: 1.5, scoreB: 0 }, { scoreA: 1 }, { scoreA: 1, scoreB: 1, by: "x" }]) {
+      expect((await call("POST", b.url("g001"), body, "bcap")).status).toBe(400);
+    }
+    expect((await call("POST", b.url("g001"), { scoreA: 99, scoreB: 99 }, "bcap")).status).toBe(204);
+  });
+
+  it("only scheduled games with both teams, on the day, in an event being played", async () => {
+    const b = await live();
+    // g002 waits on g001's winner.
+    expect(code(await call("POST", b.url("g002"), { scoreA: 0, scoreB: 0 }, "cap"))).toBe("failed_precondition");
+    expect((await call("POST", b.url("nope"), { scoreA: 0, scoreB: 0 }, "bcap")).status).toBe(404);
+    // Too early (more than 2 hours before) and too late (a day after).
+    store.put(b.path("g001"), { ...b.g("g001"), startsAt: new Date(now + 3 * 3600_000) });
+    expect(code(await call("POST", b.url("g001"), { scoreA: 0, scoreB: 0 }, "bcap"))).toBe("failed_precondition");
+    store.put(b.path("g001"), { ...b.g("g001"), startsAt: new Date(now - 25 * 3600_000) });
+    expect(code(await call("POST", b.url("g001"), { scoreA: 0, scoreB: 0 }, "bcap"))).toBe("failed_precondition");
+    store.put(b.path("g001"), { ...b.g("g001"), startsAt: new Date(now - 3600_000) });
+    expect((await call("POST", b.url("g001"), { scoreA: 0, scoreB: 0 }, "bcap")).status).toBe(204);
+    // Reported or final: no more running score.
+    store.put(b.path("g001"), { ...b.g("g001"), status: "reported", report: { scoreA: 15, scoreB: 3, byTeam: "blue" } });
+    expect(code(await call("POST", b.url("g001"), { scoreA: 1, scoreB: 0 }, "bcap"))).toBe("failed_precondition");
+    store.put(b.path("g001"), { ...b.g("g001"), status: "done", scoreA: 15, scoreB: 3, report: null });
+    expect(code(await call("POST", b.url("g001"), { scoreA: 1, scoreB: 0 }, "bcap"))).toBe("failed_precondition");
+    // A finished event.
+    store.put(b.path("g001"), { ...b.g("g001"), status: "scheduled", scoreA: null, scoreB: null });
+    store.put(`tournaments/${b.id}`, { ...store.doc(`tournaments/${b.id}`), status: "finished" });
+    expect(code(await call("POST", b.url("g001"), { scoreA: 1, scoreB: 0 }, "bcap"))).toBe("failed_precondition");
+  });
+
+  it("the first live game makes a scheduled event live; startedAt is kept", async () => {
+    const b = await live();
+    expect(store.doc(`tournaments/${b.id}`)?.status).toBe("scheduled");
+    await call("POST", b.url("g001"), { scoreA: 0, scoreB: 0 }, "bcap");
+    expect(store.doc(`tournaments/${b.id}`)?.status).toBe("live");
+    const started = b.g("g001").live as Record<string, unknown>;
+    store.put(b.path("g001"), { ...b.g("g001"), live: { ...started, startedAt: new Date(now - 600_000) } });
+    await call("POST", b.url("g001"), { scoreA: 1, scoreB: 0 }, "bcap");
+    expect(b.g("g001").live).toMatchObject({ scoreA: 1, startedAt: new Date(now - 600_000), updatedAt: new Date(now) });
+  });
+
+  it("DELETE takes it off, for the same people", async () => {
+    const b = await live();
+    await call("POST", b.url("g001"), { scoreA: 3, scoreB: 2 }, "bcap");
+    expect((await call("DELETE", b.url("g001"), undefined, "cap")).status).toBe(403);
+    expect((await call("DELETE", b.url("g001"), undefined, "gcap")).status).toBe(204);
+    expect(b.g("g001").live).toBeUndefined();
+    expect((await call("DELETE", b.url("g001"), undefined, "mgr")).status).toBe(204);
+  });
+
+  it("a draft event is hidden from captains", async () => {
+    const b = await live();
+    store.put(`tournaments/${b.id}`, { ...store.doc(`tournaments/${b.id}`), status: "draft" });
+    expect((await call("POST", b.url("g001"), { scoreA: 0, scoreB: 0 }, "bcap")).status).toBe(404);
+  });
+});
+
 describe("the host's view keeps things in step (reconcile)", () => {
   it("goes live with the first result, records places when the division is done, then final", async () => {
     const t = await accepted([["red", "cap"], ["blue", "bcap"]]);

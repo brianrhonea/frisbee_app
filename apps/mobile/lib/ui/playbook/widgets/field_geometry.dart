@@ -38,7 +38,7 @@ class FieldGeometry {
       ? FieldPoint(o.dy / size.height, o.dx / size.width)
       : FieldPoint(o.dx / size.width, o.dy / size.height);
 
-  /// Id of the element or arrow under [o], elements first. Of several
+  /// Id of the element, arrow or pen stroke under [o], in that order. Of several
   /// elements in reach, the nearest wins (the top one on a tie).
   String? hitTest(Play play, Offset o) {
     final r = math.max(minHitRadius, elementRadius * 1.3);
@@ -63,7 +63,33 @@ class FieldGeometry {
         if (d <= tolerance) return a.id;
       }
     }
+    return hitDrawing(play, o);
+  }
+
+  /// Id of the pen stroke under [o], the top one first.
+  String? hitDrawing(Play play, Offset o) {
+    final tolerance = math.max(14.0, elementRadius * 0.8);
+    for (final d in play.drawings.reversed) {
+      if (d.points.length == 1 &&
+          (toCanvas(d.points.first) - o).distance <= tolerance) {
+        return d.id;
+      }
+      for (var i = 0; i < d.points.length - 1; i++) {
+        final dist = _distanceToSegment(
+          o,
+          toCanvas(d.points[i]),
+          toCanvas(d.points[i + 1]),
+        );
+        if (dist <= tolerance) return d.id;
+      }
+    }
     return null;
+  }
+
+  /// Id of the piece under [o] (see [hitTest]), ignoring arrows and strokes.
+  String? hitElement(Play play, Offset o) {
+    final id = hitTest(play, o);
+    return play.elements.any((e) => e.id == id) ? id : null;
   }
 
   static double _distanceToSegment(Offset p, Offset a, Offset b) {

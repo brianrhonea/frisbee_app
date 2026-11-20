@@ -88,8 +88,11 @@ export function nextOwner(team: TeamMembers, uid: string): string | undefined {
   return best;
 }
 
-/** Event response maps holding one entry per member. */
-export const eventResponseFields = ["rsvps", "reactions", "votes"] as const;
+/**
+ * Response maps holding one entry per member: an event's, and a meeting's
+ * (rsvps and rsvpNotes only).
+ */
+export const eventResponseFields = ["rsvps", "rsvpNotes", "reactions", "votes"] as const;
 
 /** The event response maps that have an entry for `uid`. */
 export function eventResponsesOf(event: Data, uid: string): string[] {

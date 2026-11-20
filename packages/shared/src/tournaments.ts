@@ -221,6 +221,84 @@ export const scoreRequestSchema = z
   })
   .refine((s) => s.scoreA !== s.scoreB, { message: "Games can't end in a tie.", path: ["scoreB"] });
 
+// ---- Live running scores -------------------------------------------------------
+//
+// While a game is played, either team's captain or the host's event managers
+// keep its running score (`games/{id}.live`, written only by the API:
+// POST /v1/tournaments/:id/divisions/:divisionId/games/:gameId/live). It's
+// never the final: the game stays `scheduled` with no scoreA/scoreB, so the
+// engine, standings and brackets ignore it, and the final still goes through
+// report → confirm (or the host's set score). A game is live while it's
+// scheduled and its running score was updated in the last
+// liveLimits.staleAfterMs (the app and older clients can't clear it).
+
+/** POST .../games/:gameId/live: the running score (0–0 starts the game; ties are fine). */
+export const liveScoreRequestSchema = z.strictObject({
+  scoreA: z.number().int().min(0).max(tournamentLimits.maxScore),
+  scoreB: z.number().int().min(0).max(tournamentLimits.maxScore),
+});
+export type LiveScoreRequest = z.infer<typeof liveScoreRequestSchema>;
+
+export const liveLimits = {
+  /** A running score not updated for this long no longer shows as live. */
+  staleAfterMs: 3 * 60 * 60 * 1000,
+  /** How early before its start time a game can go live. */
+  earlyMs: 2 * 60 * 60 * 1000,
+  /** How long after its start time a game can still go live or be updated. */
+  lateMs: 24 * 60 * 60 * 1000,
+  /** Running-score updates per person per minute (their own bucket). */
+  perMinute: 60,
+} as const;
+
+/** games/{id}.live as stored (dates as ISO strings for the website). `by` is the uid of whoever updated it last. */
+export interface LiveScoreDoc {
+  scoreA: number;
+  scoreB: number;
+  startedAt: string | null;
+  updatedAt: string | null;
+  /** Never in public answers. */
+  by?: string;
+}
+
+/** A stored `live` map (Date or ISO dates) → its scores and times, or null. */
+export function liveScoreOf(raw: unknown): { scoreA: number; scoreB: number; startedAt: Date | null; updatedAt: Date | null; by: string | null } | null {
+  if (!raw || typeof raw !== "object") return null;
+  const m = raw as Record<string, unknown>;
+  if (typeof m.scoreA !== "number" || typeof m.scoreB !== "number") return null;
+  return {
+    scoreA: m.scoreA,
+    scoreB: m.scoreB,
+    startedAt: dateOf(m.startedAt),
+    updatedAt: dateOf(m.updatedAt),
+    by: typeof m.by === "string" ? m.by : null,
+  };
+}
+
+/**
+ * Whether a game is being played right now: still scheduled (no score
+ * reported or final) with a running score updated within
+ * liveLimits.staleAfterMs of [now]. Mirrored by GroupGame.liveAt in the app.
+ */
+export function isLiveGame(g: { status: string; live?: unknown }, now: Date | number): boolean {
+  if (g.status !== "scheduled") return false;
+  const live = liveScoreOf(g.live);
+  if (!live?.updatedAt) return false;
+  const t = typeof now === "number" ? now : now.getTime();
+  return t - live.updatedAt.getTime() <= liveLimits.staleAfterMs;
+}
+
+/**
+ * Whether a game starting at [startsAt] can take a running score at [now]:
+ * from liveLimits.earlyMs before its start to liveLimits.lateMs after
+ * (time zone free, so "today" wherever it's played). Games without a time can.
+ */
+export function inLiveWindow(startsAt: Date | null, now: Date | number): boolean {
+  if (!startsAt) return true;
+  const t = typeof now === "number" ? now : now.getTime();
+  const at = startsAt.getTime();
+  return t >= at - liveLimits.earlyMs && t <= at + liveLimits.lateMs;
+}
+
 const sourceSchema = z.union([
   z.strictObject({ type: z.literal("winner"), game: z.string().min(1).max(128) }),
   z.strictObject({ type: z.literal("loser"), game: z.string().min(1).max(128) }),
@@ -357,6 +435,8 @@ export interface GameDoc {
   report: { scoreA: number; scoreB: number; byTeam: string } | null;
   ifNeeded: boolean;
   place?: number | null;
+  /** The running score while it's played (see isLiveGame); not the final. */
+  live?: LiveScoreDoc | null;
 }
 /** teams/{teamId}/tournamentEntries/{tournamentId}, kept by the server. */
 export interface EnteredTournamentDoc {

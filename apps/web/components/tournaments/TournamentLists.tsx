@@ -14,7 +14,9 @@ import {
   type HostedType,
   hostedTypeLabels,
   publishedStatuses,
+  spotsLabel,
   type TournamentDoc,
+  type TournamentSpots,
   divisionLabel,
 } from "@stall10/shared";
 import { limit, orderBy, where } from "firebase/firestore";
@@ -23,6 +25,7 @@ import { useMemo, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { type Doc, useLiveQuery } from "@/lib/live";
 import "./tournaments.css";
+import { useTournamentSpots } from "./useTournamentSpots";
 import { formatDate, startOfToday } from "@/lib/dates";
 import { dayKey, localeFor, useRenderZone } from "@/lib/renderZone";
 
@@ -45,7 +48,20 @@ export function datesLabel(startsOn: string | null | undefined, endsOn: string |
 export type CardTournament = Pick<
   Doc<TournamentDoc>,
   "id" | "name" | "hostName" | "hostOfficial" | "kind" | "entryType" | "teamEntry" | "divisions" | "visibility" | "startsOn" | "endsOn" | "location" | "status"
-> & { bidFee: { amountCents: number; currency: string } | null };
+> & {
+  bidFee: { amountCents: number; currency: string } | null;
+  /** A visitor's public card carries its spots left (PublicHostedCard.spots); members' come from useTournamentSpots. */
+  spots?: TournamentSpots;
+};
+
+/**
+ * "3 spots left" while registration is open: turf while there's room,
+ * neutral "Full · waitlist" once there isn't (never amber: that's only
+ * the viewer's own to-dos).
+ */
+export function SpotsLeft({ spots }: { spots: TournamentSpots }) {
+  return <small className={`spots-left${spots.left <= 0 ? " spots-full" : ""}`}>{spotsLabel(spots)}</small>;
+}
 
 export function StatusBadge({ status }: { status: HostedStatus }) {
   return <span className={`pill hosted-status hosted-${status}`}>{hostedStatusLabels[status] ?? status}</span>;
@@ -70,6 +86,8 @@ function DateTile({ iso, zone }: { iso: string | null | undefined; zone?: string
 /** One tournament in a list (HostedTournamentCard). */
 export function TournamentCard({ t, showHost = true }: { t: CardTournament; showHost?: boolean }) {
   const zone = useRenderZone();
+  const fetched = useTournamentSpots();
+  const spots = t.spots ?? fetched.get(t.id);
   const type = hostedType(t);
   const fee = t.bidFee;
   const meta = [
@@ -89,6 +107,7 @@ export function TournamentCard({ t, showHost = true }: { t: CardTournament; show
         </b>
         <small>{[datesLabel(t.startsOn, t.endsOn, zone), t.location].filter(Boolean).join(" · ")}</small>
         {meta.length > 0 && <small>{meta.join(" · ")}</small>}
+        {spots && t.status === "registration" && <SpotsLeft spots={spots} />}
       </span>
       <StatusBadge status={t.status} />
     </Link>

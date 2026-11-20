@@ -8,6 +8,14 @@ import '../../core/themes/theme.dart';
 import '../view_models/play_editor_viewmodel.dart' show Trail;
 import 'field_geometry.dart';
 
+/// The field shade of a pen colour.
+Color penColor(DrawingColor c) => switch (c) {
+  DrawingColor.ink => FieldColors.penInk,
+  DrawingColor.turf => FieldColors.penTurf,
+  DrawingColor.amber => FieldColors.penAmber,
+  DrawingColor.white => FieldColors.penWhite,
+};
+
 /// Paints an ultimate field with a play diagram on top.
 class FieldPainter extends CustomPainter {
   FieldPainter({
@@ -18,6 +26,8 @@ class FieldPainter extends CustomPainter {
     this.draftKind,
     this.trails = const [],
     this.ghosts = const [],
+    this.draftStroke = const [],
+    this.draftColor = DrawingColor.ink,
   });
 
   final Play play;
@@ -34,10 +44,33 @@ class FieldPainter extends CustomPainter {
   /// Faded elements marking where movers started the step.
   final List<PlayElement> ghosts;
 
+  /// In-progress pen stroke on the whiteboard, and its colour.
+  final List<FieldPoint> draftStroke;
+  final DrawingColor draftColor;
+
   @override
   void paint(Canvas canvas, Size size) {
     final g = FieldGeometry(size, horizontal: horizontal);
     _paintField(canvas, g);
+    // Pen strokes lie on the grass, under arrows and pieces.
+    for (final d in play.drawings) {
+      _paintStroke(
+        canvas,
+        g,
+        d.points,
+        penColor(d.color),
+        selected: d.id == selectedId,
+      );
+    }
+    if (draftStroke.length > 1) {
+      _paintStroke(
+        canvas,
+        g,
+        draftStroke,
+        penColor(draftColor),
+        selected: false,
+      );
+    }
     if (ghosts.isNotEmpty) {
       canvas.saveLayer(
         Offset.zero & size,
@@ -184,6 +217,46 @@ class FieldPainter extends CustomPainter {
     canvas.drawPath(arrowHead, Paint()..color = color);
   }
 
+  void _paintStroke(
+    Canvas canvas,
+    FieldGeometry g,
+    List<FieldPoint> points,
+    Color color, {
+    required bool selected,
+  }) {
+    if (points.length < 2) return;
+    final pts = points.map(g.toCanvas).toList();
+    final width = math.max(2.5, g.shortSide * 0.01);
+    final path = Path()..moveTo(pts.first.dx, pts.first.dy);
+    for (var i = 1; i < pts.length; i++) {
+      if (i < pts.length - 1) {
+        final mid = (pts[i] + pts[i + 1]) / 2;
+        path.quadraticBezierTo(pts[i].dx, pts[i].dy, mid.dx, mid.dy);
+      } else {
+        path.lineTo(pts[i].dx, pts[i].dy);
+      }
+    }
+    if (selected) {
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = FieldColors.selection.withValues(alpha: 0.5)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = width * 3
+          ..strokeCap = StrokeCap.round,
+      );
+    }
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = width
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round,
+    );
+  }
+
   Path _dashed(Path source, double dash, double gap) {
     final out = Path();
     for (final ui.PathMetric m in source.computeMetrics()) {
@@ -280,5 +353,7 @@ class FieldPainter extends CustomPainter {
       old.draft != draft ||
       old.draftKind != draftKind ||
       old.trails != trails ||
-      old.ghosts != ghosts;
+      old.ghosts != ghosts ||
+      old.draftStroke != draftStroke ||
+      old.draftColor != draftColor;
 }

@@ -82,6 +82,14 @@ export function membershipRoutes(app: FastifyInstance, m: MembershipService) {
     await m.editTeam(requireCaller(req), params(req).teamId, req.body);
     return ok;
   });
+  app.put("/v1/teams/:teamId/sections", async (req) => {
+    await m.setSections(requireCaller(req), params(req).teamId, req.body);
+    return ok;
+  });
+  app.put("/v1/teams/:teamId/public-page", async (req) => {
+    await m.setPublicPage(requireCaller(req), params(req).teamId, req.body);
+    return ok;
+  });
   app.put("/v1/teams/:teamId/listing", async (req) => {
     await m.publishListing(requireCaller(req), params(req).teamId);
     return ok;

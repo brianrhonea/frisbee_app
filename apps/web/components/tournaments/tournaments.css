@@ -194,3 +194,42 @@
 .hosted-form .segmented { display: flex; width: 100%; border-radius: var(--radius-control); }
 .hosted-form .segmented button { flex: 1 1 0; border-radius: 9px; padding: 8px 10px; }
 .hosted-form .hosted-chips .pill { margin: 0; }
+
+/* Live running scores (F1): the red LIVE pill on a game while it's played,
+   the navy header's live line, and the Live score stepper. */
+.hosted-game-pills { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.hosted-live-pill.hosted-live-small {
+  height: 20px; padding: 0 8px; gap: 5px; background: var(--live); color: #fff;
+  font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em;
+}
+.hosted-live-pill.hosted-live-small i { width: 6px; height: 6px; background: #fff; }
+.hosted-live-line { display: flex; align-items: center; gap: 8px; margin: 4px 0 0; color: var(--on-board); font-size: 0.95rem; min-width: 0; }
+.hosted-live-line > i { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--live); box-shadow: 0 0 0 3px color-mix(in srgb, var(--live) 30%, transparent); }
+.hosted-live-line > span { min-width: 0; overflow-wrap: anywhere; }
+.hosted-live-score { font-family: var(--font-score); font-weight: 800; font-size: 1.35rem; line-height: 1; padding: 0 2px; }
+.hosted-live-more { color: var(--board-muted); }
+
+dialog.dialog:has(.live-dialog) { width: min(100% - 32px, 480px); }
+.live-dialog { display: grid; gap: 12px; }
+.live-dialog > * { margin: 0; }
+.live-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.live-dialog-head .card-title { margin: 0; font-size: 1.25rem; }
+.live-steps { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.live-step { display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 14px; }
+.live-step + .live-step { border-top: 1px solid var(--line); }
+.live-step-name { flex: 1; min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
+.live-step-btn { flex: none; min-width: 44px; height: 44px; padding: 0; justify-content: center; font-size: 1.2rem; }
+.live-step-plus { min-width: 60px; height: 50px; font-family: var(--font-score); font-weight: 800; font-size: 1.4rem; }
+.live-step-score { flex: none; width: 3ch; text-align: center; font-family: var(--font-score); font-weight: 800; font-size: 2.5rem; line-height: 1; }
+.live-note { text-align: center; }
+.live-stop { justify-self: center; color: var(--muted); }
+.live-dialog .form-actions { justify-content: flex-end; }
+@media (max-width: 420px) {
+  .live-step { gap: 6px; padding-left: 10px; }
+  .live-step .hosted-mark { display: none; }
+  .live-step-score { font-size: 2rem; }
+}
+
+/* Spots left on a tournament card (F10): turf while there is room, neutral when full; never amber. */
+.row-card small.spots-left { color: var(--accent-ink); font-weight: 700; }
+.row-card small.spots-left.spots-full { color: var(--muted); font-weight: 500; }

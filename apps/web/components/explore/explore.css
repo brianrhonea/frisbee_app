@@ -71,3 +71,16 @@
 .explore-live .row-card:hover { border-color: var(--board-muted); }
 .explore-live .row-card small { color: var(--board-muted); }
 .explore-live .event-date { background: var(--board); color: var(--on-board); }
+/* Live now's games being played (F1): "nameA 9–7 nameB · Field 3", up to three. */
+.explore-live-event { display: grid; gap: 6px; }
+.explore-live-games { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.explore-live-games li {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  padding: 8px 10px; border-radius: 10px; background: var(--board-2); color: var(--on-board); font-size: 0.88rem;
+}
+.explore-live-games li small { color: var(--board-muted); white-space: nowrap; flex: none; }
+.explore-live-name { flex: 1 1 0; min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.explore-live-a { text-align: right; }
+.explore-live-score { flex: none; font-family: var(--font-score); font-size: 1.25rem; font-weight: 800; line-height: 1; }
+.live-dot.live-dot-small { width: 7px; height: 7px; box-shadow: none; }
+.explore-live-games li.explore-live-more { background: none; padding: 0 10px; color: var(--board-muted); }

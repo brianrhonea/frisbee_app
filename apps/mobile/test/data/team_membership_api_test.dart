@@ -263,6 +263,17 @@ void main() {
         () => repo().unlinkTeam('org1', 't1'),
         (method: 'DELETE', path: '/v1/teams/org1/linked-teams/t1', body: null),
       ),
+      'setSections': (
+        () => repo().setSections('t1', {
+          OptionalSection.playbook: true,
+          OptionalSection.meetings: false,
+        }),
+        (
+          method: 'PUT',
+          path: '/v1/teams/t1/sections',
+          body: {'playbook': true, 'meetings': false},
+        ),
+      ),
     };
 
     for (final MapEntry(key: name, value: (run, expected)) in cases.entries) {
@@ -369,6 +380,22 @@ void main() {
       expect(r, isA<Ok<void>>());
       expect(sent, isEmpty);
       expect((await db.doc('teams/t1').get()).exists, isFalse);
+    });
+
+    test('setSections with the flag off updates only those switches', () async {
+      await db.doc('teams/t1').set({
+        'name': 'Haze',
+        'sections': {'playbook': false, 'videos': false},
+      });
+      final r = await repo(
+        flags: FeatureFlags.fixed({'use_api_membership': false}),
+      ).setSections('t1', {OptionalSection.playbook: true});
+      expect(r, isA<Ok<void>>());
+      expect(sent, isEmpty);
+      expect((await db.doc('teams/t1').get()).get('sections'), {
+        'playbook': true,
+        'videos': false,
+      });
     });
 
     test('so do builds without an API', () async {

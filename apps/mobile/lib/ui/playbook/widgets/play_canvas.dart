@@ -8,8 +8,8 @@ import 'field_painter.dart';
 
 /// Field sized to fit its constraints at the correct aspect ratio, rotated to
 /// landscape when there is more horizontal room.
-class _FieldFrame extends StatelessWidget {
-  const _FieldFrame({required this.builder});
+class FieldFrame extends StatelessWidget {
+  const FieldFrame({super.key, required this.builder});
 
   final Widget Function(Size size, bool horizontal) builder;
 
@@ -48,7 +48,7 @@ class PlayDiagram extends StatelessWidget {
   final List<PlayElement> ghosts;
 
   @override
-  Widget build(BuildContext context) => _FieldFrame(
+  Widget build(BuildContext context) => FieldFrame(
     builder: (size, horizontal) => ClipRRect(
       borderRadius: BorderRadius.circular(8),
       child: CustomPaint(
@@ -167,7 +167,7 @@ class _PlayCanvasState extends State<PlayCanvas> {
 
   @override
   Widget build(BuildContext context) {
-    return _FieldFrame(
+    return FieldFrame(
       builder: (size, horizontal) {
         final g = FieldGeometry(size, horizontal: horizontal);
         return ListenableBuilder(

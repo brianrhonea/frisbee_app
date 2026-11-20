@@ -105,9 +105,12 @@ service firebase.storage {
         return firestore.exists(postPath())
           && firestore.get(postPath()).data.public == true;
       }
+      // A private group, or a team whose "Public team page" is off
+      // (publicPage false; showsPublic in firestore.rules).
       function privateGroup(t) {
-        return t.get('kind', 'team') in ['community', 'organization']
-          && t.get('requiresApproval', false) == true;
+        return (t.get('kind', 'team') in ['community', 'organization']
+          && t.get('requiresApproval', false) == true)
+          || t.get('publicPage', true) == false;
       }
 
       allow get: if (request.auth != null

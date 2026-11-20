@@ -599,6 +599,27 @@ class MessageReply {
   };
 }
 
+/// The team event a message shares (redesign F3): its id, and its title
+/// as it was when shared, for pushes, previews and quotes. The card reads
+/// the live event and says "Event no longer available" when it's gone.
+/// Only the API writes it (POST .../event-shares).
+class ChatEventRef {
+  const ChatEventRef({required this.id, this.title = ''});
+
+  final String id;
+  final String title;
+
+  static ChatEventRef? fromMap(Object? map) {
+    if (map is! Map) return null;
+    final id = map['id'];
+    if (id is! String || id.isEmpty) return null;
+    return ChatEventRef(id: id, title: map['title'] as String? ?? '');
+  }
+}
+
+/// Most pinned messages in one team room (chatPinsMax in packages/shared).
+const chatPinsMax = 10;
+
 /// The quick reactions offered on a message, as iMessage's tapbacks.
 const quickReactions = ['❤️', '👍', '👎', '😂', '‼️', '❓'];
 
@@ -616,6 +637,9 @@ class ChatMessage {
     this.createdAt,
     this.replyTo,
     this.reactions = const {},
+    this.event,
+    this.pinnedAt,
+    this.pinnedBy,
   });
 
   /// Longest reaction stored: one emoji, possibly several code units.
@@ -637,6 +661,16 @@ class ChatMessage {
   /// again replaces it.
   final Map<String, String> reactions;
 
+  /// The team event it shares, shown as a card (team rooms only).
+  final ChatEventRef? event;
+
+  /// When it was pinned to its room, and by whom; null when it isn't.
+  /// Only the API writes them (PUT .../pin).
+  final DateTime? pinnedAt;
+  final String? pinnedBy;
+
+  bool get isPinned => pinnedAt != null;
+
   /// Its text, else what's attached: for quotes and previews.
   String get preview {
     final images =
@@ -645,6 +679,9 @@ class ChatMessage {
         attachments.isNotEmpty && attachments.every((a) => a.isVideo);
     final t = text.trim().replaceAll(RegExp(r'\s+'), ' ');
     if (t.isNotEmpty) return t.length > 120 ? '${t.substring(0, 117)}…' : t;
+    if (event case final e?) {
+      return '📅 ${e.title.isEmpty ? 'Event' : e.title}';
+    }
     if (attachments.isEmpty) return '';
     if (images) return attachments.length == 1 ? '📷 Photo' : '📷 Photos';
     if (videos) return attachments.length == 1 ? '🎬 Video' : '🎬 Videos';
@@ -690,6 +727,9 @@ class ChatMessage {
         if (e.key != uid) e.key: e.value,
       uid: ?emoji,
     },
+    event: event,
+    pinnedAt: pinnedAt,
+    pinnedBy: pinnedBy,
   );
 
   factory ChatMessage.fromMap(String id, Map<String, dynamic> map) =>
@@ -709,6 +749,9 @@ class ChatMessage {
             if (e.value is String && (e.value as String).isNotEmpty)
               '${e.key}': e.value as String,
         },
+        event: ChatEventRef.fromMap(map['event']),
+        pinnedAt: parseDate(map['pinnedAt']),
+        pinnedBy: map['pinnedBy'] as String?,
       );
 }
 

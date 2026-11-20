@@ -7,15 +7,27 @@ import 'hosted_status_badge.dart';
 import 'hosted_tournament_screen.dart' show hostedDates;
 import 'tournament_parts.dart';
 
+/// A game being played, for the navy header: its teams and running
+/// score, and how many others are live too.
+typedef LiveHeadline = ({
+  String nameA,
+  String nameB,
+  int scoreA,
+  int scoreB,
+  int more,
+});
+
 /// The top of an event's page, under its app bar: on a live (or today's)
 /// event a scoreboard-navy block with its status, name, and when, where
-/// and who; otherwise its date badge, status, name and host. Then its tabs.
+/// and who, and the game being played ([live]); otherwise its date badge,
+/// status, name and host. Then its tabs.
 class EventPageHeader extends StatelessWidget implements PreferredSizeWidget {
   const EventPageHeader._({
     required this.tournament,
     required this.board,
     required this.tabs,
     required this.height,
+    this.live,
   });
 
   /// Sized for [context]'s width and text scale, so a long name gets its
@@ -25,6 +37,7 @@ class EventPageHeader extends StatelessWidget implements PreferredSizeWidget {
     required HostedTournament tournament,
     required bool board,
     required PreferredSizeWidget tabs,
+    LiveHeadline? live,
   }) {
     final scaler = MediaQuery.textScalerOf(context);
     final width = MediaQuery.sizeOf(context).width;
@@ -51,6 +64,9 @@ class EventPageHeader extends StatelessWidget implements PreferredSizeWidget {
           measure(t.name, _nameStyle(26), w, 2) +
           4 +
           measure(_meta(t, board), _metaStyle, w, 1) +
+          (live == null
+              ? 0
+              : 6 + measure(_liveText(live), _liveMeasureStyle, w - 16, 1)) +
           8;
     } else {
       final w = width - 32 - _badge - 14;
@@ -66,6 +82,7 @@ class EventPageHeader extends StatelessWidget implements PreferredSizeWidget {
       tournament: t,
       board: board,
       tabs: tabs,
+      live: board ? live : null,
       height: body + tabs.preferredSize.height,
     );
   }
@@ -74,6 +91,26 @@ class EventPageHeader extends StatelessWidget implements PreferredSizeWidget {
   final bool board;
   final PreferredSizeWidget tabs;
   final double height;
+
+  /// The game being played, on the board only.
+  final LiveHeadline? live;
+
+  static const _liveStyle = TextStyle(
+    fontFamily: appFont,
+    fontSize: 14,
+    fontWeight: FontWeight.w700,
+  );
+
+  /// The line measured as if all of it were in the score's size.
+  static const _liveMeasureStyle = TextStyle(
+    fontFamily: scoreFont,
+    fontSize: 19,
+    fontWeight: FontWeight.w800,
+  );
+
+  static String _liveText(LiveHeadline l) =>
+      '${l.nameA} ${l.scoreA}–${l.scoreB} ${l.nameB}'
+      '${l.more > 0 ? ' · +${l.more} more live' : ''}';
 
   static const double _badge = 56;
 
@@ -162,6 +199,40 @@ class EventPageHeader extends StatelessWidget implements PreferredSizeWidget {
               overflow: TextOverflow.ellipsis,
               style: _metaStyle.copyWith(color: c.onFeatureMuted),
             ),
+            if (live case final l?) ...[
+              const SizedBox(height: 6),
+              Row(
+                key: const Key('header-live'),
+                children: [
+                  const LiveDot(),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text.rich(
+                      TextSpan(
+                        style: _liveStyle.copyWith(color: c.onFeature),
+                        children: [
+                          TextSpan(text: '${l.nameA} '),
+                          TextSpan(
+                            text: '${l.scoreA}–${l.scoreB}',
+                            style: _liveMeasureStyle.copyWith(
+                              color: c.onFeature,
+                            ),
+                          ),
+                          TextSpan(text: ' ${l.nameB}'),
+                          if (l.more > 0)
+                            TextSpan(
+                              text: ' · +${l.more} more live',
+                              style: TextStyle(color: c.onFeatureMuted),
+                            ),
+                        ],
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       );

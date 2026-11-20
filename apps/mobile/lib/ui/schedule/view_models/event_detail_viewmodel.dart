@@ -29,6 +29,7 @@ class EventDetailViewModel extends ChangeNotifier {
     setRsvp = Command1<void, RsvpStatus?>(
       (s) => _events.setRsvp(teamId, eventId, uid, s),
     );
+    saveNote = Command1<void, String>(_saveNote);
     toggleReaction = Command1<void, Reaction>(_toggleReaction);
     vote = Command1<void, String>(_vote);
     deleteEvent = Command0<void>(() => _events.deleteEvent(teamId, eventId));
@@ -105,6 +106,9 @@ class EventDetailViewModel extends ChangeNotifier {
       _event?.type == EventType.tournament;
 
   late final Command1<void, RsvpStatus?> setRsvp;
+
+  /// Saves the user's note on their answer (empty removes it).
+  late final Command1<void, String> saveNote;
   late final Command1<void, Reaction> toggleReaction;
 
   /// Toggles an option; in single-choice polls it replaces the old vote.
@@ -112,6 +116,23 @@ class EventDetailViewModel extends ChangeNotifier {
   late final Command0<void> deleteEvent;
 
   RsvpStatus? get myRsvp => _event?.rsvpOf(uid);
+
+  /// The user's note on their answer; empty when none.
+  String get myNote => _event?.noteOf(uid) ?? '';
+
+  Future<Result<void>> _saveNote(String raw) async {
+    if (myRsvp == null) {
+      return Result.error(Exception('Answer first, then add a note.'));
+    }
+    final note = cleanRsvpNote(raw);
+    if (note.length > rsvpNoteMax) {
+      return Result.error(
+        Exception('Keep the note under $rsvpNoteMax characters.'),
+      );
+    }
+    if (note == myNote) return const Result.ok(null);
+    return _events.setRsvpNote(teamId, eventId, uid, note);
+  }
 
   /// The user hasn't answered and the event hasn't happened yet.
   bool get needsRsvp {
@@ -136,6 +157,18 @@ class EventDetailViewModel extends ChangeNotifier {
     for (final s in RsvpStatus.values)
       s: _names(_event?.responders(s) ?? const []),
   };
+
+  /// Who gave each answer, with their notes, by name.
+  Map<RsvpStatus, List<Responder>> get responders {
+    final e = _event;
+    return {
+      for (final s in RsvpStatus.values)
+        s: sortedResponders([
+          for (final u in e?.responders(s) ?? const <String>[])
+            (name: nameOf(u), note: e!.noteOf(u)),
+        ]),
+    };
+  }
 
   /// Team members who haven't responded yet.
   List<String> get noResponse {

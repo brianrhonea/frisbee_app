@@ -9,16 +9,31 @@ import '../../core/ui/status_views.dart';
 import '../../teams/view_models/team_detail_viewmodel.dart';
 import 'play_canvas.dart';
 
-class PlaybookTab extends StatelessWidget {
+/// The playbook's two views: the team's plays, or the whiteboard.
+enum PlaybookView { plays, whiteboard }
+
+class PlaybookTab extends StatefulWidget {
   const PlaybookTab({super.key, required this.viewModel});
 
   final TeamDetailViewModel viewModel;
+
+  @override
+  State<PlaybookTab> createState() => _PlaybookTabState();
+}
+
+class _PlaybookTabState extends State<PlaybookTab> {
+  // Which view is showing is view state, like a tab.
+  PlaybookView _view = PlaybookView.plays;
+
+  TeamDetailViewModel get viewModel => widget.viewModel;
 
   Future<void> _delete(BuildContext context, Play play) async {
     if (await confirmDialog(
       context,
       title: 'Delete "${play.name}"?',
-      message: 'This play will be removed from the playbook.',
+      message: play.isWhiteboard
+          ? 'This whiteboard will be removed from the playbook.'
+          : 'This play will be removed from the playbook.',
       confirmLabel: 'Delete',
       destructive: true,
     )) {
@@ -28,8 +43,53 @@ class PlaybookTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final plays = viewModel.plays;
     final canEdit = viewModel.canEdit;
+    final plays = _view == PlaybookView.plays;
+    return Scaffold(
+      floatingActionButton: canEdit && plays
+          ? FloatingActionButton.extended(
+              heroTag: 'new-play',
+              onPressed: () => context.go(Routes.newPlay(viewModel.teamId)),
+              icon: const Icon(Icons.add),
+              label: const Text('New play'),
+            )
+          : null,
+      body: CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            sliver: SliverToBoxAdapter(
+              child: _ViewSwitch(
+                view: _view,
+                onChanged: (v) => setState(() => _view = v),
+              ),
+            ),
+          ),
+          if (plays)
+            ..._playSlivers(context, canEdit)
+          else
+            ..._whiteboardSlivers(context, canEdit),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _playSlivers(BuildContext context, bool canEdit) {
+    final plays = viewModel.plays;
+    if (plays.isEmpty) {
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: EmptyView(
+            icon: Icons.draw_outlined,
+            title: 'No plays yet',
+            message: canEdit
+                ? 'Draw your first play on the field.'
+                : 'Your coaches haven\'t added plays yet.',
+          ),
+        ),
+      ];
+    }
     // The playbook in sections, one per category, in the category order.
     final sections = [
       for (final category in PlayCategory.values)
@@ -41,60 +101,173 @@ class PlaybookTab extends StatelessWidget {
           ],
         ),
     ].where((s) => s.$2.isNotEmpty);
-    return Scaffold(
-      floatingActionButton: canEdit
-          ? FloatingActionButton.extended(
-              heroTag: 'new-play',
-              onPressed: () => context.go(Routes.newPlay(viewModel.teamId)),
-              icon: const Icon(Icons.add),
-              label: const Text('New play'),
-            )
-          : null,
-      body: plays.isEmpty
-          ? EmptyView(
-              icon: Icons.draw_outlined,
-              title: 'No plays yet',
-              message: canEdit
-                  ? 'Draw your first play on the field.'
-                  : 'Your coaches haven\'t added plays yet.',
-            )
-          : CustomScrollView(
-              slivers: [
-                for (final (category, list) in sections) ...[
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                    sliver: SliverToBoxAdapter(
-                      child: _SectionTitle(
-                        title: category.label,
-                        count: list.length,
-                      ),
+    return [
+      for (final (category, list) in sections) ...[
+        _sectionTitle(category.label, list.length, 'play'),
+        _grid(context, list, canEdit),
+      ],
+      const SliverToBoxAdapter(child: SizedBox(height: 96)),
+    ];
+  }
+
+  List<Widget> _whiteboardSlivers(BuildContext context, bool canEdit) {
+    final boards = viewModel.whiteboards;
+    return [
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        sliver: SliverToBoxAdapter(
+          child: _BlankWhiteboardCard(
+            onOpen: () => context.push(Routes.newWhiteboard(viewModel.teamId)),
+          ),
+        ),
+      ),
+      if (boards.isNotEmpty) ...[
+        _sectionTitle('Saved whiteboards', boards.length, 'whiteboard'),
+        _grid(context, boards, canEdit),
+      ],
+      const SliverToBoxAdapter(child: SizedBox(height: 32)),
+    ];
+  }
+
+  Widget _sectionTitle(String title, int count, String noun) => SliverPadding(
+    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+    sliver: SliverToBoxAdapter(
+      child: _SectionTitle(
+        title: title,
+        count: count == 1 ? '1 $noun' : '$count ${noun}s',
+      ),
+    ),
+  );
+
+  Widget _grid(BuildContext context, List<Play> list, bool canEdit) =>
+      SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        sliver: SliverGrid.builder(
+          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: 220,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 1.1,
+          ),
+          itemCount: list.length,
+          itemBuilder: (context, i) => _PlayCard(
+            play: list[i],
+            canEdit: canEdit,
+            onOpen: () => list[i].isWhiteboard
+                ? context.push(Routes.whiteboard(viewModel.teamId, list[i].id))
+                : context.go(Routes.play(viewModel.teamId, list[i].id)),
+            onDelete: () => _delete(context, list[i]),
+          ),
+        ),
+      );
+}
+
+/// "Plays | Whiteboard" at the top of the playbook, turf when selected.
+class _ViewSwitch extends StatelessWidget {
+  const _ViewSwitch({required this.view, required this.onChanged});
+
+  final PlaybookView view;
+  final ValueChanged<PlaybookView> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return SegmentedButton<PlaybookView>(
+      segments: const [
+        ButtonSegment(value: PlaybookView.plays, label: Text('Plays')),
+        ButtonSegment(
+          value: PlaybookView.whiteboard,
+          label: Text('Whiteboard'),
+        ),
+      ],
+      selected: {view},
+      showSelectedIcon: false,
+      expandedInsets: EdgeInsets.zero,
+      style: ButtonStyle(
+        backgroundColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected) ? c.accent : c.card,
+        ),
+        foregroundColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected) ? c.onAccent : c.ink2,
+        ),
+        side: WidgetStatePropertyAll(BorderSide(color: c.border2)),
+      ),
+      onSelectionChanged: (s) => onChanged(s.single),
+    );
+  }
+}
+
+/// The way into a blank whiteboard: an empty field and "Open whiteboard".
+class _BlankWhiteboardCard extends StatelessWidget {
+  const _BlankWhiteboardCard({required this.onOpen});
+
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Material(
+      color: c.card,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(cardRadius),
+        side: BorderSide(color: c.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onOpen,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(
+              height: 150,
+              child: ColoredBox(
+                color: FieldColors.grass,
+                child: Padding(
+                  padding: EdgeInsets.all(8),
+                  child: IgnorePointer(
+                    child: PlayDiagram(
+                      play: Play(id: '', name: ''),
                     ),
                   ),
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    sliver: SliverGrid.builder(
-                      gridDelegate:
-                          const SliverGridDelegateWithMaxCrossAxisExtent(
-                            maxCrossAxisExtent: 220,
-                            mainAxisSpacing: 10,
-                            crossAxisSpacing: 10,
-                            childAspectRatio: 1.1,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Blank whiteboard',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: c.ink,
                           ),
-                      itemCount: list.length,
-                      itemBuilder: (context, i) => _PlayCard(
-                        play: list[i],
-                        canEdit: canEdit,
-                        onOpen: () => context.go(
-                          Routes.play(viewModel.teamId, list[i].id),
                         ),
-                        onDelete: () => _delete(context, list[i]),
-                      ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Sketch a chalk talk: draw, drop players and the '
+                          'disc, then save it or throw it away.',
+                          style: TextStyle(fontSize: 12, color: c.muted),
+                        ),
+                      ],
                     ),
+                  ),
+                  const SizedBox(width: 12),
+                  FilledButton(
+                    onPressed: onOpen,
+                    child: const Text('Open whiteboard'),
                   ),
                 ],
-                const SliverToBoxAdapter(child: SizedBox(height: 96)),
-              ],
+              ),
             ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -104,7 +277,9 @@ class _SectionTitle extends StatelessWidget {
   const _SectionTitle({required this.title, required this.count});
 
   final String title;
-  final int count;
+
+  /// e.g. "3 plays".
+  final String count;
 
   @override
   Widget build(BuildContext context) {
@@ -127,10 +302,7 @@ class _SectionTitle extends StatelessWidget {
             ),
           ),
         ),
-        Text(
-          count == 1 ? '1 play' : '$count plays',
-          style: TextStyle(fontSize: 13, color: c.muted),
-        ),
+        Text(count, style: TextStyle(fontSize: 13, color: c.muted)),
       ],
     );
   }
@@ -185,7 +357,11 @@ class _PlayCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          play.name.isEmpty ? 'Untitled play' : play.name,
+                          play.name.isNotEmpty
+                              ? play.name
+                              : play.isWhiteboard
+                              ? 'Untitled whiteboard'
+                              : 'Untitled play',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
@@ -197,7 +373,9 @@ class _PlayCard extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           [
-                            play.category.label,
+                            play.isWhiteboard
+                                ? 'Whiteboard'
+                                : play.category.label,
                             if (steps > 0)
                               steps == 1 ? '1 step' : '$steps steps',
                           ].join(' · '),

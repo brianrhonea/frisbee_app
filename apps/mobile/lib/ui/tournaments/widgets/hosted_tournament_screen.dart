@@ -22,6 +22,7 @@ import '../view_models/hosted_tournament_viewmodel.dart';
 import '../view_models/player_signups_viewmodel.dart';
 import 'event_guide_cards.dart';
 import 'event_page_header.dart';
+import 'live_score_sheet.dart';
 import 'player_signups_tab.dart';
 import 'tournament_dialogs.dart';
 import 'tournament_parts.dart';
@@ -294,6 +295,7 @@ class _HostedTournamentScreenState extends State<HostedTournamentScreen> {
                 context,
                 tournament: t,
                 board: board,
+                live: _liveHeadline(vm),
                 tabs: TabBar(
                   isScrollable: true,
                   tabAlignment: TabAlignment.start,
@@ -366,6 +368,25 @@ class _HostedTournamentScreenState extends State<HostedTournamentScreen> {
 }
 
 // ---- Shared pieces ---------------------------------------------------------
+
+/// The game being played for the navy header: the user's own first, else
+/// the first on the schedule; null when none is live.
+LiveHeadline? _liveHeadline(HostedTournamentViewModel vm) {
+  final live = vm.liveGames;
+  if (live.isEmpty) return null;
+  final g = live.firstWhere(
+    (x) => vm.myTeamIn(x) != null,
+    orElse: () => live.first,
+  );
+  final l = vm.liveOf(g)!;
+  return (
+    nameA: vm.slotLabel(g, a: true),
+    nameB: vm.slotLabel(g, a: false),
+    scoreA: l.scoreA,
+    scoreB: l.scoreB,
+    more: live.length - 1,
+  );
+}
 
 /// "Teams need at least 7 players on their roster to register." When
 /// divisions differ, the range.
@@ -1526,6 +1547,7 @@ class _YourGameCard extends StatelessWidget {
     final g = game;
     final confirm = vm.actionFor(g) == HostedGameAction.confirm;
     final r = g.report;
+    final live = vm.liveOf(g);
     final mine = vm.myTeamIn(g);
     Widget side(String? team, bool a, int? score) {
       final name = vm.slotLabel(g, a: a);
@@ -1589,6 +1611,10 @@ class _YourGameCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
+                if (live != null) ...[
+                  const LivePill(),
+                  const SizedBox(width: 8),
+                ],
                 Text(
                   [
                     'Field ${g.field}',
@@ -1603,9 +1629,9 @@ class _YourGameCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            side(g.teamA, true, confirm ? r?.scoreA : null),
+            side(g.teamA, true, confirm ? r?.scoreA : live?.scoreA),
             const SizedBox(height: 8),
-            side(g.teamB, false, confirm ? r?.scoreB : null),
+            side(g.teamB, false, confirm ? r?.scoreB : live?.scoreB),
             const SizedBox(height: 10),
             Text(
               [
@@ -1616,6 +1642,18 @@ class _YourGameCard extends StatelessWidget {
               style: TextStyle(fontSize: 12, color: c.muted),
             ),
             const SizedBox(height: 12),
+            if (!confirm && vm.canKeepLive(g)) ...[
+              FilledButton.icon(
+                onPressed: () => showLiveScoreSheet(context, vm, g.id),
+                icon: Icon(
+                  live == null
+                      ? Icons.play_arrow_rounded
+                      : Icons.exposure_plus_1_rounded,
+                ),
+                label: Text(live == null ? 'Start game' : 'Update live score'),
+              ),
+              const SizedBox(height: 8),
+            ],
             HighlightButton(
               label: confirm ? 'Confirm score' : 'Report score',
               icon: Icons.scoreboard_outlined,
@@ -1796,6 +1834,7 @@ class _HostedGameTile extends StatelessWidget {
         _ => null,
       },
       waiting: action == HostedGameAction.awaiting,
+      live: vm.liveOf(g),
       onTap: () => _openGame(context, vm, g.id),
     );
   }
@@ -1826,6 +1865,7 @@ class _GameSheet extends StatelessWidget {
         final nameA = vm.slotLabel(g, a: true);
         final nameB = vm.slotLabel(g, a: false);
         final r = g.report;
+        final live = vm.liveOf(g);
         final busy =
             vm.report.running || vm.confirm.running || vm.setFinalScore.running;
         final action = vm.actionFor(g);
@@ -1845,8 +1885,9 @@ class _GameSheet extends StatelessWidget {
             title: title,
             nameA: nameA,
             nameB: nameB,
-            scoreA: g.scoreA ?? r?.scoreA,
-            scoreB: g.scoreB ?? r?.scoreB,
+            // A running score fills it in; it's still checked and confirmed.
+            scoreA: g.scoreA ?? r?.scoreA ?? live?.scoreA,
+            scoreB: g.scoreB ?? r?.scoreB ?? live?.scoreB,
             message: message,
           );
           if (score != null) {
@@ -1854,9 +1895,9 @@ class _GameSheet extends StatelessWidget {
           }
         }
 
-        // The score shown: final, else the one reported.
-        final shownA = g.isDone ? g.scoreA : r?.scoreA;
-        final shownB = g.isDone ? g.scoreB : r?.scoreB;
+        // The score shown: final, else the one reported, else the running one.
+        final shownA = g.isDone ? g.scoreA : r?.scoreA ?? live?.scoreA;
+        final shownB = g.isDone ? g.scoreB : r?.scoreB ?? live?.scoreB;
         Widget side(String name, String? team, int? score) {
           final me = team != null && team == mine;
           final won = g.winner != null && g.winner == team;
@@ -1903,14 +1944,21 @@ class _GameSheet extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  'Game ${vm.gameNumber(g)} · ${g.label}',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.3,
-                    color: c.ink,
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Game ${vm.gameNumber(g)} · ${g.label}',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                          color: c.ink,
+                        ),
+                      ),
+                    ),
+                    if (live != null) const LivePill(),
+                  ],
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -1976,8 +2024,30 @@ class _GameSheet extends StatelessWidget {
                 else if (!g.hasTeams)
                   _SheetNote('Teams are decided by earlier games.')
                 else if (g.isDone)
-                  _SheetNote('Final.'),
+                  _SheetNote('Final.')
+                else if (live != null)
+                  _SheetNote("Live score. It isn't final until it's reported."),
                 const SizedBox(height: 16),
+                if (vm.canKeepLive(g)) ...[
+                  FilledButton.icon(
+                    onPressed: busy
+                        ? null
+                        : () {
+                            // Opened from the page, as this sheet closes.
+                            final nav = Navigator.of(context)..pop();
+                            showLiveScoreSheet(nav.context, vm, g.id);
+                          },
+                    icon: Icon(
+                      live == null
+                          ? Icons.play_arrow_rounded
+                          : Icons.exposure_plus_1_rounded,
+                    ),
+                    label: Text(
+                      live == null ? 'Start game' : 'Update live score',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 if (action == HostedGameAction.report)
                   FilledButton(
                     style: amber,

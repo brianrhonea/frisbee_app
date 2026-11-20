@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../domain/models/discover.dart';
 import '../../../domain/models/hosted_tournament.dart';
 import '../../../domain/models/ranking.dart';
 import '../../../routing/routes.dart';
@@ -10,6 +11,8 @@ import '../../core/ui/layout.dart';
 import '../../core/ui/scoreboard.dart';
 import '../../core/ui/skeleton.dart';
 import '../../tournaments/widgets/hosted_status_badge.dart';
+import '../../tournaments/widgets/spots_left.dart';
+
 import '../../tournaments/widgets/hosted_tournament_screen.dart'
     show hostedDates;
 import '../view_models/explore_viewmodel.dart';
@@ -47,7 +50,8 @@ class UpcomingTournamentsCard extends StatelessWidget {
                   style: TextStyle(fontSize: 12.5, color: c.muted),
                 )
               else
-                for (final t in list) TournamentTile(tournament: t),
+                for (final t in list)
+                  TournamentTile(tournament: t, spots: viewModel.spotsOf(t.id)),
             ],
           ),
         );
@@ -59,9 +63,12 @@ class UpcomingTournamentsCard extends StatelessWidget {
 /// A tournament or league in Discover: dates, place, host, divisions,
 /// whether it's invite only and its fee, with its status.
 class TournamentTile extends StatelessWidget {
-  const TournamentTile({super.key, required this.tournament});
+  const TournamentTile({super.key, required this.tournament, this.spots});
 
   final HostedTournament tournament;
+
+  /// Team spots left; shown only while registration is open.
+  final TournamentSpots? spots;
 
   @override
   Widget build(BuildContext context) {
@@ -94,7 +101,21 @@ class TournamentTile extends StatelessWidget {
           ],
         ],
       ),
-      subtitle: Text(
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _subtitle(t, details, divisions),
+          if (spots case final s? when t.status == HostedStatus.registration)
+            SpotsLeft(spots: s),
+        ],
+      ),
+      trailing: HostedStatusBadge(status: t.status),
+      onTap: () => context.push(Routes.tournament(t.id)),
+    );
+  }
+
+  Widget _subtitle(HostedTournament t, String details, String divisions) =>
+      Text(
         [
           details,
           [
@@ -108,11 +129,7 @@ class TournamentTile extends StatelessWidget {
         ].join('\n'),
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
-      ),
-      trailing: HostedStatusBadge(status: t.status),
-      onTap: () => context.push(Routes.tournament(t.id)),
-    );
-  }
+      );
 }
 
 /// Champions of recently finished public tournaments.
@@ -517,6 +534,136 @@ class RankingRow extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Public team events coming up (pickup games, practices open to all),
+/// from `GET /v1/public/events` as the website's Discover lists them:
+/// every one under All, pickup games under Pickup.
+class PublicEventsCard extends StatelessWidget {
+  const PublicEventsCard({super.key, required this.viewModel, this.only});
+
+  final ExploreViewModel viewModel;
+
+  /// The chip picked; null for All.
+  final ExploreFilter? only;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final vm = viewModel;
+    final list = vm.publicEventsFor(only);
+    final pickup = only == ExploreFilter.pickup;
+    return SectionCard(
+      title: pickup ? 'Pickup games' : 'Team events',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (!vm.publicEventsLoaded)
+            const SkeletonList(count: 2, padding: EdgeInsets.zero)
+          else if (vm.loadPublic.error && list.isEmpty)
+            Text(
+              "Couldn't load events. Try again.",
+              style: TextStyle(fontSize: 12.5, color: c.muted),
+            )
+          else if (list.isEmpty)
+            Text(
+              pickup
+                  ? 'No pickup games coming up yet. Pickup communities post '
+                        'theirs here when they open them to everyone.'
+                  : 'Nothing coming up.',
+              style: TextStyle(fontSize: 12.5, color: c.muted),
+            )
+          else
+            for (final e in list) PublicEventRow(event: e, viewModel: vm),
+        ],
+      ),
+    );
+  }
+}
+
+/// A public team event: its date, title, who runs it (with a team or
+/// community dot), when and where, and its type. Opens the event for the
+/// team's members, else the team or community's page (only members read
+/// its events).
+class PublicEventRow extends StatelessWidget {
+  const PublicEventRow({
+    super.key,
+    required this.event,
+    required this.viewModel,
+  });
+
+  final PublicTeamEvent event;
+  final ExploreViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final e = event;
+    final start = e.startsAt;
+    final when = start == null
+        ? ''
+        : DateFormat('EEE, MMM d · h:mm a').format(start);
+    // Only communities run pickup games; anything else reads as a team's.
+    final dot = e.isPickup ? c.accent : c.team;
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: start == null
+          ? const SizedBox(width: 40)
+          : DateBadge(date: start, size: 40),
+      title: Text(
+        e.title.isEmpty ? 'Event' : e.title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: 15,
+          color: c.ink,
+        ),
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  e.teamName.isEmpty ? 'A team on Stall 10' : e.teamName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          Text(
+            [when, if (e.location.isNotEmpty) e.location].join(' · '),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+      trailing: e.type == null
+          ? null
+          : Text(
+              e.type!.label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: c.muted,
+              ),
+            ),
+      onTap: () => context.push(
+        viewModel.isMine(e.teamId)
+            ? Routes.event(e.teamId, e.id)
+            : Routes.teamOver(e.teamId),
       ),
     );
   }

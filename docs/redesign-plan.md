@@ -78,20 +78,20 @@ Branch: `feature/redesign` (from `feature/team-first`).
 
 | # | Feature | Where | Needs |
 |---|---|---|---|
-| F1 | Live running scores (captains update mid-game) | tournaments | shared + API + rules |
-| F2 | Pinned messages in chat rooms | chat | API/rules |
-| F3 | Event and poll cards posted into chat | chat | API/rules |
+| F1 | Live running scores (captains update mid-game) | tournaments | shared + API + rules — built |
+| F2 | Pinned messages in chat rooms | chat | API (team rooms; no rules change) — built |
+| F3 | Event and poll cards posted into chat | chat | API — built (event cards); chat polls → backlog F33 |
 | F4 | Video timestamped notes / clips | videos | data model + rules |
 | F5 | Video comments | videos | data model + rules |
 | F6 | Tag a video to a game | videos | data model |
 | F7 | Note on an RSVP | schedule | data model + rules |
 | F8 | Audience picker on posts (Everyone / followers / a team) | posts | verify; maybe API |
-| F9 | Learn progress ("3 of 9 read") | learn | user doc or local |
-| F10 | Spots left on tournament lists | tournaments | derive from division caps |
-| F11 | Blocked accounts list in Privacy | settings | verify block feature |
-| F12 | "Public team page" switch | team settings | verify; rules |
+| F9 | Learn progress ("3 of 9 read") | learn | local per device (shared `learnLessons`) — built |
+| F10 | Spots left on tournament lists | tournaments | API `spots` on the public list, from division caps — built |
+| F11 | Blocked accounts list in Privacy | settings | verify block feature — not built: blocking doesn't exist yet; design note waiting for approval |
+| F12 | "Public team page" switch | team settings | verify; rules — built (app + web): `publicPage` on team + listing, `PUT /v1/teams/:id/public-page`, rules + public reads honour it |
 | F13 | Email notifications (beside push) | settings | email provider + secret |
-| F14 | Download your data | account | API export |
+| F14 | Download your data | account | API export — built (app + web): `GET /v1/me/export` JSON, once per 10 min |
 | F15 | Discord import: pick channels | teams | app only |
 | F16 | Schedule month view | schedule | app only |
 | F17 | Meetings list screen | meetings | app only |
@@ -108,10 +108,12 @@ Branch: `feature/redesign` (from `feature/team-first`).
 | F27 | Community page: RSVP on the next pickup card, chat + organizers sections | community | app + web |
 | F28 | More: row subtitles, Manage group, Leave button | team More | app + web |
 
-| F29 | App Discover lists public team events (pickup games) via `/v1/public/events`, as the web does | discover | app |
+| F29 | App Discover lists public team events (pickup games) via `/v1/public/events`, as the web does | discover | app — built |
 | F30 | Tournament extras: standalone bracket page, stepper score entry, week stepper for leagues, full-screen enter-a-team, form wizard with Save draft / Publish, Share | tournaments | app + web |
 
-| F31 | Playbook whiteboard mode: a switch on the playbook page between Plays and Whiteboard. Whiteboard = a blank field to sketch freely (pen, colours, players/disc/cones, eraser, undo, clear), for chalk talks; can be saved as a play (or as a whiteboard) or thrown away | playbook | app + web (+ data if saved) |
+| F31 | Playbook whiteboard mode: a switch on the playbook page between Plays and Whiteboard. Whiteboard = a blank field to sketch freely (pen, colours, players/disc/cones, eraser, undo, clear), for chalk talks; can be saved as a play (or as a whiteboard) or thrown away | playbook | app + web (+ data if saved) — built |
+
+| F33 | Polls posted into chat (a standalone poll; event polls live inside events and need RSVP "going", so F3 shipped event cards only) | chat | shared + API + app + web |
 
 Web parity follow-ups from the app restyle (do in W4 or sooner):
 - Live tournament days open on the Schedule tab (app 3a).
@@ -157,9 +159,66 @@ app restyle is done.
    cone orange. Kept; say if you want the old red/blue.
 3. **App vs web: public pickup games.** The website's Discover lists
    public team events (pickup games) from `/v1/public/events`; the app's
-   doesn't (F29 adds it to the app).
+   doesn't (F29 adds it to the app). Done: F29 built (product-spec
+   §8.1 item 34).
+
 
 4. **Team colours.** Team badges now show initials coloured by kind (team
    blue, pickup community turf, school/club navy). The mockups give each
    team its own colour, which needs a team colour field (owners pick one).
    Add it? (backlog F32)
+
+5. **Logo.** `apps/web/public/logo.png` (and the app icon) is still the old
+   purple "10" mark; the wordmark is now the italic condensed STALL 10.
+   A new mark in turf/navy needs your design call (or a designer).
+6. **Team chat bubbles.** Team rooms show messages as rows (both
+   platforms, as the mockups do); only direct messages use bubbles.
+   Say if you want bubbles in team rooms too.
+7. **development pushed.** `development` was fast-forwarded to
+   `feature/redesign` (app 0.0.36, web 0.45.0) on 2026-11-20 — that
+   also brought in `fix/ui-wording`, `feature/profile-team-stats` and
+   `feature/team-first`, which weren't on development before.
+
+8. **Old app builds and RSVP notes.** Under the new rule, an app build
+   older than the one with RSVP notes can't take back an answer that has
+   a note (it doesn't delete the note). Only matters for TestFlight
+   testers who don't update; fine to accept?
+9. **Sections are display only.** A section switched off (F21) is
+   hidden, but the server doesn't refuse playbook/video/stats writes and
+   deep links still open. Enforce server-side too?
+
+10. **F11 blocking: not built — needs your approval.** There is no block
+    feature anywhere yet. Proposed (your 'full block' decision): block docs
+    `users/{uid}/blocks/{other}` (owner-read, API-written) + a mirrored
+    `blockedBy` lookup for rules; PUT/DELETE/GET `/v1/me/blocks`. A block
+    stops DMs both ways, removes follows both ways and refuses follow
+    requests, hides each other's posts/comments/likes, stops mentions and
+    pushes; shared teams keep working. Hard part: feeds and comments are
+    read straight from Firestore, so hiding them per viewer means either
+    `exists()` checks on every read (costly; list queries can't filter) or
+    moving those reads behind the API. Then Settings › Privacy › Blocked
+    accounts on both platforms. Go ahead, and which read approach?
+11. **Public page off also hides from public tournaments/rankings.** A
+    team that turns its public page off (F12) is treated like a private
+    group for signed-out visitors: its hosted public tournaments and its
+    ranking rows disappear for them too. Keep, or limit the switch to the
+    team page only (one line in `apps/api/src/browse/visibility.ts`)?
+
+## Status when the overnight run stopped (2026-11-20)
+
+- Committed and pushed to `development`: the full app + website restyle
+  (app 0.0.36, web 0.45.0).
+- Committed on `feature/redesign` (app 0.0.37, web 0.46.0, api 0.34.0,
+  2026-11-20) after a full check run: F1 live scores, F21 start simple,
+  F31 whiteboard, F7 RSVP notes, F16 month view, F17 meetings list, F2
+  pins, F3 event cards, F12 public page switch, F14 download data, F9
+  Learn progress, F10 spots left, F29 app pickup games.
+- Next: deploy to dev in this order:
+  Firestore + Storage rules → API → functions groups `notifications`,
+  `browse`, `tournaments`, `account` (ask first), then merge to
+  `development`.
+- Not started: F4–F6 videos, F8 audience picker, F15 Discord channels,
+  F18 team stat tiles, F22 done, F23 roster lines, F24 pinned posts,
+  F25 role presets, F26 team join requests, F27 community page, F28
+  More subtitles, F30 tournament extras, F11 blocking (needs approval),
+  F33 chat polls.

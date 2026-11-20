@@ -9,6 +9,7 @@ import '../../../domain/models/model_utils.dart';
 import '../../../domain/models/outbox.dart';
 import '../../../domain/models/team.dart';
 import '../../../utils/result.dart';
+import '../../services/api_client.dart';
 import '../../services/attachment_storage.dart';
 import '../../services/firestore_utils.dart';
 import '../../services/shared_streams.dart';
@@ -26,7 +27,9 @@ class ChatRepositoryFirebase implements ChatRepository {
     FirebaseFirestore? firestore,
     SharedStreams? sharedStreams,
     OutboxRepository? outbox,
-  }) : _files = attachments,
+    ApiClient? api,
+  }) : _api = api,
+       _files = attachments,
        _db = firestore ?? FirebaseFirestore.instance,
        _shared = sharedStreams ?? SharedStreams.instance,
        _outbox = outbox {
@@ -54,6 +57,9 @@ class ChatRepositoryFirebase implements ChatRepository {
 
   /// Holds messages sent offline until they can go out.
   final OutboxRepository? _outbox;
+
+  /// Pins and event cards; null in builds without `API_BASE_URL`.
+  final ApiClient? _api;
 
   final AttachmentStorage _files;
   final FirebaseFirestore _db;
@@ -424,6 +430,73 @@ class ChatRepositoryFirebase implements ChatRepository {
     await _files.delete(message.attachments.map((a) => a.path));
     await _messages(teamId, roomId).doc(message.id).delete();
   });
+
+  static const _noApi = 'Pins and event cards need a connection to Stall 10.';
+
+  ApiClient get _client =>
+      _api ?? (throw const ApiException('unavailable', _noApi));
+
+  static String _roomPath(String teamId, String roomId) =>
+      '/v1/teams/${Uri.encodeComponent(teamId)}/chats/'
+      '${Uri.encodeComponent(roomId)}';
+
+  static String _pinPath(String teamId, String roomId, String messageId) =>
+      '${_roomPath(teamId, roomId)}/messages/'
+      '${Uri.encodeComponent(messageId)}/pin';
+
+  @override
+  bool get canUseChatExtras => _api != null;
+
+  @override
+  Stream<List<ChatMessage>> watchPins(String teamId, String roomId) =>
+      _shared.get(
+        'pins/$teamId/$roomId',
+        () =>
+            countedSnapshots(
+              _messages(
+                teamId,
+                roomId,
+              ).orderBy('pinnedAt', descending: true).limit(chatPinsMax),
+              'chatPins',
+            ).map(
+              (snap) => [
+                // Firestore leaves out messages without pinnedAt; checked
+                // here too.
+                for (final d in snap.docs)
+                  if (ChatMessage.fromMap(d.id, plainData(d.data()))
+                      case final m when m.isPinned)
+                    m,
+              ],
+            ),
+      );
+
+  @override
+  Future<Result<void>> pinMessage(
+    String teamId,
+    String roomId,
+    String messageId, {
+    String? unpin,
+  }) => guard(
+    () => _client.put(_pinPath(teamId, roomId, messageId), {'unpin': ?unpin}),
+  );
+
+  @override
+  Future<Result<void>> unpinMessage(
+    String teamId,
+    String roomId,
+    String messageId,
+  ) => guard(() => _client.delete(_pinPath(teamId, roomId, messageId)));
+
+  @override
+  Future<Result<void>> shareEvent(
+    String teamId,
+    String roomId,
+    String eventId,
+  ) => guard(
+    () => _client.post('${_roomPath(teamId, roomId)}/event-shares', {
+      'eventId': eventId,
+    }),
+  );
 
   @override
   Future<Result<Uint8List>> downloadAttachment(ChatAttachment attachment) =>

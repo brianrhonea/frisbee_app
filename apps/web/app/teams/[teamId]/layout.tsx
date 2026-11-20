@@ -1,10 +1,11 @@
-import { isYouthTeam, rosterIsPublic } from "@stall10/shared";
+import { isYouthTeam, publicPageOn, rosterIsPublic } from "@stall10/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { AllTeamsLink } from "@/components/team/AllTeamsLink";
 import { ForVisitors } from "@/components/ForVisitors";
 import { InviteProvider } from "@/components/team/InviteDialog";
+import { SectionGate } from "@/components/team/SectionGate";
 import { InviteOnlyHint, TeamAbout, TeamAddress, TeamBannerActions, TeamHeadBadge, TeamMeta, TeamName } from "@/components/team/TeamBanner";
 import { TeamProvider } from "@/components/team/TeamContext";
 import { TeamNav } from "@/components/team/TeamNav";
@@ -39,10 +40,12 @@ export default async function TeamLayout({ params, children }: Props) {
   const group = kind !== "team";
   // isPrivateGroup in the rules: a group that approves joins.
   const privateGroup = group && team.requiresApproval === true;
+  // A team whose "Public team page" is off (publicPageOn): its card only.
+  const privatePage = !group && !publicPageOn(team);
   const subtitle = listingSubtitle(team);
 
   return (
-    <TeamProvider teamId={teamId} name={name} kind={kind} privateGroup={privateGroup} youth={isYouthTeam(team)} publicRoster={rosterIsPublic(team)}>
+    <TeamProvider teamId={teamId} name={name} kind={kind} privateGroup={privateGroup} privatePage={privatePage} youth={isYouthTeam(team)} publicRoster={rosterIsPublic(team)}>
       <InviteProvider>
         <div className="page page-wide team-hub">
           <AllTeamsLink />
@@ -68,7 +71,9 @@ export default async function TeamLayout({ params, children }: Props) {
             </div>
           </ForVisitors>
           <TeamNav />
-          <div className="team-section">{children}</div>
+          <div className="team-section">
+            <SectionGate>{children}</SectionGate>
+          </div>
         </div>
       </InviteProvider>
     </TeamProvider>

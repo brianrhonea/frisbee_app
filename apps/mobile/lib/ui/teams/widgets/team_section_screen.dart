@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../data/repositories/discover/discover_repository.dart';
 import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
@@ -65,9 +66,21 @@ enum TeamSection {
       league ? const [chat, members] : _forKind(kind);
 
   /// [team]'s sections: a league team ([Team.isLeagueTeam]) only has its
-  /// chat and members.
-  static List<TeamSection> forTeam(Team team) =>
-      forKind(team.kind, league: team.isLeagueTeam);
+  /// chat and members, and the owner may have turned some off
+  /// ([Team.hasSection]; new teams start without Playbook, Videos and
+  /// Stats).
+  static List<TeamSection> forTeam(Team team) => [
+    for (final s in forKind(team.kind, league: team.isLeagueTeam))
+      if (s.optional == null || team.hasSection(s.optional!)) s,
+  ];
+
+  /// The switch in Settings › Sections this section follows, if any.
+  OptionalSection? get optional => switch (this) {
+    playbook => OptionalSection.playbook,
+    videos => OptionalSection.videos,
+    stats => OptionalSection.stats,
+    _ => null,
+  };
 
   static List<TeamSection> _forKind(TeamKind kind) => switch (kind) {
     TeamKind.team => values.where((s) => s != teams).toList(),
@@ -253,6 +266,7 @@ class _TeamSectionBodyState extends State<TeamSectionBody> {
         tournamentRepository: c.read(),
         teamRepository: c.read(),
         authRepository: c.read(),
+        discoverRepository: c.read<DiscoverRepository?>(),
       ),
       builder: (_, hosted) => vm.team?.kind != TeamKind.community
           ? HostedTournamentsSection(viewModel: hosted)
@@ -324,13 +338,23 @@ class TeamSectionScreen extends StatelessWidget {
           );
         }
         if (!TeamSection.forTeam(team).contains(section)) {
+          final o = section.optional;
+          final off =
+              o != null &&
+              !team.hasSection(o) &&
+              TeamSection.forKind(
+                team.kind,
+                league: team.isLeagueTeam,
+              ).contains(section);
           return Scaffold(
             appBar: AppBar(leading: leading),
             body: EmptyView(
               icon: section.icon,
-              title: 'Not here',
-              message:
-                  "A ${team.kind.noun} doesn't have ${section.label.toLowerCase()}.",
+              title: off ? '${section.label} is off' : 'Not here',
+              message: off
+                  ? 'The owner can turn it on in Settings › Sections.'
+                  : "A ${team.kind.noun} doesn't have "
+                        '${section.label.toLowerCase()}.',
             ),
           );
         }

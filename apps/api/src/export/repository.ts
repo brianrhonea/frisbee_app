@@ -1,0 +1,91 @@
+import { type DocumentSnapshot, FieldPath, type Firestore, type Query } from "firebase-admin/firestore";
+import { type Data, plain } from "../browse/repository.js";
+
+/** A document with its full path (where it lives says what it is: a DM, a team chat, …). */
+export interface PathDoc {
+  id: string;
+  path: string;
+  data: Data;
+}
+
+/**
+ * The reads "Download your data" makes, all about one person ([uid]).
+ * Each list method returns at most [limit] + 1 documents, so the service
+ * can tell a capped section (`truncated`) from a complete one. Values come
+ * back with Timestamps as ISO strings.
+ */
+export interface ExportRepository {
+  /** One document of the caller's own (users/{uid}, profiles/{uid}, their settings…); null when missing. */
+  own(path: string): Promise<Data | null>;
+  /** Documents of one of the caller's own collections (users/{uid}/follows, users/{uid}/events). */
+  ownCollection(path: string, limit: number): Promise<PathDoc[]>;
+  /** Posts, comments or messages anywhere (collection groups) whose authorId is [uid]. */
+  authored(group: "posts" | "comments" | "messages", uid: string, limit: number): Promise<PathDoc[]>;
+  /** Conversations listing [uid] in participants. */
+  conversationsOf(uid: string, limit: number): Promise<PathDoc[]>;
+  /** Teams listing [uid] in memberIds. */
+  teamsOf(uid: string, limit: number): Promise<PathDoc[]>;
+  /**
+   * A team's events or meetings with only [fields] and the caller's own
+   * entry of each response map in [responseFields] (`rsvps.{uid}`, …).
+   */
+  answers(teamId: string, kind: "events" | "meetings", uid: string, fields: readonly string[], responseFields: readonly string[], limit: number): Promise<PathDoc[]>;
+  /** Roster spots on any team linked to [uid] (roster userId). */
+  rosterSpots(uid: string, limit: number): Promise<PathDoc[]>;
+}
+
+/** Documents read per round trip while paging through a long list. */
+const pageSize = 500;
+
+const pathDoc = (d: DocumentSnapshot): PathDoc => ({ id: d.id, path: d.ref.path, data: plain(d.data() ?? {}) as Data });
+
+export class FirestoreExportRepository implements ExportRepository {
+  constructor(private readonly db: Firestore) {}
+
+  /** Up to [max] documents of [query], [pageSize] at a time, in document order. */
+  private async paged(query: Query, max: number): Promise<PathDoc[]> {
+    const out: PathDoc[] = [];
+    let last: DocumentSnapshot | undefined;
+    while (out.length < max) {
+      let q = query.limit(Math.min(pageSize, max - out.length));
+      if (last) q = q.startAfter(last);
+      const snap = await q.get();
+      out.push(...snap.docs.map(pathDoc));
+      if (snap.size < pageSize) break;
+      last = snap.docs[snap.docs.length - 1];
+    }
+    return out;
+  }
+
+  async own(path: string) {
+    const snap = await this.db.doc(path).get();
+    return snap.exists ? (plain(snap.data()) as Data) : null;
+  }
+
+  ownCollection(path: string, limit: number) {
+    return this.paged(this.db.collection(path), limit + 1);
+  }
+
+  // Indexes: single-field collection-group exemptions on authorId (posts,
+  // comments, messages), as deleteAccount's queries use.
+  authored(group: "posts" | "comments" | "messages", uid: string, limit: number) {
+    return this.paged(this.db.collectionGroup(group).where("authorId", "==", uid), limit + 1);
+  }
+
+  conversationsOf(uid: string, limit: number) {
+    return this.paged(this.db.collection("conversations").where("participants", "array-contains", uid), limit + 1);
+  }
+
+  teamsOf(uid: string, limit: number) {
+    return this.paged(this.db.collection("teams").where("memberIds", "array-contains", uid), limit + 1);
+  }
+
+  answers(teamId: string, kind: "events" | "meetings", uid: string, fields: readonly string[], responseFields: readonly string[], limit: number) {
+    const paths = [...fields.map((f) => new FieldPath(f)), ...responseFields.map((f) => new FieldPath(f, uid))];
+    return this.paged(this.db.collection(`teams/${teamId}/${kind}`).select(...paths), limit + 1);
+  }
+
+  rosterSpots(uid: string, limit: number) {
+    return this.paged(this.db.collectionGroup("roster").where("userId", "==", uid), limit + 1);
+  }
+}

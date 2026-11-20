@@ -125,8 +125,60 @@ export interface SaveTeamEventResult {
   id: string;
 }
 
-/** `PUT .../events/:eventId/rsvp`: null takes the answer back. */
-export const rsvpRequestSchema = z.strictObject({ status: z.enum(rsvpStatuses).nullable() });
+/** The longest note on an RSVP ("Late 15 min"), after [cleanRsvpNote]. */
+export const rsvpNoteMax = 140;
+
+/**
+ * An RSVP note as stored: one line, without control characters (newlines
+ * and tabs become spaces, the rest are dropped), runs of spaces squeezed
+ * and trimmed. Empty means no note. The app's `cleanRsvpNote` matches.
+ */
+export function cleanRsvpNote(raw: string): string {
+  return raw
+    .replace(/[\t\n\r\p{Zl}\p{Zp}]+/gu, " ")
+    .replace(/[\u0000-\u001f\u007f-\u009f]/g, "")
+    .replace(/ {2,}/g, " ")
+    .trim();
+}
+
+/**
+ * The optional `note` on an RSVP (events and meetings): left out keeps the
+ * one there, null or empty removes it. Taking the answer back removes it too.
+ */
+export const rsvpNoteSchema = z
+  .string()
+  .max(1000, `Keep the note under ${rsvpNoteMax} characters.`)
+  .transform(cleanRsvpNote)
+  .pipe(z.string().max(rsvpNoteMax, `Keep the note under ${rsvpNoteMax} characters.`))
+  .nullable()
+  .optional();
+
+/**
+ * A doc's `rsvpNotes` (uid → note) after [uid] answers: unchanged when
+ * [note] is left out and they still have an answer; without theirs when
+ * they took the answer back or [note] is null or empty (after
+ * [rsvpNoteSchema]); otherwise with [note]. Other members' notes stay.
+ */
+export function nextRsvpNotes(
+  current: unknown,
+  uid: string,
+  answered: boolean,
+  note: string | null | undefined,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (current && typeof current === "object") {
+    for (const [k, v] of Object.entries(current as Record<string, unknown>)) if (typeof v === "string") out[k] = v;
+  }
+  if (!answered || note === null || note === "") delete out[uid];
+  else if (note !== undefined) out[uid] = note;
+  return out;
+}
+
+/**
+ * `PUT .../events/:eventId/rsvp`: null takes the answer back (and its
+ * note); [note] as in [rsvpNoteSchema], stored in the event's `rsvpNotes`.
+ */
+export const rsvpRequestSchema = z.strictObject({ status: z.enum(rsvpStatuses).nullable(), note: rsvpNoteSchema });
 
 /** `PUT .../events/:eventId/reaction`. */
 export const eventReactionRequestSchema = z.strictObject({ reaction: z.enum(eventReactions), on: z.boolean() });

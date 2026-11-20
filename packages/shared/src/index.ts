@@ -35,4 +35,7 @@ export * from "./schedule.js";
 export * from "./rankings.js";
 export * from "./profile_stats.js";
 export * from "./team_chats.js";
+export * from "./chat_extras.js";
 export * from "./tournament_day.js";
+export * from "./discover.js";
+export * from "./data_export.js";

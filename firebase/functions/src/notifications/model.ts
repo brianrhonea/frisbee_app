@@ -31,6 +31,8 @@ export interface TeamDoc {
   memberRoles?: Record<string, string[]>;
   memberPerms?: Record<string, string[]>;
   deletingAt?: unknown;
+  /** false: the "Public team page" is off, so public posts stay with members (publicPageOn in packages/shared). */
+  publicPage?: boolean;
 }
 
 export interface RoomDoc {
@@ -347,7 +349,12 @@ export function chatNotice(a: {
   message: Data;
   messageId?: string;
 }): Notice {
-  const line = `${String(a.message.authorName ?? "Someone")}: ${messagePreview(a.message)}`;
+  const author = String(a.message.authorName ?? "") || "Someone";
+  // A shared event (redesign F3) says so, with its title as it was shared.
+  const event = a.message.event && typeof a.message.event === "object" ? (a.message.event as Data) : null;
+  const line = event
+    ? `${author} shared an event: ${String(event.title ?? "") || "Event"}`
+    : `${author}: ${messagePreview(a.message)}`;
   return {
     category: "chat",
     teamId: a.teamId,
@@ -496,14 +503,17 @@ export function playNotice(a: {
   teamName: string;
   play: Data;
 }): Notice {
-  const name = String(a.play.name ?? "") || "Untitled play";
+  // A saved whiteboard sketch (kind "whiteboard") opens on the whiteboard.
+  const board = a.play.kind === "whiteboard";
+  const what = board ? "whiteboard" : "play";
+  const name = String(a.play.name ?? "") || `Untitled ${what}`;
   return {
     category: "teamActivity",
     teamId: a.teamId,
-    route: `/teams/${a.teamId}/plays/${a.playId}`,
+    route: board ? `/teams/${a.teamId}/whiteboards/${a.playId}` : `/teams/${a.teamId}/plays/${a.playId}`,
     collapseId: `play_${a.teamId}_${a.playId}`,
     text: () => ({
-      title: `${a.teamName}: ${a.created ? "new play" : "play updated"}`,
+      title: `${a.teamName}: ${a.created ? `new ${what}` : `${what} updated`}`,
       body: name,
     }),
   };

@@ -36,14 +36,24 @@ abstract class EventRepository {
 
   Future<Result<void>> deleteEvent(String teamId, String eventId);
 
-  /// Sets [uid]'s RSVP, or clears it when [status] is null. Anything but
-  /// [RsvpStatus.going] also removes [uid]'s reactions and votes, since only
-  /// attendees may react or vote.
+  /// Sets [uid]'s RSVP, or clears it (and its note) when [status] is null.
+  /// Anything but [RsvpStatus.going] also removes [uid]'s reactions and
+  /// votes, since only attendees may react or vote. The note stays.
   Future<Result<void>> setRsvp(
     String teamId,
     String eventId,
     String uid,
     RsvpStatus? status,
+  );
+
+  /// Sets [uid]'s note on their answer, or removes it when [note] is
+  /// empty. [note] is already cleaned ([cleanRsvpNote]); [uid] must have
+  /// answered.
+  Future<Result<void>> setRsvpNote(
+    String teamId,
+    String eventId,
+    String uid,
+    String note,
   );
 
   Future<Result<void>> setReaction(

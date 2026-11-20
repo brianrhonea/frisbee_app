@@ -62,6 +62,65 @@ export const createTeamRequestSchema = z
     }
   });
 
+/**
+ * A team's sections its owner switches on or off (`sections` on the team
+ * doc; Team.sections in the app). Feed, Schedule, Chat and Roster are
+ * always there. A missing map or key reads as on, so teams made before
+ * the switches keep everything; new teams start with these off
+ * ([newTeamSections]). Communities and organizations store none.
+ */
+export const optionalTeamSections = ["playbook", "videos", "stats", "meetings"] as const;
+export type OptionalTeamSection = (typeof optionalTeamSections)[number];
+
+/** What a new team (not a community) stores: every optional section off. */
+export const newTeamSections = (): Record<OptionalTeamSection, boolean> => ({
+  playbook: false,
+  videos: false,
+  stats: false,
+  meetings: false,
+});
+
+/** Whether [team] shows [section]: on unless stored as false. */
+export function sectionOn(team: { sections?: unknown } | Record<string, unknown>, section: OptionalTeamSection): boolean {
+  const s = (team as { sections?: unknown }).sections;
+  return !(s && typeof s === "object" && (s as Record<string, unknown>)[section] === false);
+}
+
+/**
+ * Body of `PUT /v1/teams/:id/sections`: the sections to switch, each on
+ * (true) or off (false). Sections left out keep what they have.
+ */
+export const setTeamSectionsRequestSchema = z
+  .strictObject({
+    playbook: z.boolean().optional(),
+    videos: z.boolean().optional(),
+    stats: z.boolean().optional(),
+    meetings: z.boolean().optional(),
+  })
+  .refine((s) => Object.values(s).some((v) => v !== undefined), { message: "Pick a section to switch." });
+export type SetTeamSectionsRequest = z.input<typeof setTeamSectionsRequestSchema>;
+
+/**
+ * A team's "Public team page" switch (`publicPage` on the team doc and its
+ * directory listing; Team.publicPage in the app). Missing or true: anyone
+ * may see its public posts, upcoming public events and, for an adult team,
+ * its roster. false: people outside the team see only its card (name,
+ * division, level and city in search), as a private group's. It only ever
+ * hides more: youth rosters stay private either way. Teams only; groups
+ * use requiresApproval.
+ */
+export function publicPageOn(team: { publicPage?: unknown } | Record<string, unknown> | null | undefined): boolean {
+  return (team as { publicPage?: unknown } | null | undefined)?.publicPage !== false;
+}
+
+/** What the switch does, as both apps say it (publicPageDescription in team_settings_screen.dart). */
+export const publicPageDescription =
+  "Anyone can see the team's public posts, upcoming public events and, for an adult team, its roster. Turned off, people outside the team see only its name and city. Chat always stays private.";
+
+/** Body of `PUT /v1/teams/:id/public-page` (manageTeam admins). */
+export const setPublicPageRequestSchema = z.strictObject({ public: z.boolean() });
+export type SetPublicPageRequest = z.input<typeof setPublicPageRequestSchema>;
+
 export type CreateTeamRequest = z.input<typeof createTeamRequestSchema>;
 export type CreateTeamInput = z.output<typeof createTeamRequestSchema>;
 
@@ -87,9 +146,10 @@ export const publicRosterLevels = ["club", "college", "league", "pickup"] as con
  * team doc and its directory listing; the website, which has only the
  * listing, uses it to choose what to show.
  */
-export function rosterIsPublic(team: { kind?: unknown; level?: unknown } | null | undefined): boolean {
+export function rosterIsPublic(team: { kind?: unknown; level?: unknown; publicPage?: unknown } | null | undefined): boolean {
   if (!team) return false;
   if (team.kind !== undefined && team.kind !== "team") return false;
+  if (!publicPageOn(team)) return false;
   return (publicRosterLevels as readonly unknown[]).includes(team.level);
 }
 

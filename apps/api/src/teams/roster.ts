@@ -1,5 +1,6 @@
 import {
   isYouthTeam,
+  publicPageOn,
   type PublicRoster,
   type PublicRosterPlayer,
   rosterIsPublic,
@@ -21,6 +22,8 @@ import { can, mapOf } from "./access.js";
 const positions = ["handler", "cutter", "hybrid"] as const;
 /** What anyone who isn't on a youth team sees in place of its roster (the app and website say the same). */
 export const youthRosterPrivate = "Rosters of youth teams are private: only members see them.";
+/** What anyone who isn't on a team with its public page off sees in place of its roster. */
+export const teamPagePrivate = "This team's page is private: only members see its roster.";
 const kinds = ["team", "community", "organization"] as const;
 /** Tiers first by rank, then everyone else by name (the app's roster order). */
 const tierOrder = ["owner", "coach", "captain", "stats", "player"];
@@ -71,6 +74,10 @@ export class RosterService {
     // level the team doc says (drafted before league teams kept "youth").
     if (!isMember && (isYouthTeam(team) || (await this.inYouthLeague(team, teamId)))) {
       if (!(await this.managesOrgOf(team, teamId, caller.uid))) throw new ApiError("permission_denied", youthRosterPrivate);
+    }
+    // A team whose public page is off (publicPageOn) shows outsiders its card only.
+    if (!isMember && !publicPageOn(team) && !(await this.managesOrgOf(team, teamId, caller.uid))) {
+      throw new ApiError("permission_denied", teamPagePrivate);
     }
 
     const players = kind === "team" ? await this.store.list(`teams/${teamId}/roster`, rosterMax) : [];

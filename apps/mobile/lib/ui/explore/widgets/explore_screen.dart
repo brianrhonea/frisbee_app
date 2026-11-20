@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderAbstractViewport;
 import 'package:go_router/go_router.dart';
 
+import '../../../domain/models/discover.dart';
 import '../../../domain/models/hosted_tournament.dart';
+
 import '../../../domain/models/player_profile.dart';
 import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
@@ -237,9 +239,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
         _only == null ||
         _only == ExploreFilter.tournaments ||
         _only == ExploreFilter.leagues;
+    // Public team events (pickup games) under All and Pickup, as the
+    // website's Discover lists them.
+    final publicShown =
+        x != null &&
+        x.discoversPublicEvents &&
+        (_only == null || _only == ExploreFilter.pickup);
     if (!_hasEvents || !eventsShown) {
       final what = switch (_only) {
-        ExploreFilter.pickup => 'pickup communities',
+        ExploreFilter.pickup => 'pickup communities and pickup games',
         ExploreFilter.teams => 'teams',
         ExploreFilter.groups => 'communities, schools and clubs',
         ExploreFilter.players => 'players by name or username',
@@ -255,6 +263,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
             style: TextStyle(color: c.muted),
           ),
         ),
+        if (publicShown) PublicEventsCard(viewModel: x, only: _only),
       ];
     }
     final live = [
@@ -268,7 +277,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
           children: [
             const SectionHeader('Live now', leading: LiveDot()),
             ...spaced([
-              for (final t in live) _LiveCard(tournament: t),
+              for (final t in live)
+                _LiveCard(tournament: t, games: x!.liveGamesOf(t.id)),
             ], gap: 10),
           ],
         ),
@@ -276,6 +286,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
         _ComingUp(viewModel: events)
       else if (x != null)
         UpcomingTournamentsCard(viewModel: x),
+      if (publicShown) PublicEventsCard(viewModel: x, only: _only),
       if (x != null && _only != ExploreFilter.leagues)
         RecentResultsCard(viewModel: x),
     ];
@@ -313,6 +324,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
     ];
     final playersShown = _shows(ExploreFilter.players);
     final people = playersShown ? players.results : const <PlayerProfile>[];
+    // Public team events: every one under All, pickup games under Pickup.
+    final teamEvents =
+        widget.explore?.matchingEvents(_text.text, _only) ??
+        const <PublicTeamEvent>[];
+    TournamentSpots? spotsOf(String id) =>
+        events?.spotsOf(id) ?? widget.explore?.spotsOf(id);
 
     final searchesTeams = teamsShown || groupsShown;
     final running =
@@ -329,7 +346,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
         leagues.isEmpty &&
         teams.isEmpty &&
         groups.isEmpty &&
-        people.isEmpty;
+        people.isEmpty &&
+        teamEvents.isEmpty;
     // From the lists shown, not the searches' own: a search can match only
     // what the chip hides (schools and clubs under Pickup).
     final noMatches =
@@ -358,11 +376,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
         ),
       if (tournaments.isNotEmpty)
         group('Tournaments', [
-          for (final t in tournaments) TournamentTile(tournament: t),
+          for (final t in tournaments)
+            TournamentTile(tournament: t, spots: spotsOf(t.id)),
         ]),
       if (leagues.isNotEmpty)
         group('Leagues', [
-          for (final t in leagues) TournamentTile(tournament: t),
+          for (final t in leagues)
+            TournamentTile(tournament: t, spots: spotsOf(t.id)),
         ]),
       if (teams.isNotEmpty)
         group('Teams', [
@@ -374,6 +394,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
         ]),
       if (people.isNotEmpty)
         group('Players', [for (final p in people) PlayerTile(profile: p)]),
+      if (teamEvents.isNotEmpty)
+        group(pickup ? 'Pickup games' : 'Events', [
+          for (final e in teamEvents)
+            PublicEventRow(event: e, viewModel: widget.explore!),
+        ]),
     ];
   }
 }
@@ -381,9 +406,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
 /// A tournament or league being played now, on a navy scoreboard card.
 /// No running scores yet: its name, host, place and divisions.
 class _LiveCard extends StatelessWidget {
-  const _LiveCard({required this.tournament});
+  const _LiveCard({required this.tournament, this.games = const []});
 
   final HostedTournament tournament;
+
+  /// Its games being played now, with their running scores.
+  final List<LiveGameRow> games;
+
+  /// Live games a card lists before "+N more".
+  static const shown = 3;
 
   @override
   Widget build(BuildContext context) {
@@ -422,6 +453,83 @@ class _LiveCard extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(color: c.onFeatureMuted, fontSize: 12.5),
+          ),
+          if (games.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            for (final row in games.take(shown))
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: _LiveGameLine(row: row),
+              ),
+            if (games.length > shown)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  '+${games.length - shown} more live',
+                  style: TextStyle(color: c.onFeatureMuted, fontSize: 12.5),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// A live game on a navy card: its dot, the teams around the running
+/// score, and its field.
+class _LiveGameLine extends StatelessWidget {
+  const _LiveGameLine({required this.row});
+
+  final LiveGameRow row;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final name = TextStyle(
+      color: c.onFeature,
+      fontSize: 13.5,
+      fontWeight: FontWeight.w700,
+    );
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+      decoration: BoxDecoration(
+        color: c.featureHighlight,
+        borderRadius: BorderRadius.circular(controlRadius),
+      ),
+      child: Row(
+        children: [
+          const LiveDot(size: 7),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              row.nameA,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+              style: name,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: ScoreText(
+              '${row.live.scoreA}–${row.live.scoreB}',
+              size: 20,
+              color: c.onFeature,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              row.nameB,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: name,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'Field ${row.game.field}',
+            style: TextStyle(color: c.onFeatureMuted, fontSize: 11.5),
           ),
         ],
       ),
@@ -481,7 +589,8 @@ class _ComingUp extends StatelessWidget {
                   child: const Text('Host an event'),
                 ),
               ),
-            for (final t in list) TournamentTile(tournament: t),
+            for (final t in list)
+              TournamentTile(tournament: t, spots: vm.spotsOf(t.id)),
           ],
         ],
       ),

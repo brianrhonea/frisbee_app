@@ -33,8 +33,17 @@ import 'team_initials.dart';
 import 'team_post_widgets.dart';
 import 'team_community_sheet.dart';
 import 'team_section_screen.dart';
+import 'team_settings_screen.dart';
 
-enum _MenuAction { edit, community, leave, delete }
+enum _MenuAction { edit, settings, community, leave, delete }
+
+/// The sections [vm]'s page shows: the team's own for members (some may
+/// be turned off), else every one its kind has.
+List<TeamSection> _sectionsOf(TeamHomeViewModel vm, TeamKind kind) =>
+    switch (vm.team) {
+      final t? => TeamSection.forTeam(t),
+      null => TeamSection.forKind(kind),
+    };
 
 /// Goes to [location], another tab of the team page. On a team pushed over
 /// a tournament ([Routes.teamOver]) it swaps the tab in place, keeping the
@@ -210,6 +219,8 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
     switch (action) {
       case _MenuAction.community:
         await showTeamCommunity(context, team);
+      case _MenuAction.settings:
+        await showTeamSettings(context, team.id);
       case _MenuAction.edit:
         final updated = await showDialog<NewTeam>(
           context: context,
@@ -407,7 +418,12 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                   menu: mobile ? null : menu,
                 ),
                 Expanded(
-                  child: _MoreList(teamId: vm.teamId, sections: more),
+                  child: _MoreList(
+                    teamId: vm.teamId,
+                    sections: more,
+                    meetings:
+                        team?.hasSection(OptionalSection.meetings) ?? false,
+                  ),
                 ),
               ],
             ),
@@ -567,7 +583,11 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
         ],
       );
     } else if (section == null) {
-      body = _MoreList(teamId: vm.teamId, sections: more);
+      body = _MoreList(
+        teamId: vm.teamId,
+        sections: more,
+        meetings: team.hasSection(OptionalSection.meetings),
+      );
     } else {
       body = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -610,8 +630,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                 actions: _headerActions(context, vm, summary),
                 tabs: _TeamTabs(
                   teamId: vm.teamId,
-                  kind: summary.kind,
-                  league: team.isLeagueTeam,
+                  sections: sections,
                   tournamentsTab: promoted,
                   selected: tab,
                 ),
@@ -655,6 +674,11 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (vm.showSectionsHint)
+              _SectionsHint(
+                onOpen: () => showTeamSettings(context, vm.teamId),
+                onDismiss: vm.dismissSectionsHint,
+              ),
             if (team != null && team.isLeagueTeam)
               // A league team is its chat and members; the league page
               // has its games.
@@ -752,6 +776,13 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
       itemBuilder: (_) => [
         if (vm.canEdit)
           PopupMenuItem(value: _MenuAction.edit, child: Text('Edit $noun')),
+        // Settings: Sections (the owner switches Playbook, Videos, Stats
+        // and Meetings) and Visibility (admins switch the public page).
+        if (vm.canEdit && team.kind == TeamKind.team && !team.isLeagueTeam)
+          const PopupMenuItem(
+            value: _MenuAction.settings,
+            child: Text('Settings'),
+          ),
         if (vm.canEdit && !team.isCommunity)
           const PopupMenuItem(
             value: _MenuAction.community,
@@ -999,10 +1030,13 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
   List<Widget> _posts(BuildContext context) {
     final posts = vm.posts;
     if (vm.isPrivateToMe) {
-      return const [
+      return [
         _Note(
-          'This is a private community. Its location, events and posts are '
-          'only visible to members.',
+          vm.isGroup
+              ? 'This is a private community. Its location, events and posts '
+                    'are only visible to members.'
+              : "This team's page is private. Its events, posts and roster "
+                    'are only visible to members.',
         ),
       ];
     }
@@ -1172,8 +1206,7 @@ class _Hero extends StatelessWidget {
               const SizedBox(height: 6),
               _TeamTabs(
                 teamId: teamId,
-                kind: summary.kind,
-                league: vm.team?.isLeagueTeam ?? false,
+                sections: _sectionsOf(vm, summary.kind),
                 tournamentsTab: vm.tournamentsTab,
                 selected: TeamTab.feed,
               ),
@@ -1483,28 +1516,24 @@ class _TeamHeaderDelegate extends SliverPersistentHeaderDelegate {
 class _TeamTabs extends StatelessWidget {
   const _TeamTabs({
     required this.teamId,
-    required this.kind,
+    required this.sections,
     required this.selected,
-    this.league = false,
     this.tournamentsTab = false,
   });
 
-  /// A league team: just chat and members.
-  final bool league;
+  /// The page's sections ([TeamSection.forTeam]): a league team has just
+  /// chat and members, and sections the owner turned off have no tab.
+  final List<TeamSection> sections;
 
   /// Tournaments is a tab of its own ([TeamHomeViewModel.tournamentsTab]).
   final bool tournamentsTab;
 
   final String teamId;
-  final TeamKind kind;
   final TeamTab selected;
 
   @override
   Widget build(BuildContext context) {
-    final tabs = TeamTab.forSections(
-      TeamSection.forKind(kind, league: league),
-      tournamentsTab: tournamentsTab,
-    );
+    final tabs = TeamTab.forSections(sections, tournamentsTab: tournamentsTab);
     return UnderlineTabs(
       labels: [for (final t in tabs) t.label],
       selected: tabs.indexOf(selected),
@@ -1513,12 +1542,71 @@ class _TeamTabs extends StatelessWidget {
   }
 }
 
-/// The More tab: the team's other sections, one row each.
+/// For the owner of a brand-new team: where the sections it started
+/// without are. Shown until dismissed (remembered on the device).
+class _SectionsHint extends StatelessWidget {
+  const _SectionsHint({required this.onOpen, required this.onDismiss});
+
+  final VoidCallback onOpen;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: c.accentSoft,
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onOpen,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 4, 10),
+            child: Row(
+              children: [
+                Icon(Icons.tune, size: 20, color: c.accentInk),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Turn on ${OptionalSection.listed} in Settings › '
+                    'Sections.',
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      color: c.accentInk,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Dismiss',
+                  icon: Icon(Icons.close, size: 18, color: c.accentInk),
+                  onPressed: onDismiss,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The More tab: the team's other sections, one row each, then its
+/// Meetings list when the team has Meetings on.
 class _MoreList extends StatelessWidget {
-  const _MoreList({required this.teamId, required this.sections});
+  const _MoreList({
+    required this.teamId,
+    required this.sections,
+    this.meetings = false,
+  });
 
   final String teamId;
   final List<TeamSection> sections;
+
+  /// Whether to list Meetings (Settings › Sections), which open on a page
+  /// of their own.
+  final bool meetings;
 
   @override
   Widget build(BuildContext context) {
@@ -1557,6 +1645,35 @@ class _MoreList extends StatelessWidget {
                     ),
                     trailing: Icon(Icons.chevron_right, color: c.muted),
                     onTap: () => goWithinTeam(context, s.route(teamId)),
+                  ),
+                ],
+                if (meetings) ...[
+                  if (sections.isNotEmpty) Divider(height: 1, color: c.border),
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+                    leading: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: c.accentSoft,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.videocam_outlined,
+                        size: 19,
+                        color: c.accentInk,
+                      ),
+                    ),
+                    title: Text(
+                      'Meetings',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        color: c.ink,
+                      ),
+                    ),
+                    trailing: Icon(Icons.chevron_right, color: c.muted),
+                    onTap: () => context.push(Routes.teamMeetings(teamId)),
                   ),
                 ],
               ],
@@ -1623,8 +1740,7 @@ class _SectionHeader extends StatelessWidget {
               ),
             _TeamTabs(
               teamId: viewModel.teamId,
-              kind: summary.kind,
-              league: viewModel.team?.isLeagueTeam ?? false,
+              sections: _sectionsOf(viewModel, summary.kind),
               tournamentsTab: viewModel.tournamentsTab,
               selected: tab,
             ),

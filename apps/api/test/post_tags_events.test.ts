@@ -93,6 +93,11 @@ describe("event posts (validSharedEvent, sharesOwnTeamEvent)", () => {
     expect((await call("POST", "/v1/posts", { body: "", shareEvent: { eventId: "e1", teamId: "t1" } })).status).toBe(201);
   });
 
+  it("keeps a team's events with its members while its public page is off", async () => {
+    store.put("teams/t1", { ...store.doc("teams/t1")!, publicPage: false });
+    expect((await call("POST", "/v1/posts", { body: "", shareEvent: { eventId: "e1", teamId: "t1" } })).status).toBe(412);
+  });
+
   it("shares an event from the caller's own schedule (teamId null), with no words needed", async () => {
     const res = await call("POST", "/v1/posts", { body: "", shareEvent: { eventId: "m1", teamId: null } });
     expect(res.status).toBe(201);

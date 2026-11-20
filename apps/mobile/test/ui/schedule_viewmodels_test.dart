@@ -65,6 +65,38 @@ void main() {
       expect(vm.myRsvp, isNull);
     });
 
+    test('a note goes with the answer, cleaned, and shows by name', () async {
+      final vm = detail();
+      await pumpEventQueue();
+      // No answer, no note.
+      await vm.saveNote.execute('Late');
+      expect(vm.saveNote.error, isTrue);
+
+      await vm.setRsvp.execute(RsvpStatus.going);
+      await vm.saveNote.execute('  Late\n15   min ');
+      await pumpEventQueue();
+      expect(vm.myNote, 'Late 15 min');
+      expect(events.noteWrites.last, ('e1', testUser.uid, 'Late 15 min'));
+      final going = vm.responders[RsvpStatus.going]!;
+      expect(going.map((r) => r.note), contains('Late 15 min'));
+
+      // Too long is refused; the same note isn't written again.
+      await vm.saveNote.execute('x' * (rsvpNoteMax + 1));
+      expect(vm.saveNote.error, isTrue);
+      final writes = events.noteWrites.length;
+      await vm.saveNote.execute('Late 15 min');
+      expect(events.noteWrites, hasLength(writes));
+
+      // Changing the answer keeps it; taking it back drops it.
+      await vm.setRsvp.execute(RsvpStatus.maybe);
+      await pumpEventQueue();
+      expect(vm.myNote, 'Late 15 min');
+      await vm.setRsvp.execute(null);
+      await pumpEventQueue();
+      expect(vm.myNote, isEmpty);
+      expect(events.events['e1']!.rsvpNotes, isNot(contains(testUser.uid)));
+    });
+
     test('only attendees can react or vote', () async {
       final vm = detail();
       await pumpEventQueue();

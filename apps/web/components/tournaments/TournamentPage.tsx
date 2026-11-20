@@ -118,6 +118,7 @@ export function TournamentView({ s, open }: { s: TournamentState; open?: { tab?:
           )}
           <h1>{t.name}</h1>
           <p className="hosted-meta">{where}</p>
+          {board && <LiveHeadline s={s} />}
         </div>
         <div className="home-actions hosted-head-actions">
           {t.status !== "draft" && !s.visitor && <FollowButton type="tournament" targetId={tournamentId} groupId={t.hostId} />}
@@ -141,6 +142,28 @@ export function TournamentView({ s, open }: { s: TournamentState; open?: { tab?:
       {current === "results" && <ResultsTab s={s} />}
       {current === "news" && (s.visitor ? <PublicNews s={s} /> : <TournamentNews s={s} />)}
     </div>
+  );
+}
+
+/**
+ * The game being played, on the navy header: "nameA 7–5 nameB · +2 more
+ * live", the viewer's own game first, else the first on the schedule;
+ * nothing when none is live.
+ */
+function LiveHeadline({ s }: { s: TournamentState }) {
+  const live = s.liveGames;
+  if (live.length === 0) return null;
+  const g = live.find((x) => s.myTeamIds.has(x.teamA ?? "") || s.myTeamIds.has(x.teamB ?? "")) ?? live[0];
+  const l = s.liveOf(g);
+  if (!l) return null;
+  return (
+    <p className="hosted-live-line">
+      <i aria-hidden />
+      <span>
+        <b>{s.teamName(g.teamA)}</b> <span className="hosted-live-score">{l.scoreA}–{l.scoreB}</span> <b>{s.teamName(g.teamB)}</b>
+        {live.length > 1 && <span className="hosted-live-more"> · +{live.length - 1} more live</span>}
+      </span>
+    </p>
   );
 }
 

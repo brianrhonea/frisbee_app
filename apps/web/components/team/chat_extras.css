@@ -1,0 +1,96 @@
+/* Pins and event cards in team rooms (redesign F2, F3). */
+
+.pinned-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 18px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pinned-strip:hover { background: var(--field); }
+.pinned-strip .pinned-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.pinned-strip .pinned-text b { font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase; color: var(--accent); }
+.pinned-strip .pinned-text span { font-size: 13px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pinned-error { margin: 6px 18px; }
+
+.pins-dialog { width: min(520px, calc(100vw - 32px)); max-height: min(80vh, 720px); overflow-y: auto; }
+.pins-dialog h2 { margin: 0 0 8px; font-size: 1.1rem; }
+.pins-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 8px; }
+.pins-list li { padding: 12px; border: 1px solid var(--line); border-radius: 12px; display: grid; gap: 4px; justify-items: start; }
+.pin-meta { margin: 0; font-size: 12px; font-weight: 700; color: var(--muted); }
+.pin-text { margin: 0; font-size: 14px; line-height: 1.45; color: var(--ink-soft); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.message-pinned { margin-left: 6px; font-size: 11px; color: var(--muted); }
+
+.chat-event-card {
+  margin-top: 4px;
+  max-width: 480px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--card);
+  display: grid;
+  gap: 10px;
+}
+.chat-event-card.gone { color: var(--muted); font-size: 14px; }
+.chat-event-head { display: flex; gap: 12px; align-items: center; color: inherit; text-decoration: none; }
+.chat-event-head .date-tile { flex-shrink: 0; }
+.chat-event-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.chat-event-info b { font-size: 14px; display: flex; align-items: center; gap: 6px; }
+.chat-event-info small { font-size: 12px; color: var(--muted); }
+.chat-event-info .type-dot { width: 8px; height: 8px; border-radius: 4px; background: var(--team); flex-shrink: 0; }
+.chat-event-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chat-event-actions .rsvp-pill.needs { margin-right: auto; }
+.chat-event-actions .btn.chosen { background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; }
+
+.share-event-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; }
+.share-event-list button {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.share-event-list button:hover { border-color: var(--accent); }
+.share-event-list span { display: flex; flex-direction: column; min-width: 0; }
+.share-event-list small { color: var(--muted); font-size: 12px; }
+
+.attach-menu { position: relative; }
+.attach-menu-list {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 5;
+  min-width: 200px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+  display: grid;
+}
+.attach-menu-list button {
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.attach-menu-list button:hover { background: var(--field); }

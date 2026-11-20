@@ -16,6 +16,8 @@ import 'package:frisbee_app/domain/models/video_folder.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/playbook/view_models/play_editor_viewmodel.dart';
 import 'package:frisbee_app/ui/playbook/widgets/playbook_tab.dart';
+import 'package:frisbee_app/ui/playbook/view_models/whiteboard_viewmodel.dart';
+import 'package:frisbee_app/ui/playbook/widgets/whiteboard_screen.dart';
 import 'package:frisbee_app/ui/teams/view_models/team_detail_viewmodel.dart';
 import 'package:frisbee_app/ui/videos/view_models/team_videos_viewmodel.dart';
 import 'package:frisbee_app/ui/videos/widgets/videos_tab.dart';
@@ -100,12 +102,20 @@ final _vert = Play(
     PlayArrow(
       id: 'a1',
       kind: ArrowKind.cut,
-      points: [FieldPoint(0.5, 0.34), FieldPoint(0.62, 0.28), FieldPoint(0.75, 0.2)],
+      points: [
+        FieldPoint(0.5, 0.34),
+        FieldPoint(0.62, 0.28),
+        FieldPoint(0.75, 0.2),
+      ],
     ),
     PlayArrow(
       id: 'a2',
       kind: ArrowKind.throw_,
-      points: [FieldPoint(0.43, 0.76), FieldPoint(0.6, 0.5), FieldPoint(0.74, 0.22)],
+      points: [
+        FieldPoint(0.43, 0.76),
+        FieldPoint(0.6, 0.5),
+        FieldPoint(0.74, 0.22),
+      ],
     ),
   ],
   steps: const [
@@ -157,7 +167,10 @@ final _plays = [
     id: 'p4',
     name: 'Force flick, person',
     category: PlayCategory.defense,
-    steps: const [PlayStep(id: 's'), PlayStep(id: 't')],
+    steps: const [
+      PlayStep(id: 's'),
+      PlayStep(id: 't'),
+    ],
     elements: [_o('a', '1', 0.5, 0.6), _d('b', 0.45, 0.58)],
   ),
   Play(
@@ -209,6 +222,30 @@ void main() {
     for (final p in _plays) {
       plays.plays[p.id] = p;
     }
+    plays.plays['w1'] = const Play(
+      id: 'w1',
+      name: 'Zone talk',
+      kind: PlayKind.whiteboard,
+      elements: [
+        PlayElement(
+          id: 'o1',
+          kind: ElementKind.offense,
+          position: FieldPoint(0.4, 0.4),
+          label: '1',
+        ),
+      ],
+      drawings: [
+        PlayDrawing(
+          id: 'k1',
+          color: DrawingColor.amber,
+          points: [
+            FieldPoint(0.2, 0.3),
+            FieldPoint(0.5, 0.5),
+            FieldPoint(0.7, 0.4),
+          ],
+        ),
+      ],
+    );
     videos = FakeVideoRepository();
     videos.folders['t1'] = const [
       VideoFolder(id: 'f1', name: 'Mile High Open'),
@@ -221,8 +258,7 @@ void main() {
         youtubeId: 'dQw4w9WgXcQ',
         folderId: 'f1',
         title: 'Pool A vs Boulder Gold',
-        description:
-            'Full game, end zone camera. Second half starts at 24:30.',
+        description: 'Full game, end zone camera. Second half starts at 24:30.',
         authorId: 'coach',
         authorName: 'Riley Chen',
         createdAt: DateTime(2026, 11, 15),
@@ -316,6 +352,8 @@ void main() {
       addTearDown(vm.dispose);
       await pumpScreen(tester, PlaybookTab(viewModel: vm), tab: 'Playbook');
       await capture(tester, '01-playbook-$who');
+      await tester.tap(find.text('Whiteboard'));
+      await capture(tester, '01b-playbook-whiteboard-$who');
 
       final p = play();
       addTearDown(p.dispose);
@@ -340,6 +378,39 @@ void main() {
       await capture(tester, '04b-videos-folder-$who');
     });
   }
+
+  testWidgets('whiteboard', skip: skip != null, (tester) async {
+    seed(owner: true);
+    final wb = WhiteboardViewModel(
+      teamId: 't1',
+      playId: null,
+      playRepository: plays,
+      teamRepository: teams,
+      authRepository: auth,
+    );
+    addTearDown(wb.dispose);
+    await pumpScreen(tester, WhiteboardScreen(viewModel: wb));
+    for (final (i, c) in DrawingColor.values.indexed) {
+      wb
+        ..setColor(c)
+        ..addStroke([
+          for (var k = 0; k <= 20; k++)
+            FieldPoint(
+              0.15 + 0.2 * i + 0.05 * (k.isEven ? 1 : 0),
+              0.3 + k / 40,
+            ),
+        ]);
+    }
+    wb
+      ..setTool(WhiteboardTool.offense)
+      ..placeAt(const FieldPoint(0.3, 0.25))
+      ..setTool(WhiteboardTool.defense)
+      ..placeAt(const FieldPoint(0.35, 0.28))
+      ..setTool(WhiteboardTool.cone)
+      ..placeAt(const FieldPoint(0.8, 0.2))
+      ..setColor(DrawingColor.turf);
+    await capture(tester, '05-whiteboard');
+  });
 
   testWidgets('play editor tools', skip: skip != null, (tester) async {
     seed(owner: true);

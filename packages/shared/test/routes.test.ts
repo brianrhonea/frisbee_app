@@ -68,6 +68,9 @@ describe("webRoute", () => {
     expect(webRoute("/teams/t1?section=more")).toBe("/teams/t1");
     expect(webRoute("/teams/t1?section=..%2Fsettings")).toBe("/teams/t1");
     expect(webRoute("/teams/t1?section=constructor")).toBe("/teams/t1");
+    expect(webRoute("/teams/t1/whiteboards/w1")).toBe("/teams/t1/whiteboards/w1");
+    expect(webRoute("/teams/t1/whiteboards/new")).toBe("/teams/t1/whiteboards/new");
+    expect(webRoute("/teams/t1/whiteboards/..")).not.toBe("/teams/t1/whiteboards/..");
     expect(webRoute("/team-videos/t1/v1")).toBe("/teams/t1/videos/v1");
     expect(webRoute("/teams/t1/stats/games/g1")).toBe("/teams/t1/stats/games/g1");
     expect(webRoute("/teams/t1/stats/tournaments/x1")).toBe("/teams/t1/stats/tournaments/x1");

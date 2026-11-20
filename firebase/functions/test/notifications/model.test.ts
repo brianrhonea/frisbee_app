@@ -139,6 +139,17 @@ describe("notices", () => {
     expect(n.text({}, 3).body).toBe("Sam: Bring lights");
   });
 
+  it("says who shared an event, and which", () => {
+    const n = chatNotice({
+      teamId: "t1",
+      roomId: "general",
+      teamName: "Hawks",
+      roomName: "General",
+      message: { authorName: "Riley", text: "", attachments: [], event: { id: "e1", title: "Practice: zone O" } },
+    });
+    expect(n.text({}, 1)).toEqual({ title: "General · Hawks", body: "Riley shared an event: Practice: zone O" });
+  });
+
   it("titles direct messages with the sender", () => {
     const n = directMessageNotice({ conversationId: "a_b", message: { authorName: "Sam", text: "yo" }, messageId: "m9" });
     expect(n.text({}, 1)).toEqual({ title: "Sam", body: "yo" });
@@ -214,6 +225,9 @@ describe("notices", () => {
     const n = playNotice({ created: true, teamId: "t1", playId: "p1", teamName: "Hawks", play: { name: "Ho stack" } });
     expect(n.text({}, 1)).toEqual({ title: "Hawks: new play", body: "Ho stack" });
     expect(n.route).toBe("/teams/t1/plays/p1");
+    const board = playNotice({ created: false, teamId: "t1", playId: "w1", teamName: "Hawks", play: { name: "Zone talk", kind: "whiteboard" } });
+    expect(board.text({}, 1)).toEqual({ title: "Hawks: whiteboard updated", body: "Zone talk" });
+    expect(board.route).toBe("/teams/t1/whiteboards/w1");
   });
 });
 

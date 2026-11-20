@@ -660,6 +660,81 @@ class FakeHostedTournamentRepository implements HostedTournamentRepository {
     return const Result.ok(null);
   }
 
+  /// Whether this build can keep running scores (an API is configured).
+  bool liveScores = true;
+
+  /// The clock live scores are stamped with.
+  DateTime Function() liveClock = DateTime.now;
+
+  /// When set, live score writes wait for it (to test taps while one is
+  /// in flight).
+  Completer<void>? liveHold;
+
+  /// Fails the next live score write with this.
+  Object? liveError;
+
+  @override
+  bool get canKeepLiveScores => liveScores;
+
+  @override
+  Future<Result<void>> setLiveScore(
+    String tournamentId,
+    String divisionId,
+    String gameId, {
+    required int scoreA,
+    required int scoreB,
+  }) async {
+    log.add('live $gameId $scoreA-$scoreB');
+    await liveHold?.future;
+    if (liveError case final e?) {
+      liveError = null;
+      return Result.error(e is Exception ? e : Exception('$e'));
+    }
+    final now = liveClock();
+    _update(
+      _key(tournamentId, divisionId),
+      (g) => g.id != gameId
+          ? g
+          : g.copyWith(
+              live: () => LiveScore(
+                scoreA: scoreA,
+                scoreB: scoreB,
+                startedAt: g.live?.startedAt ?? now,
+                updatedAt: now,
+              ),
+            ),
+    );
+    _changed();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> clearLiveScore(
+    String tournamentId,
+    String divisionId,
+    String gameId,
+  ) async {
+    log.add('live off $gameId');
+    _update(
+      _key(tournamentId, divisionId),
+      (g) => g.id != gameId ? g : g.copyWith(live: () => null),
+    );
+    _changed();
+    return const Result.ok(null);
+  }
+
+  @override
+  Stream<List<GroupGame>> watchLiveGames(
+    String tournamentId,
+    String divisionId,
+  ) => _watch(
+    () => [
+      for (final g in [...?games[_key(tournamentId, divisionId)]])
+        if (g.live?.updatedAt case final at?)
+          if (liveClock().difference(at) <= LiveScore.staleAfter) g,
+    ],
+  );
+
   @override
   Future<Result<void>> applyFills(
     String tournamentId,

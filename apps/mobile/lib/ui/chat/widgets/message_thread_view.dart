@@ -38,6 +38,11 @@ class MessageThreadView extends StatefulWidget {
     this.hintText = 'Message',
     this.footer,
     this.videoPlayer = fileVideoPlayer,
+    this.header,
+    this.eventCard,
+    this.isPinned,
+    this.onTogglePin,
+    this.onShareEvent,
   });
 
   final MessageThreadViewModel viewModel;
@@ -52,6 +57,22 @@ class MessageThreadView extends StatefulWidget {
 
   /// Plays video attachments; tests swap in a stand-in.
   final FileVideoPlayerBuilder videoPlayer;
+
+  /// Above the messages, e.g. a team room's pinned strip.
+  final Widget? header;
+
+  /// Draws a message's shared event (team rooms); null shows nothing.
+  final Widget Function(ChatMessage message, ChatEventRef event)? eventCard;
+
+  /// Whether a message is pinned (team rooms); marks it in the thread.
+  final bool Function(ChatMessage message)? isPinned;
+
+  /// Pins or unpins a message from its long-press sheet; null where the
+  /// user can't pin.
+  final ValueChanged<ChatMessage>? onTogglePin;
+
+  /// "Share an event" in the attach menu; null hides it.
+  final VoidCallback? onShareEvent;
 
   @override
   State<MessageThreadView> createState() => _MessageThreadViewState();
@@ -193,6 +214,9 @@ class _MessageThreadViewState extends State<MessageThreadView>
         canDelete: vm.canDelete(m),
         canOpenProfile:
             vm.opensProfiles && m.authorId.isNotEmpty && !vm.isMine(m),
+        pinned: widget.onTogglePin != null && m.createdAt != null
+            ? widget.isPinned?.call(m) ?? m.isPinned
+            : null,
       ),
     );
     if (!mounted || action == null) return;
@@ -207,6 +231,8 @@ class _MessageThreadViewState extends State<MessageThreadView>
         _delete(m);
       case _Profile():
         _openProfile(m.authorId);
+      case _Pin():
+        widget.onTogglePin?.call(m);
     }
   }
 
@@ -217,6 +243,7 @@ class _MessageThreadViewState extends State<MessageThreadView>
       maxWidth: 900,
       child: Column(
         children: [
+          ?widget.header,
           Expanded(
             child: ScrollToTop(
               controller: _scroll,
@@ -235,6 +262,8 @@ class _MessageThreadViewState extends State<MessageThreadView>
                     onDelete: _delete,
                     onProfile: _openProfile,
                     reveal: _reveal,
+                    eventCard: widget.eventCard,
+                    isPinned: widget.isPinned,
                   ),
                 ),
               ),
@@ -251,6 +280,7 @@ class _MessageThreadViewState extends State<MessageThreadView>
               focusNode: _focus,
               onSend: _send,
               hintText: widget.hintText,
+              onShareEvent: widget.onShareEvent,
             )
           else
             _ReadOnlyBar(text: widget.readOnlyNotice),
@@ -286,6 +316,10 @@ class _Delete extends _MessageAction {
   const _Delete();
 }
 
+class _Pin extends _MessageAction {
+  const _Pin();
+}
+
 /// What a message row can do, handed down from the view.
 class _RowActions {
   const _RowActions({
@@ -295,6 +329,8 @@ class _RowActions {
     required this.onDelete,
     required this.onProfile,
     required this.reveal,
+    this.eventCard,
+    this.isPinned,
   });
 
   /// The long-press sheet.
@@ -310,6 +346,12 @@ class _RowActions {
 
   /// Every message's time, shown while the thread is dragged left.
   final _TimeReveal reveal;
+
+  /// A shared event's card (team rooms).
+  final Widget Function(ChatMessage, ChatEventRef)? eventCard;
+
+  /// Whether a message is pinned (team rooms).
+  final bool Function(ChatMessage)? isPinned;
 }
 
 /// Long-press on a message: when it was sent, a row of quick reactions,
@@ -323,6 +365,7 @@ class _MessageActionsSheet extends StatelessWidget {
     required this.canReply,
     required this.canDelete,
     required this.canOpenProfile,
+    this.pinned,
   });
 
   final ChatMessage message;
@@ -333,6 +376,9 @@ class _MessageActionsSheet extends StatelessWidget {
   final bool canReply;
   final bool canDelete;
   final bool canOpenProfile;
+
+  /// Whether it's pinned; null where the user can't pin.
+  final bool? pinned;
 
   @override
   Widget build(BuildContext context) {
@@ -393,6 +439,12 @@ class _MessageActionsSheet extends StatelessWidget {
               leading: const Icon(Icons.copy_outlined),
               title: const Text('Copy text'),
               onTap: () => pick(const _Copy()),
+            ),
+          if (pinned case final p?)
+            ListTile(
+              leading: Icon(p ? Icons.push_pin : Icons.push_pin_outlined),
+              title: Text(p ? 'Unpin message' : 'Pin message'),
+              onTap: () => pick(const _Pin()),
             ),
           if (canOpenProfile)
             ListTile(
@@ -1144,6 +1196,13 @@ class _FeedRow extends StatelessWidget {
                   time == null ? 'Sending…' : _stamp(time),
                   style: TextStyle(fontSize: 12, color: c.muted),
                 ),
+                if (actions.isPinned?.call(m) ?? false)
+                  Icon(
+                    Icons.push_pin,
+                    size: 13,
+                    color: c.muted,
+                    semanticLabel: 'Pinned',
+                  ),
               ],
             ),
           ),
@@ -1156,6 +1215,8 @@ class _FeedRow extends StatelessWidget {
               height: 1.4,
             ),
           ),
+        if (m.event case final e?)
+          if (actions.eventCard case final card?) card(m, e),
         _Attachments(message: m, viewModel: vm, videoPlayer: videoPlayer),
         _ReactionChips(message: m, uid: vm.uid, onReact: actions.onReact),
       ],
@@ -1724,7 +1785,7 @@ class _ReadOnlyBar extends StatelessWidget {
   }
 }
 
-enum _AttachKind { camera, video, photo, file }
+enum _AttachKind { camera, video, photo, file, event }
 
 /// The text box's menu: the usual cut, copy, paste and select all, plus
 /// Undo and Redo while there's something to undo or redo.
@@ -1840,6 +1901,7 @@ class _Composer extends StatelessWidget {
     required this.focusNode,
     required this.onSend,
     required this.hintText,
+    this.onShareEvent,
   });
 
   final MessageThreadViewModel viewModel;
@@ -1848,6 +1910,9 @@ class _Composer extends StatelessWidget {
   final FocusNode focusNode;
   final VoidCallback onSend;
   final String hintText;
+
+  /// "Share an event" in the attach menu (team rooms).
+  final VoidCallback? onShareEvent;
 
   // Its buttons (send, attach) keep the keyboard open.
   @override
@@ -2021,6 +2086,7 @@ class _Composer extends StatelessWidget {
       _AttachKind.video => vm.recordVideo.execute(),
       _AttachKind.photo => vm.pickFiles.execute(true),
       _AttachKind.file => vm.pickFiles.execute(false),
+      _AttachKind.event => onShareEvent?.call(),
     },
     itemBuilder: (_) => [
       if (vm.canUseCamera)
@@ -2053,6 +2119,14 @@ class _Composer extends StatelessWidget {
           title: Text('File'),
         ),
       ),
+      if (onShareEvent != null)
+        const PopupMenuItem(
+          value: _AttachKind.event,
+          child: ListTile(
+            leading: Icon(Icons.event_outlined),
+            title: Text('Share an event'),
+          ),
+        ),
     ],
   );
 }

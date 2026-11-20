@@ -204,6 +204,16 @@ describe("cancel (allow delete)", () => {
 describe("rsvp (respond)", () => {
   beforeEach(() => putMeeting("m1", { inviteRoles: [], inviteUsers: ["player"], rsvps: { coach: "attending" } }));
 
+  it("keeps a note with the answer and drops it when the answer goes", async () => {
+    expect((await s.call("PUT", `${M}/m1/rsvp`, { answer: "attending", note: " Joining late\t" }, "player")).status).toBe(204);
+    expect(s.store.doc("teams/t1/meetings/m1")?.rsvpNotes).toEqual({ player: "Joining late" });
+    await s.call("PUT", `${M}/m1/rsvp`, { answer: "notAttending" }, "player");
+    expect(s.store.doc("teams/t1/meetings/m1")?.rsvpNotes).toEqual({ player: "Joining late" });
+    await s.call("PUT", `${M}/m1/rsvp`, { answer: null }, "player");
+    expect(s.store.doc("teams/t1/meetings/m1")?.rsvpNotes).toEqual({});
+    expect((await s.call("PUT", `${M}/m1/rsvp`, { answer: "attending", note: "y".repeat(141) }, "player")).status).toBe(400);
+  });
+
   it("an invitee answers for themselves only, and takes it back", async () => {
     expect((await s.call("PUT", `${M}/m1/rsvp`, { answer: "attending" }, "player")).status).toBe(204);
     expect(s.store.doc("teams/t1/meetings/m1")?.rsvps).toEqual({ coach: "attending", player: "attending" });

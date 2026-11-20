@@ -163,6 +163,26 @@ describe("team events", () => {
       });
     });
 
+    it("keeps a short note with the answer, cleaned, and drops it with the answer", async () => {
+      const put = (body: object) => s.call("PUT", "/v1/teams/t1/events/e1/rsvp", body, "player");
+      s.store.put("teams/t1/events/e1", { ...s.store.doc("teams/t1/events/e1"), rsvpNotes: { coach: "Bringing discs" } });
+      expect((await put({ status: "going", note: "  Late\n15\u0007 min  " })).statusCode).toBe(204);
+      expect(s.store.doc("teams/t1/events/e1")?.rsvpNotes).toEqual({ coach: "Bringing discs", player: "Late 15 min" });
+      // Changing the answer without a note keeps it.
+      await put({ status: "maybe" });
+      expect(s.store.doc("teams/t1/events/e1")?.rsvpNotes).toEqual({ coach: "Bringing discs", player: "Late 15 min" });
+      // An empty note removes it.
+      await put({ status: "maybe", note: "   " });
+      expect(s.store.doc("teams/t1/events/e1")?.rsvpNotes).toEqual({ coach: "Bringing discs" });
+      await put({ status: "going", note: "Driving" });
+      // Taking the answer back takes the note with it, whatever the body says.
+      await put({ status: null, note: "Still here" });
+      expect(s.store.doc("teams/t1/events/e1")).toMatchObject({ rsvps: { coach: "going" }, rsvpNotes: { coach: "Bringing discs" } });
+      expect((await put({ status: "going", note: "x".repeat(141) })).statusCode).toBe(400);
+      expect((await put({ status: "going", note: 5 })).statusCode).toBe(400);
+      expect((await put({ status: "going", note: "x".repeat(140) })).statusCode).toBe(204);
+    });
+
     it("refuses outsiders, reactions and votes before going, and bad votes", async () => {
       expect((await s.call("PUT", "/v1/teams/t1/events/e1/rsvp", { status: "going" }, "stranger")).statusCode).toBe(404);
       expect((await s.call("PUT", "/v1/teams/t1/events/e1/rsvp", { status: "yes" }, "player")).statusCode).toBe(400);

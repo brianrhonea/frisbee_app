@@ -262,6 +262,11 @@ async function scrubTeam(db: Firestore, teamId: string, uid: string): Promise<vo
 
   for (const m of (await ref.collection("meetings").get()).docs) {
     void writer.delete(m.ref.collection("requests").doc(uid));
+    // Their answer and its note.
+    const fields = eventResponsesOf(m.data(), uid);
+    if (fields.length === 0) continue;
+    const [first, ...rest] = fields.map((f) => [new FieldPath(f, uid), FieldValue.delete()] as const);
+    void writer.update(m.ref, first[0], first[1], ...rest.flat());
   }
 
   const tournaments = await ref.collection("groupTournaments").where("participantIds", "array-contains", uid).get();

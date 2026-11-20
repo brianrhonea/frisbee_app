@@ -7,6 +7,10 @@ import '../data/repositories/calendar/calendar_repository.dart';
 import '../data/repositories/notification/notification_repository.dart';
 import '../data/repositories/auth/auth_repository.dart';
 import '../data/repositories/meeting/meeting_repository.dart';
+import '../data/repositories/schedule/schedule_settings_repository.dart';
+import '../data/repositories/team/team_hints_repository.dart';
+import '../data/repositories/learn/learn_progress_repository.dart';
+import '../data/repositories/discover/discover_repository.dart';
 import '../ui/auth/view_models/choose_username_viewmodel.dart';
 import '../ui/auth/view_models/sign_in_viewmodel.dart';
 import '../ui/auth/view_models/sign_up_viewmodel.dart';
@@ -16,6 +20,8 @@ import '../ui/auth/widgets/sign_up_screen.dart';
 import '../ui/core/ui/view_model_host.dart';
 import '../ui/home/view_models/home_viewmodel.dart';
 import '../ui/home/widgets/home_screen.dart';
+import '../ui/learn/view_models/learn_viewmodel.dart';
+import '../ui/learn/widgets/learn_screen.dart';
 import '../ui/posts/view_models/post_detail_viewmodel.dart';
 import '../ui/posts/widgets/post_detail_screen.dart';
 import '../domain/models/ranking.dart';
@@ -72,6 +78,16 @@ Widget chooseUsernamePage() => ViewModelHost(
   builder: (_, vm) => ChooseUsernameScreen(viewModel: vm),
 );
 
+/// Learn to play, with its reading progress (kept on this device).
+Widget learnPage() => ViewModelHost(
+  create: (c) => LearnViewModel(
+    // Tests that don't provide one keep progress in memory.
+    repository:
+        c.read<LearnProgressRepository?>() ?? LearnProgressRepositoryMemory(),
+  ),
+  builder: (_, vm) => LearnScreen(viewModel: vm),
+);
+
 /// Discover, with its search and filter from `?q=` and `?only=`: search,
 /// what's live, tournaments and leagues coming up (what the Events tab's
 /// "Find events" was), results and rankings.
@@ -86,6 +102,7 @@ Widget explorePage(GoRouterState state) => ViewModelHost(
         create: (c) => HostedTournamentsViewModel(
           tournamentRepository: c.read(),
           authRepository: c.read(),
+          discoverRepository: c.read<DiscoverRepository?>(),
         ),
         builder: (_, events) => ExploreScreen(
           viewModel: vm,
@@ -113,6 +130,7 @@ ExploreViewModel exploreViewModel(
   rankingRepository: c.read(),
   teamRepository: c.read(),
   authRepository: c.read(),
+  discoverRepository: rankingsPage ? null : c.read<DiscoverRepository?>(),
   rankingsPage: rankingsPage,
   kind: kind,
   level: level,
@@ -189,6 +207,7 @@ Widget teamPage(GoRouterState state) {
       notificationRepository: c.read(),
       groupTournamentRepository: c.read(),
       tournamentRepository: c.read<HostedTournamentRepository?>(),
+      hints: c.read<TeamHintsRepository?>(),
     ),
     builder: (_, vm) => TeamHomeScreen(
       viewModel: vm,
@@ -253,6 +272,7 @@ Widget schedulePage() => ViewModelHost(
     eventRepository: c.read(),
     meetingRepository: c.read<MeetingRepository>(),
     calendarRepository: c.read<CalendarRepository>(),
+    settingsRepository: c.read<ScheduleSettingsRepository?>(),
   ),
   builder: (context, vm) =>
       ScheduleScreen(viewModel: vm, leading: ProfileButton.leading(context)),

@@ -13,6 +13,7 @@ import { deleteOwnAccount } from "@/lib/firebase";
 import { useAuth } from "../AuthProvider";
 import { AppearanceSetting } from "./AppearanceSetting";
 import { ChangePassword } from "./ChangePassword";
+import { DownloadData } from "./DownloadData";
 import { isSignInCancelled, popupBlockedMessage } from "@/lib/auth_errors";
 
 type Method = "password" | "google.com" | "apple.com";
@@ -34,7 +35,7 @@ function problem(e: unknown): string {
   return "Couldn't delete your account. Try again, or contact us.";
 }
 
-/** Settings → Account: who they're signed in as, changing their password, and deleting the account and its data. */
+/** Settings → Account: who they're signed in as, changing their password, downloading their data, and deleting the account and its data. */
 export function AccountSettings() {
   const { user } = useAuth();
   const router = useRouter();
@@ -91,6 +92,7 @@ export function AccountSettings() {
           </div>
         )
       )}
+      <DownloadData user={me} />
       <div className="card danger-zone">
         <h2 className="card-title">Delete account</h2>
         <p className="muted small">

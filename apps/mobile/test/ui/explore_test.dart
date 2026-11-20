@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/data/repositories/ranking/ranking_repository.dart';
+import 'package:frisbee_app/domain/models/group_tournament.dart';
 import 'package:frisbee_app/domain/models/hosted_tournament.dart';
 import 'package:frisbee_app/domain/models/ranking.dart';
 import 'package:frisbee_app/domain/models/team.dart';
@@ -620,6 +621,36 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Coming up'), findsNothing);
       expect(find.textContaining('letters to search teams'), findsOneWidget);
+    });
+
+    testWidgets("Live now shows the games being played, with their scores", (
+      tester,
+    ) async {
+      final now = DateTime.now();
+      final tournaments = FakeHostedTournamentRepository();
+      seedLiveTournament(tournaments, now: now);
+      // g3 (Boulder Gold v Northside Flyers) is being played; g4's running
+      // score is hours old, so it isn't live any more.
+      LiveScore live(int a, int b, DateTime at) =>
+          LiveScore(scoreA: a, scoreB: b, startedAt: at, updatedAt: at);
+      tournaments.games['x9/d1'] = [
+        for (final g in tournaments.games['x9/d1']!)
+          switch (g.id) {
+            'g3' => g.copyWith(live: () => live(9, 7, now)),
+            'g4' => g.copyWith(
+              live: () => live(2, 2, now.subtract(const Duration(hours: 5))),
+            ),
+            _ => g,
+          },
+      ];
+      await pumpDiscover(tester, tournaments: tournaments);
+      expect(find.text('Live now'), findsOneWidget);
+      expect(find.text('Mile High Open'), findsOneWidget);
+      expect(find.text('Boulder Gold'), findsOneWidget);
+      expect(find.text('Northside Flyers'), findsOneWidget);
+      expect(find.text('9–7'), findsOneWidget);
+      expect(find.text('2–2'), findsNothing);
+      expect(find.text('Field 3'), findsOneWidget);
     });
 
     testWidgets('search results are grouped by kind', (tester) async {

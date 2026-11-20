@@ -13,6 +13,7 @@ import {
   leagueGameEvent,
   newEvent,
   newLeagueGameEvent,
+  onlyLiveChanged,
   recordUpdate,
 } from "../../src/tournaments/model";
 
@@ -175,5 +176,22 @@ describe("league games on team schedules", () => {
     expect(isLeagueGameEvent(make()!)).toBe(true);
     expect(isLeagueGameEvent(newEvent("t1", league, undefined))).toBe(false);
     expect(isLeagueGameEvent(undefined)).toBe(false);
+  });
+});
+
+describe("onlyLiveChanged", () => {
+  const game = { teamA: "a", teamB: "b", startsAt: new Date(2026, 10, 20, 9), field: 2, status: "scheduled" };
+  const live = (scoreA: number) => ({ scoreA, scoreB: 0, updatedAt: new Date(2026, 10, 20, 9, scoreA) });
+  it("is true when only the running score changed", () => {
+    expect(onlyLiveChanged({ ...game, live: live(1) }, { ...game, live: live(2) })).toBe(true);
+    expect(onlyLiveChanged(game, { ...game, live: live(0) })).toBe(true);
+    expect(onlyLiveChanged({ ...game, startsAt: new Date(game.startsAt) }, { ...game, live: live(0) })).toBe(true);
+  });
+  it("is false for anything else, a new game or a deleted one", () => {
+    expect(onlyLiveChanged({ ...game, live: live(1) }, { ...game, live: live(2), field: 3 })).toBe(false);
+    expect(onlyLiveChanged(game, { ...game, startsAt: new Date(2026, 10, 20, 10) })).toBe(false);
+    expect(onlyLiveChanged(game, { ...game, status: "reported" })).toBe(false);
+    expect(onlyLiveChanged(undefined, game)).toBe(false);
+    expect(onlyLiveChanged(game, undefined)).toBe(false);
   });
 });

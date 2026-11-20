@@ -162,7 +162,12 @@ service cloud.firestore {
       return isGroup(t) && t.get('requiresApproval', false) == true;
     }
     // Whether someone outside the team may see its public content.
-    function showsPublic(t) { return isMember(t) || !isPrivateGroup(t); }
+    // A team whose "Public team page" is off (publicPage false, set only
+    // through the API: setPublicPage in apps/api/src/teams/access.ts)
+    // shows outsiders its listing only, as a private group does.
+    function showsPublic(t) {
+      return isMember(t) || (!isPrivateGroup(t) && t.get('publicPage', true) != false);
+    }
 
     function validGroupFields(t) {
       return validString(t.description, 1000)
@@ -179,6 +184,22 @@ service cloud.firestore {
 
     function changed() {
       return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    // A member's note on their RSVP to an event or meeting (rsvpNotes,
+    // uid → note): only their own entry changes, it is 1 to 140 characters
+    // (rsvpNoteMax; clients clean it first), and it exists only while they
+    // have an answer in rsvps, so taking the answer back must drop it.
+    // Older docs have no rsvpNotes.
+    function validRsvpNote() {
+      let after = request.resource.data.get('rsvpNotes', {});
+      return after is map
+        && after.diff(resource.data.get('rsvpNotes', {})).affectedKeys().hasOnly([uid()])
+        && (!(uid() in after)
+            || (uid() in request.resource.data.rsvps
+                && after[uid()] is string
+                && after[uid()].size() > 0
+                && after[uid()].size() <= 140));
     }
 
     // A message's quote of the one it answers (MessageReply in
@@ -440,8 +461,9 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly([
              'name', 'division', 'level', 'city', 'ownerId', 'members',
              'memberIds', 'memberNames', 'createdAt', 'orgId', 'orgName',
-             'leagueId'])
+             'leagueId', 'sections'])
         && validTeamFields(request.resource.data)
+        && validSections(request.resource.data.get('sections', {}))
         && validOrgRef(request.resource.data)
         && validLeagueRef(request.resource.data)
         && request.resource.data.ownerId == uid()
@@ -467,8 +489,27 @@ service cloud.firestore {
         editDetails() || dropLegacyCode() || changeRole() ||
         setStatKeepers() || transferOwnership() || removeMember() || join() ||
         joinOpenGroup() || approveRequest() || acceptInvite() || markDeleting() ||
-        setRoles() || setOrg() || editLinks()
+        setRoles() || setOrg() || editLinks() || setSections()
       );
+
+      // A team's optional sections (optionalTeamSections in
+      // packages/shared/src/team.ts), each on or off; a missing one is on.
+      // New teams start with them off. Groups have none.
+      function validSections(s) {
+        return s is map
+          && s.keys().hasOnly(['playbook', 'videos', 'stats', 'meetings'])
+          && s.get('playbook', true) is bool
+          && s.get('videos', true) is bool
+          && s.get('stats', true) is bool
+          && s.get('meetings', true) is bool;
+      }
+      // The owner switches them (setSections in apps/api/src/teams/access.ts).
+      function setSections() {
+        return isOwner(resource.data)
+          && !isGroup(resource.data)
+          && changed().hasOnly(['sections'])
+          && validSections(request.resource.data.sections);
+      }
 
       // The community a team asks to join (or leaves). Only Cloud Functions
       // set orgLinked and orgMembers, once the community lists the team.
@@ -859,7 +900,15 @@ service cloud.firestore {
           && can(get(teamPath(teamId)).data, 'manageTeam')
           && request.resource.data.keys().hasOnly([
                'name', 'category', 'notes', 'elements', 'arrows', 'steps',
-               'updatedAt', 'updatedBy'])
+               'kind', 'drawings', 'updatedAt', 'updatedBy'])
+          // A saved whiteboard (kind 'whiteboard') has no steps. Pen
+          // strokes (drawings) are capped here; their points (200 each)
+          // in the API and the app.
+          && request.resource.data.get('kind', 'play') in ['play', 'whiteboard']
+          && (request.resource.data.get('kind', 'play') == 'play'
+              || request.resource.data.get('steps', []).size() == 0)
+          && request.resource.data.get('drawings', []) is list
+          && request.resource.data.get('drawings', []).size() <= 100
           && validString(request.resource.data.name, 100)
           && request.resource.data.category in ['offense', 'defense', 'pull', 'endzone']
           && validString(request.resource.data.notes, 5000)
@@ -903,8 +952,9 @@ service cloud.firestore {
           let d = request.resource.data;
           return isMember(team())
             && sees(resource.data)
-            && changed().hasOnly(['rsvps', 'reactions', 'votes'])
+            && changed().hasOnly(['rsvps', 'reactions', 'votes', 'rsvpNotes'])
             && onlyMine('rsvps') && onlyMine('reactions') && onlyMine('votes')
+            && validRsvpNote()
             && (d.rsvps.get(uid(), '') == 'going'
                 || (!(uid() in d.reactions) && !(uid() in d.votes)))
             && (!(uid() in d.rsvps) || d.rsvps[uid()] in ['going', 'maybe', 'notGoing'])
@@ -1016,8 +1066,9 @@ service cloud.firestore {
         function respond() {
           let d = request.resource.data;
           return invited(resource.data)
-            && changed().hasOnly(['rsvps'])
+            && changed().hasOnly(['rsvps', 'rsvpNotes'])
             && d.rsvps.diff(resource.data.rsvps).affectedKeys().hasOnly([uid()])
+            && validRsvpNote()
             && (!(uid() in d.rsvps) || d.rsvps[uid()] in ['attending', 'notAttending']);
         }
 
@@ -1737,6 +1788,9 @@ service cloud.firestore {
         // Games (GroupGame), like group tournament games: managers write
         // anything; a team's captain reports, the other confirms; a
         // captain from a finished game moves its winner and loser on.
+        // `live` (the running score while it's played) is written only by
+        // the API (TournamentService.setLive): no client sets or changes
+        // it; managers may only drop it (a rewritten schedule).
         match /games/{gameId} {
           function division() { return get(divisionPath()).data; }
           function gamePath(id) {
@@ -1752,7 +1806,7 @@ service cloud.firestore {
                      'order', 'stage', 'round', 'label', 'pool', 'field',
                      'startsAt', 'teamA', 'teamB', 'sourceA', 'sourceB',
                      'status', 'scoreA', 'scoreB', 'report', 'ifNeeded',
-                     'place'])
+                     'place', 'live'])
               && g.stage in ['pool', 'winners', 'losers', 'grandFinal', 'reset',
                              'crossover', 'placement']
               && (g.get('place', null) == null
@@ -1821,12 +1875,20 @@ service cloud.firestore {
               && slotFilled('A') && slotFilled('B');
           }
 
+          // The running score is kept as it is, or dropped.
+          function liveKept() {
+            return !changed().hasAny(['live'])
+              || !('live' in request.resource.data);
+          }
+
           allow read: if signedIn() && visible(current());
           allow create: if signedIn() && manages(current())
-            && validGame(request.resource.data);
+            && validGame(request.resource.data)
+            && !('live' in request.resource.data);
           allow delete: if signedIn() && manages(current());
           allow update: if signedIn() && (
-            (manages(current()) && validGame(request.resource.data))
+            (manages(current()) && validGame(request.resource.data)
+              && liveKept())
             || report() || confirm() || advance()
           );
         }
@@ -1990,7 +2052,8 @@ service cloud.firestore {
       function validListing(d, team) {
         return d.keys().hasOnly([
                  'name', 'division', 'level', 'city', 'keywords', 'kind',
-                 'description', 'requiresApproval', 'location', 'official'])
+                 'description', 'requiresApproval', 'location', 'official',
+                 'publicPage'])
           && d.name == team.name
           && d.get('official', false) == team.get('official', false)
           && d.division == team.division
@@ -1999,6 +2062,7 @@ service cloud.firestore {
           && d.get('kind', 'team') == team.get('kind', 'team')
           && d.get('description', '') == team.get('description', '')
           && d.get('requiresApproval', false) == team.get('requiresApproval', false)
+          && d.get('publicPage', true) == team.get('publicPage', true)
           && d.get('location', null)
                == (isPrivateGroup(team) ? null : team.get('location', null))
           && d.keywords is list && d.keywords.size() <= 100;

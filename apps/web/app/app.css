@@ -324,6 +324,12 @@ dialog.dialog > * { max-height: calc(100vh - 32px); overflow-y: auto; }
 }
 .learn-toc a:hover { border-color: var(--accent); }
 .learn-num { font-family: var(--font-score); font-size: 1.6rem; font-weight: 800; line-height: 1; color: var(--accent); }
+/* Reading progress (LearnProgress.tsx, F9): "N of M read", a tick on lessons read; Mark all unread is neutral. */
+.learn-progress { display: flex; align-items: baseline; gap: 14px; margin: 0 0 10px; }
+.learn-progress-label { color: var(--muted); font-size: 0.88rem; font-weight: 700; }
+.learn-progress .learn-unread { color: var(--ink-soft); }
+.learn-toc a.read { background: var(--accent-soft); border-color: transparent; }
+.learn-toc a.read .learn-num { color: var(--accent-ink); }
 .learn-body a { color: var(--accent); }
 .learn-body section { margin-top: 32px; scroll-margin-top: 80px; }
 .learn-body h2 { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.025em; margin: 0 0 8px; }

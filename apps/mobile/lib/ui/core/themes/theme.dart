@@ -599,4 +599,11 @@ abstract final class FieldColors {
   static const cut = Color(0xFFFFFFFF);
   static const throwLine = Color(0xFFFFEB3B);
   static const selection = Color(0xFFFFEB3B);
+
+  // Whiteboard pen colours (DrawingColor). Turf is a light tint so it
+  // shows on the grass; amber is the disc amber.
+  static const penInk = Color(0xFF14213A);
+  static const penTurf = Color(0xFF7FDDB4);
+  static const penAmber = Color(0xFFFFB627);
+  static const penWhite = Color(0xFFFFFFFF);
 }

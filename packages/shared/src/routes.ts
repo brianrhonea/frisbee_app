@@ -46,6 +46,9 @@ const rules: Rule[] = [
   [new RegExp(`^/teams/${id}/events$`), (m) => `/teams/${m[1]}/schedule`],
   [new RegExp(`^/teams/${id}/members$`), (m) => `/teams/${m[1]}/roster`],
   [new RegExp(`^/teams/${id}/plays/${id}$`), (m) => `/teams/${m[1]}/plays/${m[2]}`],
+  // The playbook's whiteboard (Routes.whiteboard / newWhiteboard in the
+  // app): a saved one, or "new" for a blank board.
+  [new RegExp(`^/teams/${id}/whiteboards/${id}$`), (m) => `/teams/${m[1]}/whiteboards/${m[2]}`],
   [new RegExp(`^/teams/${id}/stats/games/${id}$`), (m) => `/teams/${m[1]}/stats/games/${m[2]}`],
   [new RegExp(`^/teams/${id}/stats/tournaments/${id}$`), (m) => `/teams/${m[1]}/stats/tournaments/${m[2]}`],
   [new RegExp(`^/teams/${id}/stats/season$`), (m) => `/teams/${m[1]}/stats/season`],

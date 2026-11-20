@@ -32,6 +32,10 @@ import {
   hostedKinds,
   hostedStatuses,
   type HostedStatus,
+  isLiveGame,
+  liveLimits,
+  liveScoreOf,
+  type LiveScoreDoc,
   type PublicFee,
   type PublicGroupTournament,
   type PublicHostedCard,
@@ -41,10 +45,12 @@ import {
   type PublicHostedList,
   type PublicHostedPage,
   type PublicHostedTournament,
+  type PublicLiveGame,
   publicDraftedName,
   publicHostedQuerySchema,
   type SeasonDoc,
   type SettingsDoc,
+  tournamentSpots,
   tournamentVisibilities,
 } from "@stall10/shared";
 import { validId } from "../browse/model.js";
@@ -135,6 +141,14 @@ function season(raw: unknown): SeasonDoc | null {
   return s ? { ...s, skipDates: s.skipDates.map((d) => d.toISOString()) } : null;
 }
 
+/** The running score without who kept it. */
+function live(raw: unknown): LiveScoreDoc | null {
+  const l = liveScoreOf(raw);
+  return l
+    ? { scoreA: l.scoreA, scoreB: l.scoreB, startedAt: l.startedAt?.toISOString() ?? null, updatedAt: l.updatedAt?.toISOString() ?? null }
+    : null;
+}
+
 function game(d: Doc): PublicHostedGame {
   const g = engineGame(d.id, d.data);
   return {
@@ -156,6 +170,7 @@ function game(d: Doc): PublicHostedGame {
     report: g.report ? { scoreA: g.report.scoreA, scoreB: g.report.scoreB, byTeam: g.report.byTeam } : null,
     ifNeeded: g.ifNeeded,
     place: g.place ?? null,
+    live: live(d.data.live),
   };
 }
 
@@ -214,13 +229,57 @@ export class PublicTournamentService {
     for (const d of [...starting, ...running]) byId.set(d.id, d);
     const shown = [...byId.values()].filter((d) => listedStatuses.includes(publishedStatus(d.data) as HostedStatus));
     const hidden = await this.privateHosts(shown.map((d) => str(d.data.hostId)));
-    return {
-      tournaments: shown
-        .filter((d) => !hidden.has(str(d.data.hostId)))
-        .map((d) => card(d.id, d.data, publishedStatus(d.data)!))
-        .sort((a, b) => a.startsOn.localeCompare(b.startsOn))
-        .slice(0, listMax),
-    };
+    const cards = shown
+      .filter((d) => !hidden.has(str(d.data.hostId)))
+      .map((d) => card(d.id, d.data, publishedStatus(d.data)!))
+      .sort((a, b) => a.startsOn.localeCompare(b.startsOn))
+      .slice(0, listMax);
+    await Promise.all([
+      ...cards.filter((c) => c.status === "live").map(async (c) => {
+        const games = await this.liveGames(c.id, now);
+        if (games.length > 0) c.liveGames = games;
+      }),
+      // Spots left (F10): only events open for team registration read their divisions.
+      ...cards.filter((c) => c.status === "registration" && c.entryType === "teams").map(async (c) => {
+        const spots = tournamentSpots(c, (await this.repo.divisions(c.id)).map((d) => d.data));
+        if (spots) c.spots = spots;
+      }),
+    ]);
+    return { tournaments: cards };
+  }
+
+  /**
+   * A live event's games being played now (isLiveGame), for Discover:
+   * only games updated in the last liveLimits.staleAfterMs are read, with
+   * the teams' names as the event's page shows them.
+   */
+  private async liveGames(id: string, now: number): Promise<PublicLiveGame[]> {
+    const base = await this.bases.get(id, () => this.loadBase(id));
+    if (!base) return [];
+    const since = new Date(now - liveLimits.staleAfterMs);
+    const out: PublicLiveGame[] = [];
+    for (const d of base.divisions) {
+      for (const doc of await this.repo.liveGames(id, d.id, since)) {
+        const g = engineGame(doc.id, doc.data);
+        const l = liveScoreOf(doc.data.live);
+        if (!l?.updatedAt || !g.teamA || !g.teamB || !isLiveGame({ status: g.status, live: doc.data.live }, now)) continue;
+        const name = (t: string) => base.drafted.get(t) ?? base.entryNames.get(t) ?? "Team";
+        out.push({
+          divisionId: d.id,
+          gameId: g.id,
+          label: g.label,
+          field: g.field,
+          teamA: g.teamA,
+          teamB: g.teamB,
+          nameA: name(g.teamA),
+          nameB: name(g.teamB),
+          scoreA: l.scoreA,
+          scoreB: l.scoreB,
+          updatedAt: l.updatedAt.toISOString(),
+        });
+      }
+    }
+    return out.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
   /**

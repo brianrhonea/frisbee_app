@@ -22,6 +22,7 @@ import type { TeamDoc } from "@/components/team/TeamContext";
 import { callApi, problem } from "@/lib/client";
 import { type Doc, useLiveDoc, useLiveQuery } from "@/lib/live";
 import { useMyTeams } from "../useMyTeams";
+import { canKeepLiveScore, type LiveControls, type RunningScore, serverLive, useLiveScores, useNow } from "./useLiveScores";
 
 const editors = ["owner", "coach", "captain"];
 
@@ -68,6 +69,10 @@ export function useTournament(id: string) {
 
   const gameRows = useLiveQuery<GameDoc>(user && divisionId ? `tournaments/${id}/divisions/${divisionId}/games` : null, [orderBy("order")], `${divisionId}`);
   const games: EngineGame[] = useMemo(() => (gameRows.data ?? []).map((g) => engineGame(g.id, g)), [gameRows.data]);
+  // Each game's stored running score (engineGame leaves it out).
+  const liveById = useMemo(() => new Map((gameRows.data ?? []).map((g) => [g.id, g.live as unknown])), [gameRows.data]);
+  const now = useNow();
+  const liveScores = useLiveScores(user, id, divisionId, liveById);
 
   const entryOf = (teamId: string) => entries.find((e) => e.id === teamId) ?? null;
   const teamName = (teamId: string | null | undefined): string => {
@@ -84,6 +89,12 @@ export function useTournament(id: string) {
   const myEntries = entries.filter((e) => myAdminTeams.some((m) => m.id === e.id));
   /** Teams of the selected division whose captain the viewer is. */
   const captainOf = new Set(Object.entries(division?.captains ?? {}).filter(([, l]) => uid && l.includes(uid)).map(([k]) => k));
+  /** [g]'s running score if it's being played: what the viewer just set, else the server's while it's fresh. */
+  const liveOf = (g: EngineGame): RunningScore | null => {
+    if (g.status !== "scheduled") return null;
+    return liveScores.pending.get(g.id) ?? serverLive(g, liveById.get(g.id), now);
+  };
+  const liveControls: LiveControls = liveScores;
 
   return {
     id,
@@ -124,6 +135,11 @@ export function useTournament(id: string) {
     teamName,
     captainOf,
     myUpcoming: gamesToPlay(games).filter((g) => captainOf.has(g.teamA ?? "") || captainOf.has(g.teamB ?? "")),
+    liveOf,
+    /** The selected division's games being played now, in schedule order. */
+    liveGames: games.filter((g) => liveOf(g) !== null),
+    canKeepLive: (g: EngineGame) => canKeepLiveScore({ signedIn: !!user, status: t?.status, manager, captainOf, g, now }),
+    live: liveControls,
   };
 }
 

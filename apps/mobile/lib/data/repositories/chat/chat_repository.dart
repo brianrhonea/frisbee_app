@@ -105,6 +105,35 @@ abstract class ChatRepository {
 
   Future<Result<Uint8List>> downloadAttachment(ChatAttachment attachment);
 
+  // Pins and event cards (redesign F2, F3) go through the API only.
+
+  /// Whether pins and event cards can be written: this build talks to the
+  /// API (`API_BASE_URL`).
+  bool get canUseChatExtras;
+
+  /// The room's pinned messages, newest pin first (at most [chatPinsMax]).
+  /// A deleted message's pin goes with it.
+  Stream<List<ChatMessage>> watchPins(String teamId, String roomId);
+
+  /// Pins [messageId]. A room with [chatPinsMax] pins refuses
+  /// (ApiException `failed_precondition`) unless [unpin] names one of
+  /// them to take down in the same write.
+  Future<Result<void>> pinMessage(
+    String teamId,
+    String roomId,
+    String messageId, {
+    String? unpin,
+  });
+
+  Future<Result<void>> unpinMessage(
+    String teamId,
+    String roomId,
+    String messageId,
+  );
+
+  /// Posts team event [eventId] into the room as a card.
+  Future<Result<void>> shareEvent(String teamId, String roomId, String eventId);
+
   /// A URL to stream a video attachment from.
   Future<Result<String>> attachmentUrl(ChatAttachment attachment);
 }

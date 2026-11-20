@@ -100,6 +100,11 @@ beforeAll(async () => {
       ifNeeded: false,
     });
   }
+  // Running scores (games/{id}.live), read by live.updatedAt alone.
+  const liveGame = (updatedAt: Timestamp) => ({ order: 0, status: "scheduled", teamA: "a", teamB: "b", live: { scoreA: 7, scoreB: 5, startedAt: updatedAt, updatedAt, by: "capA" } });
+  batch.set(db.doc("tournaments/soon/divisions/live/games/now"), liveGame(ts(-60_000)));
+  batch.set(db.doc("tournaments/soon/divisions/live/games/stale"), liveGame(ts(-5 * 3600_000)));
+  batch.set(db.doc("tournaments/soon/divisions/live/games/none"), { order: 1, status: "scheduled", teamA: "a", teamB: "b" });
   batch.set(db.doc("tournamentDirectory/club_gt1"), { groupId: "club", tournamentId: "gt1", name: "Hat", startsAt: ts(day), status: "setup", format: "roundRobin" });
   await batch.commit();
 });
@@ -123,6 +128,13 @@ describe("visitors' tournament pages on Firestore", () => {
     expect(page.tournament.bidFee).toEqual({ amountCents: 1000, currency: "USD", dueAt: null });
     const text = JSON.stringify(page);
     for (const hidden of ["capA", "capB", "Charlie", "pat@example.test", "hostUid"]) expect(text).not.toContain(hidden);
+  });
+
+  it("finds the games whose running score was updated lately, without an index of its own", async () => {
+    const repo = new FirestorePublicTournamentRepository(db);
+    const games = await repo.liveGames("soon", "live", new Date(Date.now() - 3 * 3600_000));
+    expect(games.map((g) => g.id)).toEqual(["now"]);
+    expect(games[0].data.live).toMatchObject({ scoreA: 7, scoreB: 5 });
   });
 
   it("404s drafts and private groups' events", async () => {

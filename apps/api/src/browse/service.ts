@@ -11,7 +11,7 @@ import type {
   TeamPage,
   TeamSearchPage,
 } from "@stall10/shared";
-import { searchWords } from "@stall10/shared";
+import { publicPageOn, searchWords } from "@stall10/shared";
 import { ApiError } from "../errors.js";
 import { searchKey } from "../limits/model.js";
 import {
@@ -92,6 +92,8 @@ export class BrowseService {
       view.level = "youth";
     }
     if (isDraftedLeagueTeam(id)) view.name = draftedLeagueTeamName;
+    // The page is off by either document: the website shows its card only.
+    if (!publicPageOn(data) || !publicPageOn(team)) view.publicPage = false;
     return view;
   }
 

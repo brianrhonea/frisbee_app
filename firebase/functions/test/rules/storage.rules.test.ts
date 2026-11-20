@@ -208,6 +208,14 @@ describe("post photos", () => {
     await assertFails(visitor("pub").getMetadata());
   });
 
+  it("website visitors don't see a team's public post photos while its public page is off", async () => {
+    await seed();
+    const visitor = () => env.unauthenticatedContext().storage().ref(`teams/${TEAM}/posts/pub/1/0-photo.png`);
+    await env.withSecurityRulesDisabled((ctx) => updateDoc(doc(ctx.firestore(), "teams", TEAM), { publicPage: false }));
+    await assertFails(visitor().getMetadata());
+    await assertSucceeds(photo(PLAYER, "pub").getMetadata());
+  });
+
   it("owners, coaches and captains upload photos; players cannot", async () => {
     for (const uid of [OWNER, COACH, CAPTAIN]) {
       await assertSucceeds(

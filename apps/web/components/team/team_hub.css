@@ -301,7 +301,17 @@
   --play-defense: var(--board);
   --play-cone: color-mix(in srgb, var(--disc) 72%, var(--live));
   --play-on-piece: var(--on-board);
+  /* Pen strokes (drawings), as the app's FieldColors pens. */
+  --play-pen-ink: #14213A;
+  --play-pen-turf: #7FDDB4;
+  --play-pen-amber: #FFB627;
+  --play-pen-white: #FFFFFF;
 }
+.team-hub .field-pen { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.team-hub .field-pen.ink { stroke: var(--play-pen-ink); }
+.team-hub .field-pen.turf { stroke: var(--play-pen-turf); }
+.team-hub .field-pen.amber { stroke: var(--play-pen-amber); }
+.team-hub .field-pen.white { stroke: var(--play-pen-white); }
 .team-hub .field-el.offense circle { fill: var(--play-offense); }
 .team-hub .field-el.defense circle { fill: var(--play-defense); }
 .team-hub .field-el.cone path { fill: var(--play-cone); }
@@ -414,3 +424,25 @@
 @media (max-width: 860px) {
   .team-hub .sched-split { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Settings › Sections and the new team's hint (F21). */
+.team-hub .team-sections .switch-row input:disabled { opacity: 0.5; cursor: not-allowed; }
+.team-hub .team-sections .switch-row-locked { cursor: default; }
+.team-hub .team-sections .switch-row b { font-weight: 700; }
+.team-hub .team-sections .switch-row small { font-size: 0.82rem; }
+.team-hub .section-off .card-title { margin-bottom: 6px; }
+.team-hub .sections-hint {
+  display: flex; align-items: center; gap: 4px; border-radius: 16px; background: var(--accent-soft); color: var(--accent-ink);
+}
+.team-hub .sections-hint > a {
+  flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; padding: 10px 4px 10px 14px;
+  color: inherit; text-decoration: none; font-size: 0.85rem; font-weight: 600;
+}
+.team-hub .sections-hint > a:hover span { text-decoration: underline; }
+.team-hub .sections-hint > a svg { flex: none; }
+.team-hub .sections-hint-close {
+  flex: none; width: 36px; height: 36px; margin-right: 4px; border: 0; border-radius: 999px; background: transparent;
+  color: inherit; font-size: 1.25rem; line-height: 1; cursor: pointer;
+}
+.team-hub .sections-hint-close:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
+.team-hub .sections-hint a:focus-visible, .team-hub .sections-hint-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

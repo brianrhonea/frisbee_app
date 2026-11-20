@@ -249,7 +249,19 @@ class TeamDetailViewModel extends ChangeNotifier {
       savePlayer.execute(p.copyWith(paid: !p.paid));
 
   List<Play> _playList = const [];
-  List<Play> get plays => _playList;
+
+  /// The playbook's plays, without saved whiteboards.
+  List<Play> get plays => [
+    for (final p in _playList)
+      if (!p.isWhiteboard) p,
+  ];
+
+  /// Saved whiteboard sketches, listed under the playbook's Whiteboard
+  /// switch.
+  List<Play> get whiteboards => [
+    for (final p in _playList)
+      if (p.isWhiteboard) p,
+  ];
 
   List<TeamEvent> _teamEvents = const [];
 
@@ -295,6 +307,10 @@ class TeamDetailViewModel extends ChangeNotifier {
   String get uid => _auth.currentUser?.uid ?? '';
   TeamRole? get myRole => _team?.roleOf(uid);
   bool get canEdit => _team?.canEdit(uid) ?? false;
+
+  /// Whether the team has Meetings on (Settings › Sections); new teams
+  /// start without it, so New adds an event straight away.
+  bool get meetingsOn => _team?.hasSection(OptionalSection.meetings) ?? true;
 
   /// Invite, approve and remove members.
   bool get canManageMembers =>

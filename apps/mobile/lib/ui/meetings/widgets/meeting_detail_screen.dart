@@ -31,7 +31,11 @@ class MeetingDetailScreen extends StatefulWidget {
 class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
   MeetingDetailViewModel get vm => widget.viewModel;
 
-  late final List<Command<void>> _commands = [vm.setRsvp, vm.deleteMeeting];
+  late final List<Command<void>> _commands = [
+    vm.setRsvp,
+    vm.saveNote,
+    vm.deleteMeeting,
+  ];
 
   @override
   void initState() {
@@ -338,6 +342,14 @@ class _RsvpCard extends StatelessWidget {
             selected: vm.myRsvp,
             onChanged: vm.setRsvp.running ? null : vm.setRsvp.execute,
           ),
+          // A note goes with an answer, and goes when it's taken back.
+          if (vm.myRsvp != null) ...[
+            const SizedBox(height: 10),
+            RsvpNoteField(
+              note: vm.myNote,
+              onSave: vm.saveNote.running ? null : vm.saveNote.execute,
+            ),
+          ],
           const SizedBox(height: 8),
           Text(
             vm.myRsvp == MeetingRsvp.attending
@@ -359,7 +371,7 @@ class _Responses extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final r = viewModel.responses;
+    final r = viewModel.responders;
     return SectionCard(
       title: 'Invited (${viewModel.inviteeCount})',
       padding: const EdgeInsets.all(14),
@@ -368,10 +380,14 @@ class _Responses extends StatelessWidget {
           for (final a in MeetingRsvp.values)
             (
               label: a.label,
-              names: r[a]!,
+              people: r[a]!,
               tone: a == MeetingRsvp.attending ? RsvpTone.yes : RsvpTone.other,
             ),
-          (label: 'No reply', names: viewModel.noResponse, tone: RsvpTone.none),
+          (
+            label: 'No reply',
+            people: withoutNotes(viewModel.noResponse),
+            tone: RsvpTone.none,
+          ),
         ],
       ),
     );

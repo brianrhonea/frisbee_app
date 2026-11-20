@@ -37,6 +37,7 @@ import 'package:frisbee_app/ui/learn/widgets/learn_screen.dart';
 import 'package:frisbee_app/ui/schedule/widgets/event_detail_screen.dart';
 import 'package:frisbee_app/ui/schedule/widgets/event_editor_screen.dart';
 import 'package:frisbee_app/ui/schedule/widgets/my_event_detail_screen.dart';
+import 'package:frisbee_app/ui/meetings/widgets/meetings_list_screen.dart';
 import 'package:frisbee_app/ui/schedule/widgets/team_events_tab.dart';
 import 'package:frisbee_app/ui/teams/widgets/members_tab.dart';
 import 'package:frisbee_app/ui/teams/widgets/roster_tab.dart';
@@ -734,6 +735,16 @@ void main() {
     expect(home.section, TeamSection.playbook);
     // Still under More.
     expect(find.text('More'), findsOneWidget);
+  });
+
+  testWidgets('More opens the team\'s Meetings list', (tester) async {
+    await pumpApp(tester);
+    await tapText(tester, 'Teams');
+    await tapText(tester, 'Northside Flyers');
+    await tapText(tester, 'More');
+    await tapText(tester, 'Meetings');
+    expect(find.byType(MeetingsListScreen), findsOneWidget);
+    expect(find.text('Coming up'.toUpperCase()), findsOneWidget);
   });
 
   testWidgets('old ?tab= team links open the matching section', (tester) async {

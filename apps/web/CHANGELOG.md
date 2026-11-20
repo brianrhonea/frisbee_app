@@ -4,6 +4,28 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.46.0 — 2026-11-20
+
+Redesign features, with app 0.0.37. Needs API 0.34.0. Details in
+`docs/product-spec.md` §8.1 items 26–34.
+
+**Added**
+- Live running scores: "Live score" dialog for captains and hosts;
+  LIVE pill and score on games, the live header, tournament-day card
+  and Discover's "Live now" (`useLiveScores`).
+- Team Settings › Sections (new teams start with Feed, Schedule, Chat,
+  Roster; `SectionGate`, `SectionsHint`) and Settings › Visibility ›
+  Public team page.
+- Playbook whiteboard: `/teams/:id/playbook?view=whiteboard`,
+  `/teams/:id/whiteboards/new` and `/whiteboards/:playId`.
+- Notes on event and meeting RSVPs (`RsvpNote`).
+- Schedule List / Month switch.
+- Meetings tab: Upcoming / Past, Live now, Needs RSVP.
+- Team rooms: pinned messages and shared event cards (`ChatExtras`).
+- Settings › Account › Download your data.
+- Learn progress ("N of 12 read") and "N spots left" on tournament
+  cards (`useTournamentSpots`).
+
 ## 0.45.0 — 2026-11-20
 
 Navigation and the "Turf & Disc" redesign, with app 0.0.36. Works with
