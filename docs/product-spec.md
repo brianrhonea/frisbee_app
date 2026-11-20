@@ -538,6 +538,21 @@ everything the app does on the website alone, styled like the website
     `test/data/chat_reads_test.dart`; shared
     `test/team_chats_fixtures.test.ts`; API `test/hub.test.ts`; rules
     "stamps its lastAt", "chat read times".
+23. Tournament-day card (app 0.0.33, web 0.43.0):
+    [x] On a tournament day Home and the team page show the team's card
+    in place of the next event on both: the tournament (Live), next game
+    (opponent, time, field; the evening before from 17:00: tomorrow's
+    first game), record, pool place (once it has a pool result) and last
+    result. [x] Captains get Report / Confirm score on both, opening the
+    tournament page on that game with its score form (app: the game
+    sheet; web: **This game**, form open); `?game=`, `?division=`,
+    `?tab=` on both. One rule: app `TournamentDay.of`, shared
+    `tournamentDay`, vectors `fixtures/tournament_day/day.json`. Data:
+    accepted entries from the day before to the last day (app
+    `TournamentDays`, web `useTournamentDays`). Tests: app
+    `test/ui/tournament_day_test.dart`; shared
+    `test/tournament_day_fixtures.test.ts` (the website has no test
+    runner; its rule is the shared one).
 
 Out of scope: payments, meeting recording, USA Ultimate data.
 

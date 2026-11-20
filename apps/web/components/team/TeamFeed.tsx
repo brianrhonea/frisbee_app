@@ -17,6 +17,8 @@ import { type TeamViewer, useTeamHub } from "./TeamContext";
 import { type TeamPostView, TeamPostCard } from "./TeamPostCard";
 import { TeamPostComposer } from "./TeamPostComposer";
 import { useTeamEvents, useYouthOutsiderPublic, youthVisitorNote } from "./TeamSchedule";
+import { TournamentDayCard } from "../tournaments/TournamentDayCard";
+import { useTournamentDays } from "../tournaments/useTournamentDays";
 
 const postLimit = 30;
 
@@ -36,6 +38,8 @@ export function TeamFeed({ publicPosts, publicEvents }: { publicPosts: PublicTea
     "feed",
   );
   const events = useTeamEvents(teamId, viewer);
+  const { user } = useAuth();
+  const tournamentDay = useTournamentDays(member ? user?.uid : null, teamId)[0];
   const posts: TeamPostView[] = member ? (live.data ?? []) : outsiderYouth ? (outsider.posts.data ?? []) : publicPosts;
   const upcoming = (member ? (events.data ?? []) : outsiderYouth ? (outsider.events.data ?? []) : publicEvents).slice(0, 4);
   const hidden = !member && privateGroup;
@@ -79,6 +83,8 @@ export function TeamFeed({ publicPosts, publicEvents }: { publicPosts: PublicTea
         )}
       </section>
       <aside className="stack">
+        {/* On a tournament day the card comes before what's coming up. */}
+        {tournamentDay && <TournamentDayCard day={tournamentDay} showTeam={false} />}
         {!hidden && !youthHidden && (
           <div className="card">
             <h2 className="card-title">Coming up</h2>

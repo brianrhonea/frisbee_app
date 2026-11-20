@@ -54,9 +54,20 @@ class HostedTournamentScreen extends StatefulWidget {
     required this.viewModel,
     this.signups,
     this.fallbackHostId,
+    this.openGameId,
+    this.openDivisionId,
+    this.initialTab,
   });
 
   final HostedTournamentViewModel viewModel;
+
+  /// A game to open (from a tournament-day card's Report score): the page
+  /// starts on Schedule, in [openDivisionId], with the game's sheet up.
+  final String? openGameId;
+  final String? openDivisionId;
+
+  /// `schedule` or `results`: the tab to start on.
+  final String? initialTab;
 
   /// Players' signups, for player-entry tournaments and leagues; without
   /// it the page only takes teams.
@@ -98,8 +109,35 @@ class _HostedTournamentScreenState extends State<HostedTournamentScreen> {
   }
 
   /// The host loads after the tournament, so tell the signups when this
-  /// user turns out to manage it.
-  void _syncManager() => signups?.setManager(vm.isManager);
+  /// user turns out to manage it. Also opens [HostedTournamentScreen.
+  /// openGameId] once its division's games are in.
+  void _syncManager() {
+    signups?.setManager(vm.isManager);
+    _openGame();
+  }
+
+  bool _gameOpened = false;
+
+  void _openGame() {
+    final id = widget.openGameId;
+    if (id == null || _gameOpened || !vm.loaded) return;
+    final division = widget.openDivisionId;
+    if (division != null && vm.division?.id != division) {
+      vm.selectDivision(division);
+      if (vm.division?.id != division) return;
+    }
+    if (!vm.games.any((g) => g.id == id)) return;
+    _gameOpened = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        isScrollControlled: true,
+        builder: (_) => _GameSheet(viewModel: vm, gameId: id),
+      );
+    });
+  }
 
   void _onCommand() {
     if (vm.delete.completed) {
@@ -169,8 +207,16 @@ class _HostedTournamentScreenState extends State<HostedTournamentScreen> {
         }
         final follow = vm.follow;
         final tabs = eventTabs(t, hasSignups: signups != null);
+        final start = widget.openGameId != null
+            ? EventTab.schedule
+            : switch (widget.initialTab) {
+                'schedule' => EventTab.schedule,
+                'results' => EventTab.results,
+                _ => null,
+              };
         return DefaultTabController(
           length: tabs.length,
+          initialIndex: start == null ? 0 : tabs.indexOf(start).clamp(0, 99),
           child: Scaffold(
             appBar: AppBar(
               title: Text(t.name),

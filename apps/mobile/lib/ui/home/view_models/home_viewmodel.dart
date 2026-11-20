@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../data/repositories/hosted_tournament/hosted_tournament_repository.dart';
+import '../../../data/repositories/hosted_tournament/tournament_days.dart';
 import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/event/event_repository.dart';
 import '../../../data/repositories/follow/follow_repository.dart';
@@ -60,6 +62,7 @@ class HomeViewModel extends ChangeNotifier {
     required FollowRepository followRepository,
     required UserPostRepository userPostRepository,
     required FilePickerService filePicker,
+    HostedTournamentRepository? tournamentRepository,
     DateTime Function()? clock,
   }) : _auth = authRepository,
        _teamRepo = teamRepository,
@@ -69,6 +72,15 @@ class HomeViewModel extends ChangeNotifier {
        _picker = filePicker,
        _clock = clock ?? DateTime.now {
     joinTeam = Command1<String, String>(_joinTeam);
+    final me = authRepository.currentUser?.uid ?? '';
+    if (tournamentRepository != null && me.isNotEmpty) {
+      _days = TournamentDays(
+        repository: tournamentRepository,
+        teams: teamRepository.watchMyTeams(me),
+        uid: me,
+        clock: clock,
+      )..addListener(notifyListeners);
+    }
     savePost = Command1<void, FeedPostDraft>(_savePost);
     deletePost = Command1<void, TeamPostItem>(
       (p) => _posts.deletePost(p.teamId, p.post.id),
@@ -356,6 +368,12 @@ class HomeViewModel extends ChangeNotifier {
   // Schedule ---------------------------------------------------------------
 
   /// The next event of one of the user's teams, for the "Up next" card.
+  TournamentDays? _days;
+
+  /// The user's teams on a tournament day (today, or this evening for
+  /// tomorrow): shown in place of the next event.
+  List<TeamTournamentDay> get tournamentDays => _days?.days ?? const [];
+
   ScheduleEntry? get nextTeamEvent =>
       _feed.upcoming(limit: 1, personal: false).firstOrNull;
 
@@ -393,6 +411,9 @@ class HomeViewModel extends ChangeNotifier {
     );
     _feed
       ..removeListener(_onFeed)
+      ..dispose();
+    _days
+      ?..removeListener(notifyListeners)
       ..dispose();
     for (final sub in _requestSubs.values) {
       sub.cancel();

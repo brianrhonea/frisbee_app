@@ -32,7 +32,7 @@ import {
   leagueTeamPrefix,
   pointDiff,
 } from "@stall10/shared";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { dayKey, useRenderZone } from "@/lib/renderZone";
 import { type TournamentState, divisionPath, useAction } from "./useTournament";
 
@@ -127,19 +127,31 @@ function ScoreForm({ s, g, mode, onDone }: { s: TournamentState; g: EngineGame; 
   );
 }
 
-/** One game: its teams and score, and what the viewer can do with it. */
-export function GameCard({ s, g }: { s: TournamentState; g: EngineGame }) {
+/**
+ * One game: its teams and score, and what the viewer can do with it.
+ * [focus] (from a tournament-day card's Report score) scrolls to it and
+ * opens the score form when it's the viewer's to report.
+ */
+export function GameCard({ s, g, focus = false }: { s: TournamentState; g: EngineGame; focus?: boolean }) {
   const zone = useRenderZone();
   const [open, setOpen] = useState<"report" | "final" | null>(null);
   const { busy, error, run } = useAction();
   const action = actionFor(s, g);
+  const ref = useRef<HTMLDivElement>(null);
+  const focused = useRef(false);
+  useEffect(() => {
+    if (!focus || focused.current || !action) return;
+    focused.current = true;
+    if (action === "report") setOpen("report");
+    ref.current?.scrollIntoView({ block: "center" });
+  }, [focus, action]);
   const skipped = skippedGame(g, s.games);
   const canSet = s.manager && hasTeams(g) && !laterGamesPlayed(g, s.games);
   const winner = isDone(g) ? ((g.scoreA ?? 0) > (g.scoreB ?? 0) ? "a" : "b") : null;
   const r = g.report;
   const url = `${divisionPath(s.id, s.divisionId ?? "")}/games/${encodeURIComponent(g.id)}`;
   return (
-    <div className={`hosted-game${action === "report" || action === "confirm" ? " hosted-game-you" : ""}${skipped ? " hosted-game-skipped" : ""}`}>
+    <div ref={ref} id={`game-${g.id}`} className={`hosted-game${action === "report" || action === "confirm" ? " hosted-game-you" : ""}${skipped ? " hosted-game-skipped" : ""}`}>
       <div className="hosted-game-head">
         <small className="muted">
           Game {g.order + 1} · {g.label}
@@ -269,13 +281,16 @@ export function NoDivisions({ s }: { s: TournamentState }) {
   return <p className="empty">{s.manager ? "No divisions yet. Open one under Edit details." : "The host is still setting up divisions."}</p>;
 }
 
-export function ScheduleTab({ s }: { s: TournamentState }) {
+/** [focusGame]: a game to open first (?game=, from Report score). */
+export function ScheduleTab({ s, focusGame }: { s: TournamentState; focusGame?: string }) {
   const d = s.division;
   const zone = useRenderZone();
   const { busy, error, run } = useAction();
   if (!d || !s.t) return <NoDivisions s={s} />;
   const league = s.t.kind === "league";
   const canSeed = s.manager && bracketSeeds(s.games).length > 0;
+  const focused = focusGame ? (s.games.find((g) => g.id === focusGame) ?? null) : null;
+  const upcoming = s.myUpcoming.filter((g) => g.id !== focused?.id).slice(0, 3);
   let lastDay = "";
   return (
     <div className="stack">
@@ -292,10 +307,16 @@ export function ScheduleTab({ s }: { s: TournamentState }) {
         </div>
       )}
       {error && <p className="form-error">{error}</p>}
-      {s.myUpcoming.length > 0 && (
+      {focused && (
+        <section className="stack">
+          <h3 className="hosted-heading">This game</h3>
+          <GameCard s={s} g={focused} focus />
+        </section>
+      )}
+      {upcoming.length > 0 && (
         <section className="stack">
           <h3 className="hosted-heading">Your next games</h3>
-          {s.myUpcoming.slice(0, 3).map((g) => (
+          {upcoming.map((g) => (
             <GameCard key={g.id} s={s} g={g} />
           ))}
         </section>

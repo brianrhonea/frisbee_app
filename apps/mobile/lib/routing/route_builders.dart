@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../data/repositories/hosted_tournament/hosted_tournament_repository.dart';
 import '../data/repositories/calendar/calendar_repository.dart';
 import '../data/repositories/notification/notification_repository.dart';
 import '../data/repositories/auth/auth_repository.dart';
@@ -180,6 +181,7 @@ Widget teamPage(GoRouterState state) {
       followRepository: c.read(),
       notificationRepository: c.read(),
       groupTournamentRepository: c.read(),
+      tournamentRepository: c.read<HostedTournamentRepository?>(),
     ),
     builder: (_, vm) => TeamHomeScreen(
       viewModel: vm,
@@ -201,6 +203,7 @@ Widget homePage() => ViewModelHost(
     followRepository: c.read(),
     userPostRepository: c.read(),
     filePicker: c.read(),
+    tournamentRepository: c.read<HostedTournamentRepository?>(),
   ),
   builder: (_, vm) => HomeScreen(
     viewModel: vm,

@@ -89,6 +89,9 @@ List<GoRoute> hostedTournamentRoutes() => [
                 viewModel: vm,
                 signups: signups,
                 fallbackHostId: state.uri.queryParameters['host'],
+                openGameId: state.uri.queryParameters['game'],
+                openDivisionId: state.uri.queryParameters['division'],
+                initialTab: state.uri.queryParameters['tab'],
               ),
             ),
           );

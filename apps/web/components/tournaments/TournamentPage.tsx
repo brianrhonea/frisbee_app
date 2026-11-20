@@ -19,7 +19,7 @@ import {
   type HostedStatus,
 } from "@stall10/shared";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { FollowButton } from "@/components/FollowButton";
 import { callApi } from "@/lib/client";
@@ -46,9 +46,13 @@ export function TournamentPage({ tournamentId, fallbackHostId }: { tournamentId:
     if (fallback) router.replace(fallback);
   }, [fallback, router]);
   useReconcile(s);
+  // ?game= (with ?division=) opens on that game, as Report score on a
+  // tournament-day card does; ?tab= picks the tab.
+  const params = useSearchParams();
+  const open = { tab: params.get("tab") ?? undefined, game: params.get("game") ?? undefined, division: params.get("division") ?? undefined };
   if (!s.loaded || fallback) return <p className="muted" aria-busy="true">Loading…</p>;
   if (!s.t) return <p className="empty">This event isn&apos;t here: it may have been removed, or it hasn&apos;t been published yet.</p>;
-  return <TournamentView s={s} />;
+  return <TournamentView s={s} open={open} />;
 }
 
 /**
@@ -56,8 +60,16 @@ export function TournamentPage({ tournamentId, fallbackHostId }: { tournamentId:
  * (s.visitor: no Players or News tabs, and a sign-up prompt in place of
  * Follow, entering a team and signing up).
  */
-export function TournamentView({ s }: { s: TournamentState }) {
-  const [tab, setTab] = useState<Tab>("overview");
+export function TournamentView({ s, open }: { s: TournamentState; open?: { tab?: string; game?: string; division?: string } }) {
+  const [tab, setTab] = useState<Tab>(open?.game ? "schedule" : open?.tab === "schedule" || open?.tab === "results" ? open.tab : "overview");
+  // The linked division, once the divisions are in.
+  const pickedDivision = useRef(false);
+  const hasDivision = !!open?.division && s.divisions.some((d) => d.id === open.division);
+  useEffect(() => {
+    if (pickedDivision.current || !hasDivision || !open?.division) return;
+    pickedDivision.current = true;
+    s.selectDivision(open.division);
+  }, [hasDivision, open?.division, s]);
   const zone = useRenderZone();
   const tournamentId = s.id;
   const t = s.t;
@@ -105,7 +117,7 @@ export function TournamentView({ s }: { s: TournamentState }) {
         <SignupsSlot tournamentId={tournamentId} tournament={t} divisions={s.divisions} divisionId={s.divisionId} manager={s.manager} />
       )}
       {current === "teams" && <TeamsTab s={s} />}
-      {current === "schedule" && <ScheduleTab s={s} />}
+      {current === "schedule" && <ScheduleTab s={s} focusGame={open?.game} />}
       {current === "results" && <ResultsTab s={s} />}
       {current === "news" && (s.visitor ? <PublicNews s={s} /> : <TournamentNews s={s} />)}
     </div>

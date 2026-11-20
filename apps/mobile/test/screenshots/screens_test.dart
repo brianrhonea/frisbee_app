@@ -37,7 +37,6 @@ import 'package:frisbee_app/data/services/file_picker_service.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/chat.dart';
 import 'package:frisbee_app/domain/models/direct_message.dart';
-import 'package:frisbee_app/domain/models/hosted_tournament.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/domain/models/team_event.dart';
 import 'package:frisbee_app/domain/models/user_post.dart';
@@ -215,17 +214,10 @@ void main() {
       ),
     ]);
 
-    final hosted = FakeHostedTournamentRepository()
-      ..tournaments['x9'] = HostedTournament(
-        id: 'x9',
-        hostId: 'g1',
-        hostName: 'Denver Thursday Pickup',
-        name: 'Mile High Open',
-        startsOn: at(4, 8),
-        endsOn: at(5, 8),
-        location: 'Aurora Sports Park',
-        status: HostedStatus.scheduled,
-      );
+    // Northside Flyers are playing the Mile High Open today, and the user
+    // captains them: Home and the team page show the tournament-day card.
+    final hosted = FakeHostedTournamentRepository();
+    seedLiveTournament(hosted, now: now, captains: [testUser.uid]);
 
     final auth = FakeAuthRepository(user: testUser);
     appRouter = router(auth, FakePersonalDetailsRepository());

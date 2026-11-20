@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../tournaments/widgets/tournament_day_card.dart';
 import '../../../data/repositories/meeting/meeting_repository.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/team_event.dart';
@@ -860,8 +861,12 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
     if (events.isEmpty && !vm.isMember) return const [];
     final next = events.firstOrNull;
     final rest = events.skip(1).take(TeamHomeViewModel.upcomingLimit).toList();
+    final day = vm.tournamentDay;
     return [
-      if (next != null)
+      // On a tournament day the card takes the next event's place.
+      if (day != null)
+        TournamentDayCard(day: day, showTeam: false)
+      else if (next != null)
         _UpNextCard(
           event: next,
           teamName: vm.summary?.name ?? '',

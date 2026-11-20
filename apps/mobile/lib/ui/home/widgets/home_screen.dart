@@ -21,6 +21,7 @@ import '../../schedule/widgets/event_style.dart';
 import '../../shell/widgets/app_shell.dart';
 import '../../teams/widgets/join_team_dialog.dart';
 import '../../teams/widgets/team_post_widgets.dart';
+import '../../tournaments/widgets/tournament_day_card.dart';
 import '../view_models/home_viewmodel.dart';
 import 'home_cards.dart';
 import '../../posts/widgets/inline_composer.dart';
@@ -228,7 +229,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 narrow: [
                   if (_tab == _Tab.forYou) ...[
                     if (vm.needsYou.isNotEmpty) _needsYou(),
-                    if (vm.nextTeamEvent case final next?)
+                    // On a tournament day the card takes the next
+                    // event's place.
+                    if (vm.tournamentDays.isNotEmpty)
+                      for (final d in vm.tournamentDays)
+                        TournamentDayCard(day: d)
+                    else if (vm.nextTeamEvent case final next?)
                       _NextEventStrip(entry: next),
                     _ComingUpCard(
                       events: vm.upcomingEvents.take(2).toList(),
@@ -480,7 +486,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<Widget> _side() => [
     if (vm.needsYou.isNotEmpty) _needsYou(),
-    if (vm.nextTeamEvent case final next?) _UpNextCard(entry: next),
+    if (vm.tournamentDays.isNotEmpty)
+      for (final d in vm.tournamentDays) TournamentDayCard(day: d)
+    else if (vm.nextTeamEvent case final next?)
+      _UpNextCard(entry: next),
     _ComingUpCard(events: vm.upcomingEvents, onAdd: _newEvent),
     const _Footer(),
   ];

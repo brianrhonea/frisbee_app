@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.33  | 2026-11-19 | `feature/team-first`                    |                     |
 | 0.0.32  | 2026-11-19 | `feature/team-first`                    |                     |
 | 0.0.31  | 2026-11-19 | `feature/profile-team-stats`            |                     |
 | 0.0.30  | 2026-11-19 | `fix/ui-wording`                        |                     |
@@ -45,6 +46,40 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.33 — Tournament-day card (team-first 2)
+
+Web 0.43.0. No API, rules or function changes: hosted divisions, entries
+and games are already readable by signed-in users once the event isn't a
+draft, and `teams/{id}/tournamentEntries` by the team's members.
+
+- On a tournament day, Home and the team page show a card in place of
+  the next event: the tournament (Live when it is), the team's next game
+  (opponent, time, field; "Tomorrow" from 17:00 the evening before), its
+  record and pool place, and its last result. Home shows one per team;
+  the team page its own.
+- Captains get **Report score** (or **Confirm score**) on the card for
+  the earliest of the team's games that has started without a score, or
+  that the other captain reported. It opens the tournament page on
+  Schedule with that game's sheet up, so the existing score dialog and
+  its checks do the rest. **Schedule & standings** opens the Schedule tab.
+- One rule: `TournamentDay.of` (`domain/tournament_engine/tournament_day.dart`),
+  ported as `tournamentDay` in `@stall10/shared`, vectors
+  `fixtures/tournament_day/day.json`. Pool place shows once the team has
+  a pool result (before that it's only the seed).
+- `TournamentDays` (`data/repositories/hosted_tournament`) gathers the
+  data: each team's accepted entries from the day before the event to its
+  last day, then the tournament, entries, divisions and the team's
+  division's games, re-checked each minute while something is on. Used
+  by `HomeViewModel` and `TeamHomeViewModel` (optional
+  `tournamentRepository`).
+- `Routes.tournament(id, division:, game:, tab:)`: `?game=` opens the
+  game's sheet once its division's games load; `?tab=schedule|results`
+  picks the tab.
+- Tests: `test/ui/tournament_day_test.dart`,
+  `test/shared_fixtures/tournament_day_fixtures_test.dart`;
+  `seedLiveTournament` in `test/testing/hosted_tournament_fakes.dart`
+  (also used by the screenshot harness).
 
 ## 0.0.32 — Team chats in Messages (team-first 1)
 

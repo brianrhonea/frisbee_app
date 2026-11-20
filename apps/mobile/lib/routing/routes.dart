@@ -166,9 +166,25 @@ abstract final class Routes {
   static const tournaments = '/tournaments';
 
   /// [host] (a group id) opens that group's hat tournament [id] instead
-  /// if there's no hosted tournament [id].
-  static String tournament(String id, {String? host}) =>
-      '$tournaments/$id${host == null ? '' : '?host=${Uri.encodeQueryComponent(host)}'}';
+  /// if there's no hosted tournament [id]. [game] (in [division]) opens on
+  /// the Schedule tab with that game's sheet, where captains report and
+  /// confirm scores; [tab] (`schedule` or `results`) picks the tab.
+  static String tournament(
+    String id, {
+    String? host,
+    String? game,
+    String? division,
+    String? tab,
+  }) {
+    final query = {
+      'host': ?host,
+      'division': ?division,
+      'game': ?game,
+      'tab': ?tab,
+    };
+    return '$tournaments/$id'
+        '${query.isEmpty ? '' : '?${Uri(queryParameters: query).query}'}';
+  }
 
   /// Pick which group or club hosts a new tournament, hat tournament or
   /// league.

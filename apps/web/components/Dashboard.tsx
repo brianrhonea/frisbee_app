@@ -17,6 +17,8 @@ import { TeamStrip } from "./home/TeamStrip";
 import { FeedPager } from "./home/useInfiniteFeed";
 import { TeamInvites } from "./TeamInvites";
 import { canOn } from "./tournaments/useTournament";
+import { TournamentDayCard } from "./tournaments/TournamentDayCard";
+import { useTournamentDays } from "./tournaments/useTournamentDays";
 import { useMyTeams } from "./useMyTeams";
 
 const rsvpLabels: Record<string, string> = { going: "Going", maybe: "Maybe", notGoing: "Not going" };
@@ -71,6 +73,7 @@ export function Dashboard({ user }: { user: User }) {
   const [older, setOlder] = useState<Feed>(emptyFeed);
   const [community, setCommunity] = useState<Feed | null>(null);
   const audiences = useAudiences(user.uid);
+  const tournamentDays = useTournamentDays(user.uid);
   const tabRefs = useRef<Partial<Record<Tab, HTMLButtonElement | null>>>({});
 
   const load = useCallback(async () => {
@@ -212,7 +215,10 @@ export function Dashboard({ user }: { user: User }) {
         {/* Phones: what needs an answer or is next, before the feed. */}
         <div className="huddle-phone">
           <TeamInvites />
-          {events[0] && <NextEvent event={events[0]} />}
+          {/* On a tournament day the card takes the next event's place. */}
+          {tournamentDays.length > 0
+            ? tournamentDays.map((d) => <TournamentDayCard key={`${d.teamId}/${d.tournamentId}`} day={d} />)
+            : events[0] && <NextEvent event={events[0]} />}
         </div>
 
         <div className="feed-tabs" role="tablist" aria-label="Feed">
@@ -284,6 +290,9 @@ export function Dashboard({ user }: { user: User }) {
           <TeamInvites />
         </div>
         <NeedsYou uid={user.uid} />
+        {tournamentDays.map((d) => (
+          <TournamentDayCard key={`${d.teamId}/${d.tournamentId}`} day={d} />
+        ))}
 
         <div className="card">
           <div className="card-head">

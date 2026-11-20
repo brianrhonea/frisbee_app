@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../data/repositories/hosted_tournament/hosted_tournament_repository.dart';
+import '../../../data/repositories/hosted_tournament/tournament_days.dart';
 import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/event/event_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
@@ -39,6 +41,7 @@ class TeamHomeViewModel extends ChangeNotifier {
     FollowRepository? followRepository,
     NotificationRepository? notificationRepository,
     GroupTournamentRepository? groupTournamentRepository,
+    HostedTournamentRepository? tournamentRepository,
     DateTime Function()? clock,
   }) : _teams = teamRepository,
        _events = eventRepository,
@@ -77,6 +80,20 @@ class TeamHomeViewModel extends ChangeNotifier {
           },
         );
     _watchTeam();
+    final me = authRepository.currentUser?.uid ?? '';
+    if (tournamentRepository != null && me.isNotEmpty) {
+      _days = TournamentDays(
+        repository: tournamentRepository,
+        teams: _teams
+            .watchTeam(teamId)
+            .map(
+              (t) =>
+                  t != null && t.members.containsKey(me) ? [t] : const <Team>[],
+            ),
+        uid: me,
+        clock: clock,
+      )..addListener(notifyListeners);
+    }
   }
 
   /// Upcoming events shown on the home page; the rest are in Team Events.
@@ -442,8 +459,17 @@ class TeamHomeViewModel extends ChangeNotifier {
     _eventsSub?.cancel();
     _postsSub?.cancel();
     _followSlot.dispose();
+    _days
+      ?..removeListener(notifyListeners)
+      ..dispose();
     super.dispose();
   }
+
+  TournamentDays? _days;
+
+  /// The team's tournament day (today, or this evening for tomorrow),
+  /// shown in place of its next event; members only.
+  TeamTournamentDay? get tournamentDay => _days?.forTeam(teamId);
 }
 
 /// Picks photos for a post, or takes one with the [camera]; empty when

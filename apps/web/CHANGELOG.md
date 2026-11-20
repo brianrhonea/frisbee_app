@@ -4,6 +4,22 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.43.0 — 2026-11-19
+
+Tournament-day card, with app 0.0.33. Works with API 0.33.0.
+
+**Added**
+- On a tournament day the member home page (phones: in place of Up next;
+  wider: the side column) and the team page show the team's card: the
+  tournament (Live when it is), the next game (opponent, time, field;
+  "Tomorrow" from 17:00 the evening before), record and pool place, and
+  the last result (`useTournamentDays`, `TournamentDayCard`). One rule
+  with the app: `tournamentDay` in `@stall10/shared`.
+- Captains get **Report score** / **Confirm score** on the card. It opens
+  `/tournaments/{id}?division=…&game=…`: the Schedule tab with the game
+  first under **This game**, its score form open when it's theirs to
+  report. `?tab=schedule|results` picks a tab.
+
 ## 0.42.0 — 2026-11-19
 
 Team chats in Messages, with app 0.0.32. Needs API 0.33.0.

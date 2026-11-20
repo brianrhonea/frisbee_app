@@ -395,6 +395,13 @@ and up to 4 captains (they report scores), or **Accept invite** if
 invited. The Overview tab shows your status and whether your bid fee is
 marked paid.
 
+**On the day**: from the evening before, Home and your team's page show
+a tournament card in place of your next event: who you play next, when
+and on which field, your record and pool place, and your last result.
+Captains get **Report score** there once a game has started without a
+score (or **Confirm score** when the other captain reported); it opens
+that game on the tournament page, ready to enter.
+
 ### Schools and clubs
 
 A **School or club** community holds several full teams, like a college

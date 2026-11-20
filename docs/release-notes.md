@@ -10,6 +10,17 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.33
+
+**Tournament day**
+- When your team is playing a tournament, Home and the team page show
+  its day at a glance: who you play next, when and on which field, your
+  record and place in your pool, and your last result. The evening
+  before, it shows tomorrow's first game.
+- Captains get a **Report score** button there when a game has started
+  without a score (or **Confirm score** when the other captain has
+  reported). It opens that game on the tournament page, ready to enter.
+
 ## 0.0.32
 
 **Every chat in Messages**
