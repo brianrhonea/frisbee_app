@@ -160,6 +160,11 @@ events**: tournaments and leagues anyone can find, by type.
   counts, and buttons to Follow or Message them. Edit or delete your own
   posts from the ⋮ on each one. Deleting happens at once with **Undo**
   for a few seconds, the same for comments and chat messages.
+- **Stats on a profile** come from games your teams track once you link
+  your roster spot. Pick a season, and if you play on two or more teams
+  with stats, a **Team** to see just that team's numbers (**All teams**
+  adds them up). Per-team stats show only when you share both stats and
+  teams in Settings → Privacy.
 
 ### Notifications
 

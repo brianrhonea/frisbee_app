@@ -2213,6 +2213,16 @@ describe("direct messages", () => {
     await assertFails(setDoc(doc(db(OUTSIDER), "profiles", PLAYER), full));
   });
 
+  it("profiles may carry per-team stats, one map per team, at most 50", async () => {
+    const ref = doc(db(PLAYER), "profiles", PLAYER);
+    const season = { "2026": { games: 1, points: 10, goals: 2 } };
+    const teams = (n: number) => Object.fromEntries(Array.from({ length: n }, (_, i) => [`t${i}`, season]));
+    await assertSucceeds(setDoc(ref, { ...profile(), teamStats: { [TEAM]: season } }));
+    await assertSucceeds(setDoc(ref, { ...profile(), teamStats: teams(50) }));
+    await assertFails(setDoc(ref, { ...profile(), teamStats: teams(51) }));
+    await assertFails(setDoc(ref, { ...profile(), teamStats: [season] }));
+  });
+
   it("participants start a conversation with a listed user", async () => {
     await assertSucceeds(getDoc(conv(PLAYER))); // checking it exists
     await assertSucceeds(setDoc(conv(PLAYER), newConv({ status: "request", requestedOf: OWNER })));
@@ -3493,6 +3503,14 @@ describe("private profiles", () => {
         })
         .commit(),
     );
+  });
+
+  it("the private doc may carry per-team stats too, at most 50", async () => {
+    const season = { "2026": { games: 1 } };
+    const teams = (n: number) => Object.fromEntries(Array.from({ length: n }, (_, i) => [`t${i}`, season]));
+    await assertSucceeds(setDoc(details(PLAYER), { bio: "Handler", teamStats: teams(2) }, { merge: true }));
+    await assertFails(setDoc(details(PLAYER), { teamStats: teams(51) }, { merge: true }));
+    await assertFails(setDoc(details(OUTSIDER), { teamStats: teams(1) }, { merge: true }));
   });
 
   it("shows strangers only the public doc, and won't let them just follow", async () => {

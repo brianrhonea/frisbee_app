@@ -33,3 +33,4 @@ export * from "./meetings.js";
 export * from "./discord.js";
 export * from "./schedule.js";
 export * from "./rankings.js";
+export * from "./profile_stats.js";

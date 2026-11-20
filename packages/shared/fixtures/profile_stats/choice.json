@@ -1,0 +1,295 @@
+{
+  "about": "ProfileStatsChoice.of(summary, team): the Team filter on a profile's stats. Offers the published teams that have stats, in their order, only when there are two or more; a team it does not offer means every team. `seasons` are the picked season keys, newest first, and `goals` their total.",
+  "cases": [
+    {
+      "name": "no per-team stats: no filter, every team",
+      "teams": [
+        "t1",
+        "t2"
+      ],
+      "stats": {
+        "2026": {
+          "games": 3,
+          "goals": 5
+        }
+      },
+      "teamStats": {},
+      "team": null,
+      "choice": {
+        "options": [],
+        "team": null,
+        "seasons": [
+          "2026"
+        ],
+        "goals": 5
+      }
+    },
+    {
+      "name": "two teams with stats: offered in the teams order",
+      "teams": [
+        "t2",
+        "t1"
+      ],
+      "stats": {
+        "2025": {
+          "games": 2,
+          "goals": 3
+        },
+        "2026": {
+          "games": 3,
+          "goals": 5
+        }
+      },
+      "teamStats": {
+        "t1": {
+          "2025": {
+            "games": 2,
+            "goals": 3
+          },
+          "2026": {
+            "games": 1,
+            "goals": 1
+          }
+        },
+        "t2": {
+          "2026": {
+            "games": 2,
+            "goals": 4
+          }
+        }
+      },
+      "team": null,
+      "choice": {
+        "options": [
+          "t2",
+          "t1"
+        ],
+        "team": null,
+        "seasons": [
+          "2026",
+          "2025"
+        ],
+        "goals": 8
+      }
+    },
+    {
+      "name": "a team picked shows its seasons",
+      "teams": [
+        "t1",
+        "t2"
+      ],
+      "stats": {
+        "2025": {
+          "games": 2,
+          "goals": 3
+        },
+        "2026": {
+          "games": 3,
+          "goals": 5
+        }
+      },
+      "teamStats": {
+        "t1": {
+          "2025": {
+            "games": 2,
+            "goals": 3
+          },
+          "2026": {
+            "games": 1,
+            "goals": 1
+          }
+        },
+        "t2": {
+          "2026": {
+            "games": 2,
+            "goals": 4
+          }
+        }
+      },
+      "team": "t2",
+      "choice": {
+        "options": [
+          "t1",
+          "t2"
+        ],
+        "team": "t2",
+        "seasons": [
+          "2026"
+        ],
+        "goals": 4
+      }
+    },
+    {
+      "name": "one team with stats: no filter, the pick is ignored",
+      "teams": [
+        "t1",
+        "t2"
+      ],
+      "stats": {
+        "2026": {
+          "games": 1,
+          "goals": 1
+        }
+      },
+      "teamStats": {
+        "t1": {
+          "2026": {
+            "games": 1,
+            "goals": 1
+          }
+        }
+      },
+      "team": "t1",
+      "choice": {
+        "options": [],
+        "team": null,
+        "seasons": [
+          "2026"
+        ],
+        "goals": 1
+      }
+    },
+    {
+      "name": "a team not on the published teams is never offered",
+      "teams": [
+        "t1"
+      ],
+      "stats": {
+        "2026": {
+          "games": 3,
+          "goals": 5
+        }
+      },
+      "teamStats": {
+        "t1": {
+          "2025": {
+            "games": 2,
+            "goals": 3
+          },
+          "2026": {
+            "games": 1,
+            "goals": 1
+          }
+        },
+        "t2": {
+          "2026": {
+            "games": 2,
+            "goals": 4
+          }
+        }
+      },
+      "team": "t2",
+      "choice": {
+        "options": [],
+        "team": null,
+        "seasons": [
+          "2026"
+        ],
+        "goals": 5
+      }
+    },
+    {
+      "name": "a team whose seasons are all empty is not offered",
+      "teams": [
+        "t1",
+        "t2",
+        "t3"
+      ],
+      "stats": {
+        "2025": {
+          "games": 2,
+          "goals": 3
+        },
+        "2026": {
+          "games": 3,
+          "goals": 5
+        }
+      },
+      "teamStats": {
+        "t1": {
+          "2025": {
+            "games": 2,
+            "goals": 3
+          },
+          "2026": {
+            "games": 1,
+            "goals": 1
+          }
+        },
+        "t2": {
+          "2026": {
+            "games": 2,
+            "goals": 4
+          }
+        },
+        "t3": {
+          "2026": {
+            "games": 0,
+            "goals": 0
+          }
+        }
+      },
+      "team": "t3",
+      "choice": {
+        "options": [
+          "t1",
+          "t2"
+        ],
+        "team": null,
+        "seasons": [
+          "2026",
+          "2025"
+        ],
+        "goals": 8
+      }
+    },
+    {
+      "name": "an unknown pick means every team",
+      "teams": [
+        "t1",
+        "t2"
+      ],
+      "stats": {
+        "2025": {
+          "games": 2,
+          "goals": 3
+        },
+        "2026": {
+          "games": 3,
+          "goals": 5
+        }
+      },
+      "teamStats": {
+        "t1": {
+          "2025": {
+            "games": 2,
+            "goals": 3
+          },
+          "2026": {
+            "games": 1,
+            "goals": 1
+          }
+        },
+        "t2": {
+          "2026": {
+            "games": 2,
+            "goals": 4
+          }
+        }
+      },
+      "team": "nope",
+      "choice": {
+        "options": [
+          "t1",
+          "t2"
+        ],
+        "team": null,
+        "seasons": [
+          "2026",
+          "2025"
+        ],
+        "goals": 8
+      }
+    }
+  ]
+}

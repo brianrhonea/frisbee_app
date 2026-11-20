@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.31  | 2026-11-19 | `feature/profile-team-stats`            |                     |
 | 0.0.30  | 2026-11-19 | `fix/ui-wording`                        |                     |
 | 0.0.29  | 2026-11-17 | `fix/private-posts`                     |                     |
 | 0.0.28  | 2026-11-16 | `feature/offline-queue`                 |                     |
@@ -43,6 +44,35 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.31 — Stats per team on profiles
+
+Web 0.41.0, api 0.32.0. Rules change (deploy to dev).
+
+- `ProfileSummary.teamSeasons` (team id → season → totals), built in
+  `PlayerProfileViewModel._recompute` beside `seasons` and published as
+  `teamStats` (in `_summaryFields` and `PlayerProfile.privateFields`, so
+  it moves with a private profile). It says which teams someone plays
+  on, so it's published only with both stats and teams shown;
+  `saveVisibility` deletes it when either is hidden (deleted rather than
+  `{}`, since a merge keeps an old map's entries). `sameAs` compares it,
+  so existing profiles republish with it.
+- `ProfileStatsChoice`: the profile's **Team** filter beside the season
+  menu, offering the published teams that have stats (two or more);
+  it narrows By the numbers, the season list and Season by season.
+  Recent games stay unfiltered. Ported as `profileStatsChoice` in
+  `@stall10/shared` and checked on `fixtures/profile_stats/choice.json`.
+- Rules: `profiles/{uid}` and `private/details` accept `teamStats`, a
+  map of at most 50 teams.
+- `firebase/functions/src/browse/model.ts` gets the API's `profileView`
+  change (the copies are checked to match); the old browse callables
+  aren't redeployed for it.
+- The profile's team tag for a pickup community says **Pickup** (was
+  Group), as does the website's sidebar.
+- Tests: `player_profile_test` (filter, publish, round trip, hiding
+  teams), `profile_api_test` (writes, hide, private move),
+  `shared_fixtures/profile_stats_fixtures_test`; rules "per-team stats";
+  API `profiles` and `browse.model`.
 
 ## 0.0.30 — Wording, QR invites, message times (UI review release 1)
 

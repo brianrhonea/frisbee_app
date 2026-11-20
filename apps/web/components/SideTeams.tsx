@@ -20,7 +20,7 @@ export function tint(id: string) {
 }
 
 /** Kinds, short enough to sit beside the member count in the sidebar. */
-const shortKinds: Record<string, string> = { team: "Team", community: "Community", organization: "School/club" };
+const shortKinds: Record<string, string> = { team: "Team", community: "Pickup", organization: "School/club" };
 
 /** 128, "1.2k", "12k": short enough to always fit. */
 function compact(n: number) {

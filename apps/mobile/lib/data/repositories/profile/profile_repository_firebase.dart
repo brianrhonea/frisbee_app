@@ -215,6 +215,10 @@ class ProfileRepositoryFirebase implements ProfileRepository {
           'visibility': v.toMap(),
           'tags': tags,
           if (!v.stats) 'stats': const <String, dynamic>{},
+          // Per-team stats say which teams they're on, so they go with
+          // either part hidden (deleted: a merge would keep an old map's
+          // entries).
+          if (!v.stats || !v.teams) 'teamStats': FieldValue.delete(),
           if (!v.games) 'games': const <Object>[],
           if (!v.teams) 'teams': const <Object>[],
         };
@@ -283,6 +287,12 @@ class ProfileRepositoryFirebase implements ProfileRepository {
       'stats': {
         for (final e in summary.seasons.entries) e.key: e.value.toMap(),
       },
+      'teamStats': {
+        for (final team in summary.teamSeasons.entries)
+          team.key: {
+            for (final e in team.value.entries) e.key: e.value.toMap(),
+          },
+      },
       'games': [for (final g in summary.games) g.toMap()],
       'summaryUpdatedAt': FieldValue.serverTimestamp(),
     };
@@ -318,6 +328,7 @@ class ProfileRepositoryFirebase implements ProfileRepository {
     ..._baseFields,
     'teams',
     'stats',
+    'teamStats',
     'games',
     'summaryUpdatedAt',
   ];

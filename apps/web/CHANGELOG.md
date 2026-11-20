@@ -4,6 +4,19 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.41.0 — 2026-11-19
+
+Stats per team on profiles, with app 0.0.31. Works with API 0.32.0.
+
+**Added**
+- A player's page has a **Team** menu on its Career table (two or more
+  teams with stats; `profileStatsChoice` in `@stall10/shared`, the app's
+  rule), kept in `?team=`. It narrows the table and the season tiles.
+  The Career table also ends with a Career total row, as the app's does.
+
+**Changed**
+- The sidebar's short label for a pickup community is "Pickup".
+
 ## 0.40.0 — 2026-11-19
 
 UI review release 1, with app 0.0.30. Works with API 0.31.1.

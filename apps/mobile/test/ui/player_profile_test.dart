@@ -95,6 +95,7 @@ void main() {
       expect(vm.primaryTeam?.number, 17);
       expect(vm.summary.games.single.won, isTrue);
       expect(profiles.published.last.seasons['2026']?.goals, 1);
+      expect(profiles.published.last.teamSeasons['t1']?['2026']?.goals, 1);
       vm.dispose();
     });
 
@@ -118,15 +119,39 @@ void main() {
         'name': 'Alex Smith',
         'teams': [for (final t in sent.teams) t.toMap()],
         'stats': {for (final e in sent.seasons.entries) e.key: e.value.toMap()},
+        'teamStats': {
+          for (final t in sent.teamSeasons.entries)
+            t.key: {for (final e in t.value.entries) e.key: e.value.toMap()},
+        },
         'games': [for (final g in sent.games) g.toMap()],
       });
       final back = PlayerProfile.fromMap(
         testUser.uid,
         plainData(doc! as Map<String, dynamic>),
       ).summary;
+      expect(sent.teamSeasons, isNotEmpty);
       expect(back.sameAs(sent), isTrue);
       vm.dispose();
     });
+
+    test(
+      'hiding teams keeps per-team stats out of what is published',
+      () async {
+        final vm = profileOf(testUser.uid);
+        await pumpEventQueue();
+        await vm.claim.execute(('t1', 'r1'));
+        await pumpEventQueue();
+        expect(profiles.published.last.teamSeasons, isNotEmpty);
+        await vm.saveDetails.execute(
+          const ProfileDetails(visibility: ProfileVisibility(teams: false)),
+        );
+        await pumpEventQueue();
+        final last = profiles.published.last;
+        expect(last.seasons['2026']?.goals, 1);
+        expect(last.teamSeasons, isEmpty);
+        vm.dispose();
+      },
+    );
 
     test('hidden parts are not published, but you still see them', () async {
       teams.roster['t1'] = const [
@@ -178,6 +203,127 @@ void main() {
       expect(vm.totals.goals, 3);
       expect(vm.claimable, isEmpty);
       vm.dispose();
+    });
+
+    test(
+      'the Team filter narrows the numbers and seasons to one team',
+      () async {
+        profiles.put(
+          PlayerProfile(
+            uid: 'p2',
+            name: 'Pat',
+            summary: ProfileSummary(
+              teams: const [
+                ProfileTeam(id: 't1', name: 'Riptide'),
+                ProfileTeam(id: 't2', name: 'Sol'),
+                ProfileTeam(id: 't3', name: 'No stats'),
+              ],
+              seasons: {
+                '2025': const StatTotals(games: 2, goals: 3),
+                '2026': const StatTotals(games: 3, goals: 5),
+              },
+              teamSeasons: {
+                't1': {
+                  '2025': const StatTotals(games: 2, goals: 3),
+                  '2026': const StatTotals(games: 1, goals: 1),
+                },
+                't2': {'2026': const StatTotals(games: 2, goals: 4)},
+              },
+            ),
+          ),
+        );
+        final vm = profileOf('p2');
+        await pumpEventQueue();
+        expect(
+          [for (final t in vm.statsChoice.options) t.name],
+          ['Riptide', 'Sol'],
+        );
+        expect(vm.totals.goals, 8);
+
+        vm.selectSeason('2025');
+        vm.selectStatsTeam('t2');
+        // Sol has no 2025, so the season falls back to every season.
+        expect(vm.seasons, ['2026']);
+        expect(vm.season, isNull);
+        expect(vm.totals.goals, 4);
+        expect(vm.career.games, 2);
+
+        vm.selectStatsTeam('t1');
+        vm.selectSeason('2025');
+        expect(vm.totals.goals, 3);
+
+        vm.selectStatsTeam(null);
+        expect(vm.totals.goals, 3);
+        expect(vm.career.goals, 8);
+        vm.dispose();
+      },
+    );
+
+    test('one team with stats: no Team filter', () async {
+      profiles.put(
+        PlayerProfile(
+          uid: 'p2',
+          name: 'Pat',
+          summary: ProfileSummary(
+            teams: const [
+              ProfileTeam(id: 't1', name: 'Riptide'),
+              ProfileTeam(id: 't2', name: 'Sol'),
+            ],
+            seasons: {'2026': const StatTotals(games: 1, goals: 1)},
+            teamSeasons: {
+              't1': {'2026': const StatTotals(games: 1, goals: 1)},
+              // A team that isn't on their published teams isn't offered.
+              'gone': {'2026': const StatTotals(games: 1, goals: 1)},
+            },
+          ),
+        ),
+      );
+      final vm = profileOf('p2');
+      await pumpEventQueue();
+      expect(vm.statsChoice.options, isEmpty);
+      vm.selectStatsTeam('t1');
+      expect(vm.statsChoice.teamId, isNull);
+      vm.dispose();
+    });
+
+    testWidgets('the Team menu sits beside the season menu', (tester) async {
+      tester.view.physicalSize = const Size(1400, 1800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      profiles.put(
+        PlayerProfile(
+          uid: 'p2',
+          name: 'Pat',
+          summary: ProfileSummary(
+            teams: const [
+              ProfileTeam(id: 't1', name: 'Riptide'),
+              ProfileTeam(id: 't2', name: 'Sol'),
+            ],
+            seasons: {'2026': const StatTotals(games: 3, goals: 5)},
+            teamSeasons: {
+              't1': {'2026': const StatTotals(games: 1, goals: 1)},
+              't2': {'2026': const StatTotals(games: 2, goals: 4)},
+            },
+          ),
+        ),
+      );
+      final vm = profileOf('p2');
+      addTearDown(vm.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: PlayerProfileScreen(viewModel: vm),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Stats').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('All teams').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sol').last);
+      await tester.pumpAndSettle();
+      expect(vm.statsChoice.teamId, 't2');
+      expect(find.text('Season by season · Sol'), findsOneWidget);
     });
 
     testWidgets('hidden stats read as private, and there is no Edit', (
@@ -249,7 +395,7 @@ void main() {
     expect(find.text('Teams 2'), findsOneWidget);
     expect(find.text('Pickup communities 1'), findsOneWidget);
     expect(find.text('Team'), findsNWidgets(2));
-    expect(find.text('Group'), findsOneWidget);
+    expect(find.text('Pickup'), findsOneWidget);
 
     await tester.tap(find.text('Pickup communities 1'));
     await tester.pumpAndSettle();

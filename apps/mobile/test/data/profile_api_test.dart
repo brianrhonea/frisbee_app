@@ -107,6 +107,46 @@ void main() {
       },
     );
 
+    test('publishes per-team stats, and hiding teams clears them', () async {
+      final r = repo(flags: FeatureFlags.fixed({'use_api_profiles': false}));
+      final summary = ProfileSummary(
+        teams: const [ProfileTeam(id: 't1', name: 'Riptide')],
+        seasons: {'2026': const StatTotals(games: 1, goals: 2)},
+        teamSeasons: {
+          't1': {'2026': const StatTotals(games: 1, goals: 2)},
+        },
+      );
+      expect(
+        await r.publishSummary(me, summary, tags: const []),
+        isA<Ok<void>>(),
+      );
+      final doc = (await db.doc('profiles/u1').get()).data()!;
+      expect(doc['teamStats'], {
+        't1': {'2026': const StatTotals(games: 1, goals: 2).toMap()},
+      });
+      expect(
+        PlayerProfile.fromMap('u1', doc).summary.teamSeasons['t1']?['2026'],
+        const StatTotals(games: 1, goals: 2),
+      );
+
+      await r.saveVisibility(me, const ProfileVisibility(teams: false));
+      final hidden = (await db.doc('profiles/u1').get()).data()!;
+      expect(hidden.containsKey('teamStats'), isFalse);
+      expect((hidden['stats'] as Map)['2026'], isNotNull);
+
+      // A private profile's per-team stats move with the rest.
+      await r.publishSummary(me, summary, tags: const []);
+      await r.setPrivate(me, true);
+      expect(
+        (await db.doc('profiles/u1').get()).data()!.containsKey('teamStats'),
+        isFalse,
+      );
+      expect(
+        (await db.doc('profiles/u1/private/details').get()).get('teamStats'),
+        isNotEmpty,
+      );
+    });
+
     test('writes Firestore itself when use_api_profiles is off', () async {
       await repo(
         flags: FeatureFlags.fixed({'use_api_profiles': false}),

@@ -2371,8 +2371,8 @@ service cloud.firestore {
             'name', 'keywords', 'photoUrl', 'updatedAt', 'tags',
             'bio', 'pronouns', 'hometown', 'school', 'throwingHand',
             'playingSince', 'visibility',
-            'teams', 'stats', 'games', 'summaryUpdatedAt', 'username',
-            'private', 'headerUrl'])
+            'teams', 'stats', 'teamStats', 'games', 'summaryUpdatedAt',
+            'username', 'private', 'headerUrl'])
           && p.get('private', false) is bool
           && p.name is string
           && p.name.size() > 0
@@ -2396,6 +2396,9 @@ service cloud.firestore {
           && p.get('teams', []).size() <= 50
           && p.get('stats', {}) is map
           && p.get('stats', {}).size() <= 50
+          // Team id → season → totals, one per team on the profile.
+          && p.get('teamStats', {}) is map
+          && p.get('teamStats', {}).size() <= 50
           && p.get('games', []) is list
           && p.get('games', []).size() <= 5;
       }
@@ -2430,8 +2433,10 @@ service cloud.firestore {
           && doc == 'details'
           && request.resource.data.keys().hasOnly([
                'bio', 'pronouns', 'hometown', 'school', 'throwingHand',
-               'playingSince', 'visibility', 'teams', 'stats', 'games',
-               'summaryUpdatedAt', 'tags', 'updatedAt'])
+               'playingSince', 'visibility', 'teams', 'stats', 'teamStats',
+               'games', 'summaryUpdatedAt', 'tags', 'updatedAt'])
+          && request.resource.data.get('teamStats', {}) is map
+          && request.resource.data.get('teamStats', {}).size() <= 50
           && request.resource.data.get('tags', []) is list
           && request.resource.data.get('tags', []).size() <= 100
           && validString(request.resource.data.get('bio', ''), 280)

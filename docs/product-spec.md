@@ -509,6 +509,19 @@ everything the app does on the website alone, styled like the website
     `test/ui/invites_test.dart` (QR), `test/ui/messages_test.dart`; the
     website's side is checked by hand. Community *types* (§5) are still
     to come.
+21. Stats per team on profiles (app 0.0.31, web 0.41.0, api 0.32.0):
+    [x] a **Team** filter on a profile's stats on both, offered with two
+    or more published teams that have stats; it narrows the totals,
+    seasons and season table (recent games stay as they are). The
+    player's app publishes `teamStats` (team → season → totals) only
+    with both stats and teams shown; the API's `profileView` and
+    visibility follow the same rule, and the rules cap it at 50 teams.
+    One rule: app `ProfileStatsChoice`, shared `profileStatsChoice`,
+    vectors `fixtures/profile_stats/choice.json`. The website keeps the
+    pick in `?team=`. Tests: app `test/ui/player_profile_test.dart`,
+    `test/data/profile_api_test.dart`; shared
+    `test/profile_stats_fixtures.test.ts`; API `test/profiles.test.ts`,
+    `test/browse.model.test.ts`; rules "per-team stats".
 
 Out of scope: payments, meeting recording, USA Ultimate data.
 

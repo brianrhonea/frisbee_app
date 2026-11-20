@@ -85,6 +85,11 @@ export interface PublicProfile {
   teams?: ProfileTeam[];
   /** Season (the year, e.g. "2026") → totals. */
   stats?: Record<string, StatTotals>;
+  /**
+   * Team id → season → totals: `stats` split by team, for the profile's
+   * Team filter (profileStatsChoice). Only with both stats and teams shown.
+   */
+  teamStats?: Record<string, Record<string, StatTotals>>;
   /** Newest first, at most 5. */
   games?: ProfileGame[];
 }

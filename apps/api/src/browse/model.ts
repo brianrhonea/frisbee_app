@@ -140,6 +140,8 @@ export function profileView(profile: Data): Data {
     visibility: { stats: shows("stats"), teams: shows("teams"), games: shows("games") },
     ...(shows("teams") ? pick(profile, ["teams"]) : {}),
     ...(shows("stats") ? pick(profile, ["stats"]) : {}),
+    // Per-team stats say which teams they're on, so only with both shown.
+    ...(shows("stats") && shows("teams") ? pick(profile, ["teamStats"]) : {}),
     ...(shows("games") ? pick(profile, ["games"]) : {}),
   };
 }

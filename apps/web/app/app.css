@@ -93,6 +93,8 @@
 .stats-table th, .stats-table td { padding: 8px 6px; text-align: right; border-bottom: 1px solid var(--line); }
 .stats-table th:first-child, .stats-table td:first-child { text-align: left; }
 .stats-table th { color: var(--muted); font-weight: 600; }
+.stats-table .stats-total td { font-weight: 700; border-bottom: 0; }
+.stats-team-filter select { max-width: 12rem; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); font: inherit; font-size: 0.88rem; }
 .table-scroll { overflow-x: auto; }
 
 /* Search */

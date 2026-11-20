@@ -714,10 +714,16 @@ class _NumbersCard extends StatelessWidget {
     final t = vm.totals;
     final seasons = vm.seasons;
     final updated = vm.isMe ? null : vm.summary.updatedAt;
-    final teams = vm.summary.teams
-        .where((x) => x.number != null || x.kind.name == 'team')
-        .map((x) => x.name)
-        .toSet();
+    final choice = vm.statsChoice;
+    final teams = switch (choice.team) {
+      final picked? => {picked.name},
+      null =>
+        vm.summary.teams
+            .where((x) => x.number != null || x.kind.name == 'team')
+            .map((x) => x.name)
+            .toSet(),
+    };
+    final menuStyle = TextStyle(fontSize: 12, color: c.muted);
     return SectionCard(
       title: 'By the numbers',
       action: Row(
@@ -727,12 +733,38 @@ class _NumbersCard extends StatelessWidget {
             const _HiddenTag(),
             const SizedBox(width: 8),
           ],
+          if (choice.options.isNotEmpty) ...[
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 140),
+              child: DropdownButton<String?>(
+                value: choice.teamId,
+                isDense: true,
+                isExpanded: true,
+                underline: const SizedBox.shrink(),
+                style: menuStyle,
+                hint: const Text('All teams'),
+                items: [
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('All teams', overflow: TextOverflow.ellipsis),
+                  ),
+                  for (final t in choice.options)
+                    DropdownMenuItem(
+                      value: t.id,
+                      child: Text(t.name, overflow: TextOverflow.ellipsis),
+                    ),
+                ],
+                onChanged: vm.selectStatsTeam,
+              ),
+            ),
+            const SizedBox(width: 10),
+          ],
           if (seasons.isNotEmpty)
             DropdownButton<String?>(
               value: vm.season,
               isDense: true,
               underline: const SizedBox.shrink(),
-              style: TextStyle(fontSize: 12, color: c.muted),
+              style: menuStyle,
               items: [
                 const DropdownMenuItem(value: null, child: Text('All time')),
                 for (final s in seasons)
@@ -853,11 +885,14 @@ class _SeasonsCard extends StatelessWidget {
       '${t.throwaways}',
     ];
     final rows = [
-      for (final s in vm.seasons) row(s, vm.summary.seasons[s]!),
-      row('Career', vm.summary.career),
+      for (final s in vm.seasons) row(s, vm.seasonTotals[s]!),
+      row('Career', vm.career),
     ];
     return SectionCard(
-      title: 'Season by season',
+      title: switch (vm.statsChoice.team) {
+        final team? => 'Season by season · ${team.name}',
+        null => 'Season by season',
+      },
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: DataTable(
@@ -1128,7 +1163,7 @@ extension on TeamKind {
 
   String get shortLabel => switch (this) {
     TeamKind.team => 'Team',
-    TeamKind.community => 'Group',
+    TeamKind.community => 'Pickup',
     TeamKind.organization => 'School/club',
   };
 

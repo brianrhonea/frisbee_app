@@ -7,6 +7,14 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.32.0 — 2026-11-19
+
+**Added**
+- Profiles (`/v1/players/:uid`, `profileView`) include `teamStats` (team
+  id → season → totals) when the player shows both stats and teams.
+  `PUT /v1/me/profile/visibility` deletes it when either is hidden, and
+  making a profile private moves it with the rest (`privateProfileFields`).
+
 ## 0.31.1 — 2026-11-19
 
 **Changed**

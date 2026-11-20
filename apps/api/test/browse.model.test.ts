@@ -116,6 +116,15 @@ describe("profiles", () => {
     expect(view.visibility).toEqual({ stats: false, teams: true, games: true });
   });
 
+  it("show per-team stats only with both stats and teams shown", () => {
+    const teamStats = { t1: { "2026": { games: 1 } } };
+    const shown = { ...profile, teamStats, visibility: {} };
+    expect(profileView(shown).teamStats).toEqual(teamStats);
+    expect(profileView({ ...shown, visibility: { stats: false } })).not.toHaveProperty("teamStats");
+    expect(profileView({ ...shown, visibility: { teams: false } })).not.toHaveProperty("teamStats");
+    expect(profileView({ ...shown, private: true })).not.toHaveProperty("teamStats");
+  });
+
   it("never show search keywords or tags", () => {
     expect(profileView(profile)).not.toHaveProperty("keywords");
     expect(profileView(profile)).not.toHaveProperty("tags");

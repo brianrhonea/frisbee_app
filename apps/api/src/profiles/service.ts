@@ -154,6 +154,8 @@ export class ProfileService {
       ...(!visibility.stats && { stats: {} }),
       ...(!visibility.games && { games: [] }),
       ...(!visibility.teams && { teams: [] }),
+      // Per-team stats say which teams they're on: gone with either hidden.
+      ...((!visibility.stats || !visibility.teams) && { teamStats: deleteField }),
     };
     const who = await this.who(caller);
     await this.store.transact(async (tx) => {

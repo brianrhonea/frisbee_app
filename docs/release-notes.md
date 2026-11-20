@@ -10,6 +10,18 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.31
+
+**Stats by team**
+- On a team or two with stats? Your profile's stats have a **Team** menu
+  beside the season menu: pick one team to see just your numbers and
+  seasons for it, or **All teams**. It works on other players' profiles
+  too, and on the website.
+- Per-team stats show only when you share both your stats and your teams
+  (Settings → Privacy).
+
+---
+
 ## 0.0.30
 
 **Clearer names**
