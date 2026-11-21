@@ -44,6 +44,8 @@ export interface ExportRepository {
    * any, as account deletion finds them).
    */
   joinRequestsOf(uid: string, limit: number): Promise<Array<PathDoc & { team: Data }>>;
+  /** Reports [uid] made (reports where reporterId). */
+  reportsBy(uid: string, limit: number): Promise<PathDoc[]>;
 }
 
 /** Documents read per round trip while paging through a long list. */
@@ -76,6 +78,10 @@ export class FirestoreExportRepository implements ExportRepository {
 
   ownCollection(path: string, limit: number) {
     return this.paged(this.db.collection(path), limit + 1);
+  }
+
+  reportsBy(uid: string, limit: number) {
+    return this.paged(this.db.collection("reports").where("reporterId", "==", uid), limit + 1);
   }
 
   // Indexes: single-field collection-group exemptions on authorId (posts,

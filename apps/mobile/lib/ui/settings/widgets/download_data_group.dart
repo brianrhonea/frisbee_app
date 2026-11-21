@@ -37,7 +37,8 @@ Future<void> shareDataFile(BuildContext context, DataExportFile file) async {
 /// What "Download your data" gives (the website says the same).
 const downloadDataDescription =
     'A JSON file of your account, profile, personal details, posts, '
-    'comments, messages you sent, follows, teams, RSVPs and stats. '
+    'comments, messages you sent, follows, people you blocked, reports you '
+    'made, teams, RSVPs and stats. '
     'Once every 10 minutes.';
 
 /// Settings › Account › Your data: downloads the user's data

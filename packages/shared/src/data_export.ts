@@ -24,11 +24,14 @@ export const dataExportLimits = {
   rosterSpots: 500,
   /** Requests to join groups and teams still waiting (F26). */
   joinRequests: 500,
+  /** People they blocked, and reports they made (moderation). */
+  blocks: 1000,
+  reports: 500,
 } as const;
 
 /** What "Download your data" gives, as both apps say it (downloadDataDescription in download_data_group.dart). */
 export const downloadDataDescription =
-  "A JSON file of your account, profile, personal details, posts, comments, messages you sent, follows, teams, RSVPs and stats. Once every 10 minutes.";
+  "A JSON file of your account, profile, personal details, posts, comments, messages you sent, follows, people you blocked, reports you made, teams, RSVPs and stats. Once every 10 minutes.";
 
 /** The file's name, by the day it was made (UTC). */
 export const dataExportFileName = (exportedAt: Date) => `stall10-data-${exportedAt.toISOString().slice(0, 10)}.json`;
@@ -182,4 +185,23 @@ export interface DataExport {
   rosterSpots: DataExportSection<DataExportRosterSpot>;
   /** Their requests to join groups and teams, still waiting (F26). */
   joinRequests: DataExportSection<DataExportJoinRequest>;
+  /** People they blocked (users/{uid}/blocks where mine), not who blocked them. */
+  blocks: DataExportSection<DataExportBlock>;
+  /** Reports they made: what and why, not the reported content. */
+  reports: DataExportSection<DataExportReport>;
+}
+
+export interface DataExportBlock {
+  uid: string;
+  name: string;
+  blockedAt: string | null;
+}
+
+export interface DataExportReport {
+  id: string;
+  target: Json;
+  reason: string;
+  details: string | null;
+  status: string;
+  createdAt: string | null;
 }

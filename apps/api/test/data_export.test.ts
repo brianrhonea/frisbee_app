@@ -74,6 +74,9 @@ class FakeExportRepository implements ExportRepository {
       return { ...d, data: { poll: { question: poll.question, options: poll.options, votes: { [uid]: (poll.votes as Data)[uid] } } } };
     });
   }
+  async reportsBy(uid: string, limit: number) {
+    return this.where((d, s) => s.length === 2 && s[0] === "reports" && d.data.reporterId === uid, limit);
+  }
   async joinRequestsOf(uid: string, limit: number) {
     // Groups that approve who joins and teams that allow requests, as the Firestore queries find them.
     const hosts = this.where((d, s) => {
@@ -332,5 +335,28 @@ describe("messagePlace", () => {
     expect(messagePlace("teams/t/chats/r/messages/m")).toEqual({ kind: "teamChat", teamId: "t", roomId: "r" });
     expect(messagePlace("teams/t/meetings/x/messages/m")).toEqual({ kind: "meeting", teamId: "t", meetingId: "x" });
     expect(messagePlace("elsewhere/x/messages/m")).toEqual({ kind: "other", path: "elsewhere/x/messages/m" });
+  });
+});
+
+describe("blocks and reports in the export", () => {
+  it("lists who you blocked and what you reported, not who blocked you or the reported content", async () => {
+    s.store.put("users/me/blocks/you", { mine: true, name: "Yan", blockedAt: new Date(now) });
+    s.store.put("users/me/blocks/zed", { mine: false });
+    s.store.put("reports/r1", {
+      reporterId: "me",
+      target: { kind: "post", postId: "p2" },
+      reason: "spam",
+      details: "Bot",
+      status: "open",
+      snapshot: { text: "Not mine", images: [] },
+      createdAt: new Date(now),
+    });
+    s.store.put("reports/r2", { reporterId: "you", target: { kind: "user", uid: "me" }, reason: "spam", status: "open" });
+    const data = (await s.get()).json();
+    expect(data.blocks.items).toEqual([{ uid: "you", name: "Yan", blockedAt: new Date(now).toISOString() }]);
+    expect(data.reports.items).toEqual([
+      { id: "r1", target: { kind: "post", postId: "p2" }, reason: "spam", details: "Bot", status: "open", createdAt: new Date(now).toISOString() },
+    ]);
+    expect(JSON.stringify(data)).not.toContain("Not mine\"}");
   });
 });

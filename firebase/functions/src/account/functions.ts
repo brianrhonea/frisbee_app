@@ -120,6 +120,9 @@ async function deleteUserData(db: Firestore, uid: string): Promise<void> {
   await deleteJoinRequests(db, uid);
   // Before users/{uid}, whose calendarInvites say which calendars to tidy.
   await leaveCalendars(db, uid);
+  // Blocks are kept for both people (apps/api/src/moderation): take the
+  // other person's record of this account too.
+  await removeBlocks(db, uid);
   await db.recursiveDelete(db.doc(`users/${uid}`));
   // Free their username for someone else.
   const names = await db.collection("usernames").where("uid", "==", uid).get();
@@ -129,6 +132,12 @@ async function deleteUserData(db: Firestore, uid: string): Promise<void> {
   await db.doc(`personalDetails/${uid}`).delete();
   // Their profile and header photos, and any post photos left behind.
   await deleteFolder(userFolder(uid));
+}
+
+/** The copies of [uid]'s blocks the other people hold (users/{other}/blocks/{uid}). */
+async function removeBlocks(db: Firestore, uid: string): Promise<void> {
+  const mine = await db.collection(`users/${uid}/blocks`).select().get();
+  await Promise.all(mine.docs.map((d) => db.doc(`users/${d.id}/blocks/${uid}`).delete()));
 }
 
 const bucket = () => getStorage().bucket();

@@ -7,6 +7,7 @@
 // when it hit its cap. Once per dataExportIntervalMs per person, counted
 // in `limits/{uid}` (exportedAt) so every instance agrees.
 import {
+  type DataExportReport,
   type DataExport,
   type DataExportComment,
   type DataExportConversation,
@@ -290,7 +291,12 @@ export class ExportService {
       this.repo.joinRequestsOf(uid, L.joinRequests),
     ]);
     const teams = section(teamDocs.map((d) => team(d, uid)), L.teams);
-    const [answers, pollVotes] = await Promise.all([this.responses(uid, teams.items), this.pollVotes(uid, teams.items)]);
+    const [answers, pollVotes, blocks, reports] = await Promise.all([
+      this.responses(uid, teams.items),
+      this.pollVotes(uid, teams.items),
+      this.repo.ownCollection(`users/${uid}/blocks`, L.blocks),
+      this.repo.reportsBy(uid, L.reports),
+    ]);
     const own = (d: PathDoc) => ({ id: d.id, ...withoutSecrets(d.data) });
     return {
       format: "stall10-data-export",
@@ -318,6 +324,21 @@ export class ExportService {
       personalEvents: section(personalEvents.map(own), L.personalEvents),
       rosterSpots: section(spots.map(rosterSpot), L.rosterSpots),
       joinRequests: section(requests.map(joinRequest), L.joinRequests),
+      blocks: section(
+        blocks.filter((d) => d.data.mine === true).map((d) => ({ uid: d.id, name: str(d.data.name) ?? "", blockedAt: isoOf(d.data.blockedAt) ?? null })),
+        L.blocks,
+      ),
+      reports: section(
+        reports.map((d) => ({
+          id: d.id,
+          target: (d.data.target ?? null) as DataExportReport["target"],
+          reason: str(d.data.reason) ?? "",
+          details: str(d.data.details) || null,
+          status: str(d.data.status) ?? "",
+          createdAt: isoOf(d.data.createdAt) ?? null,
+        })),
+        L.reports,
+      ),
     };
   }
 }
