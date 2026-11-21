@@ -402,8 +402,10 @@ class _Subscribe extends StatelessWidget {
                                 color: c.ink,
                               ),
                             ),
+                            // Not the link itself: it opens your events
+                            // to anyone who has it. Copy link is in Subscribe.
                             Text(
-                              url,
+                              'Private to you. Subscribe or copy it below.',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(fontSize: 12, color: c.muted),
