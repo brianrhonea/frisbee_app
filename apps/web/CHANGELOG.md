@@ -21,6 +21,10 @@ With app 0.0.42 and API 0.38.0.
   Outlook's subscribe page), and Copy link. The text says how often each
   calendar app checks the link.
 
+**Fixed**
+- Home's Upcoming events: an event's title opens it on its team's
+  schedule, as the app's Coming up card and the sidebar already did.
+
 ## 0.50.0 — 2026-11-20
 
 With app 0.0.41 and API 0.37.0.

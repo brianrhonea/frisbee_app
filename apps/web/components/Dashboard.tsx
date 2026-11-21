@@ -339,7 +339,9 @@ export function Dashboard({ user }: { user: User }) {
               {events.map((e) => (
                 <EventItem key={`${e.teamId}/${e.id}`} startsAt={e.startsAt} plain>
                   <span className="upcoming-title">
-                    <b>{e.title || "Event"}</b>
+                    <Link className="upcoming-link" href={`/teams/${encodeURIComponent(e.teamId)}/schedule?event=${encodeURIComponent(e.id)}`}>
+                      <b>{e.title || "Event"}</b>
+                    </Link>
                     <RsvpPill answer={e.rsvp} type={e.type} needs={needsRsvp(e.rsvp, e.startsAt, e.endsAt)} />
                   </span>
                   <small>

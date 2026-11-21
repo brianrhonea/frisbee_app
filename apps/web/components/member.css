@@ -97,6 +97,8 @@
 .huddle .upcoming-card .date-list .event-date b { font-family: var(--font-score); font-weight: 800; font-size: 1.45rem; line-height: 1; }
 .huddle .upcoming-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
 .huddle .upcoming-title b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.92rem; }
+.huddle .upcoming-link { min-width: 0; overflow: hidden; color: inherit; text-decoration: none; }
+.huddle .upcoming-link:hover b { color: var(--accent-ink); text-decoration: underline; }
 .huddle .upcoming-title .rsvp-pill { padding: 2px 8px; font-size: 11px; }
 .huddle .upcoming-team { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .huddle .upcoming-team a { color: var(--muted); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
