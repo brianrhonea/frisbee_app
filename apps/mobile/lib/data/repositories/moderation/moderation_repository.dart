@@ -25,7 +25,8 @@ abstract class ModerationRepository extends ChangeNotifier {
     String? authorId,
   });
 
-  Future<Result<void>> block(String uid);
+  /// Blocks [uid] ([name] shows in Blocked accounts at once).
+  Future<Result<void>> block(String uid, {String? name});
   Future<Result<void>> unblock(String uid);
 
   /// Open reports on [teamId]'s chat, posts and comments, for its admins.

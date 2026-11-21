@@ -116,9 +116,18 @@ class ModerationRepositoryApi extends ModerationRepository {
   static String _id(String id) => Uri.encodeComponent(id);
 
   @override
-  Future<Result<void>> block(String uid) => guard(() async {
+  Future<Result<void>> block(String uid, {String? name}) => guard(() async {
     await _client.put('/v1/me/blocks/${_id(uid)}', const {});
-    _hideNow(uid);
+    _set(
+      BlockList(
+        mine: [
+          for (final b in _current.mine)
+            if (b.uid != uid) b,
+          BlockedAccount(uid: uid, name: name ?? 'Player'),
+        ],
+        hidden: {..._current.hidden, uid},
+      ),
+    );
   });
 
   @override

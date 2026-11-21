@@ -133,7 +133,7 @@ export function Messages() {
       (view === "requests" ? d.inRequests && !(!isGroup(c) && blocks.hides(d.others[0])) : view === "archived" ? d.inArchive : d.inInbox) &&
       (!q || d.title.toLowerCase().includes(q)),
   );
-  const requests = all.filter(({ d }) => d.inRequests).length;
+  const requests = all.filter(({ c, d }) => d.inRequests && !(!isGroup(c) && blocks.hides(d.others[0]))).length;
   const open = all.find(({ c }) => c.id === openId);
   const teamChats = useTeamChats(user?.uid);
   const shownTeams =

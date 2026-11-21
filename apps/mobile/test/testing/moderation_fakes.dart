@@ -66,11 +66,14 @@ class FakeModerationRepository extends ModerationRepository {
   }
 
   @override
-  Future<Result<void>> block(String uid) async {
+  Future<Result<void>> block(String uid, {String? name}) async {
     if (_fail<void>() case final e?) return e;
     blocked.add(uid);
     current = BlockList(
-      mine: [..._current.mine, BlockedAccount(uid: uid, name: uid)],
+      mine: [
+        ..._current.mine,
+        BlockedAccount(uid: uid, name: name ?? uid),
+      ],
       hidden: {..._current.hidden, uid},
     );
     return const Result.ok(null);

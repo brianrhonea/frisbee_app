@@ -338,7 +338,9 @@ class _InboxListState extends State<InboxList> {
             child: _FilterBar(
               selected: vm.filter,
               unread: vm.unreadCount,
-              requests: vm.requestCount,
+              requests: vm.requestItems
+                  .where((i) => i.isGroup || !blocks.hides(i.otherId))
+                  .length,
               onSelect: vm.setFilter,
             ),
           ),

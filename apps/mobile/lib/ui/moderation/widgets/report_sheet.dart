@@ -80,7 +80,7 @@ Future<bool> confirmBlock(
     destructive: true,
   );
   if (!ok || !context.mounted) return false;
-  final r = await repo.block(uid);
+  final r = await repo.block(uid, name: name);
   if (!context.mounted) return false;
   if (r case Error(:final error)) {
     showErrorSnackBar(context, error);
