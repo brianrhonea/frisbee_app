@@ -14,6 +14,8 @@ import {
   uploadLimits,
   uploadMax,
   videoFileName,
+  isUnsafeImage,
+  unsafeImageMessage,
 } from "@stall10/shared";
 import type { Caller } from "../auth.js";
 import { ApiError, fromZod } from "../errors.js";
@@ -23,6 +25,7 @@ import { canWriteRoom } from "../hub/access.js";
 import { filesOf } from "../hub/uploads.js";
 import { can, isMember, strings } from "../teams/access.js";
 import { compressImage, type HeicDecoder, UnreadableImage } from "./image.js";
+import type { ImageChecker } from "./vision.js";
 import { sniffBytes, sniffChatMediaType, sniffMediaType } from "./sniff.js";
 import type { MediaStorage } from "./storage.js";
 import { nextStatus, videoOutputs } from "./transcode.js";
@@ -79,7 +82,13 @@ export class UploadService {
   constructor(
     private readonly store: DocStore,
     private readonly storage: MediaStorage,
-    private readonly opts: { heic?: HeicDecoder; queue?: TranscodeQueue; now?: () => number } = {},
+    private readonly opts: {
+      heic?: HeicDecoder;
+      queue?: TranscodeQueue;
+      /** SafeSearch on each photo: an unsafe one is refused (unsafeImageMessage). */
+      images?: ImageChecker;
+      now?: () => number;
+    } = {},
   ) {}
 
   private now() {
@@ -276,6 +285,10 @@ export class UploadService {
       throw new ApiError("invalid_argument", message);
     }
     const { image, thumb } = compressed;
+    if (await this.unsafe(id, image.data)) {
+      await this.reject(id, rawPath, unsafeImageMessage);
+      throw new ApiError("invalid_argument", unsafeImageMessage);
+    }
     const path = `${folder}/${id}.${image.contentType === "image/png" ? "png" : "jpg"}`;
     const thumbPath = `${folder}/${id}_thumb.jpg`;
     await this.storage.write(path, image.data, image.contentType);
@@ -400,6 +413,26 @@ export class UploadService {
   }
 
   /** Marks a still-pending upload failed with [error] (a removed one stays removed), and deletes its raw file. */
+  /**
+   * Whether SafeSearch refuses the photo. If Vision can't be reached the
+   * photo is let through (and logged), so an outage doesn't stop uploads.
+   */
+  private async unsafe(id: string, image: Buffer): Promise<boolean> {
+    const checker = this.opts.images;
+    if (!checker) return false;
+    try {
+      const s = await checker.safeSearch(image);
+      if (isUnsafeImage(s)) {
+        console.warn(JSON.stringify({ severity: "WARNING", message: "Photo refused by SafeSearch", uploadId: id, safeSearch: s }));
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.error(JSON.stringify({ severity: "ERROR", message: "SafeSearch failed; photo let through", uploadId: id, error: String(e) }));
+      return false;
+    }
+  }
+
   private async reject(id: string, rawPath: string, error: string) {
     await this.store.transact(async (tx) => {
       const now = await tx.get(`uploads/${id}`);

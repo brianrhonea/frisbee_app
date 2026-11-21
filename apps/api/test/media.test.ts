@@ -2,7 +2,7 @@
 // (ffmpeg arguments, the status machine, the job runner with a fake
 // ffmpeg), and the upload endpoints against fakes.
 import { writeFile } from "node:fs/promises";
-import { acceptedImageTypes, acceptedVideoTypes, mediaStandard } from "@stall10/shared";
+import { acceptedImageTypes, acceptedVideoTypes, isUnsafeImage, mediaStandard, type SafeSearch, unsafeImageMessage } from "@stall10/shared";
 import sharp from "sharp";
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
@@ -673,5 +673,75 @@ describe("mediaFolder: the app's Storage layout, so storage.rules apply", () => 
     expect(() => mediaFolder("u1", "teamVideo", "t1/x", "v1", "up")).toThrow("Invalid id.");
     expect(() => mediaFolder("u1", "chat", "teams/../chats/r1", "m1", "up")).toThrow("Invalid id.");
     expect(() => mediaFolder("u1", "chat", "users/u2", "m1", "up")).toThrow("Say which chat this is for.");
+  });
+});
+
+describe("photo checks (SafeSearch)", () => {
+  const now = Date.UTC(2026, 10, 20, 12);
+  let storage: FakeMediaStorage;
+  let store: FakeStore;
+  let answer: SafeSearch | null | Error;
+  const setupApp = () =>
+    buildApp({
+      verifier: new FakeVerifier(),
+      users: new FakeUsers(),
+      teams: new FakeTeamRepository(),
+      store,
+      media: storage,
+      images: {
+        safeSearch: async () => {
+          if (answer instanceof Error) throw answer;
+          return answer;
+        },
+      },
+      now: () => now,
+    });
+
+  async function uploadPhoto() {
+    const app = setupApp();
+    const call = (url: string, body: object = {}) =>
+      app.inject({ method: "POST", url, payload: body, headers: { authorization: "Bearer token:u1" } });
+    const data = await sharp({ create: { width: 64, height: 64, channels: 3, background: "#123456" } }).jpeg().toBuffer();
+    const { id } = (await call("/v1/uploads", { purpose: "post", itemId: "i1", contentType: "image/jpeg", size: data.length })).json();
+    storage.files.set(`uploads/raw/u1/${id}`, { data });
+    return { id: id as string, done: await call(`/v1/uploads/${id}/complete`) };
+  }
+
+  beforeEach(() => {
+    store = new FakeStore(() => now);
+    storage = new FakeMediaStorage();
+  });
+
+  it("lets a safe photo through", async () => {
+    answer = { adult: "VERY_UNLIKELY", racy: "POSSIBLE", violence: "UNLIKELY" };
+    expect((await uploadPhoto()).done.statusCode).toBe(200);
+  });
+
+  it("refuses a nude photo, saves nothing and says why", async () => {
+    answer = { adult: "LIKELY", racy: "VERY_LIKELY" };
+    const { id, done } = await uploadPhoto();
+    expect(done.statusCode).toBe(400);
+    expect(JSON.stringify(done.json())).toContain(unsafeImageMessage);
+    expect(store.doc(`uploads/${id}`)).toMatchObject({ status: "failed", error: unsafeImageMessage });
+    expect([...storage.files.keys()].filter((k) => k.includes(id))).toEqual([]);
+  });
+
+  it("lets the photo through when Vision fails", async () => {
+    answer = new Error("Vision 503");
+    expect((await uploadPhoto()).done.statusCode).toBe(200);
+  });
+});
+
+describe("isUnsafeImage", () => {
+  it.each([
+    [{ adult: "POSSIBLE" }, false],
+    [{ adult: "LIKELY" }, true],
+    [{ racy: "LIKELY" }, false],
+    [{ racy: "VERY_LIKELY" }, true],
+    [{ violence: "VERY_LIKELY" }, true],
+    [{ medical: "VERY_LIKELY", spoof: "VERY_LIKELY" }, false],
+    [null, false],
+  ] as Array<[SafeSearch | null, boolean]>)("%j → %s", (s, unsafe) => {
+    expect(isUnsafeImage(s)).toBe(unsafe);
   });
 });

@@ -3,6 +3,7 @@
 // id, never a URL) and uploaded files, filed in folders. The limits are the
 // rules' (firebase/firestore.rules, match /videos and /videoFolders).
 import { z } from "zod";
+import { clean } from "./word_filter.js";
 
 const MB = 1024 * 1024;
 
@@ -85,8 +86,8 @@ export const youtubeThumbnailUrl = (id: string) => `https://i.ytimg.com/vi/${id}
 
 /** Empty for no folder. */
 const folderIdField = z.string().max(videoLimits.folderId);
-const titleField = z.string().trim().min(1, "Give the video a title.").max(videoLimits.title);
-const descriptionField = z.string().trim().max(videoLimits.description);
+const titleField = clean(z.string().trim().min(1, "Give the video a title.").max(videoLimits.title));
+const descriptionField = clean(z.string().trim().max(videoLimits.description));
 
 /** `POST /v1/teams/:teamId/videos`: a YouTube video. Uploads are the app's for now. */
 export const createVideoRequestSchema = z.strictObject({
@@ -112,7 +113,7 @@ export const editVideoRequestSchema = z
 
 /** `POST /v1/teams/:teamId/video-folders` and `PATCH .../video-folders/:folderId`. */
 export const saveVideoFolderRequestSchema = z.strictObject({
-  name: z.string().trim().min(1, "Name the folder.").max(videoLimits.folderName),
+  name: clean(z.string().trim().min(1, "Name the folder.").max(videoLimits.folderName)),
 });
 
 /** An uploaded file (VideoFile). */
@@ -180,11 +181,13 @@ const videoMs = z.number().int().min(0).max(videoCommentLimits.maxMs);
  */
 export const videoCommentRequestSchema = z
   .strictObject({
-    body: z
-      .string()
-      .trim()
-      .min(1, "Write something first.")
-      .max(videoCommentLimits.body, `Keep it under ${videoCommentLimits.body} characters.`),
+    body: clean(
+      z
+        .string()
+        .trim()
+        .min(1, "Write something first.")
+        .max(videoCommentLimits.body, `Keep it under ${videoCommentLimits.body} characters.`),
+    ),
     atMs: videoMs.optional(),
     endMs: videoMs.optional(),
   })

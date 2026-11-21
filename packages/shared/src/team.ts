@@ -2,6 +2,7 @@
 // team.dart and the limits in firebase/firestore.rules (validTeamFields,
 // validGroupFields, validLocation, validLeagueRef).
 import { z } from "zod";
+import { clean } from "./word_filter.js";
 
 export const divisions = ["mixed", "open", "women", "masters"] as const;
 export type Division = (typeof divisions)[number];
@@ -45,12 +46,12 @@ export const teamLimits = {
  */
 export const createTeamRequestSchema = z
   .strictObject({
-    name: z.string().trim().min(1, "Name your team.").max(teamLimits.name),
+    name: clean(z.string().trim().min(1, "Name your team.").max(teamLimits.name)),
     division: z.enum(divisions),
     level: z.enum(competitionLevels),
-    city: z.string().trim().max(teamLimits.city).default(""),
+    city: clean(z.string().trim().max(teamLimits.city).default("")),
     kind: z.enum(teamKinds).default("team"),
-    description: z.string().trim().max(teamLimits.description).default(""),
+    description: clean(z.string().trim().max(teamLimits.description).default("")),
     requiresApproval: z.boolean().default(false),
     location: groupLocationSchema.nullable().default(null),
     /** The league a team is started for, to reserve a spot (teams only). */

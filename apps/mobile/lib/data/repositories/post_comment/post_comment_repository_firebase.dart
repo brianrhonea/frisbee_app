@@ -7,6 +7,7 @@ import '../../../utils/result.dart';
 import '../../services/firestore_utils.dart';
 import '../outbox/outbox_repository.dart';
 import 'post_comment_repository.dart';
+import '../../../domain/models/word_filter.dart';
 
 /// Replies, edits and likes live on the comment documents themselves
 /// (`parentId`, `editedAt`, `likedBy`); firestore.rules checks each.
@@ -66,6 +67,8 @@ class PostCommentRepositoryFirebase implements PostCommentRepository {
     AppUser author, {
     PostComment? replyTo,
   }) async {
+    if (refuseBlockedWords<String>([body]) case final r?) return r;
+    body = maskSwearing(body);
     final id = _comments(postId).doc().id;
     final parentId = replyTo == null ? null : replyTo.parentId ?? replyTo.id;
     // Replying to a reply says whose; a top-level comment is obvious.
@@ -123,7 +126,7 @@ class PostCommentRepositoryFirebase implements PostCommentRepository {
   @override
   Future<Result<void>> editComment(PostComment comment, String body) => guard(
     () => _comments(comment.postId).doc(comment.id).update({
-      'body': body.trim(),
+      'body': cleanText(body).trim(),
       'editedAt': FieldValue.serverTimestamp(),
     }),
   );

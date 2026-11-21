@@ -32,6 +32,10 @@ import {
 } from "./model";
 import { enforceAppCheck } from "../options";
 
+// The word filter's backstop triggers.
+export * from "../moderation/text_filter";
+export { photoCheck } from "../moderation/photo_check";
+
 /** Callables only answer the real app once App Check is enforced. */
 const callable = { enforceAppCheck };
 

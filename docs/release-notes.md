@@ -10,6 +10,15 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.42
+
+**Safety**
+- Slurs, hate speech and telling someone to hurt themselves can't be
+  posted anywhere: you'll be asked to change the words.
+- Swearing still posts, but shows masked (f***).
+- Photos are checked as they upload. Nude, sexual or graphic violent
+  photos are refused.
+
 ## 0.0.41
 
 **Safety**

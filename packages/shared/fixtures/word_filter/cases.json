@@ -1,0 +1,28 @@
+{
+  "about": "Word filter cases (packages/shared/src/word_filter.ts and the app's lib/domain/models/word_filter.dart are both tested against these; hand-written). text: the input after masking; blocked: refused.",
+  "cases": [
+    { "name": "plain text", "input": "Great layout at practice!", "text": "Great layout at practice!", "blocked": false },
+    { "name": "empty", "input": "", "text": "", "blocked": false },
+    { "name": "mild swearing is masked", "input": "That was a shit throw", "text": "That was a s*** throw", "blocked": false },
+    { "name": "case is kept on the first letter", "input": "FUCK yes", "text": "F*** yes", "blocked": false },
+    { "name": "endings", "input": "fucking bitches, shitty wind", "text": "f****** b******, s***** wind", "blocked": false },
+    { "name": "look-alikes", "input": "$h1t happens", "text": "$*** happens", "blocked": false },
+    { "name": "stretched letters", "input": "fuuuuck", "text": "f******", "blocked": false },
+    { "name": "punctuation around words", "input": "(ass) and \"dick\".", "text": "(a**) and \"d***\".", "blocked": false },
+    { "name": "compounds on the list", "input": "what a dumbass, jackass", "text": "what a d******, j******", "blocked": false },
+    { "name": "words inside other words pass", "input": "Scunthorpe class assist cocktail passing glass bass", "text": "Scunthorpe class assist cocktail passing glass bass", "blocked": false },
+    { "name": "everyday words near listed ones pass", "input": "a cocky handler, spicy wings, hello", "text": "a cocky handler, spicy wings, hello", "blocked": false },
+    { "name": "names that are also masked words are masked, not refused", "input": "Dick Van Dyke", "text": "D*** Van D***", "blocked": false },
+    { "name": "a slur is refused", "input": "you nigger", "text": "you nigger", "blocked": true },
+    { "name": "a slur's plural is refused", "input": "faggots", "text": "faggots", "blocked": true },
+    { "name": "a slur in look-alikes is refused", "input": "f@gg0t", "text": "f@gg0t", "blocked": true },
+    { "name": "a slur spaced out is refused", "input": "n i g g e r", "text": "n i g g e r", "blocked": true },
+    { "name": "a slur dotted out is refused", "input": "k.i.k.e", "text": "k.i.k.e", "blocked": true },
+    { "name": "telling someone to kill themselves is refused", "input": "just go kill yourself", "text": "just go kill yourself", "blocked": true },
+    { "name": "kys is refused", "input": "kys lol", "text": "kys lol", "blocked": true },
+    { "name": "a refused phrase across punctuation", "input": "Kill... yourself!", "text": "Kill... yourself!", "blocked": true },
+    { "name": "masked words still mask in refused text", "input": "fuck you spic", "text": "f*** you spic", "blocked": true },
+    { "name": "accents and other scripts pass", "input": "Équipe très forte 🥏 东京", "text": "Équipe très forte 🥏 东京", "blocked": false },
+    { "name": "emails and handles pass", "input": "write to coach@club.org or @sam", "text": "write to coach@club.org or @sam", "blocked": false }
+  ]
+}

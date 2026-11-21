@@ -24,6 +24,7 @@ import { FirestorePublicRankingRepository } from "./rankings/public_repository.j
 import { FirestorePublicTournamentRepository } from "./tournaments/public_repository.js";
 import { ffmpegHeicDecoder } from "./media/image.js";
 import { FirebaseMediaStorage } from "./media/storage.js";
+import { VisionImageChecker } from "./media/vision.js";
 import { FirestoreTeamRepository } from "./teams/repository.js";
 import { LocalCipher, type PersonalCipher } from "./personal/cipher.js";
 import { KmsCipher } from "./personal/kms.js";
@@ -117,9 +118,20 @@ const app = buildApp({
     ? new FirebaseMediaStorage(getStorage(firebase).bucket(process.env.STORAGE_BUCKET))
     : undefined,
   heic: ffmpegHeicDecoder(),
+  // Photo checks (Cloud Vision SafeSearch); off with the emulators or SAFE_SEARCH=off.
+  images: emulated || process.env.SAFE_SEARCH === "off" ? undefined : visionChecker(),
   personal: personalCipher(),
   livekit: livekitFromEnv(),
 });
+
+/** Vision with the API's own credentials (Application Default Credentials). */
+function visionChecker() {
+  const credential = firebase.options.credential;
+  if (!credential) return undefined;
+  return new VisionImageChecker(async () => (await credential.getAccessToken()).access_token, {
+    quotaProject: process.env.GOOGLE_CLOUD_QUOTA_PROJECT || undefined,
+  });
+}
 
 /**
  * Cloud KMS (PERSONAL_DETAILS_KMS_KEY), or with the emulators only a local

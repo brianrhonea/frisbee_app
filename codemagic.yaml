@@ -69,6 +69,10 @@ workflows:
           set -euo pipefail
           echo "$SECRETS_LOCAL_JSON" | base64 --decode > secrets.local.json
           echo "$GOOGLE_SERVICE_INFO_PLIST" | base64 --decode > ios/Runner/GoogleService-Info.plist
+          # Without API_BASE_URL the app can't reach the API (reports,
+          # blocks, the Everyone feed...): stop before paying for a build.
+          # Checks the key is set without printing any value.
+          python3 -c 'import json,sys; v=json.load(open("secrets.local.json")).get("API_BASE_URL"); sys.exit(0 if isinstance(v,str) and v.startswith("https://") else "SECRETS_LOCAL_JSON has no API_BASE_URL (https://...). Add it to the frisbee_secrets group and run again.")'
       - name: Google Sign-In config (ios/Flutter/Secrets.xcconfig)
         script: |
           set -euo pipefail

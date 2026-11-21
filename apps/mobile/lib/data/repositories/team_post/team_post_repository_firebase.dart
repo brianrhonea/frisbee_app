@@ -13,6 +13,7 @@ import '../../services/firestore_utils.dart';
 import '../../services/shared_streams.dart';
 import '../outbox/outbox_repository.dart';
 import 'team_post_repository.dart';
+import '../../../domain/models/word_filter.dart';
 
 /// Posts live in `teams/{teamId}/posts`; their photos in Cloud Storage
 /// under `teams/{teamId}/posts/{postId}/`. firestore.rules and
@@ -142,6 +143,18 @@ class TeamPostRepositoryFirebase implements TeamPostRepository {
     PostDraft draft,
     AppUser author,
   ) {
+    final p = draft.post;
+    if (refuseBlockedWords<void>([p.title, p.body, p.location]) case final r?) {
+      return r;
+    }
+    draft = PostDraft(
+      post: p.copyWith(
+        title: maskSwearing(p.title),
+        body: maskSwearing(p.body),
+        location: maskSwearing(p.location),
+      ),
+      newImages: draft.newImages,
+    );
     final outbox = _outbox;
     // Only new posts wait offline; an edit needs the post as it stands.
     if (outbox == null ||

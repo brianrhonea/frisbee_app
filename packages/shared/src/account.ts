@@ -1,6 +1,7 @@
 // The member's own account: name and pictures, and notification settings
 // (users/{uid}/settings/notifications, NotificationPreferences in the app).
 import { z } from "zod";
+import { clean } from "./word_filter.js";
 import { profileLimits } from "./profile.js";
 
 const uploadId = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
@@ -12,7 +13,7 @@ const uploadId = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
  */
 export const identityRequestSchema = z
   .strictObject({
-    name: z.string().trim().min(1, "Enter your name.").max(profileLimits.name).optional(),
+    name: clean(z.string().trim().min(1, "Enter your name.").max(profileLimits.name)).optional(),
     photoUploadId: uploadId.nullable().optional(),
     headerUploadId: uploadId.nullable().optional(),
   })

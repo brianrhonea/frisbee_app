@@ -17,6 +17,7 @@ import '../../services/auth_service.dart';
 import '../../services/feature_flags.dart';
 import '../../services/shared_streams.dart';
 import 'auth_repository.dart';
+import '../../../domain/models/word_filter.dart';
 
 class AuthRepositoryFirebase extends AuthRepository {
   AuthRepositoryFirebase({
@@ -321,15 +322,15 @@ class AuthRepositoryFirebase extends AuthRepository {
 
   @override
   Future<Result<void>> updateDisplayName(String name) =>
-      guard(() => _authService.updateDisplayName(name.trim()));
+      guard(() => _authService.updateDisplayName(cleanText(name).trim()));
 
   @override
   Future<Result<void>> saveName({
     required String firstName,
     required String lastName,
   }) => guard(() async {
-    final first = firstName.trim();
-    final last = lastName.trim();
+    final first = cleanText(firstName).trim();
+    final last = cleanText(lastName).trim();
     if (first.isEmpty || last.isEmpty) {
       throw ArgumentError('Enter your first and last name');
     }

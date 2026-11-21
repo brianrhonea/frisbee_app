@@ -15,6 +15,7 @@ import '../../services/shared_streams.dart';
 import '../outbox/outbox_repository.dart';
 import 'direct_message_repository.dart';
 import '../../../domain/models/username.dart';
+import '../../../domain/models/word_filter.dart';
 
 /// The directory is `profiles/{uid}` (name and photo, written by
 /// AuthRepositoryFirebase). Conversations are `conversations/{a_b}` with
@@ -230,7 +231,7 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
     final ref = _conversations.doc('g-${_conversations.doc().id}');
     await ref.set({
       'kind': 'group',
-      'name': name.trim(),
+      'name': cleanText(name).trim(),
       'createdBy': me.uid,
       'participants': [me.uid],
       'names': {me.uid: me.label},
@@ -294,8 +295,9 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
   );
 
   @override
-  Future<Result<void>> renameGroup(String id, String name) =>
-      guard(() => _conversations.doc(id).update({'name': name.trim()}));
+  Future<Result<void>> renameGroup(String id, String name) => guard(
+    () => _conversations.doc(id).update({'name': cleanText(name).trim()}),
+  );
 
   @override
   Future<Result<void>> setArchived(
@@ -396,6 +398,8 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
     List<NewAttachment> attachments = const [],
     MessageReply? replyTo,
   }) {
+    if (refuseBlockedWords<void>([text]) case final r?) return r;
+    text = maskSwearing(text);
     // The id is picked now and kept, so a retry can't post it twice.
     final messageId = _messages(id).doc().id;
     Future<Result<void>> now() => _send(

@@ -23,6 +23,7 @@ import '../../services/firestore_utils.dart';
 import '../../services/shared_streams.dart';
 import '../chat/chat_repository_firebase.dart';
 import 'team_repository.dart';
+import '../../../domain/models/word_filter.dart';
 
 class InviteCodeNotFoundException implements Exception {
   const InviteCodeNotFoundException();
@@ -177,6 +178,9 @@ class TeamRepositoryFirebase implements TeamRepository {
   @override
   Future<Result<String>> createTeam(NewTeam team, AppUser owner) =>
       guard(() async {
+        for (final t in [team.name, team.city, team.description]) {
+          cleanText(t);
+        }
         // The API checks the name and writes the same documents
         // (newTeamDocs), as the signed-in user, whoever [owner] says.
         if (_teamsApi case final api? when team.orgId == null) {
@@ -231,6 +235,9 @@ class TeamRepositoryFirebase implements TeamRepository {
     Team org,
     Set<String> roles,
   ) => guard(() async {
+    for (final t in [team.name, team.city, team.description]) {
+      cleanText(t);
+    }
     if (_membersApi case final api?) {
       final res = await api.post('/v1/teams/${org.id}/linked-teams', {
         'name': team.name,
@@ -568,6 +575,11 @@ class TeamRepositoryFirebase implements TeamRepository {
 
   @override
   Future<Result<void>> updateTeam(Team team) => guard(() async {
+    team = team.copyWith(
+      name: cleanText(team.name),
+      city: cleanText(team.city),
+      description: cleanText(team.description),
+    );
     // The API checks the name and rewrites the listing with the team.
     if (_membersApi case final api?) {
       await api.patch('/v1/teams/${team.id}', team.toEditableMap());

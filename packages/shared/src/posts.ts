@@ -2,6 +2,7 @@
 // the app's PostActions does: liking or reposting a repost acts on its
 // original. Checks follow firestore.rules' posts rule.
 import { z } from "zod";
+import { clean } from "./word_filter.js";
 
 /** Longest repost note (UserPost.body, validString(p.body, 5000)). */
 export const repostNoteMax = 5000;
@@ -14,7 +15,7 @@ export const postStateLimit = 50;
 
 /** `PUT /v1/posts/:id/repost`: an optional note shown above the original. */
 export const repostRequestSchema = z.object({
-  note: z.string().max(repostNoteMax, `Keep the note under ${repostNoteMax} characters.`).optional(),
+  note: clean(z.string().max(repostNoteMax, `Keep the note under ${repostNoteMax} characters.`)).optional(),
 });
 
 /** After `PUT|DELETE /v1/posts/:id/like`. */
@@ -176,7 +177,7 @@ export const savePostRequestSchema = z.strictObject({
     .string()
     .regex(/^[A-Za-z0-9_-]{1,128}$/)
     .optional(),
-  body: z.string().max(postBodyMax, `Keep posts under ${postBodyMax} characters.`).default(""),
+  body: clean(z.string().max(postBodyMax, `Keep posts under ${postBodyMax} characters.`).default("")),
   links: z.array(link).max(postLinksMax, `Add at most ${postLinksMax} links.`).default([]),
   uploadIds: z
     .array(z.string().regex(/^[A-Za-z0-9_-]{1,128}$/))
@@ -228,11 +229,13 @@ export const commentRequestSchema = z.strictObject({
     .string()
     .regex(/^[A-Za-z0-9_-]{1,128}$/)
     .optional(),
-  body: z
-    .string()
-    .trim()
-    .min(1, "Write something first.")
-    .max(commentBodyMax, `Keep comments under ${commentBodyMax} characters.`),
+  body: clean(
+    z
+      .string()
+      .trim()
+      .min(1, "Write something first.")
+      .max(commentBodyMax, `Keep comments under ${commentBodyMax} characters.`),
+  ),
   replyTo: z
     .string()
     .regex(/^[A-Za-z0-9_-]{1,128}$/)

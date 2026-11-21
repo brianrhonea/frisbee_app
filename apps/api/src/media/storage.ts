@@ -103,7 +103,13 @@ export class FirebaseMediaStorage implements MediaStorage {
   }
 
   async write(path: string, data: Buffer, contentType: string) {
-    await this.bucket.file(path).save(data, { contentType, resumable: false, metadata: { cacheControl: mediaCacheControl } });
+    // checked: the API looked at it already (SafeSearch on photos), so the
+    // Cloud Functions backstop for older app builds' uploads skips it.
+    await this.bucket.file(path).save(data, {
+      contentType,
+      resumable: false,
+      metadata: { cacheControl: mediaCacheControl, metadata: { stall10Checked: "api" } },
+    });
   }
 
   async copy(from: string, to: string, contentType: string, generation?: string) {

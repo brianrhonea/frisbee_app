@@ -15,6 +15,7 @@ import '../../services/attachment_storage.dart';
 import '../../services/feature_flags.dart';
 import '../../services/firestore_utils.dart';
 import 'profile_repository.dart';
+import '../../../domain/models/word_filter.dart';
 
 /// Profiles live beside the direct-message directory in `profiles/{uid}`;
 /// `keywords` index the name and `tags` the school, hometown and teams.
@@ -248,6 +249,12 @@ class ProfileRepositoryFirebase implements ProfileRepository {
     ProfileDetails details, {
     required List<String> tags,
   }) => guard(() async {
+    details = details.copyWith(
+      bio: cleanText(details.bio),
+      pronouns: cleanText(details.pronouns),
+      hometown: cleanText(details.hometown),
+      school: cleanText(details.school),
+    );
     if (_profilesApi case final api?) {
       await api.put('/v1/me/profile/details', {
         ...details.toMap(),

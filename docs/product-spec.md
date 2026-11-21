@@ -1197,6 +1197,21 @@ Out of scope: payments, meeting recording, USA Ultimate data.
     staff member's profile, from `staff/{uid}` (only `set-staff.mjs`
     writes it). Tests: app `player_profile_test.dart`; rules
     `blocks.rules.test.ts`.
+57. Word filter: [x] app; [x] website. Slurs, hate terms and "kill
+    yourself" are refused with the guidelines message; mild swearing is
+    saved masked. One set of lists and rules (`packages/shared`
+    `word_filter.ts`, the app's `word_filter.dart`, the functions' copy),
+    all tested against `packages/shared/fixtures/word_filter/`. The
+    website gets it from the API's schemas; the app filters before its
+    direct writes; the `api` functions' triggers catch older builds.
+    Tests: shared `word_filter.test.ts`, API `word_filter.test.ts`, app
+    `test/domain/word_filter_test.dart`, functions
+    `test/moderation/word_filter.test.ts`.
+58. Photo checks: [x] app; [x] website. Cloud Vision SafeSearch on every
+    photo upload (API `media/vision.ts`, policy `safe_search.ts`); older
+    builds' direct uploads are checked by the `photoCheck` function and
+    deleted if unsafe. Tests: API `media.test.ts`, functions
+    `test/moderation/photo_check.test.ts`.
 
 Libraries the website may add (none today): a small data cache for API
 reads and mutations, the Firestore web SDK for listeners, and LiveKit's

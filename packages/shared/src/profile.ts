@@ -3,6 +3,7 @@
 // profileKeywords (model_utils.dart), with the limits firestore.rules
 // checks on profiles/{uid} (validProfile) and its private/details doc.
 import { z } from "zod";
+import { clean } from "./word_filter.js";
 import { searchKeywords } from "./keywords.js";
 
 export const usernameLimits = { min: 3, max: 20 } as const;
@@ -129,10 +130,10 @@ export const claimUsernameRequestSchema = z.strictObject({ username: z.string().
 
 /** `PUT /v1/me/profile/details`: what the player writes about themselves (ProfileDetails). */
 export const profileDetailsRequestSchema = z.strictObject({
-  bio: z.string().trim().max(profileLimits.bio).default(""),
-  pronouns: z.string().trim().max(profileLimits.pronouns).default(""),
-  hometown: z.string().trim().max(profileLimits.hometown).default(""),
-  school: z.string().trim().max(profileLimits.school).default(""),
+  bio: clean(z.string().trim().max(profileLimits.bio).default("")),
+  pronouns: clean(z.string().trim().max(profileLimits.pronouns).default("")),
+  hometown: clean(z.string().trim().max(profileLimits.hometown).default("")),
+  school: clean(z.string().trim().max(profileLimits.school).default("")),
   throwingHand: z.enum(throwingHands).nullable().default(null),
   playingSince: z.number().int().nullable().default(null),
   visibility: profileVisibilitySchema.default({ stats: true, teams: true, games: true }),

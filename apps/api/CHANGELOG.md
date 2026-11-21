@@ -7,6 +7,28 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.38.0 — 2026-11-20
+
+With app 0.0.42 and web 0.51.0. Needs the Vision API on in the project
+(`vision.googleapis.com`; on in dev) and the `api` functions from the
+same commit (the backstop for older app builds).
+
+**Added**
+- Word filter (`packages/shared` `word_filter.ts`, `clean()` in the
+  request schemas): every free-text field people write (posts, comments,
+  chat and direct messages, group and room names, team posts, events,
+  polls, RSVP notes, videos, meetings, profile details, names, teams,
+  tournaments) refuses slurs, hate terms and "kill yourself" with 400
+  and `blockedWordsMessage`, and saves mild swearing masked (`f***`).
+- Photo checks: each photo upload's compressed image goes to Cloud Vision
+  SafeSearch (`media/vision.ts`); `isUnsafeImage` (adult likely, racy or
+  violence very likely) refuses it with `unsafeImageMessage` and nothing
+  is saved. If Vision fails the photo is let through and logged. Off with
+  the emulators or `SAFE_SEARCH=off`; locally it needs
+  `GOOGLE_CLOUD_QUOTA_PROJECT`.
+- Files the API writes carry `stall10Checked` metadata, so the functions'
+  photo backstop skips them.
+
 ## 0.37.0 — 2026-11-20
 
 With app 0.0.41 and web 0.50.0. Needs the `firestore.rules` from the same

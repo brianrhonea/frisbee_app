@@ -5,6 +5,7 @@
 // meetings-voiceToken callables), which the app still calls; keep the two
 // in step, and in step with the meetings rules in firestore.rules.
 import { z } from "zod";
+import { clean } from "./word_filter.js";
 import { isoDateTime } from "./dates.js";
 import { rsvpNoteSchema } from "./hub.js";
 import { audienceTier } from "./membership.js";
@@ -192,10 +193,10 @@ const isoDate = isoDateTime("Give a date and time.");
  */
 export const saveMeetingRequestSchema = z
   .strictObject({
-    title: z.string().trim().min(1, "Give it a title.").max(meetingLimits.title, "Keep the title under 100 characters."),
+    title: clean(z.string().trim().min(1, "Give it a title.").max(meetingLimits.title, "Keep the title under 100 characters.")),
     startsAt: isoDate,
     endsAt: isoDate.nullable().default(null),
-    notes: z.string().max(meetingLimits.notes, "Keep notes under 5,000 characters.").default(""),
+    notes: clean(z.string().max(meetingLimits.notes, "Keep notes under 5,000 characters.").default("")),
     inviteRoles: z.array(z.enum(meetingInviteRoles)).max(meetingInviteRoles.length).default([]),
     inviteUsers: z
       .array(z.string().min(1).max(128))
@@ -231,7 +232,7 @@ export type MeetingPlaybackRequest = z.input<typeof meetingPlaybackRequestSchema
 
 /** `POST .../meetings/:meetingId/messages`: the call's chat, text only. */
 export const meetingMessageRequestSchema = z.strictObject({
-  text: z.string().trim().min(1, "Write a message.").max(meetingLimits.message, "Keep messages under 4,000 characters."),
+  text: clean(z.string().trim().min(1, "Write a message.").max(meetingLimits.message, "Keep messages under 4,000 characters.")),
 });
 
 export interface SaveMeetingResult {

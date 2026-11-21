@@ -3,6 +3,7 @@
 // pinnedAt, pinnedBy or commentCount, nor create a comment, so the app and
 // the website write them through the API.
 import { z } from "zod";
+import { clean } from "./word_filter.js";
 
 // ---- Pins ---------------------------------------------------------------------
 //
@@ -79,11 +80,13 @@ export const teamPostCommentLimits = {
 
 /** `POST /v1/teams/:teamId/posts/:postId/comments`. */
 export const teamPostCommentRequestSchema = z.strictObject({
-  body: z
-    .string()
-    .trim()
-    .min(1, "Write a comment first.")
-    .max(teamPostCommentLimits.body, `Keep it under ${teamPostCommentLimits.body} characters.`),
+  body: clean(
+    z
+      .string()
+      .trim()
+      .min(1, "Write a comment first.")
+      .max(teamPostCommentLimits.body, `Keep it under ${teamPostCommentLimits.body} characters.`),
+  ),
 });
 export type TeamPostCommentRequest = z.infer<typeof teamPostCommentRequestSchema>;
 

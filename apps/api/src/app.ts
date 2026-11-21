@@ -45,6 +45,7 @@ import { type LoggerOptions, traceLoggerFactory } from "./logging.js";
 import type { HeicDecoder } from "./media/image.js";
 import { uploadRoutes } from "./media/routes.js";
 import { type TranscodeQueue, UploadService } from "./media/service.js";
+import type { ImageChecker } from "./media/vision.js";
 import type { MediaStorage } from "./media/storage.js";
 import { followRoutes } from "./follows/routes.js";
 import { ServiceRemover } from "./moderation/remover.js";
@@ -115,6 +116,8 @@ export interface AppDeps {
   media?: MediaStorage;
   heic?: HeicDecoder;
   transcodeQueue?: TranscodeQueue;
+  /** SafeSearch on uploaded photos (Cloud Vision); none in tests and with the emulators. */
+  images?: ImageChecker;
   enforceAppCheck?: boolean;
   /** true for Fastify's default logger, or pino options (cloudLoggingOptions). */
   logger?: boolean | LoggerOptions;
@@ -252,7 +255,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       });
     }
     if (deps.media) {
-      const uploads = new UploadService(deps.store, deps.media, { heic: deps.heic, queue: deps.transcodeQueue, now: deps.now });
+      const uploads = new UploadService(deps.store, deps.media, { heic: deps.heic, queue: deps.transcodeQueue, images: deps.images, now: deps.now });
       uploadRoutes(app, uploads);
     }
   }

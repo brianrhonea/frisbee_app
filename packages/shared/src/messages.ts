@@ -2,6 +2,7 @@
 // (apps/mobile/lib/domain/models/direct_message.dart) and the
 // conversations rules in firestore.rules.
 import { z } from "zod";
+import { clean } from "./word_filter.js";
 
 /**
  * Who may start a conversation with someone (users/{uid}.messagePolicy).
@@ -51,7 +52,7 @@ export interface OpenConversationResult {
 
 /** `POST /v1/conversations/groups`. */
 export const createGroupRequestSchema = z.strictObject({
-  name: z.string().trim().min(1, "Name the group.").max(groupNameMax, `Keep the name under ${groupNameMax} characters.`),
+  name: clean(z.string().trim().min(1, "Name the group.").max(groupNameMax, `Keep the name under ${groupNameMax} characters.`)),
   members: z.array(z.string().min(1).max(128)).max(groupSizeMax - 1).default([]),
 });
 
@@ -68,7 +69,7 @@ export interface GroupAddedResult {
 
 /** `PATCH /v1/conversations/:id`: rename a group. */
 export const renameGroupRequestSchema = z.strictObject({
-  name: z.string().trim().min(1, "Name the group.").max(groupNameMax, `Keep the name under ${groupNameMax} characters.`),
+  name: clean(z.string().trim().min(1, "Name the group.").max(groupNameMax, `Keep the name under ${groupNameMax} characters.`)),
 });
 
 /** `PUT /v1/conversations/:id/request`: whoever a request waits on answers it. */

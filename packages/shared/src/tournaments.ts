@@ -4,6 +4,7 @@
 // as the website reads them, and the app's pure helpers (formats, labels,
 // division and entry logic).
 import { z } from "zod";
+import { clean } from "./word_filter.js";
 import { type CompetitionLevel, competitionLevels, type Division, divisions } from "./team.js";
 import {
   type EngineGame,
@@ -155,9 +156,9 @@ export const formatSchema = z.strictObject({
 });
 
 const detailsShape = {
-  name: z.string().trim().min(1, "Give it a name.").max(tournamentLimits.name),
-  description: z.string().trim().max(tournamentLimits.description).default(""),
-  location: z.string().trim().max(tournamentLimits.location).default(""),
+  name: clean(z.string().trim().min(1, "Give it a name.").max(tournamentLimits.name)),
+  description: clean(z.string().trim().max(tournamentLimits.description).default("")),
+  location: clean(z.string().trim().max(tournamentLimits.location).default("")),
   startsOn: isoDate,
   endsOn: isoDate.nullable().default(null),
   visibility: z.enum(tournamentVisibilities),

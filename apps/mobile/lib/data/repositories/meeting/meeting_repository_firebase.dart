@@ -11,6 +11,7 @@ import '../../../utils/result.dart';
 import '../../services/firestore_utils.dart';
 import '../../services/meeting_token_service.dart';
 import 'meeting_repository.dart';
+import '../../../domain/models/word_filter.dart';
 
 /// Meetings live at `teams/{teamId}/meetings/{meetingId}`, with `messages`
 /// (the chat) and `requests/{uid}` (join requests) beneath.
@@ -124,6 +125,10 @@ class MeetingRepositoryFirebase implements MeetingRepository {
     TeamMeeting meeting,
     String uid,
   ) => guard(() async {
+    meeting = meeting.copyWith(
+      title: cleanText(meeting.title),
+      notes: cleanText(meeting.notes),
+    );
     if (meeting.isNew) {
       final ref = _meetings(teamId).doc();
       await ref.set({
@@ -178,7 +183,9 @@ class MeetingRepositoryFirebase implements MeetingRepository {
     String note,
   ) => guard(
     () => _meetings(teamId).doc(meetingId).update({
-      FieldPath(['rsvpNotes', uid]): note.isEmpty ? FieldValue.delete() : note,
+      FieldPath(['rsvpNotes', uid]): note.isEmpty
+          ? FieldValue.delete()
+          : cleanText(note),
     }),
   );
 
@@ -347,7 +354,7 @@ class MeetingRepositoryFirebase implements MeetingRepository {
       () => _messages(teamId, meetingId).add({
         'authorId': author.uid,
         'authorName': author.label,
-        'text': text.trim(),
+        'text': cleanText(text).trim(),
         'createdAt': FieldValue.serverTimestamp(),
       }),
     ),

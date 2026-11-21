@@ -15,6 +15,7 @@ import {
   shouldPush,
   wants,
 } from "./model";
+import { filterText } from "../moderation/word_filter";
 
 // FIDs FCM no longer knows; their device docs are deleted.
 const goneCodes = new Set([
@@ -77,6 +78,12 @@ async function deliverTo(db: Firestore, messaging: Messaging, uid: string, notic
       push = shouldPush(before, Date.now(), notice.pushId !== undefined);
       text = notice.text(prefs, count);
     }
+    // Previews go out before the word filter's backstop has run: mask them,
+    // and send nothing for text with a blocked word (it's being deleted).
+    const title = filterText(text.title);
+    const body = filterText(text.body);
+    if (title.blocked || body.blocked) return null;
+    text = { ...text, title: title.text, body: body.text };
     tx.set(entry, {
       category: notice.category,
       title: text.title,

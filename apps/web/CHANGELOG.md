@@ -4,6 +4,16 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.51.0 — 2026-11-20
+
+With app 0.0.42 and API 0.38.0.
+
+**Added**
+- Word filter and photo checks, from the API: text with slurs or hate
+  terms is refused with the community-guidelines message, swearing is
+  saved masked, and unsafe photos are refused on upload.
+- Community guidelines: "Words and photos we filter".
+
 ## 0.50.0 — 2026-11-20
 
 With app 0.0.41 and API 0.37.0.

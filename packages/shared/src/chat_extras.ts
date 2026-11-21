@@ -2,6 +2,7 @@
 // team room. All are API-only (firestore.rules never lets a client set
 // these fields), so the app and the website write them through the API.
 import { z } from "zod";
+import { clean } from "./word_filter.js";
 import { isoDateTime } from "./dates.js";
 
 // ---- Pins (F2) ----------------------------------------------------------------
@@ -85,9 +86,9 @@ export const createChatPollRequestSchema = z.strictObject({
     .string()
     .regex(/^[A-Za-z0-9]{1,40}$/, "Invalid id.")
     .optional(),
-  question: z.string().trim().min(1, "Ask a question.").max(chatPollQuestionMax),
+  question: clean(z.string().trim().min(1, "Ask a question.").max(chatPollQuestionMax)),
   options: z
-    .array(z.string().trim().min(1, "Fill in every option, or remove it.").max(chatPollOptionMax))
+    .array(clean(z.string().trim().min(1, "Fill in every option, or remove it.").max(chatPollOptionMax)))
     .min(chatPollOptionsMin, `Give at least ${chatPollOptionsMin} options.`)
     .max(chatPollOptionsMax, `At most ${chatPollOptionsMax} options.`),
   multiple: z.boolean().default(false),

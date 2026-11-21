@@ -5,6 +5,7 @@ import '../../../utils/result.dart';
 import '../../services/firestore_utils.dart';
 import '../../services/shared_streams.dart';
 import 'event_repository.dart';
+import '../../../domain/models/word_filter.dart';
 
 class EventRepositoryFirebase implements EventRepository {
   EventRepositoryFirebase({
@@ -111,6 +112,11 @@ class EventRepositoryFirebase implements EventRepository {
     String uid, {
     bool clearVotes = false,
   }) => guard(() async {
+    event = event.copyWith(
+      title: cleanText(event.title),
+      location: cleanText(event.location),
+      notes: cleanText(event.notes),
+    );
     final col = _events(teamId);
     final ref = event.isNew ? col.doc() : col.doc(event.id);
     final publicRef = _publicEvents(teamId).doc(ref.id);
@@ -185,7 +191,9 @@ class EventRepositoryFirebase implements EventRepository {
     String note,
   ) => guard(
     () => _events(teamId).doc(eventId).update({
-      FieldPath(['rsvpNotes', uid]): note.isEmpty ? FieldValue.delete() : note,
+      FieldPath(['rsvpNotes', uid]): note.isEmpty
+          ? FieldValue.delete()
+          : cleanText(note),
     }),
   );
 

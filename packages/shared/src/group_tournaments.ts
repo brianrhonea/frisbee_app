@@ -8,6 +8,7 @@
 // The engine is tournament_engine.ts's; its functions are gathered in one
 // object (groupEngine), with scheduleFor adapted to ISO-string dates.
 import { z } from "zod";
+import { clean } from "./word_filter.js";
 import {
   awaitingSeeds,
   bracketSeeds,
@@ -256,7 +257,7 @@ const settingsSchema = z.strictObject({
 
 const teamSchema = z.strictObject({
   id: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/, "Invalid team."),
-  name: z.string().trim().min(1, "Give every team a name.").max(groupTournamentLimits.teamName, "Keep team names under 40 characters."),
+  name: clean(z.string().trim().min(1, "Give every team a name.").max(groupTournamentLimits.teamName, "Keep team names under 40 characters.")),
   captainId: uid.nullable().default(null),
   playerIds: z.array(uid).max(groupTournamentLimits.participants).default([]),
   playerNames: z.record(uid, z.string().max(groupTournamentLimits.playerName)).default({}),
@@ -269,7 +270,7 @@ const teamSchema = z.strictObject({
  */
 export const saveGroupTournamentRequestSchema = z
   .strictObject({
-    name: z.string().trim().min(1, "Give the tournament a name.").max(groupTournamentLimits.name, "Keep the name under 100 characters."),
+    name: clean(z.string().trim().min(1, "Give the tournament a name.").max(groupTournamentLimits.name, "Keep the name under 100 characters.")),
     eventId: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/, "Invalid event.").nullable().default(null),
     settings: settingsSchema,
     teams: z.array(teamSchema).max(groupTournamentLimits.teams, "A tournament can have up to 64 teams.").default([]),

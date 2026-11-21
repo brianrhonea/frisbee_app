@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.42  | 2026-11-20 | `feature/report-block`                  |                     |
 | 0.0.41  | 2026-11-20 | `feature/report-block`                  |                     |
 | 0.0.40  | 2026-11-20 | `feature/redesign`                      |                     |
 | 0.0.39  | 2026-11-20 | `feature/redesign`                      |                     |
@@ -54,6 +55,27 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.42 — Word filter and photo checks
+
+With web 0.51.0 and API 0.38.0 (product-spec §8.1 items 57–58).
+
+- Word filter in the app (`domain/models/word_filter.dart`, the same
+  lists and rules as `packages/shared` `word_filter.ts`, both tested
+  against `packages/shared/fixtures/word_filter/`). Repositories that
+  write to Firestore directly run text through it first: posts and
+  reposts, comments, direct messages and group names, team chat, rooms
+  and folders, team posts, events, meetings and their chat, RSVP notes,
+  profile details, names and teams. A blocked word fails with
+  `BlockedWordsException` (its message is the guidelines one); swearing
+  is saved masked.
+- Photos uploaded through the API are checked by SafeSearch there.
+- Functions (`api` group): `*TextFilter` triggers mask or delete text from
+  older builds that skip the filter, `photoCheck` deletes unsafe photos
+  they put in Storage directly, and notification previews are masked
+  (nothing is sent for blocked text).
+- Community guidelines (`firebase/hosting/guidelines.html`): "Words and
+  photos we filter".
 
 ## 0.0.41 — Report and block
 

@@ -3,6 +3,7 @@
 // and team chat messages. Ports of the teams/{id}/posts, events, chats and
 // messages rules in firestore.rules; the app still writes these directly.
 import { z } from "zod";
+import { clean } from "./word_filter.js";
 import { isoDateTime } from "./dates.js";
 
 // Team posts ---------------------------------------------------------------
@@ -37,9 +38,9 @@ export const saveTeamPostRequestSchema = z.strictObject({
     .string()
     .regex(/^[A-Za-z0-9]{1,40}$/, "Invalid id.")
     .optional(),
-  title: z.string().trim().max(teamPostTitleMax, `Keep the title under ${teamPostTitleMax} characters.`).default(""),
-  body: z.string().max(teamPostBodyMax, `Keep posts under ${teamPostBodyMax} characters.`).default(""),
-  location: z.string().trim().max(teamPostLocationMax, `Keep the place under ${teamPostLocationMax} characters.`).default(""),
+  title: clean(z.string().trim().max(teamPostTitleMax, `Keep the title under ${teamPostTitleMax} characters.`).default("")),
+  body: clean(z.string().max(teamPostBodyMax, `Keep posts under ${teamPostBodyMax} characters.`).default("")),
+  location: clean(z.string().trim().max(teamPostLocationMax, `Keep the place under ${teamPostLocationMax} characters.`).default("")),
   links: z.array(webLink).max(teamPostLinksMax, `Add at most ${teamPostLinksMax} links.`).default([]),
   public: z.boolean().default(false),
   uploadIds: z.array(z.string().min(1).max(128)).max(teamPostImagesMax, `Add at most ${teamPostImagesMax} photos.`).default([]),
@@ -85,12 +86,12 @@ const isoDate = isoDateTime("Give a date and time.");
 
 /** validPoll: a question and 2–10 options, each with an id. */
 export const eventPollSchema = z.strictObject({
-  question: z.string().trim().min(1, "Ask a question.").max(200, "Keep the question under 200 characters."),
+  question: clean(z.string().trim().min(1, "Ask a question.").max(200, "Keep the question under 200 characters.")),
   options: z
     .array(
       z.strictObject({
         id: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/, "Invalid option."),
-        text: z.string().trim().min(1, "Fill in each option.").max(100, "Keep options under 100 characters."),
+        text: clean(z.string().trim().min(1, "Fill in each option.").max(100, "Keep options under 100 characters.")),
       }),
     )
     .min(2, "Give at least two options.")
@@ -105,12 +106,12 @@ export const eventPollSchema = z.strictObject({
  */
 export const saveTeamEventRequestSchema = z
   .strictObject({
-    title: z.string().trim().min(1, "Give it a title.").max(100, "Keep the title under 100 characters."),
+    title: clean(z.string().trim().min(1, "Give it a title.").max(100, "Keep the title under 100 characters.")),
     type: z.enum(teamEventTypes).default("practice"),
     startsAt: isoDate,
     endsAt: isoDate.nullable().default(null),
-    location: z.string().trim().max(200, "Keep the place under 200 characters.").default(""),
-    notes: z.string().max(5000, "Keep notes under 5,000 characters.").default(""),
+    location: clean(z.string().trim().max(200, "Keep the place under 200 characters.").default("")),
+    notes: clean(z.string().max(5000, "Keep notes under 5,000 characters.").default("")),
     poll: eventPollSchema.nullable().default(null),
     public: z.boolean().default(false),
     audience: z.array(z.string().min(1).max(64)).max(20, "Pick at most 20 roles.").optional(),
@@ -149,7 +150,7 @@ export const rsvpNoteSchema = z
   .string()
   .max(1000, `Keep the note under ${rsvpNoteMax} characters.`)
   .transform(cleanRsvpNote)
-  .pipe(z.string().max(rsvpNoteMax, `Keep the note under ${rsvpNoteMax} characters.`))
+  .pipe(clean(z.string().max(rsvpNoteMax, `Keep the note under ${rsvpNoteMax} characters.`)))
   .nullable()
   .optional();
 
@@ -204,7 +205,7 @@ export const sendChatMessageRequestSchema = z.strictObject({
     .string()
     .regex(/^[A-Za-z0-9]{1,40}$/, "Invalid id.")
     .optional(),
-  text: z.string().max(chatTextMax, `Keep messages under ${chatTextMax} characters.`).default(""),
+  text: clean(z.string().max(chatTextMax, `Keep messages under ${chatTextMax} characters.`).default("")),
   uploadIds: z.array(z.string().min(1).max(128)).max(chatAttachmentsMax).default([]),
   replyTo: z.string().min(1).max(128).optional(),
 });
@@ -249,7 +250,7 @@ export const chatAccessSchema = z
     message: "Anyone who can write must also be able to read.",
   });
 
-const chatName = z.string().trim().min(1, "Name it.").max(chatRoomLimits.name);
+const chatName = clean(z.string().trim().min(1, "Name it.").max(chatRoomLimits.name));
 
 /** `POST /v1/teams/:teamId/chat-rooms` and `PATCH .../chat-rooms/:roomId` (kind is set once). */
 export const saveChatRoomRequestSchema = z.strictObject({

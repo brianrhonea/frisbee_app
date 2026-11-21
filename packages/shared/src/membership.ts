@@ -3,6 +3,7 @@
 // memberPermsFor and rolesData in apps/mobile/lib/domain/models/
 // team_role.dart, checked against packages/shared/fixtures/team_roles.json.
 import { z } from "zod";
+import { clean } from "./word_filter.js";
 import { competitionLevels, divisions, groupLocationSchema, teamLimits } from "./team.js";
 
 /** Member tiers on the team doc's `members` (TeamRole in the app). */
@@ -95,7 +96,7 @@ export const transferOwnershipRequestSchema = z.strictObject({ uid: docId });
 export const inviteToTeamRequestSchema = z.strictObject({ uid: docId });
 
 export const customRoleSchema = z.strictObject({
-  name: z.string().trim().min(1, "Name the role.").max(roleLimits.roleName),
+  name: clean(z.string().trim().min(1, "Name the role.").max(roleLimits.roleName)),
   color: z.number().int().default(0),
   position: z.number().int().default(0),
   perms: z.array(z.enum(teamPermissions)).max(teamPermissions.length).default([]),
@@ -118,12 +119,12 @@ export const saveRolesRequestSchema = z.strictObject({
  * The kind and the division never change; group fields are for groups.
  */
 export const editTeamRequestSchema = z.strictObject({
-  name: z.string().trim().min(1, "Name your team.").max(teamLimits.name),
+  name: clean(z.string().trim().min(1, "Name your team.").max(teamLimits.name)),
   level: z.enum(competitionLevels),
-  city: z.string().trim().max(teamLimits.city).default(""),
+  city: clean(z.string().trim().max(teamLimits.city).default("")),
   /** Accepted only if unchanged. */
   division: z.enum(divisions).optional(),
-  description: z.string().trim().max(teamLimits.description).optional(),
+  description: clean(z.string().trim().max(teamLimits.description)).optional(),
   requiresApproval: z.boolean().optional(),
   location: groupLocationSchema.nullable().optional(),
 });
@@ -141,10 +142,10 @@ export const linkedTeamRolesRequestSchema = z.strictObject({ roles: linkRoles })
 
 /** `POST /v1/teams/:orgId/linked-teams`: a new team in a community. */
 export const createCommunityTeamRequestSchema = z.strictObject({
-  name: z.string().trim().min(1, "Name your team.").max(teamLimits.name),
+  name: clean(z.string().trim().min(1, "Name your team.").max(teamLimits.name)),
   division: z.enum(divisions),
   level: z.enum(competitionLevels),
-  city: z.string().trim().max(teamLimits.city).default(""),
+  city: clean(z.string().trim().max(teamLimits.city).default("")),
   roles: linkRoles.default([]),
 });
 

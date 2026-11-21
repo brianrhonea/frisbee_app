@@ -15,6 +15,7 @@ import '../../services/firestore_utils.dart';
 import '../../services/shared_streams.dart';
 import '../outbox/outbox_repository.dart';
 import 'chat_repository.dart';
+import '../../../domain/models/word_filter.dart';
 
 /// Rooms live at `teams/{teamId}/chats/{roomId}` with messages beneath, and
 /// folders at `teams/{teamId}/chatFolders/{folderId}`.
@@ -177,6 +178,7 @@ class ChatRepositoryFirebase implements ChatRepository {
     ChatFolder folder,
     String uid,
   ) => guard(() async {
+    folder = folder.copyWith(name: cleanText(folder.name));
     if (folder.isNew) {
       final ref = _folders(teamId).doc();
       await ref.set(newFolderData(folder, uid));
@@ -232,6 +234,7 @@ class ChatRepositoryFirebase implements ChatRepository {
   @override
   Future<Result<String>> saveRoom(String teamId, ChatRoom room, String uid) =>
       guard(() async {
+        room = room.withName(cleanText(room.name));
         if (room.isNew) {
           final ref = _rooms(teamId).doc();
           await ref.set(newRoomData(room, uid));
@@ -328,6 +331,8 @@ class ChatRepositoryFirebase implements ChatRepository {
     List<NewAttachment> attachments = const [],
     MessageReply? replyTo,
   }) {
+    if (refuseBlockedWords<void>([text]) case final r?) return r;
+    text = maskSwearing(text);
     // The id is picked now and kept, so a retry can't post it twice.
     final messageId = _messages(teamId, roomId).doc().id;
     Future<Result<void>> now() => _send(

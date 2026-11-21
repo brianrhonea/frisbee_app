@@ -13,6 +13,7 @@ import '../../services/firestore_utils.dart';
 import 'user_post_repository.dart';
 import '../../../domain/models/outbox.dart';
 import '../outbox/outbox_repository.dart';
+import '../../../domain/models/word_filter.dart';
 
 /// Reads and writes `posts` in Firestore; the community feed comes from
 /// the Stall 10 API ([ApiClient], `GET /v1/feed`), which leaves out private
@@ -320,6 +321,11 @@ class UserPostRepositoryFirebase implements UserPostRepository {
 
   @override
   Future<Result<String>> savePost(UserPostDraft draft, AppUser author) async {
+    if (refuseBlockedWords<String>([draft.post.body]) case final r?) return r;
+    draft = UserPostDraft(
+      post: draft.post.copyWith(body: maskSwearing(draft.post.body)),
+      newImages: draft.newImages,
+    );
     final outbox = _outbox;
     // Only new posts wait offline; an edit needs the post as it stands.
     if (outbox == null ||
@@ -405,6 +411,7 @@ class UserPostRepositoryFirebase implements UserPostRepository {
   @override
   Future<Result<String>> repost(UserPost original, String note, AppUser me) =>
       guard(() async {
+        note = cleanText(note);
         final post = UserPost.repost(original, note: note);
         final originalId = post.originalId;
         final id = UserPost.repostId(originalId, me.uid);
