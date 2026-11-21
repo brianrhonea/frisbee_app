@@ -27,6 +27,7 @@ import { TeamCommunity } from "./CommunityAdmin";
 import { MembersOnlySection } from "./TeamNav";
 import { LEAVE_CONFIRM } from "./TeamContext";
 import { optionalSectionInfo } from "./SectionGate";
+import { TeamReports } from "./TeamReports";
 
 /** The team doc's editable details (Team.toEditableMap in the app). */
 interface Details {
@@ -58,6 +59,7 @@ export function TeamSettings() {
       {kind === "team" && !viewer.team.leagueId && <PublicPageCard />}
       {viewer.can("manageMembers") && <InviteCard />}
       {invite.hasRequests && <JoinRequests teamId={teamId} requests={invite.requests} />}
+      {(viewer.can("moderate") || viewer.can("manageTeam")) && <TeamReports />}
       {viewer.can("manageMembers") && <MemberRoles />}
       {owner && <TeamRoles />}
       {owner && <DiscordImport />}

@@ -10,6 +10,8 @@ import { Composer } from "./Composer";
 import { LocalTime } from "./LocalTime";
 import { MemberImage } from "./MemberImage";
 import { PostActions } from "./PostActions";
+import { useBlocks } from "@/lib/moderation";
+import { BlockButton, ReportDialog } from "./Report";
 import "./member.css";
 import { LinkedText } from "./LinkedText";
 
@@ -170,6 +172,27 @@ function OwnerMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => v
   );
 }
 
+/** Report the post or block its author, for everyone else. */
+function OthersMenu({ onReport, block }: { onReport: () => void; block: { uid: string; name: string } | null }) {
+  return (
+    <details className="post-menu">
+      <summary aria-label="Post options">⋯</summary>
+      <div className="menu-list">
+        <button
+          type="button"
+          onClick={(e) => {
+            (e.currentTarget.closest("details") as HTMLDetailsElement).open = false;
+            onReport();
+          }}
+        >
+          Report post
+        </button>
+        {block && <BlockButton uid={block.uid} name={block.name} className="danger" />}
+      </div>
+    </details>
+  );
+}
+
 /**
  * A player's post. A repost shows the reposter's note over the original
  * as it is now, as the app does. `standalone` (the post's own page) drops
@@ -183,6 +206,8 @@ export function PostCard({ post: initial, standalone = false }: { post: PublicPo
   const [deleted, setDeleted] = useState(false);
   const [showComments, setShowComments] = useState(standalone);
   const [error, setError] = useState<string | null>(null);
+  const [reporting, setReporting] = useState(false);
+  const blocks = useBlocks(user);
   // A live page passes the post again when it changes (an edit elsewhere,
   // new counts); keep what's being edited here.
   useEffect(() => {
@@ -193,6 +218,8 @@ export function PostCard({ post: initial, standalone = false }: { post: PublicPo
   if (deleted) return null;
   const mine = !!user && user.uid === post.authorId;
   const target = post.repostOf ? post.original : post;
+  // Someone blocked either way: their posts and reposts of them aren't shown.
+  if (blocks.hides(post.authorId) || blocks.hides(target?.authorId)) return null;
 
   async function remove() {
     if (!user || !confirm(post.repostOf ? "Take back this repost?" : "Delete this post? This can't be undone.")) return;
@@ -205,7 +232,19 @@ export function PostCard({ post: initial, standalone = false }: { post: PublicPo
     }
   }
 
-  const menu = mine && !editing ? <OwnerMenu onEdit={() => setEditing(true)} onDelete={() => void remove()} /> : undefined;
+  const menu =
+    mine && !editing ? (
+      <OwnerMenu onEdit={() => setEditing(true)} onDelete={() => void remove()} />
+    ) : user && post.authorId && !mine ? (
+      <OthersMenu onReport={() => setReporting(true)} block={{ uid: post.authorId, name: post.authorName || "this player" }} />
+    ) : undefined;
+  const report = reporting && post.authorId && (
+    <ReportDialog
+      target={{ kind: "post", postId: post.id }}
+      authorName={post.authorName || "this player"}
+      onClose={() => setReporting(false)}
+    />
+  );
   const editor = editing && (
     <Composer
       editing={{
@@ -238,6 +277,7 @@ export function PostCard({ post: initial, standalone = false }: { post: PublicPo
       {showComments && target && (
         <Comments postId={target.id} postAuthorId={target.authorId} autoFocus={!standalone} />
       )}
+      {report}
     </>
   );
 

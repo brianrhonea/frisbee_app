@@ -10,6 +10,8 @@ import { FollowButton } from "./FollowButton";
 import { ForVisitors } from "./ForVisitors";
 import { LocalTime } from "./LocalTime";
 import { MessageButton } from "./MessageButton";
+import { unblockPerson, useBlocks } from "@/lib/moderation";
+import { BlockButton, ReportButton } from "./Report";
 import { PostCard } from "./PostCard";
 import { DashboardLayout, ProfileCard, StatTiles, TeamList } from "./ProfileDashboard";
 
@@ -144,14 +146,59 @@ function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePage; loc
     for (const [k] of statColumns) out[k] = (sum[k] ?? 0) + (s[k] ?? 0);
     return out;
   }, {});
+  const { user } = useAuth();
+  const blocks = useBlocks(user);
   const follow = <FollowButton targetId={uid} isPrivate={profile.private === true} signUpNext={`/players/${uid}`} />;
+  const someoneElse = !!user && user.uid !== uid;
+  // Report and Block, for anyone else's profile (the app's ⋯ menu).
+  const safety = someoneElse && (
+    <span className="profile-safety">
+      <ReportButton target={{ kind: "user", uid }} authorName={name} />
+      {!blocks.hides(uid) && <BlockButton uid={uid} name={name} label="Block" />}
+    </span>
+  );
   // Follow and Message, as the app's profile header has them.
   const actions = (
     <>
       {follow}
       <MessageButton uid={uid} />
+      {safety}
     </>
   );
+
+  // Blocked either way: only the name, as in the app.
+  if (someoneElse && blocks.hides(uid)) {
+    const mine = blocks.blockedByMe(uid);
+    return (
+      <div className="page page-wide">
+        <DashboardLayout side={<ProfileCard profile={{ ...profile, bio: undefined, teams: [] }} actions={safety} />}>
+          <div className="card">
+            <h2 className="card-title">{mine ? `You blocked ${first}` : "You can't see this profile"}</h2>
+            <p className="muted small">
+              {mine
+                ? `You don't see each other's posts, comments or messages, and neither of you can follow or message the other.`
+                : `${first}'s posts and details aren't available to you.`}
+            </p>
+            {mine && user && (
+              <p>
+                <button
+                  type="button"
+                  className="btn btn-small"
+                  onClick={() => {
+                    if (window.confirm(`Unblock ${first}? You'll see each other's posts and can follow and message again.`)) {
+                      void unblockPerson(user, uid).catch((e) => alert((e as Error).message));
+                    }
+                  }}
+                >
+                  Unblock
+                </button>
+              </p>
+            )}
+          </div>
+        </DashboardLayout>
+      </div>
+    );
+  }
 
   if (locked) {
     return (

@@ -23,6 +23,7 @@ import { MembersOnlySection } from "./TeamNav";
 import { VoiceRoom } from "./meetings/VoiceRoom";
 import { useVoice } from "../voice/VoiceProvider";
 import { EmptyState, Loading } from "../StatusViews";
+import { ReportButton } from "../Report";
 
 type Room = ManagedRoom & InboxRoom;
 type Folder = ManagedFolder;
@@ -299,10 +300,20 @@ function Thread({
                   picking={reacting === m.id}
                   onPickingChange={(open) => setReacting(open ? m.id : null)}
                   extra={
-                    canPin && m.createdAt ? (
-                      <button type="button" className="text-btn" onClick={() => void (pinned.has(m.id) ? pinActions.unpin(m.id) : pinActions.pin(m.id))}>
-                        {pinned.has(m.id) ? "Unpin" : "Pin"}
-                      </button>
+                    m.createdAt && (canPin || m.authorId !== me) ? (
+                      <>
+                        {canPin && (
+                          <button type="button" className="text-btn" onClick={() => void (pinned.has(m.id) ? pinActions.unpin(m.id) : pinActions.pin(m.id))}>
+                            {pinned.has(m.id) ? "Unpin" : "Pin"}
+                          </button>
+                        )}
+                        {m.authorId !== me && (
+                          <ReportButton
+                            target={{ kind: "teamMessage", teamId, roomId, messageId: m.id }}
+                            authorName={m.authorName || "this player"}
+                          />
+                        )}
+                      </>
                     ) : undefined
                   }
                 />

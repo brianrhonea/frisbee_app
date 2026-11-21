@@ -8,6 +8,7 @@ import { useLiveQuery } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
 import { Avatar } from "../Avatar";
 import { LocalTime } from "../LocalTime";
+import { ReportButton } from "../Report";
 
 /** A comment on a team post as stored (TeamPostComment in the app). */
 interface TeamPostComment {
@@ -79,6 +80,13 @@ export function TeamPostComments({ teamId, postId, moderator }: { teamId: string
               </div>
               <div className="comment-meta">
                 <LocalTime iso={c.createdAt} style="relative" />
+                {c.authorId !== me.uid && (
+                  <ReportButton
+                    className=""
+                    target={{ kind: "teamPostComment", teamId, postId, commentId: c.id }}
+                    authorName={c.authorName || "this player"}
+                  />
+                )}
                 {(c.authorId === me.uid || moderator) && (
                   <button
                     type="button"

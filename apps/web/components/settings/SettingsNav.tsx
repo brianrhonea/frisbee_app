@@ -10,6 +10,7 @@ const sections = [
   ["/settings/notifications", "Notifications"],
   ["/settings/calendar", "Calendars"],
   ["/settings/following", "People you follow"],
+  ["/settings/blocked", "Blocked accounts"],
   ["/settings/account", "Account"],
   ["/learn", "Learn to play"],
 ] as const;

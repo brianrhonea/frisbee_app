@@ -13,6 +13,8 @@ import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
 import { ChatAttachment, type ChatFile } from "./ChatAttachment";
 import { ChatComposer, MessageActions } from "./ChatComposer";
+import { useBlocks, unblockPerson } from "@/lib/moderation";
+import { BlockButton, ReportButton } from "./Report";
 import { LocalTime } from "./LocalTime";
 import { openConversation } from "./MessageButton";
 import { LoadMore } from "./LoadMore";
@@ -123,9 +125,13 @@ export function Messages() {
         .sort((a, b) => (ms(b.c.lastMessageAt) || 0) - (ms(a.c.lastMessageAt) || 0)),
     [convs.data, mineById, me],
   );
+  const blocks = useBlocks(user);
   const q = search.trim().toLowerCase();
+  // Requests from someone blocked either way aren't shown at all.
   const shown = all.filter(
-    ({ d }) => (view === "requests" ? d.inRequests : view === "archived" ? d.inArchive : d.inInbox) && (!q || d.title.toLowerCase().includes(q)),
+    ({ c, d }) =>
+      (view === "requests" ? d.inRequests && !(!isGroup(c) && blocks.hides(d.others[0])) : view === "archived" ? d.inArchive : d.inInbox) &&
+      (!q || d.title.toLowerCase().includes(q)),
   );
   const requests = all.filter(({ d }) => d.inRequests).length;
   const open = all.find(({ c }) => c.id === openId);
@@ -487,7 +493,15 @@ function ConversationView({
   const [managing, setManaging] = useState(false);
   const typing = useTyping(conv.id, me, conv.names);
   const body = useRef<HTMLDivElement>(null);
-  const list = (messages.list ?? []).filter((m) => Number.isNaN(hiddenBefore) || ms(m.createdAt) > hiddenBefore);
+  const blocks = useBlocks(user);
+  const group = isGroup(conv);
+  // A direct conversation with someone blocked either way can't go on; in a
+  // group, their messages aren't shown.
+  const other = group ? null : (info.others[0] ?? null);
+  const blockedHere = !!other && blocks.hides(other);
+  const list = (messages.list ?? []).filter(
+    (m) => (Number.isNaN(hiddenBefore) || ms(m.createdAt) > hiddenBefore) && !(group && blocks.hides(m.authorId)),
+  );
   useThreadScroll(body, list[0]?.id, list[list.length - 1]?.id);
 
   // Opening it, and each new message while open, marks it read.
@@ -509,13 +523,18 @@ function ConversationView({
     }
   }
 
-  const group = isGroup(conv);
   return (
     <div className="card thread">
       <header className="thread-head conv-head">
         <h2>{info.title}</h2>
         <span className="post-admin">
           <MuteButton target={{ conversationId: conv.id }} />
+          {other && !blockedHere && (
+            <>
+              <ReportButton target={{ kind: "user", uid: other }} authorName={info.title} label="Report" />
+              <BlockButton uid={other} name={info.title} label="Block" />
+            </>
+          )}
           {group && (
             <button type="button" className="text-btn" onClick={() => setManaging(!managing)} aria-expanded={managing}>
               People
@@ -601,6 +620,14 @@ function ConversationView({
                   onDeleted={() => messages.removed(m.id)}
                   picking={reacting === m.id}
                   onPickingChange={(open) => setReacting(open ? m.id : null)}
+                  extra={
+                    m.authorId !== me && m.createdAt ? (
+                      <ReportButton
+                        target={{ kind: "directMessage", conversationId: conv.id, messageId: m.id }}
+                        authorName={m.authorName || "this player"}
+                      />
+                    ) : undefined
+                  }
                 />
               </div>
             );
@@ -614,7 +641,30 @@ function ConversationView({
           </p>
         )}
       </div>
-      {info.requestForMe ? (
+      {blockedHere && other ? (
+        <footer className="thread-foot conv-request">
+          {blocks.blockedByMe(other) ? (
+            <>
+              <p>You blocked {info.title}. Neither of you can message the other.</p>
+              <div className="form-actions">
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => {
+                    if (user && window.confirm(`Unblock ${info.title}? You'll see each other's posts and can message again.`)) {
+                      void unblockPerson(user, other).catch((e) => setError((e as Error).message));
+                    }
+                  }}
+                >
+                  Unblock
+                </button>
+              </div>
+            </>
+          ) : (
+            <p>You can&apos;t message {info.title}.</p>
+          )}
+        </footer>
+      ) : info.requestForMe ? (
         <footer className="thread-foot conv-request">
           <p>
             <b>{info.title}</b> wants to message you. They won&apos;t know you&apos;ve seen it unless you accept.

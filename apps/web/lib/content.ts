@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 /** The text pages ported from firebase/hosting (content/<slug>.html). */
-export const contentPages = ["about", "help", "privacy", "terms", "cookies", "delete-account"] as const;
+export const contentPages = ["about", "help", "privacy", "terms", "cookies", "delete-account", "guidelines"] as const;
 export type ContentSlug = (typeof contentPages)[number];
 
 interface ContentPage {

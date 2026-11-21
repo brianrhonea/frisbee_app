@@ -7,9 +7,11 @@ import { callApi, problem } from "@/lib/client";
 import { newId } from "@/lib/upload";
 import { queuedNotice, submitOutbox } from "@/lib/outbox";
 import { type Doc, useLiveQuery } from "@/lib/live";
+import { useBlocks } from "@/lib/moderation";
 import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
 import { LocalTime } from "./LocalTime";
+import { ReportButton } from "./Report";
 
 /** A comment as stored (PostComment in the app). */
 interface Comment {
@@ -48,6 +50,7 @@ export function Comments({ postId, postAuthorId, autoFocus = false }: {
     `comments-${postId}`,
   );
   const [replyTo, setReplyTo] = useState<Doc<Comment> | null>(null);
+  const blocks = useBlocks(user);
 
   if (user === undefined) return null;
   if (!user) {
@@ -57,7 +60,8 @@ export function Comments({ postId, postAuthorId, autoFocus = false }: {
       </p>
     );
   }
-  const all = [...(data ?? [])].reverse();
+  // Nothing from someone blocked either way (as the app).
+  const all = [...(data ?? [])].reverse().filter((c) => !blocks.hides(c.authorId));
   const top = all.filter((c) => !c.parentId);
   const replies = (id: string) => all.filter((c) => c.parentId === id);
 
@@ -176,6 +180,13 @@ function CommentRow({
             <button type="button" onClick={() => setEditing(true)}>
               Edit
             </button>
+          )}
+          {!mine && (
+            <ReportButton
+              className=""
+              target={{ kind: "comment", postId, commentId: c.id }}
+              authorName={name}
+            />
           )}
           {(mine || postAuthorId === me.uid) && (
             <button

@@ -25,6 +25,7 @@ import { needsRsvp, RsvpPill } from "../RsvpPill";
 import { useTeamEvents, useYouthOutsiderPublic, youthVisitorNote } from "./TeamSchedule";
 import { TournamentDayCard } from "../tournaments/TournamentDayCard";
 import { useTournamentDays } from "../tournaments/useTournamentDays";
+import { ReportButton } from "../Report";
 
 const postLimit = 30;
 const leads = new Set(["owner", "coach", "captain"]);
@@ -109,6 +110,8 @@ export function TeamFeed({ publicPosts, publicEvents }: { publicPosts: PublicTea
                 actions={
                   admin ? (
                     <PostAdminActions teamId={teamId} post={p} pinned={feed.pinned} onEdit={() => setEditing(p.id)} />
+                  ) : user && p.authorId !== user.uid ? (
+                    <ReportButton target={{ kind: "teamPost", teamId, postId: p.id }} authorName={p.authorName || name} />
                   ) : undefined
                 }
                 comments={member ? () => <TeamPostComments teamId={teamId} postId={p.id} moderator={admin} /> : undefined}
