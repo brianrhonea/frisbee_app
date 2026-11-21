@@ -4,7 +4,7 @@ import { limit, orderBy, where } from "firebase/firestore";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ApiError, callApi, problem } from "@/lib/client";
-import { type Signal, useChangeSignal } from "@/lib/live";
+import { type Signal, useChangeSignal, useLiveDoc } from "@/lib/live";
 import { useAuth } from "./AuthProvider";
 import { FollowButton } from "./FollowButton";
 import { ForVisitors } from "./ForVisitors";
@@ -148,6 +148,8 @@ function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePage; loc
   }, {});
   const { user } = useAuth();
   const blocks = useBlocks(user);
+  // The "Stall 10 staff" badge (written only by firebase/scripts/set-staff.mjs).
+  const staff = useLiveDoc(user ? `staff/${uid}` : null).data != null;
   const follow = <FollowButton targetId={uid} isPrivate={profile.private === true} signUpNext={`/players/${uid}`} />;
   const someoneElse = !!user && user.uid !== uid;
   // Report and Block, for anyone else's profile (the app's ⋯ menu).
@@ -203,7 +205,7 @@ function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePage; loc
   if (locked) {
     return (
       <div className="page page-wide">
-        <DashboardLayout side={<ProfileCard profile={profile} actions={actions} />}>
+        <DashboardLayout side={<ProfileCard profile={profile} actions={actions} staff={staff} />}>
           <div className="card">
             <h2 className="card-title">This profile is private</h2>
             <p className="muted small">
@@ -218,7 +220,7 @@ function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePage; loc
 
   const side = (
     <>
-      <ProfileCard profile={profile} actions={actions} />
+      <ProfileCard profile={profile} actions={actions} staff={staff} />
       {profile.visibility?.stats !== false && <StatTiles stats={choice.seasons} teamName={picked?.name} />}
       {profile.visibility?.teams !== false && (
         <TeamList teams={(profile.teams ?? []).map((t) => ({ id: t.id, name: t.name, subtitle: t.subtitle }))} />

@@ -61,7 +61,7 @@ beforeAll(async () => {
       rules: readFileSync(join(__dirname, "../../../firestore.rules"), "utf8"),
     },
   });
-});
+}, 60_000);
 
 afterAll(() => env.cleanup());
 

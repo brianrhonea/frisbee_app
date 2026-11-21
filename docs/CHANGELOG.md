@@ -57,7 +57,7 @@ Plain-language notes for testers are in
 
 ## 0.0.41 — Report and block
 
-With web 0.50.0 and API 0.37.0 (product-spec §8.1 items 51–55). Reports
+With web 0.50.0 and API 0.37.0 (product-spec §8.1 items 51–56). Reports
 and blocks go through the API only (`ModerationRepositoryApi`); a build
 without `API_BASE_URL` says they aren't available in this version.
 
@@ -74,6 +74,9 @@ without `API_BASE_URL` says they aren't available in this version.
   place of the composer. Team chat and team posts stay (shared teams).
 - Settings › Blocked accounts; Team settings › Safety › Reports for the
   owner, admins and members who may moderate (`TeamReportsScreen`).
+- "Stall 10 staff" badge on staff members' profiles, from `staff/{uid}`
+  (read-only in `firestore.rules`; written by
+  `firebase/scripts/set-staff.mjs` with the `staff` claim).
 - The "need a connection to Stall 10" messages (calendars, pins, live
   scores, video notes, personal details) now say the feature isn't
   available in this version of the app (a build without the API address).

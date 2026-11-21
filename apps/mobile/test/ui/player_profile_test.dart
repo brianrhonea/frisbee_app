@@ -19,6 +19,7 @@ import 'package:frisbee_app/ui/settings/widgets/settings_screen.dart';
 import 'package:frisbee_app/ui/teams/view_models/team_search_viewmodel.dart';
 
 import '../testing/fakes.dart';
+import '../testing/moderation_fakes.dart';
 
 void main() {
   late FakeAuthRepository auth;
@@ -355,6 +356,34 @@ void main() {
       expect(find.text('Appearance'), findsNothing);
       vm.dispose();
     });
+  });
+
+  testWidgets('Stall 10 staff have a badge by their name', (tester) async {
+    profiles.put(const PlayerProfile(uid: 'p2', name: 'Pat'));
+    profiles.put(const PlayerProfile(uid: 'p3', name: 'Quinn'));
+    final mod = FakeModerationRepository()..staff.add('p2');
+    PlayerProfileViewModel vmOf(String uid) => PlayerProfileViewModel(
+      uid: uid,
+      profileRepository: profiles,
+      authRepository: auth,
+      teamRepository: teams,
+      statsRepository: stats,
+      directMessageRepository: FakeDirectMessageRepository(),
+      moderationRepository: mod,
+    );
+    for (final (uid, badge) in [('p2', findsOneWidget), ('p3', findsNothing)]) {
+      final vm = vmOf(uid);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: PlayerProfileScreen(viewModel: vm, key: ValueKey(uid)),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(vm.isStaff, badge == findsOneWidget);
+      expect(find.text('STALL 10 STAFF'), badge);
+      vm.dispose();
+    }
   });
 
   testWidgets('teams of more than one kind are colored and filter by kind', (

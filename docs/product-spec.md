@@ -1193,6 +1193,10 @@ Out of scope: payments, meeting recording, USA Ultimate data.
     › Safety); [x] website (Team settings). Remove or dismiss.
 55. Staff report queue: website only (`/staff`), by design: it's a staff
     tool, not a member feature (remove, dismiss, warn, suspend).
+56. Staff badge: [x] app; [x] website. "Stall 10 staff" by the name on a
+    staff member's profile, from `staff/{uid}` (only `set-staff.mjs`
+    writes it). Tests: app `player_profile_test.dart`; rules
+    `blocks.rules.test.ts`.
 
 Libraries the website may add (none today): a small data cache for API
 reads and mutations, the Firestore web SDK for listeners, and LiveKit's

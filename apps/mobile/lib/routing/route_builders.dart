@@ -175,6 +175,7 @@ PlayerProfileViewModel playerProfileViewModel(BuildContext c, String uid) =>
       userPostRepository: c.read(),
       notificationRepository: c.read(),
       filePicker: c.read(),
+      moderationRepository: c.read(),
     );
 
 /// Another player's profile.

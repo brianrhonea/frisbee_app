@@ -79,6 +79,12 @@ class FakeModerationRepository extends ModerationRepository {
     return const Result.ok(null);
   }
 
+  /// Who [watchStaff] says is staff.
+  final staff = <String>{};
+
+  @override
+  Stream<bool> watchStaff(String uid) => Stream.value(staff.contains(uid));
+
   @override
   Future<Result<void>> unblock(String uid) async {
     if (_fail<void>() case final e?) return e;

@@ -2933,5 +2933,13 @@ service cloud.firestore {
     match /reports/{reportId} {
       allow read, write: if false;
     }
+
+    // Stall 10 staff, for the badge on their profile: set and removed only
+    // with firebase/scripts/set-staff.mjs (with the `staff` claim the API
+    // checks), so nobody can give themselves one.
+    match /staff/{userId} {
+      allow get: if signedIn();
+      allow list, write: if false;
+    }
   }
 }

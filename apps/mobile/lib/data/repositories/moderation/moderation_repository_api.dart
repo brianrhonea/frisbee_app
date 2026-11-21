@@ -131,6 +131,14 @@ class ModerationRepositoryApi extends ModerationRepository {
   });
 
   @override
+  Stream<bool> watchStaff(String uid) => (_db ?? FirebaseFirestore.instance)
+      .collection('staff')
+      .doc(uid)
+      .snapshots()
+      .map((d) => d.exists)
+      .handleError((Object _) {});
+
+  @override
   Future<Result<void>> unblock(String uid) =>
       guard(() => _client.delete('/v1/me/blocks/${_id(uid)}'));
 

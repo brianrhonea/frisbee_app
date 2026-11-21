@@ -18,7 +18,16 @@ export function DashboardLayout({ side, children }: { side: ReactNode; children:
   );
 }
 
-export function ProfileCard({ profile, actions }: { profile: PublicProfile; actions?: ReactNode }) {
+export function ProfileCard({
+  profile,
+  actions,
+  staff = false,
+}: {
+  profile: PublicProfile;
+  actions?: ReactNode;
+  /** Stall 10 staff (`staff/{uid}`): the badge under the name, as in the app. */
+  staff?: boolean;
+}) {
   const name = profile.name || "Player";
   const facts = [
     profile.pronouns,
@@ -33,6 +42,11 @@ export function ProfileCard({ profile, actions }: { profile: PublicProfile; acti
       <Avatar name={name} url={profile.photoUrl} size={96} />
       <h1>{name}</h1>
       {profile.username && <p className="muted handle">@{profile.username}</p>}
+      {staff && (
+        <p className="staff-badge" title="Stall 10 staff">
+          <span aria-hidden="true">✓</span> Stall 10 staff
+        </p>
+      )}
       {profile.private && <p className="pill">Private profile</p>}
       {profile.bio && <p className="bio">{profile.bio}</p>}
       {facts.length > 0 && (

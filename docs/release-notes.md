@@ -22,6 +22,8 @@ Firebase project; App Store builds come from `main` and use production.
 - Settings › Blocked accounts lists who you blocked, with Unblock.
 - Team admins see reports on their team's chat and posts in Team
   settings › Reports, and can remove what was reported.
+- Stall 10's own team has a "Stall 10 staff" badge on their profiles, so
+  you know who's official.
 
 **Fixed**
 - Features this version can't reach the server for now say so plainly,

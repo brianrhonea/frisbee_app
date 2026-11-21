@@ -524,6 +524,7 @@ class _Hero extends StatelessWidget {
                                 ),
                               if (primary?.role case final role?)
                                 Tag(role.toUpperCase()),
+                              if (vm.isStaff) const StaffBadge(),
                               if (vm.isPrivate) const Tag('PRIVATE'),
                             ],
                           ),
@@ -1591,5 +1592,42 @@ class SettingsButton extends StatelessWidget {
     return outlined
         ? IconButton.outlined(tooltip: 'Settings', onPressed: open, icon: icon)
         : IconButton(tooltip: 'Settings', onPressed: open, icon: icon);
+  }
+}
+
+/// "Stall 10 staff" by a staff member's name (the website's staff-badge).
+class StaffBadge extends StatelessWidget {
+  const StaffBadge({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Semantics(
+      label: 'Stall 10 staff',
+      excludeSemantics: true,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(6, 3, 8, 3),
+        decoration: BoxDecoration(
+          color: c.accent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.verified, size: 12, color: c.onAccent),
+            const SizedBox(width: 4),
+            Text(
+              'STALL 10 STAFF',
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.2,
+                color: c.onAccent,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

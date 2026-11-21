@@ -26,7 +26,8 @@ record).
 - Staff queue: `GET /v1/me/moderation`, `GET /v1/staff/reports`,
   `POST /v1/staff/reports/:reportId` (`remove`, `dismiss`, `warn`,
   `suspend`, `unsuspend`) for accounts with the `staff` claim
-  (`firebase/scripts/set-staff.mjs`). Suspending sets
+  (`firebase/scripts/set-staff.mjs`, which also writes `staff/{uid}` for
+  the profile badge). Suspending sets
   `limits/{uid}.suspended`, disables sign-in and revokes tokens; warning
   sends a notification linking the community guidelines.
 - Blocks: `GET /v1/me/blocks`, `PUT`/`DELETE /v1/me/blocks/:uid`. Written

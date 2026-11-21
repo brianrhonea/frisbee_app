@@ -17,6 +17,7 @@ With app 0.0.41 and API 0.37.0.
   of the composer.
 - Settings › Blocked accounts; a team's Reports (Team settings, for its
   admins and moderators); `/staff`, the report queue for Stall 10's staff.
+- "Stall 10 staff" badge on staff members' profiles (`staff/{uid}`).
 - Community guidelines page (`/guidelines`, a draft for review), linked
   from the footer and Help; Help explains reporting and blocking.
 

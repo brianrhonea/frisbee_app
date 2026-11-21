@@ -25,6 +25,7 @@ import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 import '../../follow/view_models/follow_viewmodel.dart';
 import '../../teams/view_models/team_home_viewmodel.dart' show pickPostImages;
+import '../../../data/repositories/moderation/moderation_repository.dart';
 
 /// A team whose roster the user isn't linked to yet, and the roster spots
 /// they could claim, best name match first.
@@ -51,6 +52,7 @@ class PlayerProfileViewModel extends ChangeNotifier {
     UserPostRepository? userPostRepository,
     NotificationRepository? notificationRepository,
     FilePickerService? filePicker,
+    ModerationRepository? moderationRepository,
   }) : _profiles = profileRepository,
        _picker = filePicker,
        _auth = authRepository,
@@ -95,6 +97,14 @@ class PlayerProfileViewModel extends ChangeNotifier {
         }, onError: (Object _) {}),
       );
     }
+    if (moderationRepository != null) {
+      _subs.add(
+        moderationRepository.watchStaff(uid).listen((s) {
+          _staff = s;
+          notifyListeners();
+        }, onError: (Object _) {}),
+      );
+    }
     _watchProfile();
     // A new profile picture comes through the account.
     _watchesAccount = isMe;
@@ -108,6 +118,11 @@ class PlayerProfileViewModel extends ChangeNotifier {
 
   /// Whose profile this is.
   final String uid;
+
+  bool _staff = false;
+
+  /// Whether they're Stall 10 staff: a "Stall 10 staff" badge by the name.
+  bool get isStaff => _staff;
   final ProfileRepository _profiles;
   final AuthRepository _auth;
   final TeamRepository _teamRepo;

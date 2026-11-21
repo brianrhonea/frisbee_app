@@ -1,6 +1,7 @@
 // Makes an account Stall 10 staff (or takes it away): sets the `staff`
 // custom claim the API reads from the ID token (Caller.staff), which opens
-// the website's /staff report queue (remove, dismiss, warn, suspend).
+// the website's /staff report queue (remove, dismiss, warn, suspend), and
+// writes `staff/{uid}`, the "Stall 10 staff" badge on their profile.
 //
 // The person must sign out and back in (or wait up to an hour for their
 // token to refresh) before it takes effect.
@@ -20,6 +21,7 @@ import { createRequire } from "node:module";
 const require = createRequire(new URL("../functions/package.json", import.meta.url));
 const { initializeApp, applicationDefault } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 
 const projects = {
   dev: "frisbee-app-brianrhonea-dev",
@@ -39,6 +41,9 @@ if (!project || project.startsWith("--") || (!who && !list)) {
   process.exit(2);
 }
 
+// With local (user) credentials the Auth admin API needs a quota project,
+// or Google answers 403 "requires a quota project".
+process.env.GOOGLE_CLOUD_QUOTA_PROJECT ??= project;
 initializeApp({ credential: applicationDefault(), projectId: project });
 const auth = getAuth();
 
@@ -64,6 +69,10 @@ const claims = { ...(user.customClaims ?? {}) };
 if (remove) delete claims.staff;
 else claims.staff = true;
 await auth.setCustomUserClaims(user.uid, claims);
+// The "Stall 10 staff" badge on their profile (firestore.rules: read-only).
+const badge = getFirestore().doc(`staff/${user.uid}`);
+if (remove) await badge.delete();
+else await badge.set({ since: FieldValue.serverTimestamp() });
 console.log(
   `${remove ? "Removed staff from" : "Made staff:"} ${user.email ?? user.uid} on ${project}. ` +
     "They need to sign out and back in.",

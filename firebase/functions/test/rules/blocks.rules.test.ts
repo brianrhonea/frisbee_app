@@ -135,4 +135,12 @@ describe("suspended accounts", () => {
     await assertFails(getDoc(doc(db(ME), "reports", "r1")));
     await assertFails(setDoc(doc(db(ME), "reports", "r1"), { reason: "spam" }));
   });
+
+  it("anyone signed in sees a staff badge; nobody can give themselves one", async () => {
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), "staff", FRIEND), { since: 1 }));
+    await assertSucceeds(getDoc(doc(db(ME), "staff", FRIEND)));
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "staff", FRIEND)));
+    await assertFails(setDoc(doc(db(ME), "staff", ME), { since: serverTimestamp() }));
+    await assertFails(deleteDoc(doc(db(FRIEND), "staff", FRIEND)));
+  });
 });
