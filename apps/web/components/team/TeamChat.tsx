@@ -203,6 +203,8 @@ function Thread({
   viewer: TeamViewer;
 }) {
   const [replyTo, setReplyTo] = useState<Doc<Message> | null>(null);
+  // The message whose reaction bubble is open (double-click, as the app's double-tap).
+  const [reacting, setReacting] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
   const [polling, setPolling] = useState(false);
   const names = viewer.state === "member" ? (viewer.team.memberNames ?? {}) : {};
@@ -242,7 +244,7 @@ function Thread({
               Object.values(m.reactions ?? {}).reduce<Record<string, number>>((acc, e) => ({ ...acc, [e]: (acc[e] ?? 0) + 1 }), {}),
             );
             return (
-              <div key={m.id} className={`message${grouped ? " grouped" : ""}${m.authorId === me ? " mine" : ""}`}>
+              <div key={m.id} className={`message${grouped ? " grouped" : ""}${m.authorId === me ? " mine" : ""}`} onDoubleClick={m.createdAt ? () => setReacting(m.id) : undefined}>
                 {grouped && (
                   <span className="message-time">
                     <LocalTime iso={m.createdAt} style="time" />
@@ -294,6 +296,8 @@ function Thread({
                   canDelete={m.authorId === me || canModerate}
                   onReply={canWrite ? () => setReplyTo(m) : undefined}
                   onDeleted={() => messages.removed(m.id)}
+                  picking={reacting === m.id}
+                  onPickingChange={(open) => setReacting(open ? m.id : null)}
                   extra={
                     canPin && m.createdAt ? (
                       <button type="button" className="text-btn" onClick={() => void (pinned.has(m.id) ? pinActions.unpin(m.id) : pinActions.pin(m.id))}>

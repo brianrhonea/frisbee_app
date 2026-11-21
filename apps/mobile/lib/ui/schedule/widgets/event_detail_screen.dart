@@ -527,8 +527,15 @@ class _RsvpSection extends StatelessWidget {
 
   final EventDetailViewModel viewModel;
 
+  // The screen rebuilds on the view model; the buttons also follow the
+  // commands, or they stay off after a save finishes.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: Listenable.merge([viewModel.setRsvp, viewModel.saveNote]),
+    builder: (context, _) => _section(),
+  );
+
+  Widget _section() {
     final vm = viewModel;
     final r = vm.responses;
     final type = vm.event?.type ?? EventType.other;

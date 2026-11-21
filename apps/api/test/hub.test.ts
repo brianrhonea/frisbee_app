@@ -272,6 +272,10 @@ describe("team chat", () => {
     expect((await s.call("PUT", "/v1/teams/t1/chats/general/messages/m1/reaction", { emoji: "👍" }, "player")).statusCode).toBe(204);
     expect(s.store.doc("teams/t1/chats/general/messages/m1")?.reactions).toEqual({ coach: "🔥", player: "👍" });
     expect((await s.call("PUT", "/v1/teams/t1/chats/general/messages/m1/reaction", { emoji: "hello" }, "player")).statusCode).toBe(400);
+    // Any one emoji, not only the quick ones (the bubble's +).
+    expect((await s.call("PUT", "/v1/teams/t1/chats/general/messages/m1/reaction", { emoji: "🐐" }, "player")).statusCode).toBe(204);
+    expect(s.store.doc("teams/t1/chats/general/messages/m1")?.reactions).toEqual({ coach: "🔥", player: "🐐" });
+    expect((await s.call("PUT", "/v1/teams/t1/chats/general/messages/m1/reaction", { emoji: "ok 👍" }, "player")).statusCode).toBe(400);
     expect((await s.call("PUT", "/v1/teams/t1/chats/general/messages/m1/reaction", { emoji: null }, "player")).statusCode).toBe(204);
     expect(s.store.doc("teams/t1/chats/general/messages/m1")?.reactions).toEqual({ coach: "🔥" });
     s.store.put("teams/t1/chats/coaches/messages/m2", { authorId: "coach", text: "secret" });

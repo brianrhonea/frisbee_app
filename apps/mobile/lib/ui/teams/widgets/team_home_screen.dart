@@ -12,6 +12,7 @@ import '../../../domain/models/team_event.dart';
 import '../../../domain/models/team_page.dart';
 import '../../../domain/models/team_post.dart';
 import '../../../routing/routes.dart';
+import '../../../routing/push_team_route.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 import '../../core/ui/back_or.dart';
@@ -1079,28 +1080,32 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
   Widget? _pickupCard(TeamListing summary) {
     if (!_showsPickupCard(summary)) return null;
     final next = vm.nextEvent;
-    return NextPickupCard(
+    // Follows the command too, or the buttons stay off after a save.
+    return ListenableBuilder(
       key: const ValueKey('next-pickup'),
-      kind: summary.kind,
-      event: next,
-      member: vm.isMember,
-      mine: vm.myNextRsvp,
-      needsRsvp: vm.nextNeedsRsvp,
-      busy: vm.setNextRsvp.running,
-      onAnswer: vm.answerNext,
-      onOpen: next == null ? null : () => _openEvent(next),
-      onNewEvent: vm.canAddEvents
-          ? () => showEventEditor(context, teamId: vm.teamId)
-          : null,
-      join: vm.isMember
-          ? null
-          : PickupJoinPrompt(
-              requiresApproval: summary.requiresApproval,
-              pending: vm.requestPending,
-              busy: vm.joinGroup.running || vm.cancelJoinRequest.running,
-              onJoin: vm.joinGroup.execute,
-              onCancel: vm.cancelJoinRequest.execute,
-            ),
+      listenable: vm.setNextRsvp,
+      builder: (context, _) => NextPickupCard(
+        kind: summary.kind,
+        event: next,
+        member: vm.isMember,
+        mine: vm.myNextRsvp,
+        needsRsvp: vm.nextNeedsRsvp,
+        busy: vm.setNextRsvp.running,
+        onAnswer: vm.answerNext,
+        onOpen: next == null ? null : () => _openEvent(next),
+        onNewEvent: vm.canAddEvents
+            ? () => showEventEditor(context, teamId: vm.teamId)
+            : null,
+        join: vm.isMember
+            ? null
+            : PickupJoinPrompt(
+                requiresApproval: summary.requiresApproval,
+                pending: vm.requestPending,
+                busy: vm.joinGroup.running || vm.cancelJoinRequest.running,
+                onJoin: vm.joinGroup.execute,
+                onCancel: vm.cancelJoinRequest.execute,
+              ),
+      ),
     );
   }
 
@@ -1405,7 +1410,7 @@ Widget? _communityChip(BuildContext context, TeamHomeViewModel vm) =>
         avatar: const Icon(Icons.account_balance_outlined, size: 18),
         label: Text(team.orgName.isEmpty ? 'Community' : team.orgName),
         tooltip: 'Open the community',
-        onPressed: () => context.push(Routes.team(team.orgId!)),
+        onPressed: () => pushTeamRoute(context, Routes.team(team.orgId!)),
       ),
       _ => null,
     };

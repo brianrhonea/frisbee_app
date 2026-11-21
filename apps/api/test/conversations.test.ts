@@ -164,6 +164,8 @@ describe("messages", () => {
     s.store.put("conversations/amy_ben/messages/m1", { authorId: "ben", text: "yo" });
     expect((await s.call("PUT", "/v1/conversations/amy_ben/messages/m1/reaction", { emoji: "🔥" })).statusCode).toBe(204);
     expect(s.store.doc("conversations/amy_ben/messages/m1")?.reactions).toEqual({ amy: "🔥" });
+    expect((await s.call("PUT", "/v1/conversations/amy_ben/messages/m1/reaction", { emoji: "‼️" })).statusCode).toBe(204);
+    expect((await s.call("PUT", "/v1/conversations/amy_ben/messages/m1/reaction", { emoji: "yes" })).statusCode).toBe(400);
     expect((await s.call("DELETE", "/v1/conversations/amy_ben/messages/m1")).statusCode).toBe(403);
     expect((await s.call("DELETE", "/v1/conversations/amy_ben/messages/m1", undefined, "ben")).statusCode).toBe(204);
   });

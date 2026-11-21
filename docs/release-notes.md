@@ -10,6 +10,19 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.39
+
+**Chat**
+- Double-tap a message to react: a bubble of reactions pops up above
+  it. Tap + for any other emoji.
+
+**Events**
+- Changing your RSVP (Going, Maybe, Can't go) works straight away; no
+  need to close the event and open it again.
+- The RSVP choices look like buttons now.
+
+---
+
 ## 0.0.38
 
 **Teams**

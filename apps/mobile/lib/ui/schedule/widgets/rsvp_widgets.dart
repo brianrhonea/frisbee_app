@@ -26,39 +26,38 @@ class RsvpChoice<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: c.field,
-        borderRadius: BorderRadius.circular(controlRadius),
-      ),
-      // Equal heights when a long answer wraps.
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (var i = 0; i < options.length; i++) ...[
-              if (i > 0) const SizedBox(width: 6),
-              Expanded(child: _option(context, c, options[i])),
-            ],
+    // Separate buttons, not a segmented track, so it reads as tappable.
+    // Equal heights when a long answer wraps.
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < options.length; i++) ...[
+            if (i > 0) const SizedBox(width: 8),
+            Expanded(child: _option(context, c, options[i])),
           ],
-        ),
+        ],
       ),
     );
   }
 
   Widget _option(BuildContext context, AppColors c, RsvpOption<T> o) {
     final on = o.value == selected;
-    final fg = on ? c.onAccent : c.ink2;
+    final fg = on ? c.onAccent : c.ink;
     return Semantics(
       inMutuallyExclusiveGroup: true,
       checked: on,
       button: true,
       child: Material(
-        color: on ? c.accent : Colors.transparent,
-        borderRadius: BorderRadius.circular(controlRadius - 2),
+        color: on ? c.accent : c.card,
+        elevation: on ? 0 : 1,
+        shadowColor: c.ink.withValues(alpha: 0.25),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(controlRadius),
+          side: BorderSide(color: on ? c.accent : c.border2, width: 1.5),
+        ),
+        clipBehavior: Clip.antiAlias,
         child: InkWell(
-          borderRadius: BorderRadius.circular(controlRadius - 2),
           onTap: onChanged == null
               ? null
               : () => onChanged!(on ? null : o.value),

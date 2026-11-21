@@ -481,6 +481,8 @@ function ConversationView({
   const hiddenBefore = ms(mine?.clearedAt);
   const messages = usePagedMessages<Message>(`conversations/${conv.id}/messages`, pageSize, hiddenBefore);
   const [replyTo, setReplyTo] = useState<Doc<Message> | null>(null);
+  // The message whose reaction bubble is open (double-click, as the app's double-tap).
+  const [reacting, setReacting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [managing, setManaging] = useState(false);
   const typing = useTyping(conv.id, me, conv.names);
@@ -559,7 +561,7 @@ function ConversationView({
               Object.values(m.reactions ?? {}).reduce<Record<string, number>>((acc, e) => ({ ...acc, [e]: (acc[e] ?? 0) + 1 }), {}),
             );
             return (
-              <div key={m.id} className={`message${grouped ? " grouped" : ""}${m.authorId === me ? " mine" : ""}`}>
+              <div key={m.id} className={`message${grouped ? " grouped" : ""}${m.authorId === me ? " mine" : ""}`} onDoubleClick={m.createdAt ? () => setReacting(m.id) : undefined}>
                 {grouped && (
                   <span className="message-time">
                     <LocalTime iso={m.createdAt} style="time" />
@@ -597,6 +599,8 @@ function ConversationView({
                   canDelete={m.authorId === me}
                   onReply={info.requestForMe ? undefined : () => setReplyTo(m)}
                   onDeleted={() => messages.removed(m.id)}
+                  picking={reacting === m.id}
+                  onPickingChange={(open) => setReacting(open ? m.id : null)}
                 />
               </div>
             );

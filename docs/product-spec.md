@@ -1144,6 +1144,23 @@ everything the app does on the website alone, styled like the website
     `test/ui/community_page_test.dart`, `test/domain/team_page_test.dart`.
     The website's side is checked by typecheck and by hand.
 Out of scope: payments, meeting recording, USA Ultimate data.
+45. Chat reactions bubble: [x] app; [x] website. Double-tap (website:
+    double-click, or React) a message for a bubble of the quick reactions
+    ❤️ 👍 👎 😂 ‼️ ❓ just above it, with + for every emoji by group (the
+    same list on both, `fixtures/chat_reactions/choices.json`); the
+    user's own reaction is highlighted, picking it again takes it back,
+    and one picked from + shows in the bubble. The app's long-press sheet
+    has the + too. The API accepts any one emoji (`isChatReaction`), not
+    only the quick ones. Tests: app `messages_test.dart` (double-tap
+    bubble), `chat_reactions_fixtures_test.dart`; shared
+    `chat_reactions_fixtures.test.ts`; API `hub.test.ts`,
+    `conversations.test.ts`. The website's bubble has no test runner
+    (typecheck and build only).
+46. RSVP buttons: [x] app; [x] website (already separate buttons). The
+    app's Going / Maybe / Can't go are separate outlined buttons, filled
+    when chosen, and change straight away on the event, meeting and
+    community cards (they were switched off after the first save until
+    the event was reopened).
 
 Libraries the website may add (none today): a small data cache for API
 reads and mutations, the Firestore web SDK for listeners, and LiveKit's

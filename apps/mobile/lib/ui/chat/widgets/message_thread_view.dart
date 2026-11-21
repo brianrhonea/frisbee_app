@@ -21,13 +21,15 @@ import '../../core/ui/undo_snack_bar.dart';
 import '../../core/ui/user_avatar.dart';
 import '../../videos/widgets/file_video_player.dart';
 import '../view_models/message_thread_viewmodel.dart';
+import 'reaction_bubble.dart';
 import '../../core/ui/skeleton.dart';
 
 /// Messages with a composer below, for a team room or a direct message.
 /// Shows [readOnlyNotice] in place of the composer when the user can't post.
 ///
-/// Long-press (or right-click) a message to react, reply, copy or delete
-/// it; swipe a message's bubble to the right to reply. Drag anywhere to the
+/// Double-tap a message for the reaction bubble; long-press (or right-click)
+/// it to react, reply, copy or delete
+/// it. Swipe a message's bubble to the right to reply. Drag anywhere to the
 /// left to see every message's time.
 class MessageThreadView extends StatefulWidget {
   const MessageThreadView({
@@ -200,6 +202,19 @@ class _MessageThreadViewState extends State<MessageThreadView>
 
   void _react(ChatMessage m, String emoji) => vm.react.execute((m, emoji));
 
+  bool _canReact(ChatMessage m) => vm.canReact && m.createdAt != null;
+
+  /// Double-tap: the bubble of reactions over the message (rect on screen).
+  Future<void> _quickReact(ChatMessage m, Rect rect) async {
+    final emoji = await showReactionBubble(
+      context,
+      anchor: rect,
+      mine: m.reactionOf(vm.uid),
+      alignEnd: vm.isMine(m) && vm.style == ThreadStyle.bubbles,
+    );
+    if (mounted && emoji != null) _react(m, emoji);
+  }
+
   /// The author's profile, over the conversation so back returns here.
   void _openProfile(String uid) {
     if (uid.isEmpty || !vm.opensProfiles) return;
@@ -217,7 +232,7 @@ class _MessageThreadViewState extends State<MessageThreadView>
       builder: (_) => _MessageActionsSheet(
         message: m,
         mine: m.reactionOf(vm.uid),
-        canReact: vm.canReact && m.createdAt != null,
+        canReact: _canReact(m),
         canReply: _canReply(m),
         canDelete: vm.canDelete(m),
         canOpenProfile:
@@ -231,6 +246,12 @@ class _MessageThreadViewState extends State<MessageThreadView>
     switch (action) {
       case _React(:final emoji):
         _react(m, emoji);
+      case _MoreReactions():
+        final emoji = await showEmojiPicker(
+          context,
+          mine: m.reactionOf(vm.uid),
+        );
+        if (mounted && emoji != null) _react(m, emoji);
       case _Reply():
         _reply(m);
       case _Copy():
@@ -267,6 +288,9 @@ class _MessageThreadViewState extends State<MessageThreadView>
                     onActions: _actions,
                     onReply: (m) => _canReply(m) ? _reply(m) : null,
                     onReact: vm.canReact ? _react : null,
+                    onQuickReact: (m, rect) {
+                      if (_canReact(m)) _quickReact(m, rect);
+                    },
                     onDelete: _delete,
                     onProfile: _openProfile,
                     reveal: _reveal,
@@ -310,6 +334,11 @@ class _React extends _MessageAction {
   final String emoji;
 }
 
+/// The + in the sheet's reactions: every emoji.
+class _MoreReactions extends _MessageAction {
+  const _MoreReactions();
+}
+
 class _Reply extends _MessageAction {
   const _Reply();
 }
@@ -336,6 +365,7 @@ class _RowActions {
     required this.onActions,
     required this.onReply,
     required this.onReact,
+    required this.onQuickReact,
     required this.onDelete,
     required this.onProfile,
     required this.reveal,
@@ -352,6 +382,9 @@ class _RowActions {
 
   /// Toggles a reaction; null where reactions aren't offered.
   final void Function(ChatMessage, String)? onReact;
+
+  /// Double-tap: the reaction bubble over the message at that rect.
+  final void Function(ChatMessage, Rect) onQuickReact;
   final ValueChanged<ChatMessage> onDelete;
   final ValueChanged<String> onProfile;
 
@@ -399,6 +432,7 @@ class _MessageActionsSheet extends StatelessWidget {
     final c = AppColors.of(context);
     void pick(_MessageAction a) => Navigator.pop(context, a);
     final name = message.authorName.isEmpty ? 'Member' : message.authorName;
+    final other = quickReactions.contains(mine) ? null : mine;
     return SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -439,6 +473,27 @@ class _MessageActionsSheet extends StatelessWidget {
                         ),
                       ),
                     ),
+                  // Any other emoji; shows theirs when it's not above.
+                  Semantics(
+                    button: true,
+                    label: 'More emoji',
+                    child: InkResponse(
+                      radius: 26,
+                      onTap: () => pick(const _MoreReactions()),
+                      child: Container(
+                        width: 48,
+                        height: 48,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: other == null ? c.field : c.accentSoft,
+                        ),
+                        child: other == null
+                            ? Icon(Icons.add, color: c.ink2)
+                            : Text(other, style: const TextStyle(fontSize: 26)),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -1114,9 +1169,9 @@ class _Attachments extends StatelessWidget {
   );
 }
 
-/// Long-press (or right-click) handling shared by both row styles: opens
-/// the message's actions.
-class _Pressable extends StatelessWidget {
+/// Long-press (or right-click) and double-tap handling shared by both row
+/// styles: the actions sheet, or the reaction bubble.
+class _Pressable extends StatefulWidget {
   const _Pressable({
     required this.message,
     required this.actions,
@@ -1128,11 +1183,53 @@ class _Pressable extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-    behavior: HitTestBehavior.opaque,
-    onLongPress: () => actions.onActions(message),
-    onSecondaryTap: () => actions.onActions(message),
-    child: child,
+  State<_Pressable> createState() => _PressableState();
+}
+
+/// Double-tap is spotted from raw pointer events rather than a
+/// double-tap recognizer: that one holds every single tap inside the
+/// message (links, cards, poll buttons) until it times out.
+class _PressableState extends State<_Pressable> {
+  Offset? _down;
+  Duration? _lastUp;
+  Offset? _lastUpAt;
+
+  void _onUp(PointerUpEvent e) {
+    final down = _down;
+    _down = null;
+    // A drag or a swipe, not a tap.
+    if (down == null || (e.position - down).distance > kTouchSlop) return;
+    final last = _lastUp;
+    final lastAt = _lastUpAt;
+    if (last != null &&
+        lastAt != null &&
+        e.timeStamp - last <= kDoubleTapTimeout &&
+        (e.position - lastAt).distance <= kDoubleTapSlop) {
+      _lastUp = null;
+      _lastUpAt = null;
+      final box = context.findRenderObject();
+      if (box is! RenderBox || !box.hasSize) return;
+      widget.actions.onQuickReact(
+        widget.message,
+        box.localToGlobal(Offset.zero) & box.size,
+      );
+      return;
+    }
+    _lastUp = e.timeStamp;
+    _lastUpAt = e.position;
+  }
+
+  @override
+  Widget build(BuildContext context) => Listener(
+    onPointerDown: (e) => _down = e.position,
+    onPointerCancel: (_) => _down = null,
+    onPointerUp: _onUp,
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onLongPress: () => widget.actions.onActions(widget.message),
+      onSecondaryTap: () => widget.actions.onActions(widget.message),
+      child: widget.child,
+    ),
   );
 }
 

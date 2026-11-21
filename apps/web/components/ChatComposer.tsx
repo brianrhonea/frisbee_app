@@ -1,5 +1,5 @@
 "use client";
-import { chatAttachmentsMax, chatReactionChoices, chatTextMax, formatFileSize } from "@stall10/shared";
+import { chatAttachmentsMax, chatQuickReactions, chatReactionGroups, chatTextMax, formatFileSize } from "@stall10/shared";
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import type { OutboxKind } from "@stall10/shared";
 import { callApi } from "@/lib/client";
@@ -267,7 +267,12 @@ export function ChatComposer({
   );
 }
 
-/** Reply, react and delete on one message; [path] is the message's endpoint. */
+/**
+ * Reply, react and delete on one message; [path] is the message's endpoint.
+ * Reacting opens a bubble of quick reactions above the message with a +
+ * for any other emoji (as the app's double-tap); the list opens it on a
+ * double-click too, through [picking] and [onPickingChange].
+ */
 export function MessageActions({
   path,
   mine,
@@ -275,6 +280,8 @@ export function MessageActions({
   onReply,
   onDeleted,
   extra,
+  picking: pickingProp,
+  onPickingChange,
 }: {
   path: string;
   mine: string | null;
@@ -284,9 +291,14 @@ export function MessageActions({
   extra?: ReactNode;
   /** Told once the message is deleted (older pages aren't live). */
   onDeleted?: () => void;
+  /** Whether the reaction bubble is open, when the list controls it. */
+  picking?: boolean;
+  onPickingChange?: (open: boolean) => void;
 }) {
   const { user } = useAuth();
-  const [picking, setPicking] = useState(false);
+  const [pickingOwn, setPickingOwn] = useState(false);
+  const picking = pickingProp ?? pickingOwn;
+  const setPicking = (open: boolean) => (onPickingChange ? onPickingChange(open) : setPickingOwn(open));
   const [error, setError] = useState<string | null>(null);
 
   async function call(url: string, method: "PUT" | "DELETE", body?: unknown) {
@@ -307,25 +319,18 @@ export function MessageActions({
           Reply
         </button>
       )}
-      <button type="button" className="text-btn" aria-expanded={picking} onClick={() => setPicking(!picking)} aria-label="React">
+      <button type="button" className="text-btn" data-reaction-toggle aria-expanded={picking} onClick={() => setPicking(!picking)} aria-label="React">
         {mine ?? "☺"}
       </button>
       {picking && (
-        <span className="reaction-picker" role="group" aria-label="Pick a reaction">
-          {chatReactionChoices.map((e) => (
-            <button
-              key={e}
-              type="button"
-              className={mine === e ? "on" : ""}
-              onClick={() => {
-                setPicking(false);
-                void call(`${path}/reaction`, "PUT", { emoji: mine === e ? null : e });
-              }}
-            >
-              {e}
-            </button>
-          ))}
-        </span>
+        <ReactionBubble
+          mine={mine}
+          onClose={() => setPicking(false)}
+          onPick={(e) => {
+            setPicking(false);
+            void call(`${path}/reaction`, "PUT", { emoji: mine === e ? null : e });
+          }}
+        />
       )}
       {extra}
       {canDelete && (
@@ -340,6 +345,65 @@ export function MessageActions({
         </button>
       )}
       {error && <span className="form-error">{error}</span>}
+    </div>
+  );
+}
+
+/** The quick reactions in a pill over the message, then + for every emoji. Escape or a click outside closes it. */
+function ReactionBubble({ mine, onPick, onClose }: { mine: string | null; onPick: (emoji: string) => void; onClose: () => void }) {
+  const [more, setMore] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const close = useRef(onClose);
+  close.current = onClose;
+  useEffect(() => {
+    ref.current?.querySelector("button")?.focus();
+    const key = (e: KeyboardEvent) => e.key === "Escape" && close.current();
+    const click = (e: MouseEvent) => {
+      const t = e.target as Element;
+      // The React button toggles it itself.
+      if (ref.current && !ref.current.contains(t) && !t.closest?.("[data-reaction-toggle]")) close.current();
+    };
+    document.addEventListener("keydown", key);
+    document.addEventListener("mousedown", click);
+    return () => {
+      document.removeEventListener("keydown", key);
+      document.removeEventListener("mousedown", click);
+    };
+  }, []);
+  const other = mine && !(chatQuickReactions as readonly string[]).includes(mine) ? mine : null;
+  return (
+    <div className="reaction-bubble" ref={ref} role="dialog" aria-label="React to this message">
+      <div className="reaction-quick" role="group" aria-label="Quick reactions">
+        {chatQuickReactions.map((e) => (
+          <button key={e} type="button" className={mine === e ? "on" : ""} aria-pressed={mine === e} aria-label={`React ${e}`} onClick={() => onPick(e)}>
+            {e}
+          </button>
+        ))}
+        {other && (
+          <button type="button" className="on" aria-pressed aria-label={`React ${other}`} onClick={() => onPick(other)}>
+            {other}
+          </button>
+        )}
+        <button type="button" className="reaction-more" aria-expanded={more} aria-label="More emoji" onClick={() => setMore(!more)}>
+          +
+        </button>
+      </div>
+      {more && (
+        <div className="reaction-all">
+          {chatReactionGroups.map((g) => (
+            <section key={g.name} aria-label={g.name}>
+              <h4>{g.name}</h4>
+              <div className="reaction-grid">
+                {g.emoji.map((e) => (
+                  <button key={e} type="button" className={mine === e ? "on" : ""} aria-label={`React ${e}`} onClick={() => onPick(e)}>
+                    {e}
+                  </button>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

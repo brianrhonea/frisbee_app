@@ -1288,6 +1288,15 @@ button.person-row:hover { background: var(--field); }
 .unpin-choices .btn { text-align: left; justify-content: flex-start; }
 .event-detail-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .rsvp-buttons { margin: 12px 0 4px; }
+/* RSVP answers are separate buttons, not a quiet track, so they read as tappable. */
+.segmented.rsvp-buttons { display: flex; gap: 8px; padding: 0; background: none; border: 0; border-radius: 0; }
+.segmented.rsvp-buttons button {
+  flex: 1 1 0; min-height: 44px; border: 1.5px solid var(--line-2); background: var(--card); color: var(--ink);
+  border-radius: 10px; box-shadow: 0 1px 2px rgb(0 0 0 / 0.12); padding: 6px 10px;
+}
+.segmented.rsvp-buttons button:hover:not(:disabled) { border-color: var(--accent); }
+.segmented.rsvp-buttons button.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); box-shadow: none; }
+.segmented.rsvp-buttons button.on .rsvp-count { color: inherit; }
 .reaction-picker { display: inline-flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
 .reaction-picker button {
   border: 1px solid var(--line); background: var(--field); border-radius: 999px; padding: 3px 9px;
@@ -1315,6 +1324,24 @@ button.poll-option.on { border-color: var(--accent); }
 }
 .message:hover .message-actions, .message:focus-within .message-actions { display: flex; }
 .message-reactions .mine { color: var(--accent); font-weight: 600; }
+/* Reaction bubble over the message: quick tapbacks, + for every emoji. */
+.reaction-bubble {
+  position: absolute; bottom: calc(100% - 4px); left: 42px; z-index: 30; max-width: min(360px, calc(100vw - 32px));
+  background: var(--card); border: 1px solid var(--line); border-radius: 22px; box-shadow: var(--shadow); padding: 4px 6px;
+}
+.message.mine .reaction-bubble { left: auto; right: 0; }
+.reaction-quick { display: flex; gap: 2px; align-items: center; overflow-x: auto; }
+.reaction-bubble button {
+  border: 0; background: none; border-radius: 999px; width: 38px; height: 38px; flex: none;
+  font-size: 1.35rem; line-height: 1; cursor: pointer; display: grid; place-items: center;
+}
+.reaction-bubble button:hover, .reaction-bubble button:focus-visible { background: var(--field); }
+.reaction-bubble button.on { background: var(--accent-soft); }
+.reaction-bubble .reaction-more { background: var(--field); color: var(--ink-2); font-size: 1.3rem; font-weight: 600; width: 32px; height: 32px; margin-left: 2px; }
+.reaction-all { max-height: 260px; overflow-y: auto; border-top: 1px solid var(--line); margin-top: 4px; padding: 4px 2px; }
+.reaction-all h4 { margin: 6px 4px 2px; font-size: 0.75rem; color: var(--muted); font-weight: 700; }
+.reaction-grid { display: grid; grid-template-columns: repeat(auto-fill, 38px); gap: 2px; }
+.reaction-grid button { font-size: 1.25rem; }
 @media (hover: none) { .message-actions { display: flex; } }
 
 /* Messages (web 0.11.0). */

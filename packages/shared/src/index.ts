@@ -18,6 +18,7 @@ export * from "./ical.js";
 export * from "./calendar_links.js";
 export * from "./routes.js";
 export * from "./hub.js";
+export * from "./chat_reactions.js";
 export * from "./account.js";
 export * from "./password.js";
 export * from "./playbook.js";

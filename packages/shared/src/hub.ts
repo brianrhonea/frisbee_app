@@ -218,8 +218,6 @@ export const chatReactionRequestSchema = z.strictObject({
   emoji: z.string().min(1).max(16).nullable(),
 });
 
-/** The emoji the website offers for chat reactions. */
-export const chatReactionChoices = ["👍", "❤️", "😂", "🔥", "🥏", "👏", "😮", "😢"] as const;
 
 // ---- Chat rooms and folders (teams/{id}/chats, chatFolders) ---------------
 

@@ -21,6 +21,7 @@ import 'package:frisbee_app/ui/messages/view_models/direct_chat_viewmodel.dart';
 import 'package:frisbee_app/ui/messages/view_models/group_members_viewmodel.dart';
 import 'package:frisbee_app/ui/messages/view_models/inbox_viewmodel.dart';
 import 'package:frisbee_app/ui/messages/widgets/direct_chat_screen.dart';
+import 'package:frisbee_app/ui/chat/widgets/reaction_bubble.dart';
 import 'package:frisbee_app/ui/messages/widgets/inbox_screen.dart';
 import 'package:frisbee_app/utils/result.dart';
 
@@ -1127,6 +1128,94 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Profile a'), findsOneWidget);
+  });
+
+  testWidgets('double-tap a message for a bubble of reactions over it; '
+      'its + offers every emoji', (tester) async {
+    await dms.openConversation(
+      testUser,
+      const UserProfile(uid: 'a', name: 'Avery'),
+    );
+    await dms.sendMessage(
+      'a_u1',
+      author: const AppUser(uid: 'a', displayName: 'Avery'),
+      text: 'Pickup at 6?',
+    );
+    final vm = DirectChatViewModel(
+      conversationId: 'a_u1',
+      directMessageRepository: dms,
+      authRepository: auth,
+      filePicker: FakeFilePickerService(),
+    );
+    addTearDown(vm.dispose);
+    await tester.pumpWidget(
+      withRepos(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: DirectChatScreen(viewModel: vm),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    Future<void> doubleTap() async {
+      final at = tester.getCenter(find.text('Pickup at 6?').first);
+      await tester.tapAt(at);
+      await tester.pump(const Duration(milliseconds: 60));
+      await tester.tapAt(at);
+      await tester.pumpAndSettle();
+    }
+
+    await doubleTap();
+    final bubble = find.byType(ReactionBubble);
+    expect(bubble, findsOneWidget);
+    // It sits just above the message.
+    expect(
+      tester.getBottomLeft(bubble).dy,
+      lessThanOrEqualTo(tester.getTopLeft(find.text('Pickup at 6?').first).dy),
+    );
+    for (final e in quickReactions) {
+      expect(find.bySemanticsLabel('React $e'), findsOneWidget);
+    }
+    await tester.tap(find.bySemanticsLabel('React ‼️'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ReactionBubble), findsNothing);
+    expect(vm.messages.single.reactionOf(testUser.uid), '‼️');
+
+    // The +: any emoji, by group.
+    await doubleTap();
+    await tester.tap(find.bySemanticsLabel('More emoji'));
+    await tester.pumpAndSettle();
+    expect(find.text('Smileys'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('🐐'),
+      200,
+      scrollable: find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.tap(find.text('🐐'));
+    await tester.pumpAndSettle();
+    expect(vm.messages.single.reactionOf(testUser.uid), '🐐');
+
+    // Theirs from the + shows in the bubble, so it can be taken back.
+    await doubleTap();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(ReactionBubble),
+        matching: find.text('🐐'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(vm.messages.single.reactionOf(testUser.uid), isNull);
+
+    // Tapping outside closes it without reacting.
+    await doubleTap();
+    await tester.tapAt(const Offset(5, 5));
+    await tester.pumpAndSettle();
+    expect(find.byType(ReactionBubble), findsNothing);
+    expect(vm.messages.single.reactionOf(testUser.uid), isNull);
   });
 
   testWidgets('on a phone, back from a conversation goes to Messages', (

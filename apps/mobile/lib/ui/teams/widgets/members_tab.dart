@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
+import '../../../routing/push_team_route.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/layout.dart';
@@ -586,7 +587,8 @@ class _RolesHelp extends StatelessWidget {
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton.icon(
-                onPressed: () => context.push(Routes.teamRoles(team.id)),
+                onPressed: () =>
+                    pushTeamRoute(context, Routes.teamRoles(team.id)),
                 icon: const Icon(Icons.tune),
                 label: const Text('Manage roles'),
               ),

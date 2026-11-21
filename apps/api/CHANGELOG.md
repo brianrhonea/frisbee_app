@@ -7,6 +7,17 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.36.0 — 2026-11-20
+
+With app 0.0.39 and web 0.48.0.
+
+**Changed**
+- Chat reactions (`PUT .../messages/:messageId/reaction` for team rooms
+  and conversations) take any one emoji (`isChatReaction` in
+  `packages/shared`), not only the website's old list of eight, so the
+  app's quick reactions and the emoji picker's choices are accepted.
+  Anything else is still 400.
+
 ## 0.35.0 — 2026-11-20
 
 Redesign features, second batch, with app 0.0.38 and web 0.47.0.

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../domain/models/personal_details.dart';
 import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
+import '../../../routing/push_team_route.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 import '../../core/themes/theme.dart';
@@ -68,7 +68,7 @@ class _CommunityTeamsTabState extends State<CommunityTeamsTab> {
     switch (cmd.result) {
       case Ok<String>(:final value):
         cmd.clearResult();
-        context.push(Routes.team(value));
+        pushTeamRoute(context, Routes.team(value));
       case Error<String>():
         showErrorSnackBar(context, cmd.result);
         cmd.clearResult();
@@ -202,7 +202,7 @@ class _CommunityTeamsTabState extends State<CommunityTeamsTab> {
                         on: vm.isOn(t),
                         joining: vm.isJoining(t),
                         roleNames: vm.roleNames(t),
-                        onOpen: () => context.push(Routes.team(t.id)),
+                        onOpen: () => pushTeamRoute(context, Routes.team(t.id)),
                         onInvite: vm.canInvite
                             ? () => showInviteMembers(
                                 context,

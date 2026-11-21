@@ -1,5 +1,5 @@
 import {
-  chatReactionChoices,
+  isChatReaction,
   chatReactionRequestSchema,
   eventReactionRequestSchema,
   eventVotesRequestSchema,
@@ -405,8 +405,8 @@ export class HubService {
     const roomId = docIdParam(rawRoom);
     const id = docIdParam(rawMessage);
     const { emoji } = parseBody(chatReactionRequestSchema, body);
-    if (emoji !== null && !(chatReactionChoices as readonly string[]).includes(emoji)) {
-      throw new ApiError("invalid_argument", "Pick one of the reactions.");
+    if (emoji !== null && !isChatReaction(emoji)) {
+      throw new ApiError("invalid_argument", "Pick one emoji.");
     }
     await this.store.transact(async (tx) => {
       const [team, room, message] = await Promise.all([

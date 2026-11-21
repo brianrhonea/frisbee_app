@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.39  | 2026-11-20 | `feature/redesign`                      |                     |
 | 0.0.38  | 2026-11-20 | `feature/redesign`                      |                     |
 | 0.0.37  | 2026-11-20 | `feature/redesign`                      |                     |
 | 0.0.36  | 2026-11-20 | `feature/redesign`                      |                     |
@@ -51,6 +52,25 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.39 — Double-tap reactions; RSVP buttons fixed
+
+With web 0.48.0 and API 0.36.0 (product-spec §8.1 item 45).
+
+- Chat: double-tap a message (pointer events in `_Pressable`, not a
+  double-tap recognizer, so taps inside messages aren't delayed) for a
+  bubble of quick reactions above it (`reaction_bubble.dart`) with a +
+  that opens every emoji by group; the long-press sheet has the + too.
+  `quickReactions`, `reactionGroups` and `isChatReaction` in
+  `domain/models/chat.dart`; shared vectors in
+  `packages/shared/fixtures/chat_reactions/choices.json`. The website's
+  quick reactions are now the app's (it offered a different set, and the
+  API refused three of the app's).
+- RSVP: Going / Maybe / Can't go switched off while a save ran and
+  nothing redrew them after, so a second answer needed the event
+  reopened. The event, meeting and community cards now rebuild on the
+  command. The choices are separate outlined buttons (filled when
+  chosen) instead of a segmented track.
 
 ## 0.0.38 — Redesign features, second batch (redesign 4)
 

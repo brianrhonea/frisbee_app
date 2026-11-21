@@ -4,6 +4,16 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.48.0 — 2026-11-20
+
+With app 0.0.39. Needs API 0.36.0 for emoji beyond the old eight.
+
+**Added**
+- Chat reactions as the app: double-click a message (or React) for a
+  bubble of quick reactions over it, with + for every emoji by group
+  (`chatQuickReactions`, `chatReactionGroups` in `packages/shared`).
+  The quick ones are now the app's ❤️ 👍 👎 😂 ‼️ ❓.
+
 ## 0.47.0 — 2026-11-20
 
 Redesign features, second batch, with app 0.0.38. Needs API 0.35.0.

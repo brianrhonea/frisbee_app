@@ -7,6 +7,7 @@ import '../../../domain/models/hosted_tournament.dart';
 import '../../../domain/tournament_engine/generator.dart';
 import '../../../domain/tournament_engine/league_weeks.dart';
 import '../../../routing/routes.dart';
+import '../../../routing/push_team_route.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 import '../../core/themes/theme.dart';
@@ -536,7 +537,7 @@ class _OverviewTab extends StatelessWidget {
             'your players now: they join the team with its link.',
         confirmLabel: 'Invite players',
       )) {
-        if (context.mounted) context.push(Routes.teamMembers(value));
+        if (context.mounted) pushTeamRoute(context, Routes.teamMembers(value));
       }
     } else {
       showErrorSnackBar(context, result);
@@ -992,7 +993,8 @@ class _MyEntryCard extends StatelessWidget {
                 if (active)
                   TextButton(
                     style: TextButton.styleFrom(foregroundColor: c.accent),
-                    onPressed: () => context.push(Routes.teamMembers(e.teamId)),
+                    onPressed: () =>
+                        pushTeamRoute(context, Routes.teamMembers(e.teamId)),
                     child: const Text('Invite players'),
                   ),
                 if (active)

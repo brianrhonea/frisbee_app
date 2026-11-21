@@ -323,8 +323,14 @@ class _RsvpCard extends StatelessWidget {
 
   final MeetingDetailViewModel viewModel;
 
+  // The buttons follow the commands too, or they stay off after a save.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: Listenable.merge([viewModel.setRsvp, viewModel.saveNote]),
+    builder: (context, _) => _card(context),
+  );
+
+  Widget _card(BuildContext context) {
     final vm = viewModel;
     final r = vm.responses;
     return SectionCard(

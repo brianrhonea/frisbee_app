@@ -635,6 +635,9 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
   Future<Result<void>> _react(ChatMessage message, String emoji) async {
     // Not on the server yet.
     if (isQueued(message)) return const Result.ok(null);
+    if (!isChatReaction(emoji)) {
+      return Result.error(Exception('Pick one emoji.'));
+    }
     final current = _reacting[message.id]?.$1 ?? message.reactionOf(uid);
     final next = current == emoji ? null : emoji;
     _reacting[message.id] = (next,);
