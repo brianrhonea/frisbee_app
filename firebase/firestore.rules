@@ -21,9 +21,22 @@ service cloud.firestore {
     function limitsPath() {
       return /databases/$(database)/documents/limits/$(uid());
     }
+    // Staff suspend an account (limits/{uid}.suspended, the API's
+    // moderation): it can't create those either.
     function notMuted() {
       return !exists(limitsPath())
-        || get(limitsPath()).data.get('mutedUntil', timestamp.value(0)) < request.time;
+        || (get(limitsPath()).data.get('mutedUntil', timestamp.value(0)) < request.time
+            && get(limitsPath()).data.get('suspended', false) != true);
+    }
+
+    // Blocks (apps/api/src/moderation): when either person blocks the
+    // other, the API writes users/{a}/blocks/{b} AND users/{b}/blocks/{a},
+    // so one lookup covers both ways. Between them: no follows, follow
+    // requests, direct messages, comments, likes, reposts or profile
+    // details. Feeds and lists hide each other's posts in the apps and
+    // the API (the rules can't filter a query by author).
+    function blockedWith(other) {
+      return exists(/databases/$(database)/documents/users/$(uid())/blocks/$(other));
     }
 
     // Private profiles (PlayerProfile in lib/domain/models/player_profile.dart):
@@ -257,6 +270,13 @@ service cloud.firestore {
     match /users/{userId} {
       allow read, write: if signedIn() && uid() == userId;
 
+      // Who the user blocked, or who blocked them (mine says which; see
+      // blockedWith). Only the API writes them.
+      match /blocks/{otherId} {
+        allow read: if signedIn() && uid() == userId;
+        allow write: if false;
+      }
+
       // Each direct-message conversation as the user keeps it, private to
       // them: when they last read it (the conversation's readAt is the
       // shared read receipt, which they can turn off with readReceipts on
@@ -424,9 +444,11 @@ service cloud.firestore {
           && ((uid() == userId
                && request.resource.data.get('approved', false) == false
                && (request.resource.data.type != 'user'
-                   || !isPrivateProfile(request.resource.data.targetId)))
+                   || (!isPrivateProfile(request.resource.data.targetId)
+                       && !blockedWith(request.resource.data.targetId))))
               || (request.resource.data.type == 'user'
                   && request.resource.data.targetId == uid()
+                  && !blockedWith(userId)
                   && request.resource.data.get('approved', false) == true
                   && exists(followRequestPath(uid(), userId))
                   && !existsAfter(followRequestPath(uid(), userId))));
@@ -2395,6 +2417,7 @@ service cloud.firestore {
       // original, so a repost's own repostedBy never changes).
       allow update: if signedIn()
         && canSeePost(resource.data)
+        && !blockedWith(resource.data.authorId)
         && changed().hasOnly(['likedBy', 'repostedBy'])
         && onlySelfToggled('likedBy')
         && onlySelfToggled('repostedBy')
@@ -2432,6 +2455,7 @@ service cloud.firestore {
         allow get: if signedIn() && canSeePost(post());
         allow list: if signedIn() && canSeePost(post()) && capped(100);
         allow create: if signedIn() && notMuted() && canSeePost(post())
+          && !blockedWith(post().authorId)
           && request.resource.data.keys().hasOnly([
                'body', 'authorId', 'authorName', 'authorPhotoUrl',
                'createdAt', 'parentId', 'replyToName'])
@@ -2552,7 +2576,8 @@ service cloud.firestore {
       // A private profile's details, summary and search tags: the player,
       // and people they let follow them.
       match /private/{doc} {
-        allow read: if signedIn() && (uid() == userId || followsUser(userId));
+        allow read: if signedIn()
+          && (uid() == userId || (followsUser(userId) && !blockedWith(userId)));
         allow delete: if signedIn() && uid() == userId;
         allow create, update: if signedIn() && uid() == userId
           && doc == 'details'
@@ -2588,6 +2613,7 @@ service cloud.firestore {
         allow create: if signedIn()
           && uid() == requesterId && requesterId != userId
           && isPrivateProfile(userId)
+          && !blockedWith(userId)
           && !followsUser(userId)
           && request.resource.data.keys().hasOnly([
                'name', 'username', 'photoUrl', 'createdAt'])
@@ -2696,6 +2722,7 @@ service cloud.firestore {
           && request.resource.data.names.diff(resource.data.names)
                .affectedKeys().hasOnly([added])
           && validString(request.resource.data.names[added], 80)
+          && !blockedWith(added)
           && exists(/databases/$(database)/documents/profiles/$(added))
           && follows(added, uid())
           && messagePolicy(added) != 'nobody';
@@ -2724,14 +2751,19 @@ service cloud.firestore {
       function allowedStart(d) {
         let other = d.participants[0] == uid() ? d.participants[1] : d.participants[0];
         let policy = messagePolicy(other);
-        return (d.get('status', 'accepted') == 'accepted'
+        return !blockedWith(other) && ((d.get('status', 'accepted') == 'accepted'
                  && d.get('requestedOf', null) == null
                  && policy != 'nobody'
                  && follows(other, uid()))
           || (d.get('status', 'accepted') == 'request'
                  && d.get('requestedOf', null) == other
                  && (policy == 'everyone'
-                     || (policy == 'followers' && follows(uid(), other))));
+                     || (policy == 'followers' && follows(uid(), other)))));
+      }
+      // The other person in a direct conversation.
+      function otherPerson() {
+        let ids = convId.split('_');
+        return ids[0] == uid() ? ids[1] : ids[0];
       }
       // A request still waiting on the signed-in user.
       function awaitingMe() {
@@ -2815,6 +2847,7 @@ service cloud.firestore {
         allow read: if signedIn() && inConversation();
         allow create: if signedIn() && notMuted() && inConversation()
           && exists(convPath())
+          && (isGroup() || !blockedWith(otherPerson()))
           // Not by whoever a request waits on, until they accept it.
           && !(get(convPath()).data.get('status', 'accepted') == 'request'
                && get(convPath()).data.get('requestedOf', null) == uid())
@@ -2893,6 +2926,12 @@ service cloud.firestore {
     // Each user reads their own, so the app can say how long a mute lasts.
     match /limits/{userId} {
       allow read: if signedIn() && uid() == userId;
+    }
+
+    // Reports (apps/api/src/moderation): written and read only by the
+    // API, for Stall 10's staff and the reported team's admins.
+    match /reports/{reportId} {
+      allow read, write: if false;
     }
   }
 }
