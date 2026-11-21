@@ -499,8 +499,12 @@ class _Subscribe extends StatelessWidget {
   }
 }
 
-class _ColorChoice extends StatelessWidget {
-  const _ColorChoice({required this.value, required this.onChanged});
+class CalendarColorChoice extends StatelessWidget {
+  const CalendarColorChoice({
+    super.key,
+    required this.value,
+    required this.onChanged,
+  });
 
   final CalendarColor value;
   final ValueChanged<CalendarColor>? onChanged;
@@ -577,7 +581,7 @@ class _NewCalendarDialogState extends State<_NewCalendarDialog> {
           onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 8),
-        _ColorChoice(
+        CalendarColorChoice(
           value: _color,
           onChanged: (c) => setState(() => _color = c),
         ),
@@ -708,7 +712,7 @@ class _CalendarDetailScreenState extends State<CalendarDetailScreen> {
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: _ColorChoice(
+                child: CalendarColorChoice(
                   value: cal.color,
                   onChanged: busy ? null : (color) => vm.recolor(cal, color),
                 ),

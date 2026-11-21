@@ -9,6 +9,14 @@ import '../../../utils/result.dart';
 /// [step] ("Deleting chat").
 typedef DeleteProgress = ({int done, int total, String step});
 
+/// Why a club team can't be made without the API: only the API checks
+/// the owner is 16 or over (firestore.rules refuses club teams otherwise).
+const clubTeamNeedsServerMessage =
+    "Club teams need a connection to Stall 10's server, which checks "
+    "everyone on them is 16 or over, and this version of the app doesn't "
+    'have one. Update the app, or pick another level (college, youth, '
+    'league or pickup).';
+
 abstract class TeamRepository {
   /// Teams the user is a member of, sorted by name.
   Stream<List<Team>> watchMyTeams(String uid);

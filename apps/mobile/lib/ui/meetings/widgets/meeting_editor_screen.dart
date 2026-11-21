@@ -13,6 +13,7 @@ import '../../core/ui/status_views.dart';
 import '../../schedule/widgets/event_editor_screen.dart'
     show FieldLabel, PickerField, SettingsCard;
 import '../view_models/meeting_editor_viewmodel.dart';
+import '../../core/ui/time_picker.dart';
 
 class MeetingEditorScreen extends StatefulWidget {
   const MeetingEditorScreen({super.key, required this.viewModel});
@@ -142,12 +143,15 @@ class _MeetingFormState extends State<_MeetingForm> {
   }
 
   Future<void> _pickStart() async {
-    final picked = await showTimePicker(context: context, initialTime: _start);
+    final picked = await showTypedTimePicker(
+      context: context,
+      initialTime: _start,
+    );
     if (picked != null) setState(() => _start = picked);
   }
 
   Future<void> _pickEnd() async {
-    final picked = await showTimePicker(
+    final picked = await showTypedTimePicker(
       context: context,
       initialTime:
           _end ??

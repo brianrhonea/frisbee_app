@@ -83,16 +83,20 @@ class DeviceCalendarService {
   }
 
   /// Shares [ics] as a calendar file named [fileName], which the share
-  /// sheet offers to Apple Calendar, Outlook, Google Calendar or Files.
+  /// sheet offers to Apple Calendar, Outlook, Google Calendar or Files, or
+  /// to send in a message or email (with [text] alongside where the app
+  /// takes it).
   /// [origin] anchors the sheet on iPad.
   Future<void> shareIcs({
     required String ics,
     required String fileName,
     required String subject,
+    String? text,
     Rect? origin,
   }) async {
     await SharePlus.instance.share(
       ShareParams(
+        text: text,
         files: [
           XFile.fromData(
             utf8.encode(ics),

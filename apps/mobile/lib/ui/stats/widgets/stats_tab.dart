@@ -17,6 +17,7 @@ import 'game_screen.dart' show confirmDeleteGame;
 import 'game_to_field.dart';
 import 'stat_sheet.dart';
 import 'stats_glossary.dart';
+import '../../core/ui/time_picker.dart';
 
 class StatsTab extends StatelessWidget {
   const StatsTab({super.key, required this.viewModel});
@@ -748,7 +749,7 @@ class _NewEventDialogState extends State<_NewEventDialog> {
   }
 
   Future<void> _pickTime() async {
-    final t = await showTimePicker(context: context, initialTime: _time);
+    final t = await showTypedTimePicker(context: context, initialTime: _time);
     if (t != null) setState(() => _time = t);
   }
 

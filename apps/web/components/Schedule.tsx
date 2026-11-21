@@ -3,6 +3,7 @@ import {
   type CalendarEvent,
   type CalendarEventResult,
   type CalendarEventsResponse,
+  type CalendarColor,
   type CalendarInfo,
   type CalendarInvite,
   type CalendarInvitesResponse,
@@ -18,7 +19,9 @@ import {
   scheduleFilters,
   scheduleOnDay,
   scheduleTeamLabel,
+  type ShareRole,
   shareRoleLabels,
+  shareRoles,
   upcomingSchedule,
 } from "@stall10/shared";
 import Link from "next/link";
@@ -34,6 +37,8 @@ import { useAuth } from "./AuthProvider";
 import { type ShareChoice, ShareEventField, shareEvent } from "./team/ShareEvent";
 import { fromLocalInput, startOfToday, toLocalInput } from "@/lib/dates";
 import { useMyTeams } from "./useMyTeams";
+import { type PickedPerson, PersonPicker } from "./PersonPicker";
+import { ColorPicker } from "./settings/CalendarSettings";
 import { meetingAnswer, needsRsvp, RsvpPill } from "./RsvpPill";
 import "./member.css";
 
@@ -700,6 +705,9 @@ function EventEditor({
   onDone: (saved: boolean) => void;
 }) {
   const { user } = useAuth();
+  // Calendars made here (New shared calendar) join the list at once.
+  const [made, setMade] = useState<CalendarInfo[]>([]);
+  const [newCal, setNewCal] = useState(false);
   const [calendarId, setCalendarId] = useState(event.calendarId ?? calendars[0]?.id ?? "");
   const [title, setTitle] = useState(event.title ?? "");
   const [type, setType] = useState<EventType>(event.type ?? "workout");
@@ -716,7 +724,8 @@ function EventEditor({
   const [share, setShare] = useState<ShareChoice>({ on: false, message: "" });
   if (!user) return null;
   const me = user;
-  const calendar = calendars.find((c) => c.id === calendarId);
+  const all = [...calendars, ...made.filter((m) => !calendars.some((c) => c.id === m.id))];
+  const calendar = all.find((c) => c.id === calendarId);
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -751,14 +760,30 @@ function EventEditor({
     <form className="settings-form event-editor" onSubmit={(e) => void save(e)}>
       <label>
         Calendar
-        <select value={calendarId} disabled={Boolean(event.id)} onChange={(e) => setCalendarId(e.target.value)}>
-          {calendars.map((c) => (
+        <select
+          value={calendarId}
+          disabled={Boolean(event.id)}
+          onChange={(e) => (e.target.value === NEW_CALENDAR ? setNewCal(true) : setCalendarId(e.target.value))}
+        >
+          {all.map((c) => (
             <option key={c.id} value={c.id}>
               {c.role === "owner" ? c.name : `${c.name} (${c.owner.name})`}
             </option>
           ))}
+          {!event.id && <option value={NEW_CALENDAR}>New shared calendar…</option>}
         </select>
       </label>
+      {newCal && (
+        <NewSharedCalendar
+          me={me}
+          onCancel={() => setNewCal(false)}
+          onMade={(c) => {
+            setMade((m) => [...m, c]);
+            setCalendarId(c.id);
+            setNewCal(false);
+          }}
+        />
+      )}
       <label>
         Title
         <input value={title} required maxLength={100} onChange={(e) => setTitle(e.target.value)} />
@@ -809,5 +834,104 @@ function EventEditor({
         </button>
       </div>
     </form>
+  );
+}
+
+const NEW_CALENDAR = "__new";
+
+/**
+ * From the event editor: a calendar to share, made on the spot (name,
+ * color, who to invite and what they may do), so sharing an event needs no
+ * trip to Calendars first. As the app's New shared calendar sheet.
+ */
+function NewSharedCalendar({
+  me,
+  onMade,
+  onCancel,
+}: {
+  me: NonNullable<ReturnType<typeof useAuth>["user"]>;
+  onMade: (c: CalendarInfo) => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [color, setColor] = useState<CalendarColor>("blue");
+  const [role, setRole] = useState<ShareRole>("view");
+  const [people, setPeople] = useState<PickedPerson[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function create() {
+    if (!name.trim()) return setError("Name the calendar.");
+    setBusy(true);
+    setError(null);
+    try {
+      const cal = await callApi<CalendarInfo>(me, "/v1/me/calendars", { method: "POST", body: { name: name.trim(), color } });
+      let missed = 0;
+      for (const p of people) {
+        try {
+          await callApi(me, `/v1/calendars/${encodeURIComponent(cal.id)}/invites`, { method: "POST", body: { uid: p.uid, role } });
+        } catch {
+          missed++;
+        }
+      }
+      if (missed > 0) window.alert(`${cal.name} is made, but ${missed} invite${missed === 1 ? "" : "s"} didn't send. Invite them from Calendars.`);
+      onMade(cal);
+    } catch (err) {
+      setError(problem(err));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <fieldset className="new-shared-cal">
+      <legend>New shared calendar</legend>
+      <p className="muted small">This event goes on it. People see it once they accept; add more later from Calendars.</p>
+      <label>
+        Name
+        <input value={name} maxLength={60} placeholder="e.g. Family, Carpool" autoFocus onChange={(e) => setName(e.target.value)} />
+      </label>
+      <ColorPicker value={color} onChange={setColor} disabled={busy} />
+      <label>
+        They can
+        <select value={role} disabled={busy} onChange={(e) => setRole(e.target.value as ShareRole)}>
+          {shareRoles.map((r) => (
+            <option key={r} value={r}>
+              {shareRoleLabels[r]}
+            </option>
+          ))}
+        </select>
+      </label>
+      {people.length > 0 && (
+        <ul className="chip-list">
+          {people.map((p) => (
+            <li key={p.uid}>
+              {p.name}{" "}
+              <button type="button" className="text-btn" aria-label={`Remove ${p.name}`} onClick={() => setPeople(people.filter((x) => x.uid !== p.uid))}>
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <PersonPicker
+        label="Invite people by name or username"
+        exclude={[me.uid, ...people.map((p) => p.uid)]}
+        disabled={busy}
+        onPick={(p) => setPeople((x) => [...x, p])}
+      />
+      <div className="form-actions">
+        {error && (
+          <span className="form-error" role="alert">
+            {error}
+          </span>
+        )}
+        <button type="button" className="btn" disabled={busy} onClick={onCancel}>
+          Cancel
+        </button>
+        <button type="button" className="btn btn-primary" disabled={busy || !name.trim()} onClick={() => void create()}>
+          {busy ? "Creating…" : people.length ? "Create and invite" : "Create calendar"}
+        </button>
+      </div>
+    </fieldset>
   );
 }

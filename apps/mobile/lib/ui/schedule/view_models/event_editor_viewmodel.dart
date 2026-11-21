@@ -3,10 +3,12 @@ import 'package:flutter/foundation.dart';
 import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/calendar/calendar_repository.dart';
 import '../../../data/repositories/event/event_repository.dart';
+import '../../../data/repositories/profile/profile_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
 import '../../../data/repositories/user_post/user_post_repository.dart';
 import '../../../domain/models/calendar.dart';
 import '../../../domain/models/chat.dart';
+import '../../../domain/models/player_profile.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/team_event.dart';
 import '../../../domain/models/user_post.dart';
@@ -20,7 +22,9 @@ import '../../../utils/result.dart';
 /// another calendar they own or can edit ([setCalendar], through the API),
 /// or on any team schedule they may edit ([setSchedule]); an existing one
 /// stays where it is. A new one can also be posted for the user's
-/// followers ([shareWith]).
+/// followers ([shareWith]), or go on a shared calendar made right here
+/// ([createCalendar]: name, color and who to invite), without a trip to
+/// Calendars first.
 class EventEditorViewModel extends ChangeNotifier {
   EventEditorViewModel({
     required String? teamId,
@@ -30,12 +34,14 @@ class EventEditorViewModel extends ChangeNotifier {
     required AuthRepository authRepository,
     UserPostRepository? postRepository,
     CalendarRepository? calendarRepository,
+    ProfileRepository? profileRepository,
     String? calendarId,
     DateTime? initialDay,
   }) : assert(teamId == null || calendarId == null),
        _teamId = teamId,
        _calendarId = calendarId,
        _calendarRepo = calendarRepository,
+       _profiles = profileRepository,
        _events = eventRepository,
        _teams = teamRepository,
        _auth = authRepository,
@@ -43,6 +49,7 @@ class EventEditorViewModel extends ChangeNotifier {
        _initialDay = initialDay {
     load = Command0<void>(_load)..execute();
     save = Command1<String, TeamEvent>(_save);
+    createCalendar = Command1<void, NewSharedCalendar>(_createCalendar);
   }
 
   /// Null when creating an event.
@@ -52,7 +59,64 @@ class EventEditorViewModel extends ChangeNotifier {
   final AuthRepository _auth;
   final UserPostRepository? _posts;
   final CalendarRepository? _calendarRepo;
+  final ProfileRepository? _profiles;
   final DateTime? _initialDay;
+
+  /// A new event can go on a calendar made right here.
+  bool get canCreateCalendar => isNew && _calendarRepo != null;
+
+  /// Makes a calendar, invites the people picked (nothing is shared with
+  /// them until they accept), and puts the new event on it.
+  late final Command1<void, NewSharedCalendar> createCalendar;
+
+  Future<Result<void>> _createCalendar(NewSharedCalendar n) async {
+    final repo = _calendarRepo;
+    if (repo == null || !isNew) {
+      return Result.error(Exception('Calendars need a connection.'));
+    }
+    final made = await repo.create(n.name, n.color);
+    final CalendarInfo cal;
+    switch (made) {
+      case Ok(:final value):
+        cal = value;
+      case Error(:final error):
+        return Result.error(error);
+    }
+    var missed = 0;
+    for (final p in n.invite) {
+      if (await repo.invite(cal.id, p.uid, n.role) is Error) missed++;
+    }
+    final list = await repo.calendars();
+    _calendars = switch (list) {
+      Ok(:final value) when value.any((c) => c.id == cal.id) => value,
+      _ => [..._calendars, cal],
+    };
+    _calendarId = cal.id;
+    _teamId = null;
+    notifyListeners();
+    return missed == 0
+        ? const Result.ok(null)
+        : Result.error(
+            Exception(
+              "${cal.name} is made, but $missed invite${missed == 1 ? '' : 's'} "
+              "didn't send. Invite them from Calendars.",
+            ),
+          );
+  }
+
+  /// People to invite to a new calendar, by name or username.
+  Future<List<PlayerProfile>> searchPeople(String query) async {
+    final profiles = _profiles;
+    if (profiles == null || query.trim().isEmpty) return const [];
+    final r = await profiles.searchPlayers(query.trim());
+    return switch (r) {
+      Ok(:final value) => [
+        for (final p in value)
+          if (p.uid != _uid) p,
+      ],
+      Error() => const [],
+    };
+  }
 
   /// A new event can be posted for followers, unless it's on a private
   /// group's schedule (members only) or a team's whose public page is off.
@@ -125,7 +189,10 @@ class EventEditorViewModel extends ChangeNotifier {
   List<Team> get editableTeams => _editableTeams;
 
   bool get canChooseSchedule =>
-      isNew && (_editableTeams.isNotEmpty || editableCalendars.isNotEmpty);
+      isNew &&
+      (_editableTeams.isNotEmpty ||
+          editableCalendars.isNotEmpty ||
+          canCreateCalendar);
 
   /// The team whose schedule the event is on: one of [editableTeams]
   /// for a new event, or the event's own team when editing.
@@ -318,3 +385,12 @@ class EventEditorViewModel extends ChangeNotifier {
     return key(before) != key(after);
   }
 }
+
+/// A calendar to make from the event editor: its name and color, who to
+/// invite, and what they may do on it.
+typedef NewSharedCalendar = ({
+  String name,
+  CalendarColor color,
+  List<PlayerProfile> invite,
+  CalendarRole role,
+});

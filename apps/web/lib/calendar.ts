@@ -27,6 +27,39 @@ export function downloadIcs(e: CalendarFileEvent) {
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
+/** "Pickup · Sat, Nov 21 at 6:00 PM · Riverside Park": what a shared event says, as the app's eventShareText. */
+export function eventShareText(e: CalendarFileEvent): string {
+  const d = new Date(e.startsAt);
+  const when = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  return [e.title || "Event", `${when} at ${time}`, ...(e.location?.trim() ? [e.location.trim()] : [])].join(" · ");
+}
+
+/**
+ * Share in Add to calendar: sends one event to anyone, no shared calendar
+ * needed. The browser's share sheet with the .ics file where it takes
+ * files (phones), else with the text; else the text is copied. Says what
+ * happened, for the menu to show.
+ */
+export async function shareCalendarEvent(e: CalendarFileEvent): Promise<"shared" | "copied" | "cancelled"> {
+  const text = eventShareText(e);
+  const file = new File([icsEvent(e)], icsFileName(e.title), { type: "text/calendar" });
+  try {
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ title: e.title, text, files: [file] });
+      return "shared";
+    }
+    if (typeof navigator.share === "function") {
+      await navigator.share({ title: e.title, text });
+      return "shared";
+    }
+  } catch (err) {
+    if ((err as Error).name === "AbortError") return "cancelled";
+  }
+  await navigator.clipboard.writeText(text);
+  return "copied";
+}
+
 const hiddenKey = "stall10.hiddenCalendars";
 
 /** Calendars the viewer has hidden on this browser (a convenience; nothing is shared). */

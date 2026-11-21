@@ -10,6 +10,23 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.40
+
+**Schedule**
+- Times open ready to type the hour and minutes; tap the clock to pick
+  on the dial instead.
+- Share any event in a message or email, right from the event.
+- Make a shared calendar while adding an event: name it, pick people,
+  done. No trip to Settings first.
+- The Schedule tab has a Calendars button and a Calendars card for
+  sharing, new calendars and Outlook, Apple or Google Calendar.
+
+**Teams**
+- Creating a club team explains what's wrong when it can't be created,
+  instead of a permissions error.
+
+---
+
 ## 0.0.39
 
 **Chat**

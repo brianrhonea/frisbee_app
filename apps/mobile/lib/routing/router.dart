@@ -1,5 +1,6 @@
 import '../data/repositories/chat/chat_repository.dart';
 import '../data/repositories/team/team_repository.dart';
+import '../data/repositories/profile/profile_repository.dart';
 import '../data/repositories/event/event_repository.dart';
 import '../data/repositories/video/video_repository.dart';
 import '../data/repositories/notification/notification_repository.dart';
@@ -576,6 +577,7 @@ GoRouter router(
             teamRepository: c.read(),
             authRepository: c.read(),
             calendarRepository: c.read(),
+            profileRepository: readOptional<ProfileRepository>(c),
           ),
           builder: (_, vm) => EventEditorScreen(viewModel: vm),
         );
@@ -602,6 +604,7 @@ GoRouter router(
                 authRepository: c.read(),
                 postRepository: c.read(),
                 calendarRepository: c.read(),
+                profileRepository: readOptional<ProfileRepository>(c),
               ),
               builder: (_, vm) => EventEditorScreen(viewModel: vm),
             );

@@ -20,6 +20,9 @@ import '../../core/ui/view_model_host.dart';
 import '../../../data/repositories/calendar/calendar_repository.dart';
 import '../../../data/repositories/user_post/user_post_repository.dart';
 import '../view_models/event_editor_viewmodel.dart';
+import '../../core/ui/time_picker.dart';
+import '../../../data/repositories/profile/profile_repository.dart';
+import 'new_shared_calendar_sheet.dart';
 
 /// Opens the event editor over the current page, like the post composer:
 /// a card on wide screens, a bottom sheet on phones. Adds an event to
@@ -45,6 +48,7 @@ Future<String?> showEventEditor(
         authRepository: c.read(),
         postRepository: c.read<UserPostRepository?>(),
         calendarRepository: c.read<CalendarRepository?>(),
+        profileRepository: readOptional<ProfileRepository>(c),
       ),
       builder: (_, vm) =>
           EventEditorScreen(viewModel: vm, inPanel: true, fitContent: fit),
@@ -403,12 +407,15 @@ class _EventFormState extends State<_EventForm> {
   }
 
   Future<void> _pickStart() async {
-    final picked = await showTimePicker(context: context, initialTime: _start);
+    final picked = await showTypedTimePicker(
+      context: context,
+      initialTime: _start,
+    );
     if (picked != null) setState(() => _start = picked);
   }
 
   Future<void> _pickEnd() async {
-    final picked = await showTimePicker(
+    final picked = await showTypedTimePicker(
       context: context,
       initialTime:
           _end ??
@@ -757,6 +764,18 @@ class _SchedulePicker extends StatelessWidget {
 
   final EventEditorViewModel viewModel;
 
+  Future<void> _newCalendar(BuildContext context) async {
+    final made = await showNewSharedCalendarSheet(
+      context,
+      search: viewModel.searchPeople,
+    );
+    if (made == null) return;
+    await viewModel.createCalendar.execute(made);
+    final cmd = viewModel.createCalendar;
+    if (cmd.error && context.mounted) showErrorSnackBar(context, cmd.result);
+    cmd.clearResult();
+  }
+
   @override
   Widget build(BuildContext context) {
     final vm = viewModel;
@@ -791,6 +810,23 @@ class _SchedulePicker extends StatelessWidget {
                 label: Text(t.name),
                 selected: vm.teamId == t.id,
                 onSelected: (_) => vm.setSchedule(t.id),
+              ),
+            // Share it with people without setting up a calendar first.
+            if (vm.canCreateCalendar)
+              ListenableBuilder(
+                listenable: vm.createCalendar,
+                builder: (context, _) => ActionChip(
+                  avatar: vm.createCalendar.running
+                      ? const SizedBox.square(
+                          dimension: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.person_add_alt_outlined, size: 18),
+                  label: const Text('New shared calendar'),
+                  onPressed: vm.createCalendar.running
+                      ? null
+                      : () => _newCalendar(context),
+                ),
               ),
           ],
         ),

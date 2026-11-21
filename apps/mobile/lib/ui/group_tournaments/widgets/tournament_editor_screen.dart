@@ -16,6 +16,7 @@ import '../../core/themes/theme.dart';
 import '../view_models/tournament_editor_viewmodel.dart';
 import 'hat_parts.dart';
 import 'tournament_widgets.dart';
+import '../../core/ui/time_picker.dart';
 
 /// Sets up a tournament: details and rules, players and teams, and the
 /// schedule. Organizers only.
@@ -284,7 +285,7 @@ class _Details extends StatelessWidget {
       lastDate: DateTime(initial.year + 2),
     );
     if (day == null || !context.mounted) return null;
-    final time = await showTimePicker(
+    final time = await showTypedTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(initial),
     );
@@ -369,7 +370,7 @@ class _Details extends StatelessWidget {
                 ),
                 trailing: Text(DateFormat.jm().format(day)),
                 onTap: () async {
-                  final t = await showTimePicker(
+                  final t = await showTypedTimePicker(
                     context: context,
                     initialTime: TimeOfDay.fromDateTime(day),
                     helpText: s.days.length == 1

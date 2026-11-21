@@ -322,6 +322,64 @@ void main() {
       },
     );
 
+    test('a new event can go on a shared calendar made right there, with '
+        'the people picked invited', () async {
+      final calendars = FakeCalendarRepository()..calendarList = [myCalendar];
+      final profiles = FakeProfileRepository()
+        ..profiles['pat'] = const PlayerProfile(
+          uid: 'pat',
+          name: 'Pat Player',
+          username: 'pat',
+        )
+        ..profiles['u1'] = const PlayerProfile(uid: 'u1', name: 'Pat Me');
+      final vm = EventEditorViewModel(
+        teamId: null,
+        eventId: null,
+        eventRepository: FakeEventRepository(),
+        teamRepository: FakeTeamRepository(),
+        authRepository: FakeAuthRepository(user: testUser),
+        calendarRepository: calendars,
+        profileRepository: profiles,
+      );
+      await pumpEventQueue();
+      expect(vm.canCreateCalendar, isTrue);
+      expect(vm.canChooseSchedule, isTrue);
+      // Search leaves the user out.
+      final found = await vm.searchPeople('pat');
+      expect(found.map((p) => p.uid), ['pat']);
+
+      await vm.createCalendar.execute((
+        name: 'Carpool',
+        color: CalendarColor.orange,
+        invite: found,
+        role: CalendarRole.edit,
+      ));
+      expect(vm.createCalendar.completed, isTrue);
+      expect(
+        calendars.calls,
+        containsAllInOrder(['create Carpool', 'invite cal1 pat edit']),
+      );
+      expect(vm.calendarId, 'cal1');
+      expect(vm.editableCalendars.map((c) => c.name), contains('Carpool'));
+
+      await vm.save.execute(vm.initial.copyWith(title: 'Ride to Nationals'));
+      expect(calendars.saved.single.$1, 'cal1');
+      vm.dispose();
+    });
+
+    test('editing an event offers no new calendar', () async {
+      final vm = EventEditorViewModel(
+        teamId: null,
+        eventId: 'e1',
+        eventRepository: FakeEventRepository(),
+        teamRepository: FakeTeamRepository(),
+        authRepository: FakeAuthRepository(user: testUser),
+        calendarRepository: FakeCalendarRepository(),
+      );
+      expect(vm.canCreateCalendar, isFalse);
+      vm.dispose();
+    });
+
     test('edits an event on another calendar through the API', () async {
       final calendars = FakeCalendarRepository()
         ..calendarList = [patsEdit]

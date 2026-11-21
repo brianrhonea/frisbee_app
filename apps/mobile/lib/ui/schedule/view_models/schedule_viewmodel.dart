@@ -337,6 +337,14 @@ class ScheduleViewModel extends ChangeNotifier {
     return _feed.loadCalendars(from, to, force: true);
   }
 
+  /// Whether calendars are on (they need the API): the Calendars card
+  /// and button show only then.
+  bool get hasCalendars => _calendarRepo != null;
+
+  /// The calendars the user is on (their own and shared ones), for the
+  /// Calendars card.
+  List<CalendarInfo> get calendars => _feed.calendars;
+
   /// Calendar invites waiting for the user.
   List<CalendarInvite> get invites => _feed.invites;
 

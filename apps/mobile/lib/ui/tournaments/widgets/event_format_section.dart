@@ -6,6 +6,7 @@ import '../../../domain/models/hosted_tournament.dart';
 import '../../../domain/models/team.dart';
 import '../../core/themes/theme.dart';
 import '../view_models/hosted_tournament_form_viewmodel.dart';
+import '../../core/ui/time_picker.dart';
 
 /// The one format every division of an event plays (field size, roster
 /// minimum, scoring, game length, fields and the first game's time), and
@@ -139,7 +140,7 @@ class EventFormatSection extends StatelessWidget {
         ),
         onTap: editable
             ? () async {
-                final t = await showTimePicker(
+                final t = await showTypedTimePicker(
                   context: context,
                   initialTime: TimeOfDay.fromDateTime(s.startsAt),
                   helpText: vm.isLeague

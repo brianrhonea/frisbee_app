@@ -10,6 +10,7 @@ import '../../core/ui/scoreboard.dart';
 import '../../core/ui/view_model_host.dart';
 import '../view_models/chat_poll_viewmodel.dart';
 import '../view_models/chat_room_viewmodel.dart';
+import '../../core/ui/time_picker.dart';
 
 // Polls posted into team rooms (redesign F33).
 
@@ -413,7 +414,7 @@ class _CreatePollFormState extends State<CreatePollForm> {
       lastDate: now.add(const Duration(days: 365)),
     );
     if (day == null || !mounted) return;
-    final time = await showTimePicker(
+    final time = await showTypedTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(start),
     );

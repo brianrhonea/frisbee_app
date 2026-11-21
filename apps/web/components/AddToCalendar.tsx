@@ -1,17 +1,19 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { googleCalendarUrl, outlookCalendarUrl } from "@stall10/shared";
-import { downloadIcs, type CalendarFileEvent } from "@/lib/calendar";
+import { downloadIcs, type CalendarFileEvent, shareCalendarEvent } from "@/lib/calendar";
 
 /**
  * "Add to calendar": a menu that adds [event] to a calendar the person
  * picks: Google Calendar or Outlook open their new-event page filled in
  * (they choose the calendar and save there), and "Apple / other (.ics)"
- * downloads the file Apple Calendar and the rest open. The app opens the
- * phone's own new-event editor instead.
+ * downloads the file Apple Calendar and the rest open. Share… sends the
+ * event to anyone (the share sheet, or copies its details), as the app's
+ * Share. The app opens the phone's own new-event editor instead.
  */
 export function AddToCalendar({ event }: { event: CalendarFileEvent }) {
   const ref = useRef<HTMLDetailsElement>(null);
+  const [note, setNote] = useState<string | null>(null);
 
   // Closes on a click elsewhere or Escape, as a menu should.
   useEffect(() => {
@@ -60,7 +62,25 @@ export function AddToCalendar({ event }: { event: CalendarFileEvent }) {
         >
           Apple / other (.ics)
         </button>
+        <button
+          type="button"
+          onClick={() => {
+            close();
+            void shareCalendarEvent(event).then(
+              (r) => setNote(r === "copied" ? "Copied the event's details." : null),
+              () => setNote("Couldn't share it."),
+            );
+          }}
+        >
+          Share…
+        </button>
       </span>
+      {note && (
+        <small className="muted" role="status">
+          {" "}
+          {note}
+        </small>
+      )}
     </details>
   );
 }

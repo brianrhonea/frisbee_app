@@ -1161,6 +1161,24 @@ Out of scope: payments, meeting recording, USA Ultimate data.
     when chosen, and change straight away on the event, meeting and
     community cards (they were switched off after the first save until
     the event was reopened).
+47. Typed times: [x] app; [x] website (time inputs already typed). The
+    app's time pickers open on the hour and minute boxes with the hour
+    focused; the clock icon switches to the dial. Test:
+    `time_picker_test.dart`.
+48. New shared calendar from the event editor: [x] app; [x] website. A
+    new event's calendar choice offers "New shared calendar": name,
+    color, Can view / Can edit and people to invite, made on the spot
+    (`POST /v1/me/calendars`, then `.../invites`) with the event put on
+    it; invites that fail say so. Tests: app `calendars_test.dart`
+    (create, invite, select, save); website typecheck and build only.
+49. Share an event: [x] app; [x] website. Beside Add to calendar: the
+    share sheet with the .ics and "Title · when · where" (website: the
+    browser's share sheet, else copies the text). Test: app
+    `add_to_calendar_test.dart`.
+50. Calendars on the Schedule tab: [x] app; [x] website (already). A
+    Calendars button in the header and a Calendars card under the days:
+    each calendar with its owner and role, Manage, Share a calendar, and
+    Outlook, Apple or Google Calendar, all opening Calendars.
 
 Libraries the website may add (none today): a small data cache for API
 reads and mutations, the Firestore web SDK for listeners, and LiveKit's

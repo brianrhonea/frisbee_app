@@ -183,6 +183,11 @@ class TeamRepositoryFirebase implements TeamRepository {
           final res = await api.post('/v1/teams', team.toRequest());
           return res['id']! as String;
         }
+        // firestore.rules leaves club teams to the API, which checks the
+        // owner's age; say so rather than "no permission".
+        if (team.kind == TeamKind.team && team.level == CompetitionLevel.club) {
+          throw Exception(clubTeamNeedsServerMessage);
+        }
         await _ensureNameFree(team.name, team.kind, team.division);
         final ref = _teams.doc();
         await _newTeamBatch(ref, team, owner).commit();
@@ -235,6 +240,9 @@ class TeamRepositoryFirebase implements TeamRepository {
         'roles': roles.toList()..sort(),
       });
       return res['id']! as String;
+    }
+    if (team.level == CompetitionLevel.club) {
+      throw Exception(clubTeamNeedsServerMessage);
     }
     await _ensureNameFree(team.name, team.kind, team.division);
     final ref = _teams.doc();

@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.40  | 2026-11-20 | `feature/redesign`                      |                     |
 | 0.0.39  | 2026-11-20 | `feature/redesign`                      |                     |
 | 0.0.38  | 2026-11-20 | `feature/redesign`                      |                     |
 | 0.0.37  | 2026-11-20 | `feature/redesign`                      |                     |
@@ -52,6 +53,28 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.40 — Schedule: typed times, sharing, calendars on the tab
+
+With web 0.49.0 (product-spec §8.1 items 47–50). No API change.
+
+- Time pickers open in input mode with the hour focused
+  (`core/ui/time_picker.dart`, `showTypedTimePicker`; Flutter only
+  autofocuses after a mode switch); the clock icon switches to the dial.
+  Every picker in the app uses it.
+- Event editor: "New shared calendar" in Add to (new events) makes a
+  calendar on the spot (name, color, Can view / Can edit, people to
+  invite) and puts the event on it (`EventEditorViewModel.createCalendar`,
+  `new_shared_calendar_sheet.dart`).
+- Share beside Add to calendar on every event: the share sheet with the
+  .ics and "Title · when · where" (`shareCalendarEvent`).
+- Schedule tab: Calendars button in the header and a Calendars card under
+  the days (each calendar, Manage, Share a calendar, Outlook/Apple/Google),
+  as the website's.
+- Creating a club team without the API (a build with no `API_BASE_URL`)
+  now says club teams need the server (it checks ages) instead of "You
+  don't have permission": firestore.rules refuses club teams from
+  clients. There is no one-team-per-level limit.
 
 ## 0.0.39 — Double-tap reactions; RSVP buttons fixed
 

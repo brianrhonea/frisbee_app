@@ -107,6 +107,18 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                     child: const Text('Today'),
                   ),
           ),
+          // Sharing, new shared calendars and subscription links, one
+          // tap from the schedule.
+          ListenableBuilder(
+            listenable: vm,
+            builder: (context, _) => vm.hasCalendars
+                ? IconButton(
+                    tooltip: 'Calendars and sharing',
+                    icon: const Icon(Icons.calendar_month_outlined),
+                    onPressed: () => context.push(Routes.settingsCalendar),
+                  )
+                : const SizedBox.shrink(),
+          ),
           // In the header rather than floating, so it never covers events.
           Padding(
             padding: const EdgeInsets.only(left: 4, right: 12),
@@ -176,6 +188,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                 viewModel: vm,
                                 onSwiped: _onSwiped,
                               ),
+                          if (vm.hasCalendars) ...[
+                            const SizedBox(height: 16),
+                            _CalendarsCard(calendars: vm.calendars),
+                          ],
                         ],
                       ),
                     ),
@@ -816,6 +832,86 @@ class _InviteCardState extends State<_InviteCard> {
                 FilledButton(
                   onPressed: _busy ? null : () => _answer(true),
                   child: const Text('Accept'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The user's calendars under the schedule, as the website's: each with
+/// who owns it, and the way to share one, start a shared one or see the
+/// schedule in Outlook, Apple or Google Calendar (all on Calendars).
+class _CalendarsCard extends StatelessWidget {
+  const _CalendarsCard({required this.calendars});
+
+  final List<CalendarInfo> calendars;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    void open() => context.push(Routes.settingsCalendar);
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 8, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Calendars',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                TextButton(onPressed: open, child: const Text('Manage')),
+              ],
+            ),
+            for (final cal in calendars)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    TeamDot(color: cal.color.color, size: 10),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text.rich(
+                        TextSpan(
+                          text: cal.name,
+                          children: [
+                            if (!cal.isMine)
+                              TextSpan(
+                                text:
+                                    '  ·  ${cal.owner.name}  ·  '
+                                    '${cal.role.label}',
+                                style: TextStyle(color: c.muted, fontSize: 13),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: open,
+                  icon: const Icon(Icons.person_add_alt_outlined, size: 18),
+                  label: const Text('Share a calendar'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: open,
+                  icon: const Icon(Icons.link, size: 18),
+                  label: const Text('Outlook, Apple or Google'),
                 ),
               ],
             ),

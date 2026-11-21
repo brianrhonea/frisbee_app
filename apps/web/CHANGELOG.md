@@ -4,6 +4,17 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.49.0 — 2026-11-20
+
+With app 0.0.40.
+
+**Added**
+- Schedule event editor: "New shared calendar…" in the Calendar list
+  makes a calendar there (name, color, Can view / Can edit, people to
+  invite) and selects it for the event.
+- Add to calendar → Share…: the browser's share sheet with the .ics file
+  (or the text), else copies "Title · when · where".
+
 ## 0.48.0 — 2026-11-20
 
 With app 0.0.39. Needs API 0.36.0 for emoji beyond the old eight.

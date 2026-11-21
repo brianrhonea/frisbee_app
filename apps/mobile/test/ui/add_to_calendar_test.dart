@@ -11,7 +11,8 @@ class _FakeDeviceCalendar implements DeviceCalendarService {
 
   final CalendarAddResult result;
   final added = <CalendarEntry>[];
-  final shared = <({String ics, String fileName, String subject})>[];
+  final shared =
+      <({String ics, String fileName, String subject, String? text})>[];
 
   @override
   Future<CalendarAddResult> addEvent(CalendarEntry entry) async {
@@ -24,9 +25,10 @@ class _FakeDeviceCalendar implements DeviceCalendarService {
     required String ics,
     required String fileName,
     required String subject,
+    String? text,
     Rect? origin,
   }) async {
-    shared.add((ics: ics, fileName: fileName, subject: subject));
+    shared.add((ics: ics, fileName: fileName, subject: subject, text: text));
   }
 }
 
@@ -108,6 +110,21 @@ void main() {
     expect(entry.end, DateTime.utc(2026, 11, 21, 23));
     expect(entry.location, '');
     expect(entry.notes, 'Pool play, then brackets');
+  });
+
+  testWidgets('Share sends the event as a calendar file with what and when, '
+      'no shared calendar needed', (tester) async {
+    final calendar = await tapAdd(tester, CalendarAddResult.added);
+    calendar.added.clear();
+    await tester.tap(find.text('Share'));
+    await tester.pumpAndSettle();
+    expect(calendar.added, isEmpty);
+    final s = calendar.shared.single;
+    expect(s.subject, 'Track session');
+    expect(s.fileName, endsWith('.ics'));
+    expect(s.ics, contains('SUMMARY:Track session'));
+    expect(s.text, startsWith('Track session · '));
+    expect(s.text, endsWith(' · High school track'));
   });
 
   testWidgets('closing the editor shares nothing', (tester) async {
