@@ -19,6 +19,7 @@ import { type Data, type DocStore, serverTime } from "../store.js";
 import { authorOf, checkNotMuted, checkSeesPost } from "./author.js";
 import { noPost, people } from "./service.js";
 import { sharedEvent } from "./shared_event.js";
+import { refuseBlocked } from "../moderation/blocks.js";
 
 const p = {
   post: (id: string) => `posts/${id}`,
@@ -257,6 +258,7 @@ export class PostEditor {
       const post = await tx.get(p.post(postId));
       if (!post) throw noPost();
       await checkSeesPost(tx, caller.uid, post);
+      await refuseBlocked(tx, caller.uid, post.authorId);
       if (post.repostOf) throw new ApiError("failed_precondition", "Comment on the original post.");
       let reply: Data = {};
       if (parsed.data.replyTo) {

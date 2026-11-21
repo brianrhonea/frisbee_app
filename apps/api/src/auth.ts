@@ -7,6 +7,8 @@ export interface Caller {
   uid: string;
   name?: string;
   email?: string;
+  /** Stall 10 staff (the ID token's `staff` claim): reviews every report. */
+  staff?: boolean;
 }
 
 /** Checks tokens; the Firebase Admin SDK in production, a fake in tests. */
@@ -40,6 +42,8 @@ export interface UserLookup {
   lookup(uid: string): Promise<{ name?: string; email?: string; photoUrl?: string; createdAt?: string } | null>;
   /** Changes the Auth record's name or photo (null removes it); absent where accounts can't be changed. */
   update?(uid: string, changes: { name?: string; photoUrl?: string | null }): Promise<void>;
+  /** Disables or enables sign-in (suspension), and signs a disabled account out. */
+  setDisabled?(uid: string, disabled: boolean): Promise<void>;
 }
 
 /** The name the app shows for [caller] (AppUser.label in the app). */

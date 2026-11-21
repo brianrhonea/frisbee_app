@@ -47,6 +47,9 @@ import { uploadRoutes } from "./media/routes.js";
 import { type TranscodeQueue, UploadService } from "./media/service.js";
 import type { MediaStorage } from "./media/storage.js";
 import { followRoutes } from "./follows/routes.js";
+import { ServiceRemover } from "./moderation/remover.js";
+import { moderationRoutes } from "./moderation/routes.js";
+import { ModerationService } from "./moderation/service.js";
 import { ChatExtrasService } from "./hub/chat_extras.js";
 import { chatExtrasRoutes } from "./hub/chat_extras_routes.js";
 import { TeamPostExtrasService, teamPostExtrasRoutes } from "./hub/team_post_extras.js";
@@ -207,11 +210,14 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     const reads = deps.writeLimits !== false ? writes : undefined;
     rosterRoutes(app, new RosterService(deps.store, deps.browse?.photoBuckets ?? []), reads);
     postRoutes(app, new PostService(deps.store, deps.users, deps.now), revalidate, reads);
-    postEditorRoutes(app, new PostEditor(deps.store, deps.users, deps.media, deps.now), revalidate);
+    const editor = new PostEditor(deps.store, deps.users, deps.media, deps.now);
+    postEditorRoutes(app, editor, revalidate);
     followRoutes(app, new FollowService(deps.store, deps.users, deps.now));
-    hubRoutes(app, new HubService(deps.store, deps.users, deps.media, deps.now), writes);
+    const hub = new HubService(deps.store, deps.users, deps.media, deps.now);
+    hubRoutes(app, hub, writes);
     chatExtrasRoutes(app, new ChatExtrasService(deps.store, deps.users, deps.now), writes);
-    teamPostExtrasRoutes(app, new TeamPostExtrasService(deps.store, deps.users, deps.now), writes);
+    const teamPosts = new TeamPostExtrasService(deps.store, deps.users, deps.now);
+    teamPostExtrasRoutes(app, teamPosts, writes);
     const chats = new ChatAdmin(deps.store, deps.teams, deps.media);
     chatAdminRoutes(app, chats, writes);
     discordRoutes(app, new DiscordService(deps.store, chats), writes);
@@ -223,7 +229,21 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     statsRoutes(app, new StatsService(deps.store, queries), writes);
     groupTournamentRoutes(app, new GroupTournamentService(deps.store, deps.teams, queries), writes);
     tournamentRoutes(app, new TournamentService(deps.store, queries, deps.now), writes);
-    conversationRoutes(app, new ConversationService(deps.store, deps.users, deps.media, deps.now), writes);
+    const conversations = new ConversationService(deps.store, deps.users, deps.media, deps.now);
+    conversationRoutes(app, conversations, writes);
+    const setDisabled = deps.users.setDisabled?.bind(deps.users);
+    moderationRoutes(
+      app,
+      new ModerationService(
+        deps.store,
+        deps.users,
+        queries,
+        new ServiceRemover(deps.store, editor, hub, teamPosts, conversations),
+        setDisabled ? { setDisabled } : undefined,
+      ),
+      reads,
+      revalidate,
+    );
     if (deps.calendar) {
       calendarRoutes(app, new CalendarService(deps.store, deps.calendar, deps.now), {
         limiter: deps.browse?.limiter,

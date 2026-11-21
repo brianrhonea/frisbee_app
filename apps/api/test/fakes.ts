@@ -7,12 +7,12 @@ import type { Owner } from "../src/teams/documents.js";
 import type { TeamRepository } from "../src/teams/repository.js";
 import { AlreadyExists, type Data, type DocStore, deleteField, serverTime, type Tx } from "../src/store.js";
 
-/** Accepts tokens "token:<uid>[:<name>]" and App Check token "good". */
+/** Accepts tokens "token:<uid>[:<name>]" ("staff:<uid>" for staff) and App Check token "good". */
 export class FakeVerifier implements TokenVerifier {
   async verifyIdToken(token: string): Promise<Caller> {
     const [kind, uid, name] = token.split(":");
-    if (kind !== "token" || !uid) throw new Error("bad token");
-    return { uid, name, email: `${uid}@x.test` };
+    if ((kind !== "token" && kind !== "staff") || !uid) throw new Error("bad token");
+    return { uid, name, email: `${uid}@x.test`, ...(kind === "staff" && { staff: true }) };
   }
 
   async verifyAppCheck(token: string): Promise<void> {
@@ -32,6 +32,11 @@ export class FakeUsers implements UserLookup {
     if (changes.name !== undefined) r.name = changes.name;
     if (changes.photoUrl !== undefined) r.photoUrl = changes.photoUrl ?? undefined;
     this.records.set(uid, r);
+  }
+  disabled = new Set<string>();
+  async setDisabled(uid: string, disabled: boolean) {
+    if (disabled) this.disabled.add(uid);
+    else this.disabled.delete(uid);
   }
 }
 

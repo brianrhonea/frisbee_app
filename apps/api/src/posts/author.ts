@@ -54,8 +54,13 @@ export async function checkSeesPost(read: { get(path: string): Promise<Data | nu
 }
 
 /** notMuted(): the flood mute the functions set on limits/{uid}. */
+/** What a suspended account is told when it tries to post. */
+export const suspendedMessage = "Your account is suspended for breaking the community guidelines. Write to support@stall10.app if you think that's a mistake.";
+
 export async function checkNotMuted(store: DocStore, uid: string, now: number) {
-  const until = (await store.get(`limits/${uid}`))?.mutedUntil;
+  const limits = await store.get(`limits/${uid}`);
+  if (limits?.suspended === true) throw new ApiError("permission_denied", suspendedMessage);
+  const until = limits?.mutedUntil;
   if (until instanceof Date && until.getTime() > now) {
     throw new ApiError("resource_exhausted", tooFastMessage(until.getTime(), now));
   }

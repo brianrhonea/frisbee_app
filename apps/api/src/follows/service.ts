@@ -8,6 +8,7 @@ import {
 import type { Caller, UserLookup } from "../auth.js";
 import { ApiError, fromZod } from "../errors.js";
 import { docIdParam } from "../ids.js";
+import { checkNotBlocked } from "../moderation/service.js";
 import { authorOf, checkNotMuted, photoMax, text } from "../posts/author.js";
 import { type Data, type DocStore, serverTime } from "../store.js";
 import { clip } from "../teams/access.js";
@@ -119,6 +120,7 @@ export class FollowService {
     const { type, targetId, groupId, notify } = parsed.data;
     await checkNotMuted(this.store, caller.uid, this.now());
     const t = await this.target(caller, type, targetId, groupId);
+    if (t.type === "user") await checkNotBlocked(this.store, caller.uid, t.targetId);
     const key = followKey(t.type, t.targetId);
     if (await this.store.get(p.follow(caller.uid, key))) return { key, status: "following" };
     if (t.isPrivate) {
@@ -170,6 +172,7 @@ export class FollowService {
    */
   async acceptRequest(caller: Caller, rawUid: unknown): Promise<void> {
     const requester = docIdParam(rawUid);
+    await checkNotBlocked(this.store, caller.uid, requester);
     const [me, profile] = await Promise.all([
       authorOf(this.store, this.users, caller),
       this.store.get(p.profile(caller.uid)),

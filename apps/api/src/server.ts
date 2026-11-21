@@ -64,7 +64,7 @@ const app = buildApp({
   verifier: {
     async verifyIdToken(token) {
       const t = await auth.verifyIdToken(token);
-      return { uid: t.uid, name: t.name as string | undefined, email: t.email };
+      return { uid: t.uid, name: t.name as string | undefined, email: t.email, ...(t.staff === true && { staff: true }) };
     },
     async verifyAppCheck(token) {
       await appCheck.verifyToken(token);
@@ -84,6 +84,10 @@ const app = buildApp({
         ...(changes.name !== undefined && { displayName: changes.name }),
         ...(changes.photoUrl !== undefined && { photoURL: changes.photoUrl }),
       });
+    },
+    async setDisabled(uid, disabled) {
+      await auth.updateUser(uid, { disabled });
+      if (disabled) await auth.revokeRefreshTokens(uid);
     },
   },
   teams: new FirestoreTeamRepository(db),

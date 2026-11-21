@@ -25,6 +25,7 @@ import type { MediaStorage } from "../media/storage.js";
 import { authorOf, checkNotMuted } from "../posts/author.js";
 import { type Data, type DocStore, deleteField, serverTime } from "../store.js";
 import { clip, mapOf, strings } from "../teams/access.js";
+import { blockedBetween, checkNotBlocked } from "../moderation/service.js";
 
 const p = {
   conv: (id: string) => `conversations/${id}`,
@@ -104,6 +105,7 @@ export class ConversationService {
     const id = directConversationId(caller.uid, other);
     const existing = await this.store.get(p.conv(id));
     if (existing) return { id, status: (existing.status as OpenConversationResult["status"]) ?? "accepted" };
+    await checkNotBlocked(this.store, caller.uid, other);
     const [profile, user, theyFollowMe, iFollowThem] = await Promise.all([
       this.store.get(p.profile(other)),
       this.store.get(p.user(other)),
@@ -181,7 +183,7 @@ export class ConversationService {
         this.store.get(p.follow(uid, caller.uid)),
       ]);
       const name = clip(typeof profile?.name === "string" && profile.name ? profile.name : "Player", 80);
-      if (!profile || !follows || policyOf(user) === "nobody") {
+      if (!profile || !follows || policyOf(user) === "nobody" || (await blockedBetween(this.store, caller.uid, uid))) {
         notAdded.push(name);
         continue;
       }
@@ -234,6 +236,10 @@ export class ConversationService {
     const { id, conv } = await this.mine(caller, rawId);
     if (awaiting(conv, caller.uid)) throw new ApiError("failed_precondition", "Accept the request to reply.");
     await checkNotMuted(this.store, caller.uid, this.now());
+    if (!isGroupId(id)) {
+      const other = id.split("_").find((u) => u !== caller.uid);
+      if (other) await checkNotBlocked(this.store, caller.uid, other);
+    }
     const messageId = req.id ?? this.store.newId(`conversations/${id}/messages`);
     const attachments = await uploadedFiles(this.store, caller, req.uploadIds, {
       purpose: "chat",

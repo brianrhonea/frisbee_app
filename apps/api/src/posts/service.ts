@@ -14,6 +14,7 @@ import { docIdParam, isDocId } from "../ids.js";
 import { type Data, type DocStore, serverTime, type Tx } from "../store.js";
 import { authorOf, checkNotMuted, nameMax, text, checkSeesPost } from "./author.js";
 import { clip } from "../teams/access.js";
+import { refuseBlocked } from "../moderation/blocks.js";
 
 const p = {
   post: (id: string) => `posts/${id}`,
@@ -78,6 +79,7 @@ export class PostService {
     return this.store.transact(async (tx) => {
       const t = await this.target(tx, id);
       await this.checkSees(tx, caller.uid, id, t);
+      if (liked) await refuseBlocked(tx, caller.uid, t.data.authorId);
       const before = people(t.data.likedBy);
       const had = before.includes(caller.uid);
       if (had === liked) return { liked, likeCount: before.length };
@@ -104,6 +106,7 @@ export class PostService {
       const authorId = t.data.authorId;
       if (typeof authorId !== "string" || !authorId) throw noPost();
       if (authorId === caller.uid) throw new ApiError("permission_denied", "You can't repost your own post.");
+      await refuseBlocked(tx, caller.uid, authorId);
       // It would reach the reposter's followers (validRepost in the rules).
       if (t.data.private === true) {
         throw new ApiError("failed_precondition", "Posts from private profiles can't be reposted.");
