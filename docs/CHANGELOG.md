@@ -84,6 +84,10 @@ With web 0.51.0 and API 0.38.0 (product-spec §8.1 items 57–58).
   webcal app when Android has one, and Copy link. On Android, an
   installed Outlook goes first (`<queries>` for `ms-outlook` and
   `webcal`). The footer says how often each app checks the link.
+- Reminders for shared calendars (`notifications` functions,
+  `eventReminders`): the day before, everyone on the calendar gets
+  "Tomorrow: …" with the calendar's name; it opens Schedule. Invites not
+  yet accepted don't.
 
 ## 0.0.41 — Report and block
 

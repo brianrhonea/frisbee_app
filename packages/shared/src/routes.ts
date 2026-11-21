@@ -36,6 +36,8 @@ const rules: Rule[] = [
   [new RegExp(`^/messages/${id}$`), (m) => `/messages?c=${enc(m[1]!)}`],
   [/^\/messages$/, () => "/messages"],
   [new RegExp(`^/my-events/${id}$`), () => "/schedule"],
+  // A shared calendar's reminder (its events have no page of their own).
+  [/^\/schedule$/, () => "/schedule"],
   [new RegExp(`^/team-events/${id}/${id}$`), (m) => `/teams/${m[1]}/schedule?event=${enc(m[2]!)}`],
   [new RegExp(`^/team-meetings/${id}/${id}(/room|/edit)?$`), (m) => `/teams/${m[1]}/meetings/${enc(m[2]!)}${m[3] ?? ""}`],
   [/^\/teams$/, () => "/teams"],

@@ -20,6 +20,7 @@ import {
   videoCommentRecipients,
   reminderNotice,
   reminderRecipients,
+  calendarReminderRecipients,
   roomReaders,
   quietRepeatMs,
   same,
@@ -234,6 +235,15 @@ describe("notices", () => {
     expect(reminderRecipients({ memberIds: ["a", "b", "c", "d"] }, event)).toEqual(["a", "c", "d"]);
     const n = reminderNotice({ event, route: "/team-events/t1/e1", teamId: "t1", teamName: "Hawks" });
     expect(n.text(denver, 1)).toEqual({ title: "Tomorrow: Practice", body: "Hawks · Sun, Nov 1 at 6:00 PM" });
+  });
+
+  it("reminds everyone on a shared calendar, not who's only invited", () => {
+    const calendar = { name: "Family", members: { sam: "owner", pat: "view", lee: "edit" }, pending: { kim: "view" } };
+    expect(calendarReminderRecipients(calendar).sort()).toEqual(["lee", "pat", "sam"]);
+    expect(calendarReminderRecipients(undefined)).toEqual([]);
+    const event = { title: "Dinner", startsAt: ts(start) };
+    const n = reminderNotice({ event, route: "/schedule", teamName: "Family" });
+    expect(n.text(denver, 1)).toEqual({ title: "Tomorrow: Dinner", body: "Family · Sun, Nov 1 at 6:00 PM" });
   });
 
   it("announces new and saved plays", () => {

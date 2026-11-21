@@ -23,6 +23,8 @@ Firebase project; App Store builds come from `main` and use production.
 - One Subscribe button: pick Apple Calendar, Google, Outlook (personal or
   work) or copy the link. Outlook now opens straight to its subscribe
   page.
+- Shared calendars now send a reminder the day before each event, to
+  everyone on the calendar.
 
 ## 0.0.41
 

@@ -55,6 +55,7 @@ describe("webRoute", () => {
     expect(webRoute("/team-meetings/t1/m1/room")).toBe("/teams/t1/meetings/m1/room");
     expect(webRoute("/team-meetings/t1/m1")).toBe("/teams/t1/meetings/m1");
     expect(webRoute("/my-events/e1")).toBe("/schedule");
+    expect(webRoute("/schedule")).toBe("/schedule");
     expect(webRoute("/team-meetings/t1/m1/edit")).toBe("/teams/t1/meetings/m1/edit");
     expect(webRoute("/teams/t1/plays/p1")).toBe("/teams/t1/plays/p1");
     expect(webRoute("/teams/t1?section=playbook")).toBe("/teams/t1/playbook");

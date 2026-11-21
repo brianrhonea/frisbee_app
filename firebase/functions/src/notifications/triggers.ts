@@ -52,6 +52,7 @@ import {
   replyNotice,
   repostNotice,
   repostOf,
+  calendarReminderRecipients,
   reminderNotice,
   reminderRecipients,
   type RoomDoc,
@@ -649,6 +650,21 @@ async function remind(path: string, event: Data) {
     await deliver(db, getMessaging(), [ownerId], reminderNotice({ event, route: `/my-events/${eventId}` }));
     return;
   }
+  if (root === "calendars") {
+    // A shared calendar (ownerId is its id): everyone on it. Its events have
+    // no page of their own, so the reminder opens the schedule.
+    const calendar = (await db.doc(`calendars/${ownerId}`).get()).data();
+    const to = calendarReminderRecipients(calendar);
+    if (to.length === 0) return;
+    await deliver(
+      db,
+      getMessaging(),
+      to,
+      reminderNotice({ event, route: "/schedule", teamName: String(calendar?.name ?? "") || undefined }),
+    );
+    return;
+  }
+  if (root !== "teams") return;
   const team = await liveTeam(ownerId);
   if (!team) return;
   await deliver(

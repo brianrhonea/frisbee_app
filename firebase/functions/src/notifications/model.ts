@@ -652,6 +652,17 @@ export function calendarInviteNotice(a: { calendarId: string; invite: Data; from
   };
 }
 
+/**
+ * Who a shared calendar's reminder goes to: everyone on it (its members
+ * map: owner, Can edit, Can view). Invites not yet accepted are in
+ * `pending`, not `members`, so they don't get one.
+ */
+export function calendarReminderRecipients(calendar: Data | undefined): string[] {
+  const members = calendar?.members;
+  if (!members || typeof members !== "object") return [];
+  return Object.keys(members as Record<string, unknown>).filter((uid) => uid.length > 0);
+}
+
 /** Team members a reminder goes to: everyone who hasn't said they can't go. */
 export function reminderRecipients(team: TeamDoc, event: Data): string[] {
   const rsvps = (event.rsvps ?? {}) as Record<string, unknown>;
