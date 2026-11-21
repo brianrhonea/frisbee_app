@@ -619,7 +619,9 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(
-        find.text('Calendars need a connection to Stall 10.'),
+        find.text(
+          'Shared calendars aren\'t available in this version of the app. Update the app, or use stall10.app.',
+        ),
         findsOneWidget,
       );
     });

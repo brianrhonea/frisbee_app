@@ -228,7 +228,9 @@ class VideoRepositoryFirebase implements VideoRepository {
     }
   }
 
-  static const _noApi = 'Notes and comments need a connection to Stall 10.';
+  static const _noApi =
+      "Video notes and comments aren't available in this version of the "
+      'app. Update the app, or use stall10.app.';
 
   ApiClient get _client =>
       _api ?? (throw const ApiException('unavailable', _noApi));

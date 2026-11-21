@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.41  | 2026-11-20 | `feature/report-block`                  |                     |
 | 0.0.40  | 2026-11-20 | `feature/redesign`                      |                     |
 | 0.0.39  | 2026-11-20 | `feature/redesign`                      |                     |
 | 0.0.38  | 2026-11-20 | `feature/redesign`                      |                     |
@@ -53,6 +54,29 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.41 — Report and block
+
+With web 0.50.0 and API 0.37.0 (product-spec §8.1 items 51–55). Reports
+and blocks go through the API only (`ModerationRepositoryApi`); a build
+without `API_BASE_URL` says they aren't available in this version.
+
+- Report sheet (`ui/moderation/widgets/report_sheet.dart`,
+  `ReportViewModel`): reasons from `reportReasons` in packages/shared,
+  details, "Also block". On posts (⋯), comments, team posts (⋯) and their
+  comments, team chat and direct messages (long-press), and profiles (⋯)
+  and direct conversations (header menu).
+- Block and unblock from profiles and direct conversations; the block
+  list is live from `users/{uid}/blocks` (`ModerationRepository.current`).
+  Posts and reposts, comments, message requests and group messages from
+  people blocked either way are hidden; a blocked profile shows only the
+  name; a blocked conversation shows "You blocked …" with Unblock in
+  place of the composer. Team chat and team posts stay (shared teams).
+- Settings › Blocked accounts; Team settings › Safety › Reports for the
+  owner, admins and members who may moderate (`TeamReportsScreen`).
+- The "need a connection to Stall 10" messages (calendars, pins, live
+  scores, video notes, personal details) now say the feature isn't
+  available in this version of the app (a build without the API address).
 
 ## 0.0.40 — Schedule: typed times, sharing, calendars on the tab
 

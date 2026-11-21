@@ -52,7 +52,7 @@ describe("reports", () => {
     expect([...s.store.docs.keys()].filter((k) => k.startsWith("reports/"))).toHaveLength(1);
 
     expect((await s.call("GET", "/v1/staff/reports")).statusCode).toBe(403);
-    const queue = (await s.call("GET", "/v1/staff/reports", undefined, "boss", "staff")).json();
+    const queue = (await s.call("GET", "/v1/staff/reports", undefined, "boss", "staff")).json().reports;
     expect(queue).toHaveLength(1);
     expect(queue[0]).toMatchObject({ id, reason: "hate", reporterId: "me", authorName: "Pat Public", authorSuspended: false });
   });
@@ -83,7 +83,7 @@ describe("reports", () => {
     await s.call("POST", "/v1/reports", { target, reason: "hate" }, "cap");
 
     expect((await s.call("GET", "/v1/teams/t1/reports")).statusCode).toBe(403);
-    const list = (await s.call("GET", "/v1/teams/t1/reports", undefined, "own")).json();
+    const list = (await s.call("GET", "/v1/teams/t1/reports", undefined, "own")).json().reports;
     expect(list).toHaveLength(2);
     expect(list[0]).toMatchObject({ teamName: "Northside Flyers", reporterId: null, reporterName: null, snapshot: { text: "mean message" } });
 
@@ -91,7 +91,7 @@ describe("reports", () => {
     expect(res.statusCode).toBe(204);
     expect(s.store.doc("teams/t1/chats/general/messages/m1")).toBeUndefined();
     // Both reports on it close together.
-    expect((await s.call("GET", "/v1/teams/t1/reports", undefined, "own")).json()).toHaveLength(0);
+    expect((await s.call("GET", "/v1/teams/t1/reports", undefined, "own")).json().reports).toHaveLength(0);
     expect(s.store.doc(`reports/${list[1].id}`)).toMatchObject({ status: "removed", resolvedBy: "own" });
   });
 
@@ -134,7 +134,7 @@ describe("reports", () => {
     expect((await s.call("POST", `/v1/staff/reports/${id}`, { action: "remove" }, "boss", "staff")).statusCode).toBe(400);
     await s.call("POST", `/v1/staff/reports/${id}`, { action: "dismiss" }, "boss", "staff");
     expect(s.store.doc(`reports/${id}`)).toMatchObject({ status: "dismissed" });
-    expect((await s.call("GET", "/v1/staff/reports", undefined, "boss", "staff")).json()).toHaveLength(0);
+    expect((await s.call("GET", "/v1/staff/reports", undefined, "boss", "staff")).json().reports).toHaveLength(0);
   });
 
   it("says who is staff", async () => {

@@ -22,8 +22,12 @@ import '../../workouts/widgets/record_button.dart';
 import '../view_models/player_profile_viewmodel.dart';
 import '../../posts/widgets/post_composer.dart';
 import '../../core/ui/skeleton.dart';
+import '../../../domain/models/moderation.dart';
+import '../../moderation/widgets/report_sheet.dart';
 
 enum _Tab { overview, posts, stats, teams }
+
+enum _SafetyAction { report, block, unblock }
 
 /// A player's profile: who they are, their numbers, recent games and
 /// teams. On the user's own profile they can edit it, link their roster
@@ -120,12 +124,52 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final mobile = ScreenSize.of(context).isMobile;
+    final blocks = watchBlocks(context);
+    final safety = !vm.isMe && canReport(context, vm.uid);
     return Scaffold(
       appBar: mobile || !vm.isMe
           ? AppBar(
               title: Text(vm.isMe ? 'My profile' : 'Player profile'),
               actions: [
                 if (vm.isMe) const SettingsButton(),
+                if (safety)
+                  PopupMenuButton<_SafetyAction>(
+                    tooltip: 'More',
+                    onSelected: (a) => switch (a) {
+                      _SafetyAction.report => showReportSheet(
+                        context,
+                        target: PersonReport(vm.uid),
+                        authorName: vm.name,
+                        authorId: vm.uid,
+                      ),
+                      _SafetyAction.block => confirmBlock(
+                        context,
+                        uid: vm.uid,
+                        name: vm.name,
+                      ),
+                      _SafetyAction.unblock => confirmUnblock(
+                        context,
+                        uid: vm.uid,
+                        name: vm.name,
+                      ),
+                    },
+                    itemBuilder: (_) => [
+                      PopupMenuItem(
+                        value: _SafetyAction.report,
+                        child: Text('Report ${vm.name}'),
+                      ),
+                      if (blocks.blockedByMe(vm.uid))
+                        PopupMenuItem(
+                          value: _SafetyAction.unblock,
+                          child: Text('Unblock ${vm.name}'),
+                        )
+                      else if (!blocks.hides(vm.uid))
+                        PopupMenuItem(
+                          value: _SafetyAction.block,
+                          child: Text('Block ${vm.name}'),
+                        ),
+                    ],
+                  ),
                 const SizedBox(width: 4),
               ],
             )
@@ -134,6 +178,24 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
         listenable: Listenable.merge([vm, vm.saveDetails, vm.message]),
         builder: (context, _) {
           if (!vm.loaded) return const LoadingView();
+          // Blocked either way: only their name, and Unblock for the blocker.
+          if (!vm.isMe && blocks.hides(vm.uid)) {
+            final mine = blocks.blockedByMe(vm.uid);
+            return EmptyView(
+              icon: Icons.block,
+              title: mine ? 'You blocked ${vm.name}' : vm.name,
+              message: mine
+                  ? "You won't see each other's posts or messages."
+                  : "This profile isn't available.",
+              action: mine
+                  ? OutlinedButton(
+                      onPressed: () =>
+                          confirmUnblock(context, uid: vm.uid, name: vm.name),
+                      child: const Text('Unblock'),
+                    )
+                  : null,
+            );
+          }
           if (!vm.isMe && vm.profile == null) {
             return vm.error != null
                 ? ErrorView(error: vm.error)

@@ -23,6 +23,8 @@ import '../../videos/widgets/file_video_player.dart';
 import '../view_models/message_thread_viewmodel.dart';
 import 'reaction_bubble.dart';
 import '../../core/ui/skeleton.dart';
+import '../../../domain/models/moderation.dart';
+import '../../moderation/widgets/report_sheet.dart';
 
 /// Messages with a composer below, for a team room or a direct message.
 /// Shows [readOnlyNotice] in place of the composer when the user can't post.
@@ -47,6 +49,8 @@ class MessageThreadView extends StatefulWidget {
     this.onTogglePin,
     this.onShareEvent,
     this.onCreatePoll,
+    this.reportTarget,
+    this.hideAuthor,
   });
 
   final MessageThreadViewModel viewModel;
@@ -83,6 +87,13 @@ class MessageThreadView extends StatefulWidget {
 
   /// "Poll" in the attach menu; null hides it.
   final VoidCallback? onCreatePoll;
+
+  /// What Report in someone else's message sheet reports; null hides it.
+  final ReportTarget Function(ChatMessage message)? reportTarget;
+
+  /// Messages by these authors aren't shown (people blocked either way, in
+  /// group conversations).
+  final bool Function(String authorId)? hideAuthor;
 
   @override
   State<MessageThreadView> createState() => _MessageThreadViewState();
@@ -237,6 +248,10 @@ class _MessageThreadViewState extends State<MessageThreadView>
         canDelete: vm.canDelete(m),
         canOpenProfile:
             vm.opensProfiles && m.authorId.isNotEmpty && !vm.isMine(m),
+        canReport:
+            widget.reportTarget != null &&
+            m.createdAt != null &&
+            canReport(context, m.authorId),
         pinned: widget.onTogglePin != null && m.createdAt != null
             ? widget.isPinned?.call(m) ?? m.isPinned
             : null,
@@ -262,6 +277,15 @@ class _MessageThreadViewState extends State<MessageThreadView>
         _openProfile(m.authorId);
       case _Pin():
         widget.onTogglePin?.call(m);
+      case _Report():
+        if (widget.reportTarget case final target?) {
+          showReportSheet(
+            context,
+            target: target(m),
+            authorName: m.authorName,
+            authorId: m.authorId,
+          );
+        }
     }
   }
 
@@ -284,6 +308,7 @@ class _MessageThreadViewState extends State<MessageThreadView>
                   controller: _scroll,
                   emptyMessage: widget.emptyMessage,
                   videoPlayer: widget.videoPlayer,
+                  hideAuthor: widget.hideAuthor,
                   actions: _RowActions(
                     onActions: _actions,
                     onReply: (m) => _canReply(m) ? _reply(m) : null,
@@ -359,6 +384,10 @@ class _Pin extends _MessageAction {
   const _Pin();
 }
 
+class _Report extends _MessageAction {
+  const _Report();
+}
+
 /// What a message row can do, handed down from the view.
 class _RowActions {
   const _RowActions({
@@ -412,6 +441,7 @@ class _MessageActionsSheet extends StatelessWidget {
     required this.canReply,
     required this.canDelete,
     required this.canOpenProfile,
+    this.canReport = false,
     this.pinned,
   });
 
@@ -423,6 +453,7 @@ class _MessageActionsSheet extends StatelessWidget {
   final bool canReply;
   final bool canDelete;
   final bool canOpenProfile;
+  final bool canReport;
 
   /// Whether it's pinned; null where the user can't pin.
   final bool? pinned;
@@ -521,6 +552,12 @@ class _MessageActionsSheet extends StatelessWidget {
               title: Text("View $name's profile"),
               onTap: () => pick(const _Profile()),
             ),
+          if (canReport)
+            ListTile(
+              leading: const Icon(Icons.flag_outlined),
+              title: const Text('Report message'),
+              onTap: () => pick(const _Report()),
+            ),
           // Destructive, but neutral: red is kept for live games, and the
           // confirm dialog says what deleting does.
           if (canDelete)
@@ -582,6 +619,7 @@ class _MessageList extends StatelessWidget {
     required this.emptyMessage,
     required this.videoPlayer,
     required this.actions,
+    this.hideAuthor,
   });
 
   final MessageThreadViewModel viewModel;
@@ -589,6 +627,7 @@ class _MessageList extends StatelessWidget {
   final String emptyMessage;
   final FileVideoPlayerBuilder videoPlayer;
   final _RowActions actions;
+  final bool Function(String authorId)? hideAuthor;
 
   /// A gap this long between two messages shows the time between them in
   /// bubbles, as a phone's messages app does.
@@ -598,7 +637,13 @@ class _MessageList extends StatelessWidget {
   Widget build(BuildContext context) {
     final vm = viewModel;
     if (!vm.messagesLoaded) return const LoadingView();
-    final messages = vm.messages;
+    final hide = hideAuthor;
+    final messages = hide == null
+        ? vm.messages
+        : [
+            for (final m in vm.messages)
+              if (!hide(m.authorId)) m,
+          ];
     if (messages.isEmpty) {
       return vm.messageError != null
           ? ErrorView(error: vm.messageError)

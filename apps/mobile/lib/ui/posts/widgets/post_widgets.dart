@@ -22,11 +22,13 @@ import '../../workouts/widgets/route_widgets.dart';
 import '../view_models/post_actions.dart';
 import 'post_composer.dart';
 import 'send_post_sheet.dart';
+import '../../../domain/models/moderation.dart';
+import '../../moderation/widgets/report_sheet.dart';
 
 export '../../core/ui/layout.dart' show PersonAvatar;
 export '../../core/ui/user_avatar.dart';
 
-enum _PostAction { edit, delete }
+enum _PostAction { edit, delete, report, block }
 
 String _when(DateTime? d) =>
     d == null ? 'Just now' : DateFormat.MMMd().add_jm().format(d);
@@ -73,6 +75,16 @@ class UserPostCard extends StatelessWidget {
     final theme = Theme.of(context);
     final c = AppColors.of(context);
     final repostOf = post.repostOf;
+    // Someone blocked either way: not shown, nor reposts of them.
+    final blocks = watchBlocks(context);
+    if (blocks.hides(post.authorId) || blocks.hides(repostOf?.authorId)) {
+      return const SizedBox.shrink();
+    }
+    final reportable =
+        onEdit == null && onDelete == null && canReport(context, post.authorId);
+    final authorName = post.authorName.isEmpty
+        ? 'this player'
+        : post.authorName;
     final subtitle = [
       switch (post.kind) {
         UserPostKind.workout => 'Shared a workout',
@@ -141,6 +153,7 @@ class UserPostCard extends StatelessWidget {
                       onSelected: (a) => switch (a) {
                         _PostAction.edit => onEdit?.call(),
                         _PostAction.delete => onDelete?.call(),
+                        _ => null,
                       },
                       itemBuilder: (_) => [
                         if (onEdit != null)
@@ -153,6 +166,34 @@ class UserPostCard extends StatelessWidget {
                             value: _PostAction.delete,
                             child: Text('Delete'),
                           ),
+                      ],
+                    )
+                  else if (reportable)
+                    PopupMenuButton<_PostAction>(
+                      tooltip: 'Post options',
+                      onSelected: (a) => switch (a) {
+                        _PostAction.report => showReportSheet(
+                          context,
+                          target: PostReport(post.id),
+                          authorName: authorName,
+                          authorId: post.authorId,
+                        ),
+                        _PostAction.block => confirmBlock(
+                          context,
+                          uid: post.authorId,
+                          name: authorName,
+                        ),
+                        _ => null,
+                      },
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(
+                          value: _PostAction.report,
+                          child: Text('Report post'),
+                        ),
+                        PopupMenuItem(
+                          value: _PostAction.block,
+                          child: Text('Block $authorName'),
+                        ),
                       ],
                     )
                   else

@@ -227,7 +227,8 @@ class TeamPostRepositoryFirebase implements TeamPostRepository {
   // Pins and comments (redesign F24) ------------------------------------
 
   static const _noApi =
-      'Pins and comments need a newer app version. Update the app to use them.';
+      "Pins and comments aren't available in this version of the app. "
+      'Update the app, or use stall10.app.';
 
   ApiClient get _client =>
       _api ?? (throw const ApiException('unavailable', _noApi));

@@ -19,6 +19,7 @@ import 'chat_layout.dart';
 import 'chat_tab.dart';
 import 'message_thread_view.dart';
 import 'voice_channel_view.dart';
+import '../../../domain/models/moderation.dart';
 
 /// A team chat room opened as its own page. Phones show it full screen
 /// with the chat panel (the room list) behind the top-left Chats button;
@@ -303,5 +304,8 @@ class _RoomThreadState extends State<_RoomThread> {
         ? () => showShareEventSheet(context, vm)
         : null,
     onCreatePoll: vm.canPoll ? () => showCreatePollSheet(context, vm) : null,
+    // Team chat between people who blocked each other still shows (the
+    // team is shared), but can be reported to the team's admins and staff.
+    reportTarget: (m) => TeamMessageReport(vm.teamId, vm.roomId, m.id),
   );
 }

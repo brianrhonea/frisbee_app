@@ -7,6 +7,39 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.37.0 — 2026-11-20
+
+With app 0.0.41 and web 0.50.0. Needs the `firestore.rules` from the same
+commit (blocks, suspended accounts, `reports` server-only) and the
+`account` functions (deleting an account removes the other person's block
+record).
+
+**Added**
+- Reports (App Store guideline 1.2): `POST /v1/reports` (30 a day) for a
+  post, comment, team post or comment, team message, direct message or
+  person, with a reason, optional details and `block`. One report per
+  person per thing (`reports/{id}`, id from reporter and content path),
+  with a snapshot of the text and photos. Team kinds also go to the team.
+- Team queue: `GET /v1/teams/:teamId/reports` and
+  `POST /v1/teams/:teamId/reports/:reportId` (`remove` or `dismiss`) for
+  the owner and members with `moderate` or `manageTeam`.
+- Staff queue: `GET /v1/me/moderation`, `GET /v1/staff/reports`,
+  `POST /v1/staff/reports/:reportId` (`remove`, `dismiss`, `warn`,
+  `suspend`, `unsuspend`) for accounts with the `staff` claim
+  (`firebase/scripts/set-staff.mjs`). Suspending sets
+  `limits/{uid}.suspended`, disables sign-in and revokes tokens; warning
+  sends a notification linking the community guidelines.
+- Blocks: `GET /v1/me/blocks`, `PUT`/`DELETE /v1/me/blocks/:uid`. Written
+  to both people (`users/{uid}/blocks/{other}`, `mine` on the blocker's);
+  blocking removes follows and follow requests both ways.
+- Data export includes the people you blocked and the reports you made.
+
+**Changed**
+- Blocked people can't follow, accept a follow request, start or send a
+  direct message, add each other to a group, like, repost or comment on
+  each other's posts. Suspended accounts can't post, comment or message
+  (`checkNotMuted`).
+
 ## 0.36.0 — 2026-11-20
 
 With app 0.0.39 and web 0.48.0.

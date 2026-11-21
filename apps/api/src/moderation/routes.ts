@@ -40,14 +40,14 @@ export function moderationRoutes(
 
   app.get("/v1/me/moderation", async (req) => mod.access(requireCaller(req)));
 
-  app.get<TeamP>("/v1/teams/:teamId/reports", async (req) => mod.teamReports(requireCaller(req), req.params.teamId));
+  app.get<TeamP>("/v1/teams/:teamId/reports", async (req) => ({ reports: await mod.teamReports(requireCaller(req), req.params.teamId) }));
   app.post<TeamReportP>("/v1/teams/:teamId/reports/:reportId", async (req, reply) => {
     await mod.resolveTeamReport(requireCaller(req), req.params.teamId, req.params.reportId, req.body);
     await revalidate([webTags.feed, webTags.posts], req.log);
     return reply.code(204).send();
   });
 
-  app.get("/v1/staff/reports", async (req) => mod.staffReports(requireCaller(req)));
+  app.get("/v1/staff/reports", async (req) => ({ reports: await mod.staffReports(requireCaller(req)) }));
   app.post<ReportP>("/v1/staff/reports/:reportId", async (req, reply) => {
     await mod.staffAction(requireCaller(req), req.params.reportId, req.body);
     await revalidate([webTags.feed, webTags.posts], req.log);

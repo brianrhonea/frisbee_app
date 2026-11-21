@@ -4,6 +4,22 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.50.0 — 2026-11-20
+
+With app 0.0.41 and API 0.37.0.
+
+**Added**
+- Report on posts, comments, team posts and their comments, team chat,
+  direct messages and profiles: a reason, optional details, and "Also
+  block". Block and unblock from profiles and direct conversations.
+- Posts, comments, message requests and group messages from people
+  blocked either way are hidden; a blocked conversation says so in place
+  of the composer.
+- Settings › Blocked accounts; a team's Reports (Team settings, for its
+  admins and moderators); `/staff`, the report queue for Stall 10's staff.
+- Community guidelines page (`/guidelines`, a draft for review), linked
+  from the footer and Help; Help explains reporting and blocking.
+
 ## 0.49.0 — 2026-11-20
 
 With app 0.0.40.

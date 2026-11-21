@@ -29,7 +29,9 @@ class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
   final CallableClient? _functions;
   final ApiClient? _api;
 
-  static const _noApi = 'Live scores need a connection to Stall 10.';
+  static const _noApi =
+      "Live scores aren't available in this version of the app. Update "
+      'the app, or use stall10.app.';
 
   ApiClient get _client =>
       _api ?? (throw const ApiException('unavailable', _noApi));

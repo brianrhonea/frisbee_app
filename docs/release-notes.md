@@ -10,6 +10,25 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.41
+
+**Safety**
+- Report any post, comment, message or profile: tap ⋯ (or press and hold
+  a message), pick a reason, and send. You can block the person at the
+  same time. Nobody is told who reported them.
+- Block someone from their profile or your conversation with them. You
+  won't see each other's posts, comments or messages, and neither of you
+  can follow or message the other. Teams you share still work.
+- Settings › Blocked accounts lists who you blocked, with Unblock.
+- Team admins see reports on their team's chat and posts in Team
+  settings › Reports, and can remove what was reported.
+
+**Fixed**
+- Features this version can't reach the server for now say so plainly,
+  instead of "needs a connection".
+
+---
+
 ## 0.0.40
 
 **Schedule**

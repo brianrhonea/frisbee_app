@@ -77,6 +77,8 @@ import '../data/services/push_service.dart';
 import '../data/services/shared_preferences_service.dart';
 import '../data/services/youtube_info_service.dart';
 import '../firebase_options.dart';
+import '../data/repositories/moderation/moderation_repository.dart';
+import '../data/repositories/moderation/moderation_repository_api.dart';
 
 /// Services and repositories backed by Firebase.
 List<SingleChildWidget> get firebaseProviders => [
@@ -106,6 +108,13 @@ List<SingleChildWidget> get firebaseProviders => [
       accountService: context.read<AccountService>(),
       api: context.read<ApiClient?>(),
       flags: context.read<FeatureFlags>(),
+    ),
+  ),
+  // Reports and blocks; the block list is live for the signed-in user.
+  ChangeNotifierProvider<ModerationRepository>(
+    create: (context) => ModerationRepositoryApi(
+      api: context.read<ApiClient?>(),
+      auth: context.read<AuthRepository>(),
     ),
   ),
   // Whether Stall 10 can be reached, and what waits to go out until it can.

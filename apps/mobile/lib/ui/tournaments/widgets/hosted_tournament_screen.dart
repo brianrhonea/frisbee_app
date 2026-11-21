@@ -2564,6 +2564,7 @@ class _NewsTab extends StatelessWidget {
                       post: p,
                       loadImage: vm.loadImage,
                       teamName: t.hostName,
+                      teamId: t.hostId,
                       onOpenTeam: () => context.push(Routes.teamOver(t.hostId)),
                     ),
                 ],

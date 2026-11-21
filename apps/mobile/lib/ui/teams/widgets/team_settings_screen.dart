@@ -8,6 +8,7 @@ import '../../core/ui/status_views.dart';
 import '../../core/ui/view_model_host.dart';
 import '../../settings/widgets/settings_widgets.dart';
 import '../view_models/team_settings_viewmodel.dart';
+import '../../moderation/widgets/team_reports_screen.dart';
 
 /// Opens [teamId]'s settings over the team page.
 Future<void> showTeamSettings(BuildContext context, String teamId) =>
@@ -127,6 +128,20 @@ class _TeamSettingsScreenState extends State<TeamSettingsScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
               children: [
+                if (vm.canReviewReports)
+                  SettingsGroup(
+                    title: 'Safety',
+                    children: [
+                      SettingsTile(
+                        icon: Icons.flag_outlined,
+                        title: 'Reports',
+                        subtitle:
+                            "What members reported in the team's chat "
+                            'and posts',
+                        onTap: () => showTeamReports(context, vm.teamId),
+                      ),
+                    ],
+                  ),
                 SettingsGroup(
                   title: 'Sections',
                   footer: vm.isOwner

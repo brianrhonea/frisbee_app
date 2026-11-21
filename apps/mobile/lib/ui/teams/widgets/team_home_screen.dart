@@ -1247,6 +1247,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
       for (final p in posts)
         TeamPostCard(
           post: p,
+          teamId: vm.teamId,
           loadImage: vm.imageData,
           showVisibility: vm.isMember,
           pinned: p.isPinned,

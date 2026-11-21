@@ -8,6 +8,8 @@ import '../../core/ui/error_message.dart';
 import '../../core/ui/layout.dart';
 import '../../core/ui/user_avatar.dart';
 import '../view_models/team_post_comments_viewmodel.dart';
+import '../../../domain/models/moderation.dart';
+import '../../moderation/widgets/report_sheet.dart';
 
 /// A team post's comments in a sheet (redesign F24): the thread, oldest
 /// first, and a box to add one. [create] makes its view model, which the
@@ -150,6 +152,18 @@ class _TeamPostCommentsSheetState extends State<TeamPostCommentsSheet> {
                               onDelete: vm.canDelete(comment)
                                   ? () => _delete(comment)
                                   : null,
+                              onReport: canReport(context, comment.authorId)
+                                  ? () => showReportSheet(
+                                      context,
+                                      target: TeamPostCommentReport(
+                                        vm.teamId,
+                                        vm.postId,
+                                        comment.id,
+                                      ),
+                                      authorName: comment.authorName,
+                                      authorId: comment.authorId,
+                                    )
+                                  : null,
                             ),
                         ],
                       ),
@@ -206,10 +220,11 @@ class _TeamPostCommentsSheetState extends State<TeamPostCommentsSheet> {
 }
 
 class _CommentRow extends StatelessWidget {
-  const _CommentRow({required this.comment, this.onDelete});
+  const _CommentRow({required this.comment, this.onDelete, this.onReport});
 
   final TeamPostComment comment;
   final VoidCallback? onDelete;
+  final VoidCallback? onReport;
 
   @override
   Widget build(BuildContext context) {
@@ -250,6 +265,13 @@ class _CommentRow extends StatelessWidget {
               ],
             ),
           ),
+          if (onReport != null)
+            IconButton(
+              tooltip: 'Report comment',
+              visualDensity: VisualDensity.compact,
+              onPressed: onReport,
+              icon: Icon(Icons.flag_outlined, size: 18, color: c.muted),
+            ),
           if (onDelete != null)
             IconButton(
               tooltip: 'Delete comment',

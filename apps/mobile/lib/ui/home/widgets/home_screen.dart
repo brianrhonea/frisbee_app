@@ -323,6 +323,7 @@ class _HomeScreenState extends State<HomeScreen> {
     key: ValueKey(p.id),
     post: p.post,
     teamName: p.teamName,
+    teamId: p.teamId,
     now: vm.now,
     loadImage: vm.imageData,
     showVisibility: vm.teamOf(p) != null,

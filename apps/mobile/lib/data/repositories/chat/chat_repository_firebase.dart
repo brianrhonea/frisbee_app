@@ -432,7 +432,8 @@ class ChatRepositoryFirebase implements ChatRepository {
   });
 
   static const _noApi =
-      'Pins, event cards and polls need a connection to Stall 10.';
+      "Pins, event cards and polls aren't available in this version of "
+      'the app. Update the app, or use stall10.app.';
 
   ApiClient get _client =>
       _api ?? (throw const ApiException('unavailable', _noApi));

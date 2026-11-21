@@ -29,7 +29,7 @@ export function StaffQueue() {
     try {
       const access = await callApi<ModerationAccess>(user, "/v1/me/moderation");
       setStaff(access.staff);
-      if (access.staff) setReports(await callApi<ReportInfo[]>(user, "/v1/staff/reports"));
+      if (access.staff) setReports((await callApi<{ reports: ReportInfo[] }>(user, "/v1/staff/reports")).reports);
     } catch (e) {
       setError(problem(e, "Couldn't load the reports."));
     }

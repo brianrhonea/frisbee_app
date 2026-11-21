@@ -17,6 +17,8 @@ import '../view_models/post_detail_viewmodel.dart';
 import 'post_widgets.dart';
 import 'post_composer.dart';
 import '../../workouts/widgets/route_widgets.dart';
+import '../../../domain/models/moderation.dart';
+import '../../moderation/widgets/report_sheet.dart';
 
 /// A post on its own page, with its comments and a box to add one.
 /// [focusComment] puts the cursor in the box (Comment on a feed post).
@@ -354,6 +356,9 @@ class CommentTile extends StatelessWidget {
     final theme = Theme.of(context);
     final muted = theme.colorScheme.onSurfaceVariant;
     final c = comment;
+    // Nothing from someone blocked either way.
+    if (watchBlocks(context).hides(c.authorId)) return const SizedBox.shrink();
+    final reportable = canReport(context, c.authorId);
     final name = c.authorName.isEmpty ? 'Someone' : c.authorName;
     final when = c.createdAt == null
         ? 'Just now'
@@ -460,6 +465,17 @@ class CommentTile extends StatelessWidget {
                         style: action,
                         onPressed: onEdit,
                         child: const Text('Edit'),
+                      ),
+                    if (reportable)
+                      TextButton(
+                        style: action,
+                        onPressed: () => showReportSheet(
+                          context,
+                          target: CommentReport(c.postId, c.id),
+                          authorName: name,
+                          authorId: c.authorId,
+                        ),
+                        child: const Text('Report'),
                       ),
                   ],
                 ),

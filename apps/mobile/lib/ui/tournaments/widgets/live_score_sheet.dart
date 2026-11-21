@@ -218,7 +218,8 @@ class LiveScoreSheet extends StatelessWidget {
 
   static String _whyNot(HostedTournamentViewModel vm, GroupGame g) {
     if (!vm.canKeepLiveScores) {
-      return 'Live scores need a connection to Stall 10.';
+      return "Live scores aren't available in this version of the app. "
+          'Update the app, or use stall10.app.';
     }
     if (!g.hasTeams) return 'Teams are decided by earlier games.';
     if (vm.tournament?.status == HostedStatus.finished) {

@@ -24,6 +24,7 @@ import '../../profile/widgets/delete_account_dialog.dart';
 import 'change_password_dialog.dart';
 import 'download_data_group.dart';
 import 'settings_widgets.dart';
+import '../../moderation/widgets/blocked_accounts_screen.dart';
 
 /// Names for the appearance choices.
 String themeModeLabel(ThemeMode mode) => switch (mode) {
@@ -117,6 +118,11 @@ class SettingsScreen extends StatelessWidget {
                     icon: Icons.people_outline,
                     title: 'People you follow',
                     onTap: () => context.push(Routes.settingsFollowing),
+                  ),
+                  SettingsTile(
+                    icon: Icons.block,
+                    title: 'Blocked accounts',
+                    onTap: () => showBlockedAccounts(context),
                   ),
                 ],
               ),

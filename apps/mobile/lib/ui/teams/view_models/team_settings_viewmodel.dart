@@ -89,6 +89,15 @@ class TeamSettingsViewModel extends ChangeNotifier {
   /// Admins (manageTeam) switch the public page, as they edit the details.
   bool get canManage => _team?.canEdit(_uid) ?? false;
 
+  /// Who sees the team's reports: the owner and admins, and members who
+  /// may moderate or manage the team (the API's reviewsTeamReports).
+  bool get canReviewReports {
+    final t = _team;
+    if (t == null) return false;
+    return t.has(_uid, TeamPermission.moderate) ||
+        t.has(_uid, TeamPermission.manageTeam);
+  }
+
   @override
   void dispose() {
     _teamSub.cancel();

@@ -23,7 +23,7 @@ export function TeamReports() {
   const load = useCallback(async () => {
     if (!user) return;
     try {
-      setReports(await callApi<ReportInfo[]>(user, base));
+      setReports((await callApi<{ reports: ReportInfo[] }>(user, base)).reports);
     } catch (e) {
       setError(problem(e, "Couldn't load the reports."));
     }

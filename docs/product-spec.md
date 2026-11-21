@@ -1179,6 +1179,20 @@ Out of scope: payments, meeting recording, USA Ultimate data.
     Calendars button in the header and a Calendars card under the days:
     each calendar with its owner and role, Manage, Share a calendar, and
     Outlook, Apple or Google Calendar, all opening Calendars.
+51. Report (App Store 1.2): [x] app; [x] website. Posts, comments, team
+    posts and their comments, team chat, direct messages and profiles:
+    a reason (`reportReasons`), optional details, "Also block". Tests:
+    app `report_block_test.dart`; API `moderation.test.ts`.
+52. Block and unblock: [x] app; [x] website. From profiles and direct
+    conversations; both hide posts, reposts, comments, message requests
+    and group messages from people blocked either way, show a blocked
+    profile as the name only, and replace a blocked conversation's
+    composer. Team chat and posts stay. Rules tests `blocks.rules.test.ts`.
+53. Blocked accounts in Settings: [x] app; [x] website.
+54. A team's Reports (owner, admins, `moderate`): [x] app (Team settings
+    › Safety); [x] website (Team settings). Remove or dismiss.
+55. Staff report queue: website only (`/staff`), by design: it's a staff
+    tool, not a member feature (remove, dismiss, warn, suspend).
 
 Libraries the website may add (none today): a small data cache for API
 reads and mutations, the Firestore web SDK for listeners, and LiveKit's

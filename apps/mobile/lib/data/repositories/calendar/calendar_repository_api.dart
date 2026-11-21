@@ -11,7 +11,9 @@ class CalendarRepositoryApi implements CalendarRepository {
 
   final ApiClient? _api;
 
-  static const _noApi = 'Calendars need a connection to Stall 10.';
+  static const _noApi =
+      "Shared calendars aren't available in this version of the app. "
+      'Update the app, or use stall10.app.';
 
   ApiClient get _client =>
       _api ?? (throw const ApiException('unavailable', _noApi));

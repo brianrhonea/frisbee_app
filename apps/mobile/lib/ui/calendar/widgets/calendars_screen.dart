@@ -70,7 +70,10 @@ class _CalendarsScreenState extends State<CalendarsScreen> {
           children: [
             Padding(
               padding: EdgeInsets.all(24),
-              child: Text('Calendars need a connection to Stall 10.'),
+              child: Text(
+                "Shared calendars aren't available in this version of "
+                'the app. Update the app, or use stall10.app.',
+              ),
             ),
           ],
         );

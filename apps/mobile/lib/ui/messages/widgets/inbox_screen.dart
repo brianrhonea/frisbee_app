@@ -26,6 +26,7 @@ import '../../shell/widgets/app_shell.dart' show ProfileButton;
 import '../view_models/direct_chat_viewmodel.dart';
 import '../view_models/inbox_viewmodel.dart';
 import 'direct_chat_screen.dart';
+import '../../moderation/widgets/report_sheet.dart';
 
 /// Width of the inbox list beside an open conversation.
 const _listWidth = 300.0;
@@ -308,7 +309,12 @@ class _InboxListState extends State<InboxList> {
       final onOpen = widget.onOpen;
       final c = AppColors.of(context);
       if (!vm.loaded) return const LoadingView();
-      final items = vm.items;
+      // Requests from someone blocked either way aren't shown.
+      final blocks = watchBlocks(context);
+      final items = [
+        for (final i in vm.items)
+          if (!(i.isRequest && !i.isGroup && blocks.hides(i.otherId))) i,
+      ];
       final teamChats = vm.teamChats;
       // Section headings only when both kinds are listed.
       final headed = teamChats.isNotEmpty && items.isNotEmpty;

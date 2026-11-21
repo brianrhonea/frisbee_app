@@ -19,6 +19,8 @@ import '../../core/ui/view_model_host.dart';
 import '../view_models/direct_chat_viewmodel.dart';
 import '../view_models/inbox_viewmodel.dart';
 import 'inbox_screen.dart';
+import '../../../domain/models/moderation.dart';
+import '../../moderation/widgets/report_sheet.dart';
 
 /// A conversation opened as its own page. Phones show it full screen with
 /// a back arrow to Messages, which is right underneath, like any phone's
@@ -227,6 +229,12 @@ class _DirectChatViewState extends State<DirectChatView> {
     return ListenableBuilder(
       listenable: vm,
       builder: (context, _) {
+        final blocks = watchBlocks(context);
+        // The other person in a direct conversation, when they can be
+        // reported and blocked.
+        final person = !vm.isGroup && canReport(context, vm.otherId)
+            ? vm.otherId
+            : null;
         final Widget body;
         if (!vm.loaded) {
           body = const LoadingView();
@@ -243,7 +251,19 @@ class _DirectChatViewState extends State<DirectChatView> {
             child: MessageThreadView(
               viewModel: vm,
               emptyMessage: 'Only the two of you can see these messages.',
-              footer: vm.isRequest
+              reportTarget: (m) => DirectMessageReport(vm.conversationId, m.id),
+              hideAuthor: vm.isGroup ? blocks.hides : null,
+              footer: person != null && blocks.hides(person)
+                  ? _BlockedBar(
+                      name: vm.otherName,
+                      mine: blocks.blockedByMe(person),
+                      onUnblock: () => confirmUnblock(
+                        context,
+                        uid: person,
+                        name: vm.otherName,
+                      ),
+                    )
+                  : vm.isRequest
                   ? _RequestBar(
                       name: vm.otherName,
                       busy: vm.accept.running || vm.decline.running,
@@ -304,6 +324,17 @@ class _DirectChatViewState extends State<DirectChatView> {
                     _ChatAction.leave => _confirmLeave(),
                     _ChatAction.archive => vm.toggleArchived.execute(),
                     _ChatAction.delete => _confirmClear(),
+                    _ChatAction.report => showReportSheet(
+                      context,
+                      target: PersonReport(vm.otherId!),
+                      authorName: vm.otherName,
+                      authorId: vm.otherId,
+                    ),
+                    _ChatAction.block => confirmBlock(
+                      context,
+                      uid: vm.otherId!,
+                      name: vm.otherName,
+                    ),
                   },
                   itemBuilder: (_) => [
                     if (vm.isGroup) ...[
@@ -355,6 +386,23 @@ class _DirectChatViewState extends State<DirectChatView> {
                         title: Text('Delete conversation'),
                       ),
                     ),
+                    if (person != null) ...[
+                      PopupMenuItem(
+                        value: _ChatAction.report,
+                        child: ListTile(
+                          leading: const Icon(Icons.flag_outlined),
+                          title: Text('Report ${vm.otherName}'),
+                        ),
+                      ),
+                      if (!blocks.hides(person))
+                        PopupMenuItem(
+                          value: _ChatAction.block,
+                          child: ListTile(
+                            leading: const Icon(Icons.block),
+                            title: Text('Block ${vm.otherName}'),
+                          ),
+                        ),
+                    ],
                   ],
                 ),
             ],
@@ -366,7 +414,7 @@ class _DirectChatViewState extends State<DirectChatView> {
   }
 }
 
-enum _ChatAction { members, add, rename, leave, archive, delete }
+enum _ChatAction { members, add, rename, leave, archive, delete, report, block }
 
 /// A group's members: who started it, Remove for its creator, and Add.
 class _MembersSheet extends StatelessWidget {
@@ -535,6 +583,44 @@ class _RequestBar extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// In place of the composer when either person blocked the other.
+class _BlockedBar extends StatelessWidget {
+  const _BlockedBar({
+    required this.name,
+    required this.mine,
+    required this.onUnblock,
+  });
+
+  final String name;
+
+  /// Whether the user blocked them (and can unblock).
+  final bool mine;
+  final VoidCallback onUnblock;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                mine ? 'You blocked $name.' : "You can't message $name.",
+                style: TextStyle(color: c.muted),
+              ),
+            ),
+            if (mine)
+              TextButton(onPressed: onUnblock, child: const Text('Unblock')),
+          ],
+        ),
       ),
     );
   }

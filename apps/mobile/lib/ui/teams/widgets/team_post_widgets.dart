@@ -13,8 +13,10 @@ import '../../core/ui/layout.dart';
 import '../../core/ui/linkified_text.dart';
 import '../../core/ui/skeleton.dart';
 import '../../core/ui/user_avatar.dart';
+import '../../../domain/models/moderation.dart';
+import '../../moderation/widgets/report_sheet.dart';
 
-enum _PostAction { pin, unpin, edit, delete }
+enum _PostAction { pin, unpin, edit, delete, report }
 
 /// Loads a post photo's bytes.
 typedef ImageLoader = Future<Result<Uint8List>> Function(ChatAttachment image);
@@ -40,9 +42,13 @@ class TeamPostCard extends StatelessWidget {
     this.onUnpin,
     this.onComments,
     this.now,
+    this.teamId,
   });
 
   final TeamPost post;
+
+  /// The post's team; with it, others can report the post.
+  final String? teamId;
   final ImageLoader loadImage;
   final String? teamName;
 
@@ -72,6 +78,9 @@ class TeamPostCard extends StatelessWidget {
     final c = AppColors.of(context);
     final when = post.createdAt;
     final author = post.authorName.isEmpty ? 'Team admin' : post.authorName;
+    final team = teamId;
+    final reportable =
+        team != null && onEdit == null && canReport(context, post.authorId);
     final byline = [
       ?teamName,
       if (when != null) timeAgo(when, now ?? DateTime.now()),
@@ -145,7 +154,8 @@ class TeamPostCard extends StatelessWidget {
                 if (onEdit != null ||
                     onDelete != null ||
                     onPin != null ||
-                    onUnpin != null)
+                    onUnpin != null ||
+                    reportable)
                   PopupMenuButton<_PostAction>(
                     tooltip: 'Post options',
                     icon: Icon(Icons.more_horiz, color: c.muted),
@@ -154,6 +164,12 @@ class TeamPostCard extends StatelessWidget {
                       _PostAction.unpin => onUnpin?.call(),
                       _PostAction.edit => onEdit?.call(),
                       _PostAction.delete => onDelete?.call(),
+                      _PostAction.report => showReportSheet(
+                        context,
+                        target: TeamPostReport(team!, post.id),
+                        authorName: author,
+                        authorId: post.authorId,
+                      ),
                     },
                     itemBuilder: (_) => [
                       if (onPin != null)
@@ -175,6 +191,11 @@ class TeamPostCard extends StatelessWidget {
                         const PopupMenuItem(
                           value: _PostAction.delete,
                           child: Text('Delete'),
+                        ),
+                      if (reportable)
+                        const PopupMenuItem(
+                          value: _PostAction.report,
+                          child: Text('Report post'),
                         ),
                     ],
                   )

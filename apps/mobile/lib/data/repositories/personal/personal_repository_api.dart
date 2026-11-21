@@ -115,7 +115,9 @@ class PersonalDetailsRepositoryApi extends PersonalDetailsRepository {
     notifyListeners();
   });
 
-  static const _noApi = "Personal details can't be saved in this build.";
+  static const _noApi =
+      "Personal details can't be saved in this version of the app. Update "
+      'the app, or use stall10.app.';
 
   @override
   DateTime? takeSignUpBirthDate() {
