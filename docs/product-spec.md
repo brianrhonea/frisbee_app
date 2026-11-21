@@ -1212,6 +1212,10 @@ Out of scope: payments, meeting recording, USA Ultimate data.
     builds' direct uploads are checked by the `photoCheck` function and
     deleted if unsafe. Tests: API `media.test.ts`, functions
     `test/moderation/photo_check.test.ts`.
+59. Calendar Subscribe: [x] app; [x] website. One Subscribe button with
+    the device's calendar apps (`subscribeOptions`, shared and Dart).
+    Tests: shared `subscribe_options.test.ts`, app
+    `test/domain/subscribe_options_test.dart` and `calendars_test.dart`.
 
 Libraries the website may add (none today): a small data cache for API
 reads and mutations, the Firestore web SDK for listeners, and LiveKit's

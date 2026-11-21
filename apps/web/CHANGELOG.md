@@ -14,6 +14,13 @@ With app 0.0.42 and API 0.38.0.
   saved masked, and unsafe photos are refused on upload.
 - Community guidelines: "Words and photos we filter".
 
+**Changed**
+- Calendar settings: one **Subscribe** button opens the choices for this
+  device (`subscribeOptions` in packages/shared): Apple Calendar on Apple
+  devices, Google, Outlook and Outlook for work or school (straight to
+  Outlook's subscribe page), and Copy link. The text says how often each
+  calendar app checks the link.
+
 ## 0.50.0 — 2026-11-20
 
 With app 0.0.41 and API 0.37.0.

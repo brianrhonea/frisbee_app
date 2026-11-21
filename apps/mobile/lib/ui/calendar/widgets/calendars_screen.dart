@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -333,9 +334,11 @@ class _Subscribe extends StatelessWidget {
     final c = AppColors.of(context);
     const footer =
         "Subscribe with a private link and every calendar you're on shows "
-        'up there, kept up to date (calendar apps check every hour or so). '
-        'Anyone with the link can see those events; reset it if it gets '
-        'out. Each event also has Add to calendar.';
+        'up there, kept up to date. Calendar apps check the link on their '
+        'own schedule: Apple Calendar as often as its Fetch setting, '
+        'Outlook every few hours, Google Calendar up to a day. Anyone with '
+        'the link can see those events; reset it if it gets out. Each event '
+        'also has Add to calendar.';
     if (url == null || webcal == null) {
       return SettingsGroup(
         title: 'Outlook, Apple and Google Calendar',
@@ -413,39 +416,14 @@ class _Subscribe extends StatelessWidget {
                   const SizedBox(height: 12),
                   FilledButton.icon(
                     icon: const Icon(Icons.event_available_outlined, size: 18),
-                    label: const Text('Subscribe in Apple Calendar or Outlook'),
-                    onPressed: () => launchUrl(
-                      Uri.parse(webcal),
-                      mode: LaunchMode.externalApplication,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  FilledButton.icon(
-                    icon: const Icon(Icons.calendar_month_outlined, size: 18),
-                    label: const Text('Add to Google Calendar'),
-                    onPressed: () => launchUrl(
-                      Uri.https('calendar.google.com', '/calendar/r', {
-                        'cid': webcal,
-                      }),
-                      mode: LaunchMode.externalApplication,
-                    ),
+                    label: const Text('Subscribe'),
+                    onPressed: () =>
+                        showSubscribeSheet(context, url: url, webcal: webcal),
                   ),
                   const SizedBox(height: 10),
                   const Divider(),
                   Row(
                     children: [
-                      Expanded(
-                        child: TextButton(
-                          style: small,
-                          onPressed: () async {
-                            await Clipboard.setData(ClipboardData(text: url));
-                            if (context.mounted) {
-                              showSnackBar(context, 'Link copied');
-                            }
-                          },
-                          child: const Text('Copy link'),
-                        ),
-                      ),
                       Expanded(
                         child: TextButton(
                           style: small,
@@ -880,5 +858,105 @@ class _CalendarDetailScreenState extends State<CalendarDetailScreen> {
         ],
       );
     },
+  );
+}
+
+/// The platform the options are for.
+SubscribePlatform _platform() => switch (defaultTargetPlatform) {
+  TargetPlatform.iOS => SubscribePlatform.ios,
+  TargetPlatform.macOS => SubscribePlatform.macos,
+  TargetPlatform.android => SubscribePlatform.android,
+  _ => SubscribePlatform.other,
+};
+
+/// The one "Subscribe" button's choices: the calendar apps that fit this
+/// phone (installed ones first, where the phone lets us see them), and Copy
+/// link. Each opens its app's own subscribe screen.
+Future<void> showSubscribeSheet(
+  BuildContext context, {
+  required String url,
+  required String webcal,
+}) async {
+  final platform = _platform();
+  final installed = <SubscribeTarget>{};
+  var webcalApp = true;
+  if (platform == SubscribePlatform.android) {
+    // AndroidManifest.xml's <queries> lets the app see these.
+    final checks = await Future.wait([
+      canLaunchUrl(Uri.parse('ms-outlook://'))
+          .timeout(const Duration(seconds: 1), onTimeout: () => false)
+          .catchError((Object _) => false),
+      canLaunchUrl(Uri.parse(webcal))
+          .timeout(const Duration(seconds: 1), onTimeout: () => false)
+          .catchError((Object _) => false),
+    ]);
+    if (checks[0]) installed.add(SubscribeTarget.outlook);
+    webcalApp = checks[1];
+  }
+  final options = [
+    for (final o in subscribeOptions(
+      (url: url, webcal: webcal),
+      platform,
+      installed: installed,
+    ))
+      if (o.target != SubscribeTarget.other || webcalApp) o,
+  ];
+  if (!context.mounted) return;
+  await showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (sheet) => SafeArea(
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text(
+                'Subscribe with',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+              ),
+            ),
+            for (final o in options)
+              ListTile(
+                leading: Icon(switch (o.target) {
+                  SubscribeTarget.apple => Icons.event_available_outlined,
+                  SubscribeTarget.google => Icons.calendar_month_outlined,
+                  SubscribeTarget.outlook ||
+                  SubscribeTarget.outlookWork => Icons.mail_outline,
+                  SubscribeTarget.other => Icons.open_in_new,
+                }),
+                title: Text(
+                  installed.contains(o.target)
+                      ? '${o.label} · Installed'
+                      : o.label,
+                ),
+                subtitle: Text(o.detail),
+                onTap: () {
+                  Navigator.pop(sheet);
+                  launchUrl(
+                    Uri.parse(o.url),
+                    mode: LaunchMode.externalApplication,
+                  );
+                },
+              ),
+            ListTile(
+              leading: const Icon(Icons.link),
+              title: const Text('Copy link'),
+              subtitle: const Text(
+                'For another app: paste it where it asks '
+                'to subscribe from a URL.',
+              ),
+              onTap: () async {
+                await Clipboard.setData(ClipboardData(text: url));
+                if (sheet.mounted) Navigator.pop(sheet);
+                if (context.mounted) showSnackBar(context, 'Link copied');
+              },
+            ),
+          ],
+        ),
+      ),
+    ),
   );
 }

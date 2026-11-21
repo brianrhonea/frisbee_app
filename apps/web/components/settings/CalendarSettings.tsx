@@ -10,6 +10,8 @@ import {
   calendarPeopleMax,
   type ShareRole,
   shareRoleLabels,
+  type SubscribePlatform,
+  subscribeOptions,
   shareRoles,
 } from "@stall10/shared";
 import Link from "next/link";
@@ -329,6 +331,15 @@ function NewCalendar({ busy, run }: { busy: boolean; run: Call }) {
   );
 }
 
+/** The device, for which subscribe options to offer first (browsers can't see installed apps). */
+function devicePlatform(): SubscribePlatform {
+  const ua = typeof navigator === "undefined" ? "" : navigator.userAgent;
+  if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return "ios";
+  if (/Macintosh/.test(ua)) return "macos";
+  if (/Android/.test(ua)) return "android";
+  return "other";
+}
+
 /** The private subscription link (every calendar the member is on, as iCalendar). */
 function Subscribe() {
   const { user } = useAuth();
@@ -336,6 +347,7 @@ function Subscribe() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -365,42 +377,55 @@ function Subscribe() {
     <div className="card" id="subscribe">
       <h2 className="card-title">Outlook, Apple and Google Calendar</h2>
       <p className="muted small">
-        Subscribe with a private link and every calendar you&apos;re on shows up there, kept up to date (calendar apps check
-        every hour or so). Anyone with the link can see those events, so keep it to yourself; reset it if it gets out.
+        Subscribe with a private link and every calendar you&apos;re on shows up there, kept up to date. Calendar apps check
+        the link on their own schedule: Apple Calendar as often as its refresh setting, Outlook every few hours, Google
+        Calendar up to a day. Anyone with the link can see those events, so keep it to yourself; reset it if it gets out.
         Each event on <Link href="/schedule">your schedule</Link> also has <b>Add to calendar</b>.
       </p>
       {feed?.url && feed.webcal ? (
         <>
-          <div className="input-row">
-            <input readOnly value={feed.url} aria-label="Subscription link" onFocus={(e) => e.target.select()} />
+          <p className="cal-subscribe">
             <button
               type="button"
-              className="btn btn-small"
-              onClick={() => {
-                void navigator.clipboard?.writeText(feed.url!).then(() => {
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
-                });
-              }}
+              className="btn btn-primary btn-small"
+              aria-expanded={open}
+              aria-controls="subscribe-options"
+              onClick={() => setOpen((o) => !o)}
             >
-              {copied ? "Copied" : "Copy"}
+              Subscribe
             </button>
-          </div>
-          <p className="cal-subscribe">
-            <a className="btn btn-primary btn-small" href={feed.webcal}>
-              Apple Calendar or Outlook
-            </a>
-            <a
-              className="btn btn-small"
-              href={`https://calendar.google.com/calendar/r?cid=${encodeURIComponent(feed.webcal)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Google Calendar
-            </a>
           </p>
+          {open && (
+            <div className="cal-subscribe-options" id="subscribe-options">
+              <p className="small">Subscribe with</p>
+              <ul>
+                {subscribeOptions({ url: feed.url, webcal: feed.webcal }, devicePlatform()).map((o) => (
+                  <li key={o.target}>
+                    <a href={o.url} {...(o.url.startsWith("https:") && { target: "_blank", rel: "noopener noreferrer" })}>
+                      <b>{o.label}</b>
+                      <span className="muted small">{o.detail}</span>
+                    </a>
+                  </li>
+                ))}
+                <li>
+                  <button
+                    type="button"
+                    className="text-btn"
+                    onClick={() => {
+                      void navigator.clipboard?.writeText(feed.url!).then(() => {
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      });
+                    }}
+                  >
+                    <b>{copied ? "Copied" : "Copy link"}</b>
+                  </button>
+                  <span className="muted small">For another app: paste it where it asks to subscribe from a URL.</span>
+                </li>
+              </ul>
+            </div>
+          )}
           <p className="muted small">
-            Outlook on the web: Add calendar → Subscribe from web, and paste the link.{" "}
             <button
               type="button"
               className="text-btn"

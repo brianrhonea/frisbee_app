@@ -210,3 +210,78 @@ class CalendarFeed {
     webcal: map['webcal'] as String?,
   );
 }
+
+/// Where "Subscribe" can send the link.
+enum SubscribeTarget { apple, google, outlook, outlookWork, other }
+
+/// The device it's shown on, for which options and in what order.
+enum SubscribePlatform { ios, macos, android, other }
+
+/// One choice behind the "Subscribe" button.
+class SubscribeOption {
+  const SubscribeOption(this.target, this.label, this.detail, this.url);
+
+  final SubscribeTarget target;
+  final String label;
+  final String detail;
+  final String url;
+}
+
+/// The options behind the one "Subscribe" button, best first for
+/// [platform]: Apple Calendar only on Apple devices; Google first on
+/// Android; Outlook first elsewhere. [installed] (apps the phone has) moves
+/// those first. The same as subscribeOptions in packages/shared calendar.ts.
+List<SubscribeOption> subscribeOptions(
+  ({String url, String webcal}) feed,
+  SubscribePlatform platform, {
+  Set<SubscribeTarget> installed = const {},
+}) {
+  final enc = Uri.encodeComponent;
+  String outlook(String host) =>
+      'https://$host/calendar/0/addfromweb?url=${enc(feed.url)}'
+      '&name=${enc('Stall 10')}';
+  final all = {
+    SubscribeTarget.apple: SubscribeOption(
+      SubscribeTarget.apple,
+      'Apple Calendar',
+      'Opens Calendar to subscribe.',
+      feed.webcal,
+    ),
+    SubscribeTarget.google: SubscribeOption(
+      SubscribeTarget.google,
+      'Google Calendar',
+      'Opens Google Calendar in the browser; it then shows in the app.',
+      'https://calendar.google.com/calendar/r?cid=${enc(feed.webcal)}',
+    ),
+    SubscribeTarget.outlook: SubscribeOption(
+      SubscribeTarget.outlook,
+      'Outlook',
+      'Outlook.com, Hotmail or Live accounts.',
+      outlook('outlook.live.com'),
+    ),
+    SubscribeTarget.outlookWork: SubscribeOption(
+      SubscribeTarget.outlookWork,
+      'Outlook (work or school)',
+      'Microsoft 365 accounts.',
+      outlook('outlook.office.com'),
+    ),
+    SubscribeTarget.other: SubscribeOption(
+      SubscribeTarget.other,
+      'Another calendar app',
+      'Any app that opens calendar links.',
+      feed.webcal,
+    ),
+  };
+  const t = SubscribeTarget.values;
+  final order = switch (platform) {
+    SubscribePlatform.ios ||
+    SubscribePlatform.macos => [t[0], t[1], t[2], t[3]],
+    SubscribePlatform.android => [t[1], t[2], t[3], t[4]],
+    SubscribePlatform.other => [t[2], t[3], t[1], t[4]],
+  };
+  final first = order.where(installed.contains).toList();
+  return [
+    for (final x in [...first, ...order.where((x) => !first.contains(x))])
+      all[x]!,
+  ];
+}

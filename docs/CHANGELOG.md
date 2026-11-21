@@ -76,6 +76,14 @@ With web 0.51.0 and API 0.38.0 (product-spec §8.1 items 57–58).
   (nothing is sent for blocked text).
 - Community guidelines (`firebase/hosting/guidelines.html`): "Words and
   photos we filter".
+- Calendars: one **Subscribe** button instead of three. Its sheet lists
+  the calendar apps for this device (`subscribeOptions` in
+  `domain/models/calendar.dart`, the same as packages/shared's): Apple
+  Calendar on iPhone, Google first on Android, Outlook (personal, and
+  work or school, which now open Outlook's own subscribe page), another
+  webcal app when Android has one, and Copy link. On Android, an
+  installed Outlook goes first (`<queries>` for `ms-outlook` and
+  `webcal`). The footer says how often each app checks the link.
 
 ## 0.0.41 — Report and block
 

@@ -19,6 +19,11 @@ Firebase project; App Store builds come from `main` and use production.
 - Photos are checked as they upload. Nude, sexual or graphic violent
   photos are refused.
 
+**Calendars**
+- One Subscribe button: pick Apple Calendar, Google, Outlook (personal or
+  work) or copy the link. Outlook now opens straight to its subscribe
+  page.
+
 ## 0.0.41
 
 **Safety**

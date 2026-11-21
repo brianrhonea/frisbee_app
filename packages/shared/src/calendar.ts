@@ -170,3 +170,56 @@ export interface CalendarFeedResponse {
   /** The same as webcal:// (Apple Calendar and Outlook open it to subscribe). */
   webcal: string | null;
 }
+
+/** Where "Subscribe" can send the link. */
+export type SubscribeTarget = "apple" | "google" | "outlook" | "outlookWork" | "other";
+
+/** The device it's shown on, for which options and in what order. */
+export type SubscribePlatform = "ios" | "macos" | "android" | "other";
+
+export interface SubscribeOption {
+  target: SubscribeTarget;
+  label: string;
+  detail: string;
+  url: string;
+}
+
+/**
+ * The options behind the one "Subscribe" button, best first for
+ * [platform]: Apple Calendar only on Apple devices; Google first on
+ * Android; Outlook first elsewhere. [installed] (what the app could see
+ * on the phone) moves those first. The app's subscribeOptions matches.
+ */
+export function subscribeOptions(
+  feed: { url: string; webcal: string },
+  platform: SubscribePlatform,
+  installed: readonly SubscribeTarget[] = [],
+): SubscribeOption[] {
+  const enc = encodeURIComponent;
+  const outlook = (host: string) => `https://${host}/calendar/0/addfromweb?url=${enc(feed.url)}&name=${enc("Stall 10")}`;
+  const all: Record<SubscribeTarget, SubscribeOption> = {
+    apple: { target: "apple", label: "Apple Calendar", detail: "Opens Calendar to subscribe.", url: feed.webcal },
+    google: {
+      target: "google",
+      label: "Google Calendar",
+      detail: "Opens Google Calendar in the browser; it then shows in the app.",
+      url: `https://calendar.google.com/calendar/r?cid=${enc(feed.webcal)}`,
+    },
+    outlook: { target: "outlook", label: "Outlook", detail: "Outlook.com, Hotmail or Live accounts.", url: outlook("outlook.live.com") },
+    outlookWork: {
+      target: "outlookWork",
+      label: "Outlook (work or school)",
+      detail: "Microsoft 365 accounts.",
+      url: outlook("outlook.office.com"),
+    },
+    other: { target: "other", label: "Another calendar app", detail: "Any app that opens calendar links.", url: feed.webcal },
+  };
+  const order: SubscribeTarget[] =
+    platform === "ios" || platform === "macos"
+      ? ["apple", "google", "outlook", "outlookWork"]
+      : platform === "android"
+        ? ["google", "outlook", "outlookWork", "other"]
+        : ["outlook", "outlookWork", "google", "other"];
+  const first = order.filter((t) => installed.includes(t));
+  return [...first, ...order.filter((t) => !first.includes(t))].map((t) => all[t]);
+}

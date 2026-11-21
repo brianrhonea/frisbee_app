@@ -601,10 +601,20 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Get a subscription link'));
       await tester.pumpAndSettle();
-      expect(
-        find.text('Subscribe in Apple Calendar or Outlook'),
-        findsOneWidget,
+      // One Subscribe button; its sheet has the apps and Copy link.
+      expect(find.widgetWithText(FilledButton, 'Subscribe'), findsOneWidget);
+      expect(find.text('Add to Google Calendar'), findsNothing);
+      await tester.ensureVisible(
+        find.widgetWithText(FilledButton, 'Subscribe'),
       );
+      await tester.tap(find.widgetWithText(FilledButton, 'Subscribe'));
+      // Past the installed-app checks (no plugin in tests).
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pumpAndSettle();
+      expect(find.text('Subscribe with'), findsOneWidget);
+      expect(find.text('Google Calendar'), findsOneWidget);
+      expect(find.text('Outlook'), findsOneWidget);
+      expect(find.text('Copy link'), findsOneWidget);
     });
 
     testWidgets('without an API, Calendars says so', (tester) async {

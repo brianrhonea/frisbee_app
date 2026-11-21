@@ -181,10 +181,7 @@ void main() {
           lessThanOrEqualTo(1),
           reason: 'sizes, seed $seed',
         );
-        expect(
-          {for (final t in result) ...t.playerIds},
-          hasLength(all.length),
-        );
+        expect({for (final t in result) ...t.playerIds}, hasLength(all.length));
       }
     });
 

@@ -1160,6 +1160,13 @@ a.play-card:hover { border-color: var(--accent); }
 .cal-invite-role { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
 .cal-invite-role select { width: auto; }
 .cal-subscribe { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.cal-subscribe-options { border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); padding: 10px 14px; margin: 0 0 10px; }
+.cal-subscribe-options ul { list-style: none; margin: 0; padding: 0; }
+.cal-subscribe-options li { border-top: 1px solid var(--line); padding: 8px 0; display: flex; flex-direction: column; gap: 2px; }
+.cal-subscribe-options li:first-child { border-top: 0; }
+.cal-subscribe-options a { display: flex; flex-direction: column; gap: 2px; color: inherit; text-decoration: none; }
+.cal-subscribe-options a:hover b, .cal-subscribe-options .text-btn:hover b { color: var(--accent-ink); }
+.cal-subscribe-options .text-btn { text-align: left; padding: 0; }
 .cal-invites { border-color: var(--accent); }
 .input-row { display: flex; gap: 8px; align-items: center; }
 .input-row input { flex: 1; min-width: 0; }
