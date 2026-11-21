@@ -44,7 +44,9 @@ async function safeSearch(bucket: string, path: string): Promise<SafeSearch | nu
   return r?.safeSearchAnnotation ?? null;
 }
 
-export const photoCheck = onObjectFinalized({ memory: "256MiB" }, async (e) => {
+// A Storage trigger runs in its bucket's region: both projects' default
+// buckets are in us-east1 (the other functions stay in us-central1).
+export const photoCheck = onObjectFinalized({ memory: "256MiB", region: "us-east1" }, async (e) => {
   const { bucket, name, contentType, metadata } = e.data;
   if (!name || !needsCheck(name, contentType, metadata)) return;
   let s: SafeSearch | null;
