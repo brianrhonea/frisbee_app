@@ -464,6 +464,10 @@ the fee): the charge is grossed up with Stripe's card rate
 every payment method. Check card-network and state rules on passing fees
 to payers before switching payments on in production.
 
+`paymentLog` (the payment history) is never deleted by the API; keep it
+out of any clean-up script. It holds no card or bank details, only who,
+when, amounts and Stripe's ids.
+
 Locally, put test-mode values in the gitignored `apps/api/.env` and
 forward events with the Stripe CLI:
 `stripe listen --forward-connect-to localhost:8787/v1/payments/stripe/webhook`

@@ -4367,6 +4367,11 @@ describe("hosted tournaments", () => {
     await assertFails(setDoc(payRef(CAPTAIN), { paid: true, paidAt: null, note: "" }));
     await assertSucceeds(setDoc(payRef(DIRECTOR), { paid: true, paidAt: new Date(), note: "Venmo" }));
     await assertFails(setDoc(payRef(DIRECTOR), { paid: "yes", paidAt: null, note: "" }));
+    // The payer's "paying another way" (written by the API) survives the host's marks.
+    await assertSucceeds(setDoc(payRef(DIRECTOR), { paid: false, paidAt: null, note: "Check #1042", offlineAt: new Date() }));
+    await assertSucceeds(setDoc(payRef(DIRECTOR), { paid: false, paidAt: null, note: "", offlineAt: null }));
+    await assertFails(setDoc(payRef(DIRECTOR), { paid: false, paidAt: null, note: "", offlineAt: "soon" }));
+    await assertFails(setDoc(payRef(CAPTAIN), { paid: false, paidAt: null, note: "", offlineAt: new Date() }));
     await assertSucceeds(getDoc(payRef(CAPTAIN)));
     await assertFails(getDoc(payRef(PLAYER)));
     await assertFails(getDoc(payRef(OUTSIDER)));

@@ -68,6 +68,7 @@ class PayOnlineViewModel extends ChangeNotifier {
        _open = open {
     load = Command0(_load)..execute();
     pay = Command0(_pay);
+    payOffline = Command1(_payOffline);
   }
 
   final PaymentRepository _payments;
@@ -77,6 +78,29 @@ class PayOnlineViewModel extends ChangeNotifier {
 
   late final Command0<void> load;
   late final Command0<void> pay;
+
+  /// "We'll pay another way" (true), or taking it back (false).
+  late final Command1<void, bool> payOffline;
+
+  /// The payer said they'll pay another way.
+  bool get payingAnotherWay => _options?.offlineAt != null;
+
+  /// Whether to offer "We'll pay another way": a fee still to pay, not
+  /// clearing online.
+  bool get canPayOffline {
+    final o = _options;
+    return o != null && !o.paid && !o.processing && o.amountCents > 0;
+  }
+
+  Future<Result<void>> _payOffline(bool offline) async {
+    final r = await _payments.payOffline(
+      tournamentId,
+      teamId: teamId,
+      offline: offline,
+    );
+    if (r is Ok) await _load();
+    return r;
+  }
 
   PayOptions? _options;
   PayOptions? get options => _options;

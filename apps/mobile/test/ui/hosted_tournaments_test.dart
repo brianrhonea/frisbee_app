@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frisbee_app/data/repositories/payment/payment_repository.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/group_tournament.dart';
 import 'package:frisbee_app/domain/models/hosted_tournament.dart';
@@ -66,13 +67,18 @@ void main() {
     user: AppUser(uid: uid, email: '$uid@x.com'),
   );
 
-  Future<HostedTournamentViewModel> page(String uid, String id) async {
+  Future<HostedTournamentViewModel> page(
+    String uid,
+    String id, {
+    PaymentRepository? payments,
+  }) async {
     final vm = HostedTournamentViewModel(
       tournamentId: id,
       tournamentRepository: repo,
       teamRepository: teams,
       authRepository: as(uid),
       postRepository: posts,
+      paymentRepository: payments,
       now: () => DateTime(2027, 4, 10),
     );
     await pumpEventQueue();
@@ -249,6 +255,31 @@ void main() {
     expect(cap.isPaid('t1'), isTrue);
     dir.dispose();
     cap.dispose();
+  });
+
+  test('with the API, marks and notes go through it (the payment history), '
+      'shown at once and undone if it fails', () async {
+    final id = await host(fee: const BidFee(amountCents: 20000));
+    final cap = await page('cap1', id);
+    await cap.apply.execute((
+      teamId: 't1',
+      divisionId: cap.divisions.single.id,
+      captainIds: ['cap1'],
+    ));
+    cap.dispose();
+    final api = _MarkingPayments();
+    final dir = await page('director', id, payments: api);
+    await dir.setPaid.execute((teamId: 't1', paid: true));
+    expect(api.marks, ['t1 true ']);
+    expect(dir.isPaid('t1'), isTrue);
+    await dir.setPaymentNote.execute((teamId: 't1', note: 'Check #1042'));
+    expect(api.marks.last, 't1 true Check #1042');
+    expect(dir.paymentOf('t1')?.note, 'Check #1042');
+    api.fail = true;
+    await dir.setPaid.execute((teamId: 't1', paid: false));
+    expect(dir.setPaid.error, isTrue);
+    expect(dir.isPaid('t1'), isTrue);
+    dir.dispose();
   });
 
   test('seed, publish, report, confirm and finish with placements', () async {
@@ -587,4 +618,28 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     vm.dispose();
   });
+}
+
+/// Records the host's marks, as the API would take them.
+class _MarkingPayments implements PaymentRepository {
+  final marks = <String>[];
+  bool fail = false;
+
+  @override
+  bool get available => true;
+
+  @override
+  Future<Result<void>> mark(
+    String tournamentId,
+    String payerId, {
+    required bool paid,
+    required String note,
+  }) async {
+    if (fail) return Result.error(Exception('offline'));
+    marks.add('$payerId $paid $note');
+    return const Result.ok(null);
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

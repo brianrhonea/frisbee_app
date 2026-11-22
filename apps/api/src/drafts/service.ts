@@ -41,6 +41,7 @@ import { docIdParam, storedId } from "../ids.js";
 import { type Data, type DocStore, serverTime, type Tx } from "../store.js";
 import { can, clipText, mapOf, own, strings } from "../teams/access.js";
 import type { DraftQueries } from "./repository.js";
+import { logPayment } from "../payments/log.js";
 import { paymentProblem, signupCreateProblem, signupUpdateProblem, validDivision } from "./rules.js";
 
 /** The callables' id check (idPattern in draft.ts and callables.ts). */
@@ -168,10 +169,11 @@ export class DraftService {
       if (!tournament) throw noEvent();
       const { manages } = await this.manages((x) => tx.get(x), tournament, caller.uid);
       const old = await tx.get(p.payment(tournamentId, userId));
-      const doc = { paid, paidAt: paid ? serverTime : null, note: typeof old?.note === "string" ? old.note : "" };
+      const doc = { paid, paidAt: paid ? serverTime : null, note: typeof old?.note === "string" ? old.note : "", ...(old?.offlineAt instanceof Date && { offlineAt: old.offlineAt }) };
       const problem = paymentProblem(manages, doc);
       if (problem) throw problem;
       tx.set(p.payment(tournamentId, userId), doc);
+      logPayment(this.store, tx, { tournamentId, payerId: userId, action: paid ? "marked_paid" : "marked_unpaid", by: caller.uid, note: doc.note });
     });
   }
 

@@ -970,6 +970,7 @@ class EntryPayment {
     this.paid = false,
     this.paidAt,
     this.note = '',
+    this.offlineAt,
   });
 
   static const maxNoteLength = 200;
@@ -981,18 +982,27 @@ class EntryPayment {
   /// The host's own note, e.g. "Venmo 3/2".
   final String note;
 
+  /// When the payer said they'll pay another way (a check, a PO); set
+  /// through the API. Kept by the host's marks.
+  final DateTime? offlineAt;
+
+  /// Unpaid, but the payer said they'll pay another way.
+  bool get payingAnotherWay => !paid && offlineAt != null;
+
   factory EntryPayment.fromMap(String teamId, Map<String, dynamic> map) =>
       EntryPayment(
         teamId: teamId,
         paid: map['paid'] as bool? ?? false,
         paidAt: parseDate(map['paidAt']),
         note: map['note'] as String? ?? '',
+        offlineAt: parseDate(map['offlineAt']),
       );
 
   Map<String, dynamic> toMap() => {
     'paid': paid,
     'paidAt': paidAt,
     'note': note,
+    'offlineAt': ?offlineAt,
   };
 }
 

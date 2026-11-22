@@ -59,7 +59,11 @@ class PayOptions {
     required this.paid,
     this.reason,
     this.processing = false,
+    this.offlineAt,
   }) : chargeCents = chargeCents ?? amountCents;
+
+  /// When the payer said they'll pay another way; null if they haven't.
+  final DateTime? offlineAt;
 
   /// The host takes payments through Stall 10 and this fee can be paid online.
   final bool online;
@@ -94,6 +98,7 @@ class PayOptions {
     paid: m['paid'] == true,
     reason: m['reason'] as String?,
     processing: m['pending'] == 'processing',
+    offlineAt: DateTime.tryParse(m['offlineAt'] as String? ?? ''),
   );
 }
 

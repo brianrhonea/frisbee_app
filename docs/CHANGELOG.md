@@ -85,6 +85,17 @@ Plain-language notes for testers are in
 - `PayOnlineViewModel.checking`: back from Stripe, the button gives way to
   "Checking your payment…" until the reload (which asks Stripe) answers.
   A clearing bank payment shows "Your bank payment is processing…".
+- "We'll pay another way" (`PayOnlineViewModel.payOffline`, through
+  `PUT /v1/tournaments/:id/pay/offline`), with Undo; `EntryPayment.offlineAt`
+  and `paymentStatusLabel` ("Paying another way") on the host's lists.
+- Payment notes: a note button beside each paid switch
+  (`setPaymentNote` on `HostedTournamentViewModel` and
+  `PlayerSignupsViewModel`, `editPaymentNote`). With the API there, marks
+  and notes go through `PUT /v1/tournaments/:id/payments/:payerId` (so
+  they're in the payment history), shown at once and undone on failure;
+  without it, straight to Firestore as before.
+- With online payments on, the form's "How to pay" reads "Other ways to
+  pay" (`PaymentsOnBuilder`).
 
 ## 0.0.40 — Schedule: typed times, sharing, calendars on the tab
 

@@ -1121,11 +1121,10 @@ class _TeamsTabState extends State<_TeamsTab> {
                   [
                     e.status.label,
                     if (fee != null && e.status == EntryStatus.accepted)
-                      vm.isPaid(e.teamId)
-                          ? 'Paid'
-                          : vm.isOverdue(e.teamId)
-                          ? 'Overdue'
-                          : 'Unpaid',
+                      paymentStatusLabel(
+                        vm.paymentOf(e.teamId),
+                        overdue: vm.isOverdue(e.teamId),
+                      ),
                   ].join(' · '),
                   style: TextStyle(fontSize: 12.5, color: c.muted),
                 ),
@@ -1157,6 +1156,21 @@ class _TeamsTabState extends State<_TeamsTab> {
           ),
         ],
       ),
+    );
+  }
+
+  /// The host's note on a team's payment ("Check #1042").
+  Widget _noteButton(BuildContext context, String teamId) {
+    final note = vm.paymentOf(teamId)?.note ?? '';
+    return IconButton(
+      tooltip: note.isEmpty ? 'Add a payment note' : 'Payment note: $note',
+      icon: Icon(note.isEmpty ? Icons.note_add_outlined : Icons.sticky_note_2),
+      onPressed: () async {
+        final next = await editPaymentNote(context, note);
+        if (next != null && next != note) {
+          await vm.setPaymentNote.execute((teamId: teamId, note: next));
+        }
+      },
     );
   }
 
@@ -1239,6 +1253,8 @@ class _TeamsTabState extends State<_TeamsTab> {
                       Pill(
                         vm.isPaid(id)
                             ? 'Bid paid'
+                            : vm.paymentOf(id)?.payingAnotherWay ?? false
+                            ? 'Paying another way'
                             : overdue
                             ? 'Bid fee overdue'
                             : 'Bid fee unpaid',
@@ -1249,11 +1265,23 @@ class _TeamsTabState extends State<_TeamsTab> {
                             ? PillTone.needsYou
                             : PillTone.neutral,
                       ),
+                      if (vm.isManager &&
+                          (vm.paymentOf(id)?.note ?? '').isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            vm.paymentOf(id)!.note,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 12, color: c.muted),
+                          ),
+                        ),
                     ],
                   ],
                 ),
               ),
               if (vm.isManager) ...[
+                if (fee != null) _noteButton(context, id),
                 if (fee != null) _paidSwitch(id),
                 PopupMenuButton<EntryStatus>(
                   onSelected: (s) async {

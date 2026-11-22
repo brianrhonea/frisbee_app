@@ -160,6 +160,11 @@ and events; everything else in the hub is for members. A private group
 - Bank payments (ACH) where the host switches them on in Stripe; they
   show as processing until they clear, and a failed one can be paid
   again.
+- Paying another way: payers can say they'll pay by check, PO or the
+  host's own way ("Paying another way" on the host's lists), and hosts
+  add a note to any payment. Hosts mark teams' fees on the website too.
+- A permanent payment history (`paymentLog`, server only) records every
+  change with who, when, amount and Stripe's ids, for disputes.
 - A payer who loses their connection: Pay again reuses the open
   checkout, and coming back asks Stripe directly (as well as the
   webhook), so nobody is shown a second Pay button for a fee they paid.

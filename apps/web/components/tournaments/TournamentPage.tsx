@@ -22,7 +22,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { FollowButton } from "@/components/FollowButton";
 import { ShareButton, tournamentUrl } from "@/components/ShareButton";
-import { PayOnline, PayoutsCard } from "@/components/payments/Payments";
+import { usePayments } from "@/components/drafts/data";
+import { HostPaymentControls, PayOnline, PayoutsCard } from "@/components/payments/Payments";
 import { callApi } from "@/lib/client";
 import { dayKey, useRenderZone } from "@/lib/renderZone";
 import { SignupsSlot } from "./SignupsSlot";
@@ -513,7 +514,14 @@ function ReserveSpot({ s }: { s: TournamentState }) {
 function TeamsTab({ s }: { s: TournamentState }) {
   const d = s.division;
   const { busy, error, run } = useAction();
+  // The host marks each team's bid or spot fee here, as in the app.
+  const payments = usePayments(s.id, s.manager).data ?? [];
   if (!d || !s.t) return <NoDivisions s={s} />;
+  const fee = spotFee(s.t);
+  const paymentById = new Map(payments.map((x) => [x.id, x]));
+  // Drafted teams' players pay one by one, not as a team.
+  const owes = (id: string) => !!fee && fee.amountCents > 0 && !(d.teams ?? []).some((x) => x.id === id);
+  const overdue = (id: string) => !!fee?.dueAt && Date.now() > Date.parse(fee.dueAt) && paymentById.get(id)?.paid !== true;
   const seedable = s.manager && !s.published;
   const move = (i: number, by: number) => {
     const seeds = [...d.seeds];
@@ -594,6 +602,7 @@ function TeamsTab({ s }: { s: TournamentState }) {
                 <TeamMark name={s.teamName(id)} />
                 <span>{s.teamName(id)}</span>
               </span>
+              {s.manager && s.user && owes(id) && <HostPaymentControls user={s.user} tournamentId={s.id} payerId={id} payment={paymentById.get(id)} overdue={overdue(id)} />}
               {seedable && (
                 <span className="home-actions">
                   <button type="button" className="text-btn" aria-label="Move up" disabled={busy || i === 0} onClick={() => move(i, -1)}>

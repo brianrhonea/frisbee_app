@@ -87,7 +87,7 @@ function setup(gateway: FakeGateway | null = new FakeGateway()) {
     now: () => now,
     payments: gateway ? { gateway, fee: { percentBps: 100, fixedCents: 100 }, returnUrl: site } : undefined,
   });
-  const call = async (method: "GET" | "POST", url: string, body?: object, uid: string | null = "owner") => {
+  const call = async (method: "GET" | "POST" | "PUT", url: string, body?: object, uid: string | null = "owner") => {
     const res = await app.inject({ method, url, ...(body && { payload: body }), headers: uid ? { authorization: `Bearer token:${uid}` } : {} });
     return { status: res.statusCode, json: () => res.json(), message: () => res.json()?.error?.message as string | undefined };
   };
@@ -530,6 +530,86 @@ describe("bank payments", () => {
     await s.hook("checkout.session.completed", session());
     await s.hook("checkout.session.async_payment_failed", session(), "acct_other");
     expect(s.store.doc("charges/cs_1")?.status).toBe("processing");
+  });
+});
+
+describe("paying another way", () => {
+  const team = { payer: "team", teamId: "haze" };
+  const offline = (on: boolean, uid = "captain", body: object = team) => s.call("PUT", "/v1/tournaments/t1/pay/offline", { ...body, offline: on }, uid);
+  const options = async () => (await s.call("GET", "/v1/tournaments/t1/pay?team=haze", undefined, "captain")).json();
+
+  it("lets a team's admins say they'll pay by check, and take it back", async () => {
+    expect((await offline(true)).status).toBe(204);
+    expect(s.store.doc("tournaments/t1/payments/haze")).toEqual({ paid: false, paidAt: null, note: "", offlineAt: new Date(now) });
+    expect((await options()).offlineAt).toBe(new Date(now).toISOString());
+    await offline(false);
+    expect((await options()).offlineAt).toBeNull();
+  });
+
+  it("works without online payments, and only for the payer", async () => {
+    const off = setup(null);
+    for (const [path, data] of s.store.docs) off.store.put(path, data);
+    s = off;
+    expect((await offline(true)).status).toBe(204);
+    expect((await offline(true, "player")).status).toBe(403);
+    expect((await offline(true, "stranger")).status).toBe(403);
+    expect((await s.call("PUT", "/v1/tournaments/hat/pay/offline", { payer: "player", offline: true }, "player")).status).toBe(204);
+  });
+
+  it("can't be said of a fee that's paid", async () => {
+    s.store.put("tournaments/t1/payments/haze", { paid: true, paidAt: new Date(now), note: "" });
+    expect((await offline(true)).message()).toBe("That's already paid.");
+  });
+
+  it("the host marks it paid with a note, keeping the payer's word until then", async () => {
+    await offline(true);
+    const mark = (body: object, uid = "coach") => s.call("PUT", "/v1/tournaments/t1/payments/haze", body, uid);
+    expect((await mark({ paid: false, note: "Check in the mail" })).status).toBe(204);
+    expect(s.store.doc("tournaments/t1/payments/haze")).toMatchObject({ paid: false, note: "Check in the mail", offlineAt: new Date(now) });
+    expect((await mark({ paid: true, note: "Check #1042" })).status).toBe(204);
+    expect(s.store.doc("tournaments/t1/payments/haze")).toMatchObject({ paid: true, paidAt: new Date(now), note: "Check #1042" });
+    expect((await options()).paid).toBe(true);
+    expect((await mark({ paid: true, note: "x" }, "captain")).status).toBe(403);
+    expect((await mark({ paid: true, note: "x".repeat(201) })).status).toBe(400);
+  });
+});
+
+describe("the payment history", () => {
+  const log = () =>
+    [...s.store.docs.entries()]
+      .filter(([k]) => k.startsWith("paymentLog/"))
+      .map(([, v]) => v)
+      .map(({ at, ...rest }) => ({ ...rest, at: at instanceof Date ? "t" : at }) as Record<string, unknown>);
+  const team = { payer: "team", teamId: "haze" };
+
+  it("records each step of an online payment and a refund, with Stripe's ids", async () => {
+    ready();
+    await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
+    await s.hook("checkout.session.completed", { id: "cs_1", payment_status: "paid", payment_intent: "pi_1", metadata: {} });
+    await s.hook("charge.refunded", { payment_intent: "pi_1", refunded: true, amount_refunded: 40000, application_fee: "fee_1" });
+    const ids = { tournamentId: "t1", payerId: "haze", amountCents: 40000, currency: "USD", stripeAccount: "acct_1", checkoutSession: "cs_1", at: "t" };
+    expect(log()).toEqual([
+      { ...ids, action: "checkout_started", by: "captain" },
+      { ...ids, action: "paid_online", by: "stripe", paymentIntent: "pi_1" },
+      { ...ids, action: "refunded_by_host", by: "stripe", paymentIntent: "pi_1" },
+    ]);
+  });
+
+  it("records the host's marks with their notes, and the payer's word", async () => {
+    await s.call("PUT", "/v1/tournaments/t1/pay/offline", { ...team, offline: true }, "captain");
+    await s.call("PUT", "/v1/tournaments/t1/payments/haze", { paid: true, note: "Check #1042" }, "coach");
+    expect(log()).toEqual([
+      { tournamentId: "t1", payerId: "haze", action: "paying_another_way", by: "captain", amountCents: 40000, currency: "USD", at: "t" },
+      { tournamentId: "t1", payerId: "haze", action: "marked_paid", by: "coach", note: "Check #1042", at: "t" },
+    ]);
+  });
+
+  it("records bank payments clearing and failing", async () => {
+    ready();
+    await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
+    await s.hook("checkout.session.completed", { id: "cs_1", payment_status: "unpaid", payment_intent: "pi_1", metadata: {} });
+    await s.hook("checkout.session.async_payment_failed", { id: "cs_1", payment_status: "unpaid", payment_intent: "pi_1", metadata: {} });
+    expect(log().map((e) => e.action)).toEqual(["checkout_started", "bank_payment_processing", "payment_failed"]);
   });
 });
 

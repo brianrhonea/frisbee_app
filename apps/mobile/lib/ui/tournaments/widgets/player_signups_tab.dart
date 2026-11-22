@@ -658,17 +658,39 @@ class _PlayersTabState extends State<PlayersTab> {
                     if (fee != null &&
                         s.status != SignupStatus.withdrawn &&
                         s.status != SignupStatus.declined)
-                      signups.isPaid(s.uid)
-                          ? 'Paid'
-                          : signups.isOverdue(s.uid, fee, now)
-                          ? 'Overdue'
-                          : 'Unpaid',
+                      paymentStatusLabel(
+                        signups.paymentOf(s.uid),
+                        overdue: signups.isOverdue(s.uid, fee, now),
+                      ),
+                    if ((signups.paymentOf(s.uid)?.note ?? '').isNotEmpty)
+                      signups.paymentOf(s.uid)!.note,
                   ].join(' · '),
                   style: TextStyle(fontSize: 12, color: c.muted),
                 ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (fee != null &&
+                        s.status != SignupStatus.withdrawn &&
+                        s.status != SignupStatus.declined)
+                      IconButton(
+                        tooltip: 'Payment note',
+                        icon: Icon(
+                          (signups.paymentOf(s.uid)?.note ?? '').isEmpty
+                              ? Icons.note_add_outlined
+                              : Icons.sticky_note_2,
+                        ),
+                        onPressed: () async {
+                          final note = signups.paymentOf(s.uid)?.note ?? '';
+                          final next = await editPaymentNote(context, note);
+                          if (next != null && next != note) {
+                            await signups.setPaymentNote.execute((
+                              uid: s.uid,
+                              note: next,
+                            ));
+                          }
+                        },
+                      ),
                     if (fee != null &&
                         s.status != SignupStatus.withdrawn &&
                         s.status != SignupStatus.declined)

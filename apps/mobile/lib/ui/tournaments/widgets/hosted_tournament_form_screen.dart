@@ -859,17 +859,26 @@ class _HostedTournamentFormScreenState
                           players: vm.takesPlayers,
                         ),
                         const SizedBox(height: 12),
-                        TextField(
-                          controller: _instructions,
-                          maxLength: 500,
-                          maxLines: 3,
-                          minLines: 1,
-                          decoration: const InputDecoration(
-                            labelText: 'How to pay',
-                            hintText:
-                                'e.g. Venmo @club-treasurer with your team name',
+                        // With online payments on, these are the other ways
+                        // (a school's check or PO).
+                        PaymentsOnBuilder(
+                          builder: (context, on) => TextField(
+                            controller: _instructions,
+                            maxLength: 500,
+                            maxLines: 3,
+                            minLines: 1,
+                            decoration: InputDecoration(
+                              labelText: on
+                                  ? 'Other ways to pay'
+                                  : 'How to pay',
+                              hintText: on
+                                  ? 'e.g. Checks payable to Fling Crew, '
+                                        'mailed to 12 Main St'
+                                  : 'e.g. Venmo @club-treasurer with your '
+                                        'team name',
+                            ),
+                            onChanged: (v) => vm.feeInstructions = v,
                           ),
-                          onChanged: (v) => vm.feeInstructions = v,
                         ),
                         ListTile(
                           contentPadding: EdgeInsets.zero,

@@ -29,6 +29,15 @@ up on the API).
   processing…" while a bank payment clears.
 - Marking a player's entry fee paid ticks at once and undoes itself if
   the save fails.
+- "We'll pay another way" under the Pay button (and in its place when the
+  host doesn't take payments online), with Undo; the host's lists show
+  "Paying another way".
+- Hosts mark teams' bid and spot fees paid on the Teams tab, as in the
+  app (it wasn't possible on the website before), and add a note to any
+  payment ("Check #1042"; `HostPaymentControls`), through
+  `PUT /v1/tournaments/:id/payments/:payerId`.
+- With online payments on, the form's "How to pay" reads "Other ways to
+  pay".
 
 ## 0.49.0 — 2026-11-20
 

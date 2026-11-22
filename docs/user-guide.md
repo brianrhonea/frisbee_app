@@ -417,7 +417,13 @@ fee** (or **Payers cover…**) and they pay the fees instead: $105.41 for a
 $100 fee, shown as a separate processing fee, and you get the whole $100.
 Payers can pay by card, or from a bank account if you switch it on in your
 Stripe Dashboard (bank payments take up to 4 business days and show as
-processing until then). Refunds, disputes and
+processing until then). Teams and players who pay by check, purchase
+order or another way tap **We'll pay another way**, and your lists show
+**Paying another way** until you mark it paid; tap the note button beside
+the paid switch to record how ("Check #1042"). With online payments on,
+the form's **How to pay** becomes **Other ways to pay**. Stall 10 keeps a
+history of every payment change (who, when, how much) for questions and
+disputes. Refunds, disputes and
 payouts are in your Stripe Dashboard; a full refund marks the fee unpaid
 again. You can still mark anyone paid by hand. (Online payments aren't
 switched on in test builds yet.)

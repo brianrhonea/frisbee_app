@@ -9,8 +9,11 @@
 // paid with the same three fields the host's own mark writes, so the
 // firestore rule and paymentProblem are unchanged.
 //
+// Every change is also added to paymentLog (log.ts), the permanent
+// history for questions and disputes.
+//
 // Server-only collections (no client rules match them, so clients can't
-// read or write them): payoutAccounts/{teamId}, stripeAccounts/{acct}
+// read or write them): paymentLog/{id}, payoutAccounts/{teamId}, stripeAccounts/{acct}
 // (account → team), charges/{checkoutSessionId}, stripePayments/{pi}
 // (payment intent → charge), stripeEvents/{eventId} (handled once), and
 // payerCharges/{tournamentId}~{payerId} (the payer's latest session, so a
@@ -26,6 +29,8 @@
 import {
   type CheckoutResult,
   checkoutRequestSchema,
+  markPaymentRequestSchema,
+  payOfflineRequestSchema,
   defaultPlatformFee,
   type FeeDoc,
   onlineCharge,
@@ -56,6 +61,7 @@ import type { Limit } from "../limits/model.js";
 import { type Data, type DocStore, serverTime, type Tx } from "../store.js";
 import { can, isOwner } from "../teams/access.js";
 import type { CheckoutItem, GatewayEvent, PaymentGateway } from "./gateway.js";
+import { logPayment, type PaymentLogAction } from "./log.js";
 
 const minute = 60_000;
 
@@ -97,6 +103,15 @@ const p = {
   intent: (pi: string) => `stripePayments/${pi}`,
   event: (id: string) => `stripeEvents/${id}`,
   latest: (t: string, payer: string) => `payerCharges/${t}~${payer}`,
+};
+
+/** The history entry for a charge's new status. */
+const statusActions: Record<string, PaymentLogAction | undefined> = {
+  processing: "bank_payment_processing",
+  failed: "payment_failed",
+  expired: "checkout_expired",
+  disputed: "disputed",
+  refunded: "duplicate_refunded",
 };
 
 /** A reused Checkout link must have this long left, or the payer gets a fresh one. */
@@ -243,6 +258,7 @@ export class PaymentService {
       paid,
       reason: paid ? null : reason,
       pending,
+      offlineAt: !paid && payment?.offlineAt instanceof Date ? payment.offlineAt.toISOString() : null,
     };
     return { t, payer, options, account: str(payout?.account), latest };
   }
@@ -305,6 +321,16 @@ export class PaymentService {
         createdAt: serverTime,
       });
       tx.set(p.latest(id, payer.id), { session: session.id, url: session.url, chargeCents: options.chargeCents, expiresAt: expiresAtSec * 1000, createdAt: serverTime });
+      logPayment(this.store, tx, {
+        tournamentId: id,
+        payerId: payer.id,
+        action: "checkout_started",
+        by: caller.uid,
+        amountCents: options.chargeCents,
+        currency: options.currency,
+        stripeAccount: account,
+        checkoutSession: session.id,
+      });
     });
     return { url: session.url };
   }
@@ -362,6 +388,50 @@ export class PaymentService {
     }
   }
 
+  // ---- Paying another way ------------------------------------------------------
+
+  /**
+   * The payer says they'll pay another way (a school's check or purchase
+   * order), so the host sees "Paying another way" instead of "Unpaid"; or
+   * takes it back. The same people who could pay it online.
+   */
+  async payOffline(caller: Caller, rawId: unknown, body: unknown): Promise<void> {
+    const id = docIdParam(rawId);
+    const r = parseBody(payOfflineRequestSchema, body);
+    await this.store.transact(async (tx) => {
+      const t = await tx.get(p.tournament(id));
+      if (!t || t.status === "draft") throw noEvent();
+      const payer = await this.payer(tx, caller, id, t, r.payer, r.teamId);
+      if (!payer.fee || payer.fee.amountCents <= 0) throw new ApiError("failed_precondition", "There's no fee to pay.");
+      const old = await tx.get(p.payment(id, payer.id));
+      if (old?.paid === true) throw new ApiError("failed_precondition", "That's already paid.");
+      tx.set(p.payment(id, payer.id), { paid: false, paidAt: null, note: str(old?.note), ...(r.offline && { offlineAt: serverTime }) });
+      logPayment(this.store, tx, { tournamentId: id, payerId: payer.id, action: r.offline ? "paying_another_way" : "not_paying_another_way", by: caller.uid, amountCents: payer.fee.amountCents, currency: payer.fee.currency });
+    });
+  }
+
+  /**
+   * The host marks a team's or player's fee paid or unpaid, with a note
+   * ("Check #1042"); the website's way to do what the app writes directly
+   * (the payments rule). Keeps the payer's "paying another way".
+   */
+  async mark(caller: Caller, rawId: unknown, rawPayer: unknown, body: unknown): Promise<void> {
+    const id = docIdParam(rawId);
+    const payerId = docIdParam(rawPayer);
+    const r = parseBody(markPaymentRequestSchema, body);
+    await this.store.transact(async (tx) => {
+      const t = await tx.get(p.tournament(id));
+      if (!t) throw noEvent();
+      const host = storedId(t.hostId);
+      const team = host ? await tx.get(p.team(host)) : null;
+      if (!team || !can(team, caller.uid, "manageEvents")) throw new ApiError("permission_denied", "Only the event's organizers can mark fees paid.");
+      const old = await tx.get(p.payment(id, payerId));
+      const paidAt = r.paid ? (old?.paid === true && old.paidAt instanceof Date ? old.paidAt : serverTime) : null;
+      tx.set(p.payment(id, payerId), { paid: r.paid, paidAt, note: r.note, ...(old?.offlineAt instanceof Date && { offlineAt: old.offlineAt }) });
+      logPayment(this.store, tx, { tournamentId: id, payerId, action: r.paid ? "marked_paid" : "marked_unpaid", by: caller.uid, note: r.note });
+    });
+  }
+
   // ---- Stripe's webhook -------------------------------------------------------
 
   /**
@@ -412,7 +482,25 @@ export class PaymentService {
     await this.store.transact(async (tx) => {
       const charge = await tx.get(p.charge(session));
       if (account !== undefined && charge?.account !== account) return;
-      if (charge && from.includes(str(charge.status))) tx.update(p.charge(session), { status, updatedAt: serverTime });
+      if (!charge || !from.includes(str(charge.status))) return;
+      tx.update(p.charge(session), { status, updatedAt: serverTime });
+      const action = statusActions[status];
+      if (action) this.logCharge(tx, session, charge, action);
+    });
+  }
+
+  /** A history entry for [charge] (session [session]), as Stripe reported it. */
+  private logCharge(tx: Pick<Tx, "set">, session: string, charge: Data, action: PaymentLogAction, extra: { amountCents?: number; paymentIntent?: string } = {}) {
+    logPayment(this.store, tx, {
+      tournamentId: str(charge.tournamentId),
+      payerId: str(charge.payerId),
+      action,
+      by: "stripe",
+      amountCents: extra.amountCents ?? (typeof charge.amountCents === "number" ? charge.amountCents : undefined),
+      currency: str(charge.currency) || undefined,
+      stripeAccount: str(charge.account) || undefined,
+      checkoutSession: session,
+      paymentIntent: extra.paymentIntent ?? (str(charge.paymentIntent) || undefined),
     });
   }
 
@@ -460,10 +548,12 @@ export class PaymentService {
       // Paid already (two tabs, or the host marked it by hand), or the event is gone: give it back.
       if (!t || payment?.paid === true) {
         tx.merge(p.charge(session), { ...base, status: "duplicate" });
+        this.logCharge(tx, session, charge, "duplicate_payment", { paymentIntent: pi });
         return { refund: true };
       }
       tx.merge(p.charge(session), { ...base, status: "paid", paidAt: serverTime });
       tx.set(p.payment(tournamentId, payerId), { paid: true, paidAt: serverTime, note: paidOnlineNote });
+      this.logCharge(tx, session, charge, "paid_online", { paymentIntent: pi });
       return { refund: false };
     });
     if (outcome?.refund) {
@@ -484,7 +574,9 @@ export class PaymentService {
         if (!charge) return false;
         const status = str(charge.status);
         if (!full) {
-          tx.update(p.charge(session), { amountRefundedCents: typeof o.amount_refunded === "number" ? o.amount_refunded : 0, updatedAt: serverTime });
+          const refundedCents = typeof o.amount_refunded === "number" ? o.amount_refunded : 0;
+          tx.update(p.charge(session), { amountRefundedCents: refundedCents, updatedAt: serverTime });
+          if (refundedCents !== charge.amountRefundedCents) this.logCharge(tx, session, charge, "partly_refunded_by_host", { amountCents: refundedCents });
           return false;
         }
         // A duplicate's refund already returned the fee (refund_application_fee).
@@ -501,6 +593,7 @@ export class PaymentService {
           }
         }
         tx.update(p.charge(session), { status: "refunded", refundedBy: "host", updatedAt: serverTime });
+        this.logCharge(tx, session, charge, "refunded_by_host");
         return true;
       });
       if (giveFeeBack && feeId) {
@@ -542,6 +635,14 @@ export function paymentRoutes(app: FastifyInstance, payments: PaymentService, li
     payments.payOptions(caller(req, "status"), req.params.id, req.query),
   );
   app.post<Id>(paymentPaths.checkout(":id"), async (req) => payments.checkout(caller(req, "checkout"), req.params.id, req.body));
+  app.put<Id>(paymentPaths.offline(":id"), async (req, reply) => {
+    await payments.payOffline(caller(req, "checkout"), req.params.id, req.body);
+    return reply.code(204).send();
+  });
+  app.put<{ Params: { id: string; payerId: string } }>(paymentPaths.mark(":id", ":payerId"), async (req, reply) => {
+    await payments.mark(caller(req, "status"), req.params.id, req.params.payerId, req.body);
+    return reply.code(204).send();
+  });
 
   // Stripe signs the exact bytes it sent, so this route reads the raw body
   // (its own JSON parser, in this plugin only). No ID token: the signature

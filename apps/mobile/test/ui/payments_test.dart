@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/data/repositories/payment/payment_repository.dart';
+import 'package:frisbee_app/domain/models/hosted_tournament.dart';
 import 'package:frisbee_app/domain/models/payments.dart';
 import 'package:frisbee_app/ui/payments/widgets/payment_widgets.dart';
 import 'package:frisbee_app/utils/result.dart';
@@ -33,6 +34,38 @@ class _FakePayments implements PaymentRepository {
 
   /// When set, payOptions waits for it (a slow answer from Stripe).
   Completer<Result<PayOptions>>? pending;
+
+  @override
+  bool available = true;
+
+  @override
+  Future<Result<void>> payOffline(
+    String tournamentId, {
+    String? teamId,
+    required bool offline,
+  }) async {
+    calls.add('offline $tournamentId ${teamId ?? 'me'} $offline');
+    options = PayOptions(
+      online: options.online,
+      amountCents: options.amountCents,
+      feeCents: options.feeCents,
+      feeLabel: options.feeLabel,
+      paid: false,
+      offlineAt: offline ? DateTime(2026, 11, 22) : null,
+    );
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> mark(
+    String tournamentId,
+    String payerId, {
+    required bool paid,
+    required String note,
+  }) async {
+    calls.add('mark $tournamentId $payerId $paid $note');
+    return const Result.ok(null);
+  }
 
   @override
   Future<Result<PaymentFees>> fees() async => Result.ok(feeAnswer);
@@ -444,6 +477,65 @@ void main() {
       expect(find.text(r'Pay $400 online'), findsOneWidget);
     },
   );
+
+  group('paying another way', () {
+    testWidgets("a payer says they'll pay by check, then takes it back", (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        PayOnlineButton(tournamentId: 't1', teamId: 'haze', open: open),
+      );
+      await tester.tap(find.text("We'll pay another way"));
+      await tester.pumpAndSettle();
+      expect(payments.calls, contains('offline t1 haze true'));
+      expect(
+        find.textContaining("You told the host you'll pay another way"),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      expect(payments.calls, contains('offline t1 haze false'));
+      expect(find.text("We'll pay another way"), findsOneWidget);
+    });
+
+    testWidgets('offered even when the host takes no online payments', (
+      tester,
+    ) async {
+      payments.options = const PayOptions(
+        online: false,
+        amountCents: 40000,
+        feeCents: 500,
+        feeLabel: r'1% + $1',
+        paid: false,
+        reason: "The host doesn't take payments through Stall 10.",
+      );
+      await pump(tester, const PayOnlineButton(tournamentId: 't1'));
+      expect(find.byType(FilledButton), findsNothing);
+      expect(find.text("We'll pay another way"), findsOneWidget);
+    });
+
+    test("the host's lists say who is paying another way", () {
+      expect(
+        paymentStatusLabel(
+          EntryPayment(teamId: 'haze', offlineAt: DateTime(2026)),
+          overdue: true,
+        ),
+        'Paying another way',
+      );
+      expect(
+        paymentStatusLabel(const EntryPayment(teamId: 'haze'), overdue: true),
+        'Overdue',
+      );
+      expect(
+        paymentStatusLabel(
+          EntryPayment(teamId: 'haze', paid: true, offlineAt: DateTime(2026)),
+          overdue: false,
+        ),
+        'Paid',
+      );
+    });
+  });
 
   test('amounts read as dollars', () {
     expect(centsLabel(40000), r'$400');

@@ -14,11 +14,13 @@ import {
   type PayOptions,
   type PayoutAccountView,
   type PayoutLinkResult,
+  paymentNoteMax,
   paymentPaths,
   platformFeeLabel,
 } from "@stall10/shared";
 import type { User } from "firebase/auth";
 import { useCallback, useEffect, useState } from "react";
+import type { PaymentDoc } from "@/components/drafts/data";
 import { callApi, problem } from "@/lib/client";
 
 /** Reloads [load] when the tab comes back into view (back from Stripe in another tab). */
@@ -151,12 +153,43 @@ export function PayOnline({ user, tournamentId, teamId, withStatus = false }: { 
     );
   }
   if (!options || options.amountCents <= 0) return null;
+  const body = teamId ? { payer: "team", teamId } : { payer: "player" };
+  const payOffline = async (offline: boolean) => {
+    setBusy(true);
+    setError("");
+    try {
+      await callApi(user, paymentPaths.offline(encodeURIComponent(tournamentId)), { method: "PUT", body: { ...body, offline } });
+      load();
+    } catch (e) {
+      setError(problem(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const offline =
+    !options.paid && options.pending !== "processing" ? (
+      options.offlineAt ? (
+        <small className="muted">
+          You told the host you&apos;ll pay another way. Ask them to mark it paid when it arrives.{" "}
+          <button type="button" className="text-btn" disabled={busy} onClick={() => payOffline(false)}>
+            Undo
+          </button>
+        </small>
+      ) : (
+        <>
+          <button type="button" className="text-btn" disabled={busy} onClick={() => payOffline(true)}>
+            We&apos;ll pay another way
+          </button>
+          <small className="muted">By check, purchase order or however the host takes it. If the host hasn&apos;t said how, ask them.</small>
+        </>
+      )
+    ) : null;
   const pay = async () => {
     setBusy(true);
     setError("");
     try {
       setFlag(payingKey, true);
-      await goToStripe(user, paymentPaths.checkout(encodeURIComponent(tournamentId)), teamId ? { payer: "team", teamId } : { payer: "player" });
+      await goToStripe(user, paymentPaths.checkout(encodeURIComponent(tournamentId)), body);
     } catch (e) {
       setError(problem(e));
       setBusy(false);
@@ -184,6 +217,7 @@ export function PayOnline({ user, tournamentId, teamId, withStatus = false }: { 
           </>
         )
       )}
+      {!checking && offline}
       {error && <p className="form-error">{error}</p>}
     </div>
   );
@@ -249,4 +283,71 @@ export function FeeBreakdownNote({
   const note = fees && amountCents != null ? feeNote(fees, amountCents, currency, compact, payerCovers) : null;
   if (!note) return null;
   return compact ? <p className="fee-note">{note}</p> : <small className="muted fee-note">{note}</small>;
+}
+
+/** "Paid", "Paying another way", "Overdue" or "Unpaid": a fee's state on the host's lists (paymentStatusLabel in the app). */
+export function paymentStatusLabel(p: PaymentDoc | undefined, overdue: boolean): string {
+  if (p?.paid === true) return "Paid";
+  if (p?.offlineAt) return "Paying another way";
+  return overdue ? "Overdue" : "Unpaid";
+}
+
+/**
+ * The host's controls for one payer's fee: paid or not (shown at once,
+ * undone if the save fails), the state, and a note ("Check #1042"). Saves
+ * through the API, which keeps the payment history.
+ */
+export function HostPaymentControls({ user, tournamentId, payerId, payment, overdue }: { user: User; tournamentId: string; payerId: string; payment: PaymentDoc | undefined; overdue: boolean }) {
+  const [shown, setShown] = useState<{ paid: boolean; note: string } | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const live = { paid: payment?.paid === true, note: payment?.note ?? "" };
+  const now = shown ?? live;
+  // The live record takes over once it agrees.
+  useEffect(() => {
+    if (shown && shown.paid === live.paid && shown.note === live.note) setShown(null);
+  }, [shown, live.paid, live.note]);
+  const save = async (next: { paid: boolean; note: string }) => {
+    setShown(next);
+    setError("");
+    try {
+      await callApi(user, paymentPaths.mark(encodeURIComponent(tournamentId), encodeURIComponent(payerId)), { method: "PUT", body: next });
+    } catch (e) {
+      setShown(null);
+      setError(problem(e));
+    }
+  };
+  const label = paymentStatusLabel({ ...payment, paid: now.paid }, overdue);
+  return (
+    <span className="host-payment">
+      <label className="check-row small">
+        <input type="checkbox" checked={now.paid} onChange={(e) => void save({ ...now, paid: e.target.checked })} />
+        {label}
+      </label>
+      {editing === null ? (
+        <button type="button" className="text-btn" onClick={() => setEditing(now.note)} title={now.note ? `Payment note: ${now.note}` : "Add a payment note"}>
+          {now.note ? now.note : "Add note"}
+        </button>
+      ) : (
+        <form
+          className="host-payment-note"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const note = editing.trim();
+            setEditing(null);
+            if (note !== now.note) void save({ ...now, note });
+          }}
+        >
+          <input autoFocus maxLength={paymentNoteMax} placeholder="e.g. Check #1042" value={editing} onChange={(e) => setEditing(e.target.value)} aria-label="Payment note" />
+          <button type="submit" className="btn btn-small">
+            Save
+          </button>
+          <button type="button" className="text-btn" onClick={() => setEditing(null)}>
+            Cancel
+          </button>
+        </form>
+      )}
+      {error && <small className="form-error">{error}</small>}
+    </span>
+  );
 }

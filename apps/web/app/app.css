@@ -1652,6 +1652,9 @@ dialog.dialog:has(.invite-dialog) { width: min(100% - 32px, 560px); }
 .payouts-card p {
   margin: 0 0 12px;
 }
+.host-payment { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.host-payment-note { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.host-payment-note input { min-width: 160px; }
 small.fee-note {
   display: block;
   margin: -4px 0 12px;

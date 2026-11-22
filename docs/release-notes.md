@@ -28,6 +28,9 @@ Firebase project; App Store builds come from `main` and use production.
   few days to clear; it shows as processing meanwhile).
 - Coming back from paying, the app checks with Stripe straight away, so
   the fee shows as paid without a second Pay button.
+- Paying by check or purchase order? Tap "We'll pay another way" so the
+  host knows it's coming. Hosts see "Paying another way" and can add a
+  note when they mark it paid ("Check #1042").
 
 ## 0.0.40
 

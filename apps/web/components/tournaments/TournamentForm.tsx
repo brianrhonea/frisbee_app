@@ -693,9 +693,16 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
                 </span>
               </label>
               )}
+              {/* With online payments on, these are the other ways (a school's check or PO). */}
               <label>
-                How to pay
-                <textarea rows={2} maxLength={tournamentLimits.feeInstructions} placeholder="e.g. Venmo @club-treasurer with your team name" value={f.instructions} onChange={(e) => set({ instructions: e.target.value })} />
+                {paymentFees?.available ? "Other ways to pay" : "How to pay"}
+                <textarea
+                  rows={2}
+                  maxLength={tournamentLimits.feeInstructions}
+                  placeholder={paymentFees?.available ? "e.g. Checks payable to Fling Crew, mailed to 12 Main St" : "e.g. Venmo @club-treasurer with your team name"}
+                  value={f.instructions}
+                  onChange={(e) => set({ instructions: e.target.value })}
+                />
               </label>
             </>
           )}

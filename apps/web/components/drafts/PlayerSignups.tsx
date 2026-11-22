@@ -12,11 +12,10 @@ import {
 } from "@stall10/shared";
 import type { User } from "firebase/auth";
 import Link from "next/link";
-import { type FormEvent, useEffect, useState } from "react";
-import { problem } from "@/lib/client";
+import { type FormEvent, useState } from "react";
 import type { Doc } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
-import { PayOnline } from "../payments/Payments";
+import { HostPaymentControls, PayOnline } from "../payments/Payments";
 import {
   attempt,
   dateLabel,
@@ -361,28 +360,10 @@ function SignupList({ user, tournamentId, tournament: t, division: d }: { user: 
   const [unpaidOnly, setUnpaidOnly] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Optimistic: a ticked box shows at once; the live record replaces it,
-  // and a failed save puts it back (with the error).
-  const [marked, setMarked] = useState<Record<string, boolean>>({});
   const fee = t.bidFee ?? null;
+  const paymentById = new Map(payments.map((x) => [x.id, x]));
   const paidById = new Map(payments.map((x) => [x.id, x.paid === true]));
-  const isPaid = (uid: string) => marked[uid] ?? paidById.get(uid) ?? false;
-  const markPaid = async (uid: string, paid: boolean) => {
-    setMarked((m) => ({ ...m, [uid]: paid }));
-    setError(null);
-    try {
-      await draftApi.setPaid(user, tournamentId, uid, paid);
-    } catch (e) {
-      setError(problem(e));
-      setMarked(({ [uid]: _, ...rest }) => rest);
-    }
-  };
-  // Once the live record agrees, it takes over again (so later changes, by
-  // another host or by Stripe, show).
-  useEffect(() => {
-    const settled = Object.keys(marked).filter((uid) => (paidById.get(uid) ?? false) === marked[uid]);
-    if (settled.length) setMarked((m) => Object.fromEntries(Object.entries(m).filter(([uid]) => !settled.includes(uid))));
-  });
+  const isPaid = (uid: string) => paidById.get(uid) ?? false;
   const all = (signups.data ?? []).filter((s) => s.divisionId === d.id).sort((a, b) => a.name.localeCompare(b.name));
   const owes = (s: PlayerSignupDoc & { id: string }) => s.status !== "withdrawn" && s.status !== "declined";
   const shown = all.filter((s) => !unpaidOnly || (!!fee && owes(s) && !isPaid(s.id)));
@@ -486,10 +467,7 @@ function SignupList({ user, tournamentId, tournament: t, division: d }: { user: 
                   {fee && (
                     <td>
                       {owes(s) && (
-                        <label className="check-row small">
-                          <input type="checkbox" checked={isPaid(s.id)} disabled={busy === s.id} onChange={(e) => void markPaid(s.id, e.target.checked)} />
-                          {isPaid(s.id) ? "Paid" : overdue(fee, false) ? "Overdue" : "Unpaid"}
-                        </label>
+                        <HostPaymentControls user={user} tournamentId={tournamentId} payerId={s.id} payment={paymentById.get(s.id)} overdue={overdue(fee, false)} />
                       )}
                     </td>
                   )}

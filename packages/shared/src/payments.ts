@@ -162,7 +162,29 @@ export interface PayOptions {
    * until it succeeds or fails. null otherwise.
    */
   pending: "processing" | null;
+  /** When the payer said they'll pay another way (a check, a PO); null if they haven't. */
+  offlineAt: string | null;
 }
+
+/** A host's note on a payment, e.g. "Check #1042". */
+export const paymentNoteMax = 200;
+
+/** PUT /v1/tournaments/:id/pay/offline: the payer says they'll pay another way (or takes it back). */
+export const payOfflineRequestSchema = z
+  .strictObject({
+    payer: z.enum(payerKinds),
+    teamId: z.string().min(1).max(128).optional(),
+    offline: z.boolean(),
+  })
+  .refine((r) => (r.payer === "team") === (r.teamId !== undefined), { message: "Say which team is paying." });
+export type PayOfflineRequest = z.infer<typeof payOfflineRequestSchema>;
+
+/** PUT /v1/tournaments/:id/payments/:payerId: the host marks a team's or player's fee, with a note. */
+export const markPaymentRequestSchema = z.strictObject({
+  paid: z.boolean(),
+  note: z.string().trim().max(paymentNoteMax).default(""),
+});
+export type MarkPaymentRequest = z.input<typeof markPaymentRequestSchema>;
 
 /** Shown while a bank payment clears. */
 export const processingPaymentNote = "Your bank payment is processing. It can take up to 4 business days.";
@@ -192,6 +214,8 @@ export const paymentPaths = {
   payoutLink: (teamId: string) => `/v1/teams/${teamId}/payouts/link`,
   payOptions: (tournamentId: string) => `/v1/tournaments/${tournamentId}/pay`,
   checkout: (tournamentId: string) => `/v1/tournaments/${tournamentId}/checkout`,
+  offline: (tournamentId: string) => `/v1/tournaments/${tournamentId}/pay/offline`,
+  mark: (tournamentId: string, payerId: string) => `/v1/tournaments/${tournamentId}/payments/${payerId}`,
   fees: "/v1/payments/fees",
   webhook: "/v1/payments/stripe/webhook",
 } as const;

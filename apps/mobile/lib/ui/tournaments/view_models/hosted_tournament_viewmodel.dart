@@ -17,6 +17,7 @@ import '../../../domain/models/team_post.dart';
 import '../../../domain/tournament_engine/generator.dart';
 import '../../../domain/tournament_engine/progress.dart';
 import '../../../domain/tournament_engine/standings.dart';
+import '../../../data/repositories/payment/payment_repository.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 import '../../follow/view_models/follow_viewmodel.dart';
@@ -70,8 +71,10 @@ class HostedTournamentViewModel extends ChangeNotifier {
     TeamPostRepository? postRepository,
     FollowRepository? followRepository,
     NotificationRepository? notificationRepository,
+    PaymentRepository? paymentRepository,
     DateTime Function()? now,
   }) : _repo = tournamentRepository,
+       _paymentsApi = paymentRepository,
        _teams = teamRepository,
        _posts = postRepository,
        _now = now ?? DateTime.now,
@@ -96,6 +99,9 @@ class HostedTournamentViewModel extends ChangeNotifier {
           _updateCaptains,
         );
     setPaid = Command1<void, ({String teamId, bool paid})>(_setPaid);
+    setPaymentNote = Command1<void, ({String teamId, String note})>(
+      _setPaymentNote,
+    );
     saveSeeds = Command1<void, List<String>>(_saveSeeds);
     publish = Command0<void>(_publish);
     report = Command1<void, HostedScore>(_report);
@@ -169,6 +175,7 @@ class HostedTournamentViewModel extends ChangeNotifier {
   Map<String, TournamentDivision> _divisions = const {};
   List<TournamentEntry> _entries = const [];
   Map<String, EntryPayment> _payments = const {};
+  final PaymentRepository? _paymentsApi;
   List<Team> _myTeams = const [];
   List<TeamPost> _news = const [];
   String? _divisionId;
@@ -187,6 +194,9 @@ class HostedTournamentViewModel extends ChangeNotifier {
   late final Command1<void, ({TournamentEntry entry, List<String> captainIds})>
   updateCaptains;
   late final Command1<void, ({String teamId, bool paid})> setPaid;
+
+  /// The host's note on a team's payment ("Check #1042").
+  late final Command1<void, ({String teamId, String note})> setPaymentNote;
   late final Command1<void, List<String>> saveSeeds;
   late final Command0<void> publish;
   late final Command1<void, HostedScore> report;
@@ -831,15 +841,56 @@ class HostedTournamentViewModel extends ChangeNotifier {
 
   Future<Result<void>> _setPaid(({String teamId, bool paid}) p) {
     final old = _payments[p.teamId];
-    return _repo.savePayment(
-      tournamentId,
+    return _savePayment(
       EntryPayment(
         teamId: p.teamId,
         paid: p.paid,
         paidAt: p.paid ? (old?.paidAt ?? _now()) : null,
         note: old?.note ?? '',
+        offlineAt: old?.offlineAt,
       ),
     );
+  }
+
+  Future<Result<void>> _setPaymentNote(({String teamId, String note}) p) {
+    final old = _payments[p.teamId] ?? EntryPayment(teamId: p.teamId);
+    return _savePayment(
+      EntryPayment(
+        teamId: p.teamId,
+        paid: old.paid,
+        paidAt: old.paidAt,
+        note: p.note,
+        offlineAt: old.offlineAt,
+      ),
+    );
+  }
+
+  /// Shows [payment] at once, then saves it: through the API when it's
+  /// there (so it's in the payment history), else straight to Firestore.
+  /// A failed save puts the old one back.
+  Future<Result<void>> _savePayment(EntryPayment payment) async {
+    final old = _payments[payment.teamId];
+    _payments = {..._payments, payment.teamId: payment};
+    notifyListeners();
+    final api = _paymentsApi;
+    final r = api != null && api.available
+        ? await api.mark(
+            tournamentId,
+            payment.teamId,
+            paid: payment.paid,
+            note: payment.note,
+          )
+        : await _repo.savePayment(tournamentId, payment);
+    if (r is Error) {
+      _payments = {..._payments};
+      if (old == null) {
+        _payments.remove(payment.teamId);
+      } else {
+        _payments[payment.teamId] = old;
+      }
+      notifyListeners();
+    }
+    return r;
   }
 
   /// A new Mixed division playing the event's format (or, for events from

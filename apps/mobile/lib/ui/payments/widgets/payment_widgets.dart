@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../data/repositories/payment/payment_repository.dart';
+import '../../../domain/models/hosted_tournament.dart';
 import '../../../domain/models/payments.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/view_model_host.dart';
@@ -57,6 +58,60 @@ PaymentRepository? _payments(BuildContext context) {
 void _showError(BuildContext context, Object? error) => ScaffoldMessenger.of(
   context,
 ).showSnackBar(SnackBar(content: Text(errorMessage(error))));
+
+/// "We'll pay another way" (a school's check or PO), so the host sees it's
+/// coming; or, once said, a way to take it back.
+Widget _offline(BuildContext context, PayOnlineViewModel vm) {
+  if (!vm.canPayOffline) return const SizedBox.shrink();
+  final o = vm.options!;
+  final small = Theme.of(context).textTheme.bodySmall;
+  Future<void> run(bool offline) async {
+    await vm.payOffline.execute(offline);
+    if (context.mounted && vm.payOffline.error) {
+      _showError(context, vm.payOffline.result);
+    }
+  }
+
+  return Padding(
+    padding: const EdgeInsets.only(top: 4),
+    child: ListenableBuilder(
+      listenable: vm.payOffline,
+      builder: (context, _) => vm.payingAnotherWay
+          ? Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    "You told the host you'll pay another way. Ask them to "
+                    'mark it paid when it arrives.',
+                    style: small,
+                  ),
+                ),
+                TextButton(
+                  onPressed: vm.payOffline.running ? null : () => run(false),
+                  child: const Text('Undo'),
+                ),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextButton(
+                  key: const Key('pay-another-way'),
+                  style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                  onPressed: vm.payOffline.running ? null : () => run(true),
+                  child: const Text("We'll pay another way"),
+                ),
+                if (!o.online || o.reason == null)
+                  Text(
+                    'By check, purchase order or however the host takes it. '
+                    "If the host hasn't said how, ask them.",
+                    style: small,
+                  ),
+              ],
+            ),
+    ),
+  );
+}
 
 /// The host owner's "Get paid online" card. Shows nothing until the server
 /// says online payments are available (and the user is the owner).
@@ -255,7 +310,8 @@ class PayOnlineButton extends StatelessWidget {
                 ),
               );
             }
-            if (o == null || !vm.canPay) return const SizedBox.shrink();
+            final offline = _offline(context, vm);
+            if (o == null || !vm.canPay) return offline;
             return Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Column(
@@ -288,6 +344,7 @@ class PayOnlineButton extends StatelessWidget {
                     ].join(' '),
                     style: small,
                   ),
+                  offline,
                 ],
               ),
             );
@@ -438,6 +495,65 @@ class PayerCoversFeesSwitch extends StatelessWidget {
             onChanged: onChanged,
           );
         },
+      ),
+    );
+  }
+}
+
+/// "Paid", "Overdue", "Paying another way" or "Unpaid": a fee's state on the
+/// host's lists.
+String paymentStatusLabel(EntryPayment? p, {required bool overdue}) {
+  if (p?.paid ?? false) return 'Paid';
+  if (p?.payingAnotherWay ?? false) return 'Paying another way';
+  return overdue ? 'Overdue' : 'Unpaid';
+}
+
+/// The host's note on a payment ("Check #1042"): a small button that opens
+/// a dialog, returning the new note (null when cancelled).
+Future<String?> editPaymentNote(BuildContext context, String note) {
+  final controller = TextEditingController(text: note);
+  return showDialog<String>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Payment note'),
+      content: TextField(
+        controller: controller,
+        autofocus: true,
+        maxLength: EntryPayment.maxNoteLength,
+        decoration: const InputDecoration(
+          hintText: 'e.g. Check #1042, PO 55-210, Venmo 3/2',
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, controller.text.trim()),
+          child: const Text('Save'),
+        ),
+      ],
+    ),
+  ).whenComplete(controller.dispose);
+}
+
+/// Shows its builder's answer to "does this server take payments online?",
+/// for wording that depends on it (the form's "Other ways to pay").
+class PaymentsOnBuilder extends StatelessWidget {
+  const PaymentsOnBuilder({super.key, required this.builder});
+
+  final Widget Function(BuildContext context, bool on) builder;
+
+  @override
+  Widget build(BuildContext context) {
+    final payments = _payments(context);
+    if (payments == null) return builder(context, false);
+    return ViewModelHost<PaymentFeesViewModel>(
+      create: (c) => PaymentFeesViewModel(payments: payments),
+      builder: (context, vm) => ListenableBuilder(
+        listenable: vm,
+        builder: (context, _) => builder(context, vm.fees.available),
       ),
     );
   }

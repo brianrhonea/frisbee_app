@@ -62,6 +62,19 @@ until `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` and
   Stripe sees it paid (or processing) before the webhook arrives. The
   webhook and that check share one idempotent settle path; if Stripe
   doesn't answer, the stored state stands.
+- Paying another way: `PUT /v1/tournaments/:id/pay/offline` lets the
+  payer say they'll pay by check, PO or the host's own way (or take it
+  back); the payment record's `offlineAt` (allowed by the rule, kept by
+  every mark) and `PayOptions.offlineAt` show it.
+- `PUT /v1/tournaments/:id/payments/:payerId`: the host marks a team's or
+  player's fee paid or unpaid with a note ("Check #1042"); the website's
+  way to mark teams' bid fees, and the app's when the API is there.
+- The payment history: `paymentLog/{id}` (server only, never changed or
+  deleted, kept when a tournament goes) records every step with who, when,
+  amount and Stripe's ids: checkout started, paid online, bank payment
+  processing or failed, expired, duplicate and its refund, the host's
+  refunds (full or part) and disputes, the host's marks with notes, and
+  the payer's "paying another way". `src/payments/log.ts`.
 
 ## 0.36.0 — 2026-11-20
 

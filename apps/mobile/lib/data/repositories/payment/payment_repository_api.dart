@@ -29,6 +29,40 @@ class PaymentRepositoryApi implements PaymentRepository {
   }
 
   @override
+  bool get available => _api != null;
+
+  @override
+  Future<Result<void>> payOffline(
+    String tournamentId, {
+    String? teamId,
+    required bool offline,
+  }) => guard(() async {
+    await _client.send(
+      'PUT',
+      '/v1/tournaments/${_id(tournamentId)}/pay/offline',
+      {
+        'payer': teamId == null ? 'player' : 'team',
+        'teamId': ?teamId,
+        'offline': offline,
+      },
+    );
+  });
+
+  @override
+  Future<Result<void>> mark(
+    String tournamentId,
+    String payerId, {
+    required bool paid,
+    required String note,
+  }) => guard(() async {
+    await _client.send(
+      'PUT',
+      '/v1/tournaments/${_id(tournamentId)}/payments/${_id(payerId)}',
+      {'paid': paid, 'note': note},
+    );
+  });
+
+  @override
   Future<Result<PaymentFees>> fees() async {
     if (_api == null) return const Result.ok(PaymentFees.unavailable);
     return guard(
