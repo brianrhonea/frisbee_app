@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import 'package:frisbee_app/data/repositories/agreement/agreement_repository.dart';
 import 'package:frisbee_app/data/repositories/calendar/calendar_repository.dart';
 import 'package:frisbee_app/domain/models/calendar.dart';
 import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
@@ -3168,6 +3169,33 @@ List<ChatMessage> olderThan(
   final i = all.indexWhere((m) => m.id == before.id);
   final older = i < 0 ? const <ChatMessage>[] : all.sublist(0, i);
   return older.skip(older.length > limit ? older.length - limit : 0).toList();
+}
+
+/// Agreed unless told otherwise, so most tests aren't stopped by the step.
+class FakeAgreementRepository extends AgreementRepository {
+  FakeAgreementRepository({this.agreed = true});
+
+  @override
+  bool? agreed;
+
+  int agreeCalls = 0;
+  bool failAgree = false;
+
+  void setAgreed(bool? value) {
+    agreed = value;
+    notifyListeners();
+  }
+
+  @override
+  Future<void> refresh() async {}
+
+  @override
+  Future<Result<void>> agree() async {
+    agreeCalls++;
+    if (failAgree) return Result.error(Exception('offline'));
+    setAgreed(true);
+    return const Result.ok(null);
+  }
 }
 
 class FakePersonalDetailsRepository extends PersonalDetailsRepository {

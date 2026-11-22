@@ -20,7 +20,7 @@ void main() {
     ];
 
     expect(labels('/home'), ['Home']);
-    expect(labels('/messages'), ['Inbox']);
+    expect(labels('/messages'), ['Chats']);
     expect(labels('/explore'), ['Discover']);
     expect(labels('/schedule'), ['Schedule']);
     expect(links('/explore'), [null], reason: "you're already there");
@@ -42,11 +42,11 @@ void main() {
     // The website's nav uses the same names, in the same order.
     expect(
       [for (final s in ShellSection.tabs) s.shortLabel],
-      ['Home', 'Discover', 'Schedule', 'Teams', 'Inbox'],
+      ['Home', 'Discover', 'Schedule', 'Teams', 'Chats'],
     );
     expect(
       [for (final s in ShellSection.tabs) s.label],
-      ['Home', 'Discover', 'Schedule', 'Teams', 'Inbox'],
+      ['Home', 'Discover', 'Schedule', 'Teams', 'Chats'],
     );
   });
 
@@ -90,6 +90,47 @@ void main() {
     dms.emit();
     await pumpEventQueue();
     expect(vm.unreadMessages, 1);
+  });
+
+  test('muted chats have no bubble; messages stay off the bell', () async {
+    final dms = FakeDirectMessageRepository();
+    dms.conversations['a_u1'] = Conversation(
+      id: 'a_u1',
+      participants: const ['a', 'u1'],
+      lastMessage: 'hey',
+      lastMessageAt: DateTime(2026, 10, 30),
+      lastSenderId: 'a',
+    );
+    AppNotification notice(String id, NotificationCategory c) =>
+        AppNotification(
+          id: id,
+          category: c,
+          title: id,
+          body: '',
+          route: '/',
+          createdAt: DateTime(2026, 10, 30),
+          read: false,
+        );
+    final notifications = FakeNotificationRepository(
+      feed: [
+        notice('dm', NotificationCategory.directMessages),
+        notice('chat', NotificationCategory.chat),
+        notice('event', NotificationCategory.eventChanges),
+      ],
+    );
+    final vm = ShellViewModel(
+      authRepository: FakeAuthRepository(user: testUser),
+      teamRepository: FakeTeamRepository(),
+      directMessageRepository: dms,
+      notificationRepository: notifications,
+    );
+    addTearDown(vm.dispose);
+    await pumpEventQueue();
+    expect(vm.unreadMessages, 1);
+    expect(vm.unreadNotifications, 1);
+    await notifications.setConversationMuted(testUser.uid, 'a_u1', muted: true);
+    await pumpEventQueue();
+    expect(vm.unreadMessages, 0);
   });
 
   group('notification offers', () {

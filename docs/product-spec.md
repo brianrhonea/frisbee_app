@@ -1277,6 +1277,43 @@ Out of scope: payments, meeting recording, USA Ultimate data.
     web links that open the app when installed). Tests: shared
     `directions_fixtures.test.ts`, app
     `test/shared_fixtures/directions_fixtures_test.dart`.
+62. Tournament chats with the organizers: [x] app; [x] website. A hosted
+    tournament's Captains' channel (organizers with Manage events and the
+    captains of applied, accepted and waitlisted teams) and each team's
+    private thread with the organizers, in Messages; the server sets who
+    is in them (the API when opened from the tournament page,
+    `tournaments-chatMembers` on entry changes), and nobody adds, leaves
+    or renames. Someone who stops organizing or leaves a team reads on
+    until the next of those. Not for drafts or
+    player-only events. Tests: API `tournament_chats.test.ts`, functions
+    `tournaments/chat_members.test.ts` and the rules tests, app
+    `hosted_tournaments_test.dart` and `group_messages_test.dart`.
+63. "At a tournament" tags: [x] app; [x] website. The composer lists
+    followed tournaments from a week before they start to their last day
+    (`GET /v1/me/tag-tournaments`, `tournamentTagOpen`), and the tag on a
+    post opens the tournament. Tests: shared
+    `tournament_tag_fixtures.test.ts`, API `post_tags_events.test.ts`, app
+    `test/shared_fixtures/tournament_tag_fixtures_test.dart`,
+    `inline_composer_test.dart` and `shared_event_test.dart`.
+64. Agree to the Community Guidelines and Terms: [x] app; [x] website.
+    Every member, once per `termsVersion` (`agreements.ts` / `agreement.dart`),
+    after the username step and before About you
+    (`GET`/`PUT /v1/me/agreement`). Tests: API `account.test.ts`, shared
+    `agreement_fixtures.test.ts`, app `auth_redirect_test.dart`,
+    `agree_terms_test.dart` and `shared_fixtures/agreement_fixtures_test.dart`.
+65. Composer header, body and footer: [x] app; [x] website. Avatar (opens
+    the profile), name and "Posting to" with the audience; the post; the
+    tools and Send. Hint from `postPrompts`. Tests: app
+    `inline_composer_test.dart`, shared `post_prompts_fixtures.test.ts`.
+66. Chats, not Inbox; messages only in Chats: [x] app; [x] website.
+    Messages push (and pop up in the app) but aren't listed in
+    Notifications or counted on the bell; the Chats tab's bubble leaves
+    out muted conversations and rooms, and muted rows show no unread dot.
+    Tests: app `shell_test.dart`, shared
+    `team_chats_fixtures.test.ts`.
+67. Back from a notification goes to its parent page: [x] app; [x]
+    website (`openFromNotifications`; `webParent`). Tests: app
+    `open_link_test.dart`, shared `routes.test.ts`.
 
 Libraries the website may add (none today): a small data cache for API
 reads and mutations, the Firestore web SDK for listeners, and LiveKit's

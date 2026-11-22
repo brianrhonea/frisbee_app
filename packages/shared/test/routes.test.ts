@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { appOnlyRoute, webRoute } from "../src/routes.js";
+import { appOnlyRoute, webParent, webRoute } from "../src/routes.js";
 
 const repo = new URL("../../../", import.meta.url);
 const webApp = new URL("apps/web/app/", repo);
@@ -38,6 +38,26 @@ function functionRoutes(): string[] {
   }
   return [...found];
 }
+
+describe("webParent: back from a notification goes to the page it belongs under", () => {
+  it("goes up to the team, the tournament, Chats or Home", () => {
+    expect(webParent("/teams/t1/chat?room=r1")).toBe("/teams/t1");
+    expect(webParent("/teams/t1/schedule?event=e")).toBe("/teams/t1");
+    expect(webParent("/teams/t1/meetings/m/room")).toBe("/teams/t1");
+    expect(webParent("/teams/t1")).toBe("/teams");
+    expect(webParent("/messages?c=c1")).toBe("/messages");
+    expect(webParent("/posts/p1")).toBe("/");
+    expect(webParent("/tournaments/x/bracket?division=d")).toBe("/tournaments/x");
+    expect(webParent("/tournaments/x")).toBe("/tournaments");
+  });
+  it("leaves pages with nothing above them to the usual back", () => {
+    expect(webParent("/players/u1")).toBeNull();
+    expect(webParent("/notifications/requests")).toBeNull();
+    expect(webParent("/messages")).toBeNull();
+    expect(webParent("/schedule")).toBeNull();
+    expect(webParent("/tournaments/host")).toBeNull();
+  });
+});
 
 describe("webRoute", () => {
   it("maps app routes to the website's pages", () => {

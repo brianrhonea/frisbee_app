@@ -50,7 +50,7 @@ class InboxScreen extends StatelessWidget {
       return Scaffold(
         appBar: AppBar(
           leading: ProfileButton.leading(context),
-          title: const Text('Inbox'),
+          title: const Text('Chats'),
           actions: [
             IconButton(
               tooltip: 'New message',
@@ -258,7 +258,9 @@ class _InboxListState extends State<InboxList> {
                 title: Text(item.muted ? 'Unmute' : 'Mute'),
                 subtitle: item.muted
                     ? null
-                    : const Text('No notifications from this conversation.'),
+                    : const Text(
+                        'No notifications or unread bubble for this conversation.',
+                      ),
                 onTap: () => Navigator.pop(context, _InboxAction.mute),
               ),
             if (!item.isRequest)
@@ -918,7 +920,8 @@ class _InboxTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    final unread = item.unread;
+    // Muted: no unread bubble or bold, as on the Chats tab.
+    final unread = item.unread && !item.muted;
     final when = item.lastAt;
     final typing = item.typing;
     return Material(

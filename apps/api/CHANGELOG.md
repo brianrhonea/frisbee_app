@@ -7,6 +7,39 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.42.0 — 2026-11-22
+
+With app 0.0.46 and web 0.55.0.
+
+- `GET` / `PUT /v1/me/agreement` (`account/`, `agreements.ts` in
+  packages/shared): whether the caller has agreed to the current
+  Community Guidelines and Terms (`termsVersion`), and recording that
+  they have (`users/{uid}.agreedTerms = {version, at}`). An old version
+  is refused (412). Both apps ask before anything else until it's yes.
+
+## 0.41.0 — 2026-11-22
+
+With app 0.0.45 and web 0.54.0.
+
+- Tournament chats with the organizers (`src/tournament_chats`,
+  `tournament_chats.ts` in packages/shared):
+  `POST /v1/tournaments/:id/chats/captains` opens the Captains' channel
+  (the host's organizers with manageEvents and the captains of every
+  applied, accepted or waitlisted entry: its captainIds and the team's
+  admins; invited teams join once they apply), and `POST /v1/tournaments/:id/chats/teams/:teamId` a
+  team's private thread with the organizers. Each is a conversation of
+  kind `tournament` (up to 500 people, organizers first) behind the
+  server-only pointer `tournaments/{t}/chats/{captains | team_<id>}`,
+  claimed in the same transaction, so two first opens share one. Each
+  open recomputes who is in it, keeping names and read times (opening it
+  from the inbox doesn't go through here). The
+  conversation endpoints refuse adding, removing and renaming for them
+  (they check kind `group`). Not while the tournament is a draft.
+- `GET /v1/me/tag-tournaments`: the followed tournaments a post can be
+  tagged "At" now, from 7 days before each starts to its last day
+  (`tournamentTagOpen`); hosted from `tournaments/{id}` (not drafts),
+  group ones from their `tournamentDirectory` listing. Soonest first.
+
 ## 0.40.0 — 2026-11-21
 
 With app 0.0.44 and web 0.53.0. Never released before: payments were

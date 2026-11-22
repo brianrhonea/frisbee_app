@@ -63,6 +63,27 @@ extension OpenFromOutside on GoRouter {
   }
 }
 
+extension OpenFromNotifications on GoRouter {
+  /// Opens a notification tapped in the Notifications list. Back goes to
+  /// the page it belongs under, as for a push ([openFromOutside]): a team
+  /// chat to its team, a conversation to Chats, a post to Home; not back
+  /// to Notifications. Pages with nothing above them (a person, follow
+  /// requests) open over the list ([openLink]), so back returns to it.
+  void openFromNotifications(String location) {
+    final path = Uri.parse(location).path;
+    if (_overList.hasMatch(path)) {
+      openLink(location);
+    } else {
+      openFromOutside(location);
+    }
+  }
+}
+
+/// Notification links with no page of their own above them.
+final _overList = RegExp(
+  r'^/(players|people|notifications|settings/follow-requests)(/|$)',
+);
+
 final _overTabs = RegExp(
   r'^/(posts|team-events|team-meetings|my-events|tournaments|group-tournaments)'
   r'(?:/([^/?#]+))?',

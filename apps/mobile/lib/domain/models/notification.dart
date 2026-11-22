@@ -53,6 +53,11 @@ enum NotificationCategory {
   final String label;
   final String description;
 
+  /// Messages (team chat and direct): they push, and show in Chats with
+  /// its unread bubbles, never in the Notifications list (older entries
+  /// from before are hidden too).
+  bool get isMessages => this == chat || this == directMessages;
+
   /// Whether a team can override this category.
   final bool perTeam;
 

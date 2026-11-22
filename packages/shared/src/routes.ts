@@ -107,3 +107,27 @@ export function webRoute(appRoute: string | null | undefined): string | null {
   }
   return appOnlyRoute;
 }
+
+/**
+ * The website page [webPath] belongs under, for back from a notification
+ * (openFromNotifications in the app): a team's chat, schedule or any other
+ * page of a team goes back to the team, a tournament's pages to the
+ * tournament, a conversation to Chats, a post to Home. Null for pages with
+ * nothing above them (a person, follow requests, the schedule), which go
+ * back to Notifications as usual.
+ */
+export function webParent(webPath: string): string | null {
+  const cut = webPath.search(/[?#]/);
+  const path = cut < 0 ? webPath : webPath.slice(0, cut);
+  let m: RegExpMatchArray | null;
+  if (path === "/messages") return cut < 0 ? null : "/messages";
+  if ((m = path.match(new RegExp(`^/teams/${id}/.+$`)))) return `/teams/${m[1]}`;
+  if (new RegExp(`^/teams/${id}$`).test(path)) return "/teams";
+  if ((m = path.match(new RegExp(`^/tournaments/${id}/.+$`)))) return `/tournaments/${m[1]}${cut < 0 ? "" : hostOnly(webPath.slice(cut))}`;
+  if (new RegExp(`^/tournaments/${id}$`).test(path) && !/^\/tournaments\/(host|new)$/.test(path)) return "/tournaments";
+  if (new RegExp(`^/posts/${id}$`).test(path)) return "/";
+  return null;
+}
+
+/** Keeps only ?host= (a group tournament's page needs it). */
+const hostOnly = (search: string) => query(parseQuery(search.replace(/^\?/, "").split("#")[0]!), "host");

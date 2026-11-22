@@ -14,6 +14,7 @@ import 'user_post_repository.dart';
 import '../../../domain/models/outbox.dart';
 import '../outbox/outbox_repository.dart';
 import '../../../domain/models/word_filter.dart';
+import '../../../domain/models/follow.dart';
 
 /// Reads and writes `posts` in Firestore; the community feed comes from
 /// the Stall 10 API ([ApiClient], `GET /v1/feed`), which leaves out private
@@ -210,6 +211,32 @@ class UserPostRepositoryFirebase implements UserPostRepository {
 
   @override
   bool get hasCommunityFeed => _api != null;
+
+  @override
+  bool get hasTagTournaments => _api != null;
+
+  @override
+  Future<Result<List<FollowTarget>>> tagTournaments() => guard(() async {
+    final api = _api;
+    if (api == null) {
+      throw const ApiException('unavailable', 'Needs the API.');
+    }
+    final r = await api.send('GET', '/v1/me/tag-tournaments');
+    final out = <FollowTarget>[];
+    for (final t in (r['tournaments'] as List?) ?? const []) {
+      if (t is! Map) continue;
+      final k = FollowTarget.parseTournamentKey(t['key'] as String?);
+      if (k == null) continue;
+      out.add(
+        FollowTarget.tournament(
+          k.hostId,
+          k.tournamentId,
+          t['name'] as String? ?? 'Tournament',
+        ),
+      );
+    }
+    return out;
+  });
 
   @override
   Future<Result<CommunityFeedPage>> fetchCommunityPage({int? before}) =>

@@ -181,6 +181,13 @@ describe("notices", () => {
     });
     expect(g.text({}, 1)).toEqual({ title: "Carpool", body: "Sam: yo" });
     expect(g.collapseId).toBe("dm_g-1");
+    // A tournament's chat with its organizers reads like a group's.
+    const t = directMessageNotice({
+      conversationId: "g-2",
+      message: { authorName: "Cam", text: "Check-in time?" },
+      conversation: { kind: "tournament", name: "Spring Fling · Captains" },
+    });
+    expect(t.text({}, 1)).toEqual({ title: "Spring Fling · Captains", body: "Cam: Check-in time?" });
   });
 
   it("tells a request's recipient quietly, and a decliner nothing", () => {

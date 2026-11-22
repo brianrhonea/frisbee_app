@@ -249,7 +249,9 @@ void main() {
       [
         for (final list in [signups, sameNames])
           {
-            'signups': [for (final s in list) {'uid': s.uid, 'name': s.name}],
+            'signups': [
+              for (final s in list) {'uid': s.uid, 'name': s.name},
+            ],
             'expected': [
               for (final s in [...list]..sort(PlayerSignup.compareByName))
                 s.uid,

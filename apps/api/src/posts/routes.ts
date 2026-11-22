@@ -16,6 +16,9 @@ export function postRoutes(app: FastifyInstance, posts: PostService, revalidate:
     const states = await posts.states(reader(req, "postStates"), req.query.ids);
     return reply.header("cache-control", "private, no-store").send(states);
   });
+  app.get("/v1/me/tag-tournaments", async (req, reply) =>
+    reply.header("cache-control", "private, no-store").send(await posts.tagTournaments(reader(req, "tagTournaments"))),
+  );
   app.put<Id>("/v1/posts/:id/like", async (req) => posts.setLiked(requireCaller(req), req.params.id, true));
   app.delete<Id>("/v1/posts/:id/like", async (req) => posts.setLiked(requireCaller(req), req.params.id, false));
   // A repost is a post of the reposter's: their page and the feed change.

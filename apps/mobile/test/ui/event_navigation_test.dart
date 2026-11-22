@@ -153,7 +153,11 @@ void main() {
         ],
         child: MaterialApp.router(
           theme: AppTheme.light,
-          routerConfig: router(auth, FakePersonalDetailsRepository()),
+          routerConfig: router(
+            auth,
+            FakePersonalDetailsRepository(),
+            FakeAgreementRepository(),
+          ),
         ),
       ),
     );

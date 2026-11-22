@@ -10,6 +10,7 @@ interface SummaryCase {
   name: string;
   rooms: Array<{ id: string; name: string; kind: string; lastAt: string | null; canRead: boolean }>;
   reads: Record<string, string>;
+  muted?: string[];
   summary: { rooms: string[]; unread: string[]; lastAt: string | null; open: string | null; subtitle: string };
 }
 
@@ -18,6 +19,7 @@ describe("team chats in the inbox match the app (fixtures/team_chats/summary.jso
     const s = teamChatSummary(
       c.rooms.filter((r) => r.canRead),
       c.reads,
+      (roomId) => (c.muted ?? []).includes(roomId),
     );
     expect({
       rooms: s.rooms.map((r) => r.id),

@@ -4,6 +4,52 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.55.0 — 2026-11-22
+
+Works with API 0.42.0.
+
+- **Before you start** (`AgreeTerms.tsx`, in `PersonalGate`): every
+  member reads a summary of the Community Guidelines and agrees to them
+  and the Terms of Service, after the name step and before About you.
+  Existing members see it once. `/guidelines` is readable without it.
+- Composer: a header with your picture (it opens your profile), your
+  name and "Posting to" with the audience picker; the post below; the
+  tools and **Send** in the footer. The empty box's hint goes round
+  `postPrompts` (packages/shared).
+- Inbox is now **Chats** (the tab, the page and its first view).
+- The Chats tab has an unread bubble (`useUnreadChats`): conversations
+  and team chats with something new, leaving out muted ones. Muted
+  conversations and rooms show no unread dot (`useMutedRooms`,
+  `teamChatSummary`'s `muted`).
+- Notifications: messages are no longer listed or counted on the bell
+  (they're in Chats); the Messages filter is gone. Opening a notification
+  replaces the list in the history with the page it belongs under
+  (`webParent` in packages/shared), so back goes to the team, Chats,
+  the tournament or Home.
+- Event and meeting editors: the Starts and Ends fields line up, with
+  "(optional)" on the label's line (`.form-row`).
+- Delete your account and Help: deleting works on the website (Settings
+  → Account), and the legal pages give support@stall10.app.
+
+## 0.54.0 — 2026-11-22
+
+Works with API 0.41.0.
+
+- Tournament chats with the organizers (`tournaments/TournamentChats.tsx`):
+  a "Questions?" card on a hosted tournament's overview for captains of
+  entered teams (the Captains' channel, and Message the organizers for
+  each of their teams) and "Talk with captains" for organizers, who also
+  get Message on each team's row (Waiting and the seeded teams). They
+  open in Messages, where a tournament chat lists its people and links
+  to the tournament, with no rename, add, remove or leave.
+- "At a tournament" in the composer lists followed tournaments from a
+  week before they start to their last day
+  (`GET /v1/me/tag-tournaments`), and is hidden when none are.
+- The "At …" tag on a post links to the tournament (`tournamentTagHref`:
+  the hosted page, falling back to the group's tournament).
+- Following: hosted tournaments open their own page; they opened the
+  group-tournament page, which couldn't show them.
+
 ## 0.53.0 — 2026-11-21
 
 Works with API 0.40.0 (online payments; shows nothing until Stripe is set

@@ -132,6 +132,12 @@ class DirectChatViewModel extends MessageThreadViewModel {
 
   bool get canAddPeople => _conversation?.canAddTo(uid) ?? false;
 
+  /// Rename and leave: ordinary groups, not a tournament's chat.
+  bool get canChangeGroup => _conversation?.canChange(uid) ?? false;
+
+  /// The hosted tournament a tournament chat is about.
+  String? get tournamentId => _conversation?.tournamentId;
+
   bool canRemove(String member) =>
       _conversation?.canRemove(uid, member) ?? false;
 

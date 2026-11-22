@@ -120,12 +120,16 @@ class ConversationPrivate {
 /// their uids, sorted and joined with `_`, so each pair has exactly one.
 /// A group ([isGroup]) has an id starting `g-`, a [name], and up to
 /// [maxGroupSize] members, who add people that follow them, leave, and
-/// (its creator) remove people.
+/// (its creator) remove people. A tournament's chat with its organizers
+/// ([tournamentId], kind `tournament`) is a group the server runs: it
+/// sets who is in it from the entries, and nobody adds, removes, leaves
+/// or renames.
 class Conversation {
   const Conversation({
     required this.id,
     required this.participants,
     this.isGroup = false,
+    this.tournamentId,
     this.name = '',
     this.createdBy = '',
     this.names = const {},
@@ -143,6 +147,16 @@ class Conversation {
 
   /// A group conversation rather than a pair's.
   final bool isGroup;
+
+  /// For a tournament's chat with its organizers: the hosted tournament.
+  final String? tournamentId;
+
+  /// A tournament's chat with its organizers, which the server runs.
+  bool get isTournamentChat => tournamentId != null;
+
+  /// [me] may rename it or leave: an ordinary group they're in.
+  bool canChange(String me) =>
+      isGroup && !isTournamentChat && participants.contains(me);
 
   /// A group's name; empty for a direct conversation or an unnamed group.
   final String name;
@@ -197,6 +211,7 @@ class Conversation {
     id: id,
     participants: participants ?? this.participants,
     isGroup: isGroup,
+    tournamentId: tournamentId,
     name: name ?? this.name,
     createdBy: createdBy,
     names: names ?? this.names,
@@ -213,6 +228,7 @@ class Conversation {
     id: id,
     participants: participants,
     isGroup: isGroup,
+    tournamentId: tournamentId,
     name: name,
     createdBy: createdBy,
     names: names,
@@ -273,12 +289,14 @@ class Conversation {
   /// [me] may add people: a group they're in that isn't full.
   bool canAddTo(String me) =>
       isGroup &&
+      !isTournamentChat &&
       participants.contains(me) &&
       participants.length < maxGroupSize;
 
   /// [me] may remove [member]: [me] started the group, and it's someone else.
   bool canRemove(String me, String member) =>
       isGroup &&
+      !isTournamentChat &&
       createdBy == me &&
       member != me &&
       participants.contains(member);
@@ -394,7 +412,10 @@ class Conversation {
         },
         status: ConversationStatus.parse(map['status']),
         requestedOf: map['requestedOf'] as String?,
-        isGroup: map['kind'] == 'group',
+        isGroup: map['kind'] == 'group' || map['kind'] == 'tournament',
+        tournamentId: map['kind'] == 'tournament'
+            ? map['tournamentId'] as String?
+            : null,
         name: map['name'] as String? ?? '',
         createdBy: map['createdBy'] as String? ?? '',
       );

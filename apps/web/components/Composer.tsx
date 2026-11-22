@@ -1,10 +1,13 @@
 "use client";
 import {
+  postPrompt,
   postBodyMax,
   postImagesMax,
   type PublicImage,
   type SavePostResult,
   type SaveTeamPostRequest,
+  type TagTournament,
+  type TagTournaments,
   teamPostImagesMax,
   type WorkoutActivity,
   type WorkoutInput,
@@ -24,6 +27,9 @@ import { Avatar } from "./Avatar";
 import { ComposerPhotos } from "./ComposerPhotos";
 import { NavIcon } from "./NavIcons";
 import "./composer_tag.css";
+
+/** Which prompt the next composer shows; goes round within a visit. */
+let promptTurn = 0;
 
 /**
  * A photo on the post: already saved, or chosen now (uploading, then
@@ -135,6 +141,8 @@ export function Composer({
 }) {
   const { user } = useAuth();
   const [postId, setPostId] = useState(() => editing?.id ?? newId());
+  // The empty body's hint: the next prompt each time the composer opens.
+  const [prompt] = useState(() => postPrompt(promptTurn++));
   const [body, setBody] = useState(editing?.body ?? "");
   // Links from before the link tool went (editing an older post): kept, and
   // can be removed. New ones go in the text, which shows them as links.
@@ -157,19 +165,28 @@ export function Composer({
   const text = useRef<HTMLTextAreaElement>(null);
   const files = useRef<HTMLInputElement>(null);
   const repost = editing?.kind === "repost";
-  // "At a tournament": the tournaments the member follows (the app's tag field).
+  // "At a tournament": followed tournaments from a week before they start to
+  // their last day (GET /v1/me/tag-tournaments, as in the app), asked again
+  // when the follows change. An edited post keeps its own tag on offer.
   const [tag, setTag] = useState<{ key: string; name: string } | null>(editing?.tournament ?? null);
   const followed = useLiveQuery<{ key?: string; name?: string; type?: string }>(
     user && !repost ? `users/${user.uid}/follows` : null,
     [where("type", "==", "tournament")],
     `${user?.uid ?? ""}-tournaments`,
   );
-  const tagOptions = [
-    ...(followed.data ?? []).flatMap((f) => {
-      const key = f.key ?? f.id;
-      return key.startsWith("tournament_") ? [{ key, name: (f.name ?? "Tournament").slice(0, 100) }] : [];
-    }),
-  ].sort((a, b) => a.name.localeCompare(b.name));
+  const followKeys = (followed.data ?? []).map((f) => f.key ?? f.id).sort().join(",");
+  const [taggable, setTaggable] = useState<TagTournament[]>([]);
+  useEffect(() => {
+    if (!user || repost) return;
+    let live = true;
+    callApi<TagTournaments>(user, "/v1/me/tag-tournaments")
+      .then((r) => live && setTaggable(r.tournaments))
+      .catch(() => live && setTaggable([]));
+    return () => {
+      live = false;
+    };
+  }, [user, repost, followKeys]);
+  const tagOptions = taggable.map((t) => ({ key: t.key, name: t.name.slice(0, 100) }));
   if (tag && !tagOptions.some((o) => o.key === tag.key)) tagOptions.push(tag);
 
   // Grow the box with what's written.
@@ -374,7 +391,7 @@ export function Composer({
   const left = postBodyMax - body.length;
   return (
     <form
-      className={`composer${dragging ? " dragging" : ""}`}
+      className={`composer${editing ? "" : " composer-stacked"}${dragging ? " dragging" : ""}`}
       // The new-post composer (not a post being edited): what `n` and #compose focus.
       data-compose={editing ? undefined : "new"}
       onSubmit={(e) => void submit(e)}
@@ -386,21 +403,36 @@ export function Composer({
       onDragLeave={() => setDragging(false)}
       onDrop={onDrop}
     >
-      {!editing && <Avatar name={me.displayName ?? "You"} url={me.photoURL ?? undefined} />}
+      {!editing && (
+        // Header: who's posting (the avatar opens their profile) and who to.
+        <div className="composer-head">
+          <Link href={`/players/${encodeURIComponent(me.uid)}`} className="composer-avatar" aria-label="Your profile">
+            <Avatar name={me.displayName ?? "You"} url={me.photoURL ?? undefined} />
+          </Link>
+          <div className="composer-who">
+            <b>{me.displayName || "You"}</b>
+            <span className="composer-to">
+              Posting to{" "}
+              {audiences.length > 0 ? (
+                <label className="audience-chip">
+                  <span className="sr-only">Who sees this post</span>
+                  <select value={teamId ?? ""} onChange={(e) => pickAudience(e.target.value || null)} disabled={busy}>
+                    <option value="">Everyone</option>
+                    {audiences.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <b>Everyone</b>
+              )}
+            </span>
+          </div>
+        </div>
+      )}
       <div className="composer-main">
-        {!editing && audiences.length > 0 && (
-          <label className="audience-chip">
-            <span>To</span>
-            <select value={teamId ?? ""} onChange={(e) => pickAudience(e.target.value || null)} disabled={busy}>
-              <option value="">Everyone</option>
-              {audiences.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
         {team && (
           <input
             className="composer-title"
@@ -419,7 +451,7 @@ export function Composer({
           ref={text}
           value={body}
           rows={editing ? 3 : 2}
-          placeholder={repost ? "Add a note" : team ? `What's the news for ${team.name}?` : workout ? "How did it go? (optional)" : "What's happening on the field?"}
+          placeholder={repost ? "Add a note" : team ? `What's the news for ${team.name}?` : workout ? "How did it go? (optional)" : prompt}
           onChange={(e) => {
             setBody(e.target.value);
             if (posted) setPosted(null);
@@ -549,7 +581,7 @@ export function Composer({
             </button>
           )}
           <button className="btn btn-primary btn-small" type="submit" disabled={!canPost} title="Ctrl+Enter">
-            {busy ? (editing ? "Saving…" : "Posting…") : editing ? "Save" : "Post"}
+            {busy ? (editing ? "Saving…" : "Sending…") : editing ? "Save" : "Send"}
             {!busy && !editing && <NavIcon name="arrow" size={16} />}
           </button>
         </div>

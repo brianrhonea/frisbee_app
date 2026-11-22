@@ -74,7 +74,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   void _open(AppNotification n) {
     vm.open.execute(n);
-    if (n.route case final route?) GoRouter.of(context).openLink(route);
+    // Back goes to the page it belongs under, not back to this list.
+    if (n.route case final route?) {
+      GoRouter.of(context).openFromNotifications(route);
+    }
   }
 
   Future<void> _clearAll() async {

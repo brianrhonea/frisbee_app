@@ -10,6 +10,53 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.46
+
+**Before you start**
+- Everyone now reads a short summary of the Community Guidelines and
+  agrees to them and the Terms of Service. New members see it when they
+  sign up; everyone else once, the next time they open Stall 10.
+
+**Posting**
+- The post box has a header: your picture (tap it for your profile), your
+  name and who you're posting to. Write below it, then tap **Send**. The
+  empty box suggests something to post about.
+
+**Chats**
+- The Inbox tab is now called **Chats**.
+- Messages no longer show in Notifications: they're in Chats, with a
+  bubble on the tab. You still get a push for each one.
+- Muting a chat now also hides its unread bubble.
+
+**Notifications**
+- Going back from a notification takes you to the page it belongs to
+  (the team for a team chat, Chats for a message), not back to the list.
+
+**Settings**
+- Legal and your data now links the Community Guidelines (the Cookie
+  Policy is about the website).
+
+**Your profile**
+- Under Posts, New post, Log a workout and Record are smaller chips, and
+  posts have room between them.
+
+## 0.0.45
+
+**Talk with the organizers**
+- Captains of teams in a tournament now have a **Captains' channel** with
+  the organizers, so a question asked once is answered for everyone. It's
+  in Messages, and on the tournament's overview.
+- **Message the organizers** sends a private message about your own team
+  (payments, rosters, anything just for you).
+- Organizers see **Talk with captains** on the overview, and a message
+  button on each team's row. Teams that withdraw or are declined leave the
+  chats on their own.
+
+**Posting from a tournament**
+- "At a tournament" now lists only tournaments you follow that start
+  within a week or are happening now.
+- Tap "At …" on a post to go straight to that tournament.
+
 ## 0.0.44
 
 **Paying for tournaments**

@@ -201,7 +201,7 @@ void main() {
               routes: [
                 GoRoute(
                   path: '/messages',
-                  builder: (_, _) => const Text('Inbox'),
+                  builder: (_, _) => const Text('Chats'),
                   routes: [
                     GoRoute(
                       path: ':id',
@@ -227,7 +227,7 @@ void main() {
     expect(find.text('Chat a'), findsOneWidget);
     router.pop();
     await tester.pumpAndSettle();
-    expect(find.text('Inbox'), findsOneWidget);
+    expect(find.text('Chats'), findsOneWidget);
 
     // A post's push, from a conversation: back goes to Home.
     router.go('/messages/a');
@@ -238,6 +238,95 @@ void main() {
     router.pop();
     await tester.pumpAndSettle();
     expect(find.text('Home'), findsOneWidget);
+  });
+
+  testWidgets('a notification tapped in the list: back goes to the page it '
+      'belongs under, not the list', (tester) async {
+    final root = GlobalKey<NavigatorState>();
+    final router = GoRouter(
+      navigatorKey: root,
+      initialLocation: '/home',
+      routes: [
+        GoRoute(
+          path: '/notifications',
+          builder: (_, _) => const Text('Notifications'),
+        ),
+        GoRoute(
+          path: '/people/:uid',
+          builder: (_, s) => Text('Person ${s.pathParameters['uid']}'),
+        ),
+        StatefulShellRoute.indexedStack(
+          builder: (_, _, shell) => shell,
+          branches: [
+            StatefulShellBranch(
+              routes: [
+                GoRoute(path: '/home', builder: (_, _) => const Text('Home')),
+                GoRoute(
+                  path: '/players/:uid',
+                  builder: (_, s) => Text('Player ${s.pathParameters['uid']}'),
+                ),
+              ],
+            ),
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: '/teams',
+                  builder: (_, _) => const Text('Teams'),
+                  routes: [
+                    GoRoute(
+                      path: ':id',
+                      builder: (_, s) => Text('Team ${s.pathParameters['id']}'),
+                      routes: [
+                        GoRoute(
+                          path: 'chats/:room',
+                          parentNavigatorKey: root,
+                          builder: (_, s) =>
+                              Text('Room ${s.pathParameters['room']}'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: '/messages',
+                  builder: (_, _) => const Text('Chats'),
+                  routes: [
+                    GoRoute(
+                      path: ':id',
+                      parentNavigatorKey: root,
+                      builder: (_, s) => Text('Chat ${s.pathParameters['id']}'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+
+    Future<void> fromList(String link, String opened, String back) async {
+      router.go('/home');
+      router.push('/notifications');
+      await tester.pumpAndSettle();
+      router.openFromNotifications(link);
+      await tester.pumpAndSettle();
+      expect(find.text(opened), findsOneWidget);
+      router.pop();
+      await tester.pumpAndSettle();
+      expect(find.text(back), findsOneWidget);
+    }
+
+    await fromList('/teams/t/chats/general', 'Room general', 'Team t');
+    await fromList('/messages/a', 'Chat a', 'Chats');
+    // A person has nothing above them: back to the list.
+    await fromList('/players/x', 'Person x', 'Notifications');
   });
 
   test('pages over the tabs belong under a tab or their team', () {

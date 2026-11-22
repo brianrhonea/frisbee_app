@@ -1,5 +1,5 @@
 "use client";
-import { type PublicPost, type WorkoutActivity, workoutActivityLabels } from "@stall10/shared";
+import { type PublicPost, tournamentTagHref, type WorkoutActivity, workoutActivityLabels } from "@stall10/shared";
 import Link from "next/link";
 import { type ReactNode, useEffect, useState } from "react";
 import { callApi, problem } from "@/lib/client";
@@ -90,12 +90,28 @@ function PostHead({
   );
 }
 
+/** "At a tournament": opens the tournament's page (its group's, for a pickup tournament). */
+function TournamentTag({ post }: { post: PublicPost }) {
+  const href = tournamentTagHref(post.tournamentKey);
+  return (
+    <p className="post-tag">
+      {href ? (
+        <Link href={href} className="post-tag-link" title={`Open ${post.tournamentName}`}>
+          {post.tournamentName}
+        </Link>
+      ) : (
+        post.tournamentName
+      )}
+    </p>
+  );
+}
+
 /** A post's own content: text, workout, event, photos and links. */
 function PostContent({ post }: { post: PublicPost }) {
   const links = (post.links ?? []).filter(isWebLink);
   return (
     <>
-      {post.tournamentName && <p className="post-tag">{post.tournamentName}</p>}
+      {post.tournamentName && <TournamentTag post={post} />}
       {post.body && <p className="post-body"><LinkedText text={post.body} /></p>}
       {post.workout && (
         <div className="post-box">

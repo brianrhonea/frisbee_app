@@ -421,7 +421,7 @@ export function directMessageNotice(a: {
   const preview = messagePreview(a.message);
   const author = String(a.message.authorName ?? "") || "Someone";
   // A group's notice is titled with the group, and says who wrote.
-  const group = a.conversation?.kind === "group";
+  const group = a.conversation?.kind === "group" || a.conversation?.kind === "tournament";
   const groupName = String(a.conversation?.name ?? "").trim() || "Group message";
   const line = group ? `${author}: ${preview}` : preview;
   return {

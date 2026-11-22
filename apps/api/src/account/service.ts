@@ -1,4 +1,8 @@
 import {
+  type AgreementStatus,
+  agreementRequestSchema,
+  hasAgreed,
+  termsVersion,
   type IdentityResult,
   identityRequestSchema,
   mutedConversationKey,
@@ -123,6 +127,24 @@ export class AccountService {
   }
 
   /** users/{uid}.readReceipts (owner-only in the rules); off hides when they've read messages. */
+  /** `GET /v1/me/agreement`: whether they've agreed to the current terms and guidelines. */
+  async agreement(caller: Caller): Promise<AgreementStatus> {
+    const user = await this.store.get(p.user(caller.uid));
+    return { agreed: hasAgreed(user?.agreedTerms), version: termsVersion };
+  }
+
+  /** `PUT /v1/me/agreement`: records that they read and agreed to [termsVersion]. */
+  async agree(caller: Caller, body: unknown): Promise<AgreementStatus> {
+    const { version } = parseBody(agreementRequestSchema, body);
+    if (version !== termsVersion) {
+      throw new ApiError("failed_precondition", "The terms have changed. Reload the page to read the current ones.");
+    }
+    await this.store.transact(async (tx) => {
+      tx.merge(p.user(caller.uid), { agreedTerms: { version, at: serverTime } });
+    });
+    return { agreed: true, version };
+  }
+
   async setReadReceipts(caller: Caller, body: unknown): Promise<void> {
     const { on } = parseBody(readReceiptsRequestSchema, body);
     await this.store.transact(async (tx) => {

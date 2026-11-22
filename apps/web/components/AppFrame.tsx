@@ -9,6 +9,7 @@ import { HeaderAuth } from "./HeaderAuth";
 import { BrandCard } from "./HomeCards";
 import { NavIcon, type NavIconName } from "./NavIcons";
 import { OfflineBanner } from "./OfflineBanner";
+import { useUnreadChats } from "./useUnreadChats";
 import { useUnreadCount } from "./Notifications";
 import { SideTeams } from "./SideTeams";
 import { ThemeToggle } from "./ThemeToggle";
@@ -26,7 +27,7 @@ type Tab = {
 };
 
 /**
- * Members: the app's five tabs (Home, Discover, Schedule, Teams, Inbox;
+ * Members: the app's five tabs (Home, Discover, Schedule, Teams, Chats;
  * docs/redesign-plan.md) and Learn. Discover is /explore, which also
  * holds what Events and Find tournaments did.
  */
@@ -36,13 +37,13 @@ const memberTabs: Tab[] = [
   { href: "/explore", label: "Discover", icon: "explore", also: ["/players", "/rankings", "/tournaments", "/events", "/discover"] },
   { href: "/schedule", label: "Schedule", icon: "events" },
   { href: "/teams", label: "Teams", icon: "teams" },
-  { href: "/messages", label: "Inbox", icon: "messages" },
+  { href: "/messages", label: "Chats", icon: "messages" },
   { href: "/learn", label: "Learn", icon: "learn" },
 ];
 
 /**
  * Visitors (and everyone while the browser restores a session): what they
- * can use without an account. No Teams or Inbox; the brand goes Home.
+ * can use without an account. No Teams or Chats; the brand goes Home.
  */
 const visitorTabs: Tab[] = [
   { href: "/explore", label: "Discover", icon: "explore", also: ["/players", "/rankings", "/events", "/discover"] },
@@ -133,10 +134,10 @@ function isActive(path: string, tab: Tab, only: string | null, tabs: Tab[]) {
   return tab.also?.some((p) => under(path, p)) ?? false;
 }
 
-type TabLinksProps = { tabs: Tab[]; className: string; path: string; only: string | null };
+type TabLinksProps = { tabs: Tab[]; className: string; path: string; only: string | null; chats?: number };
 
 /** The tabs as links. Teams always opens the list of your teams, even with only one. */
-function TabLinks({ tabs, className, path, only }: TabLinksProps) {
+function TabLinks({ tabs, className, path, only, chats = 0 }: TabLinksProps) {
   return tabs.map((t) => {
     const active = isActive(path, t, only, tabs);
     return (
@@ -149,7 +150,14 @@ function TabLinks({ tabs, className, path, only }: TabLinksProps) {
           if (t.href === "/" && path === "/") requestHomeRefresh();
         }}
       >
-        <NavIcon name={t.icon} />
+        {t.href === "/messages" && chats > 0 ? (
+          <span className="icon-wrap" aria-label={`${chats} unread`}>
+            <NavIcon name={t.icon} />
+            <span className="count-badge">{chats > 99 ? "99+" : chats}</span>
+          </span>
+        ) : (
+          <NavIcon name={t.icon} />
+        )}
         <span>{t.label}</span>
       </Link>
     );
@@ -177,6 +185,8 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
   const search = !under(path, "/explore");
   const tabs = user ? memberTabs : visitorTabs;
   const unread = useUnreadCount();
+  // The Chats tab's bubble: unread, unmuted conversations and team chats.
+  const chats = useUnreadChats(user?.uid);
   useShortcuts(!!user);
   // Phones' floating Post button, on pages without a composer of their own at the foot.
   const fab = !!user && !ownComposer.some((p) => under(path, p)) && !isChat(path);
@@ -190,7 +200,7 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
   }
 
   const tabLinks = (className: string) => {
-    const props = { tabs, className, path };
+    const props = { tabs, className, path, chats };
     return (
       <Suspense fallback={<TabLinks {...props} only={null} />}>
         <TabLinksWithFilter {...props} />

@@ -24,6 +24,7 @@ import { FollowButton } from "@/components/FollowButton";
 import { ShareButton, tournamentUrl } from "@/components/ShareButton";
 import { usePayments } from "@/components/drafts/data";
 import { HostPaymentControls, PayOnline, PayoutsCard } from "@/components/payments/Payments";
+import { inChats, OrganizerChats, TeamChatButton } from "./TournamentChats";
 import { callApi } from "@/lib/client";
 import { dayKey, useRenderZone } from "@/lib/renderZone";
 import { SignupsSlot } from "./SignupsSlot";
@@ -311,6 +312,8 @@ function Overview({ s }: { s: TournamentState }) {
       {/* The host's owner connects Stripe here (hidden for others). */}
       {s.manager && s.user && (fee || (t.entryType === "players" && t.bidFee)) && <PayoutsCard user={s.user} teamId={t.hostId} amountCents={(fee ?? t.bidFee)?.amountCents} payerCovers={(fee ?? t.bidFee)?.payerCoversFees === true} />}
       {!s.manager && !s.visitor && takesTeams(t) && <YourTeams s={s} />}
+      {/* Captains ask the organizers; organizers answer everyone at once. */}
+      {!s.visitor && takesTeams(t) && <OrganizerChats s={s} />}
       {t.description && (
         <section className="card">
           <p className="hosted-description">{t.description}</p>
@@ -583,6 +586,7 @@ function TeamsTab({ s }: { s: TournamentState }) {
                   <button type="button" className="text-btn" disabled={busy} onClick={() => decide(e.id, "declined")}>
                     Decline
                   </button>
+                  {s.user && s.t?.status !== "draft" && <TeamChatButton user={s.user} tournamentId={s.id} teamId={e.id} teamName={e.teamName} />}
                 </span>
               </div>
             ))}
@@ -603,6 +607,7 @@ function TeamsTab({ s }: { s: TournamentState }) {
                 <span>{s.teamName(id)}</span>
               </span>
               {s.manager && s.user && owes(id) && <HostPaymentControls user={s.user} tournamentId={s.id} payerId={id} payment={paymentById.get(id)} overdue={overdue(id)} />}
+              {s.manager && s.user && s.t?.status !== "draft" && inChats(s.entries.find((e) => e.id === id)) && <TeamChatButton user={s.user} tournamentId={s.id} teamId={id} teamName={s.teamName(id)} />}
               {seedable && (
                 <span className="home-actions">
                   <button type="button" className="text-btn" aria-label="Move up" disabled={busy || i === 0} onClick={() => move(i, -1)}>

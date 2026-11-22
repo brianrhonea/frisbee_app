@@ -27,10 +27,12 @@ const tabs = [
 function hrefOf(f: Follow): string {
   if (f.type === "user") return `/players/${encodeURIComponent(f.targetId)}`;
   if (f.type === "team") return `/teams/${encodeURIComponent(f.targetId)}`;
-  // Group tournaments store "{groupId}_{tournamentId}" with groupId beside it (Follow.fromMap).
+  // Hosted and group tournaments store "{hostId}_{tournamentId}" with the
+  // host beside it; the hosted page falls back to the group's tournament
+  // (?host=), as in the app (Routes.tournament(id, host:)).
   if (f.type === "tournament" && f.groupId && f.targetId.startsWith(`${f.groupId}_`)) {
     const id = f.targetId.slice(f.groupId.length + 1);
-    return `/teams/${encodeURIComponent(f.groupId)}/tournaments/${encodeURIComponent(id)}`;
+    return `/tournaments/${encodeURIComponent(id)}?host=${encodeURIComponent(f.groupId)}`;
   }
   if (f.type === "tournament") return `/tournaments/${encodeURIComponent(f.targetId)}`;
   return "/explore#coming-up";

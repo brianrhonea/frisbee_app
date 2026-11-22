@@ -8,18 +8,12 @@ void main() {
       InviteLinks.join('ABC234').toString(),
       'https://dev.stall10.app/join/ABC234',
     );
-    expect(
-      InviteLinks.group('g1').toString(),
-      'https://dev.stall10.app/g/g1',
-    );
+    expect(InviteLinks.group('g1').toString(), 'https://dev.stall10.app/g/g1');
   });
 
   test('maps its own links to in-app routes, and nothing else', () {
     String? path(String s) => InviteLinks.inAppPath(Uri.parse(s));
-    expect(
-      path('https://dev.stall10.app/join/ABC234'),
-      '/join/ABC234',
-    );
+    expect(path('https://dev.stall10.app/join/ABC234'), '/join/ABC234');
     expect(path('https://dev.stall10.app/g/g1'), '/g/g1');
     expect(path('stall10://open/join/ABC234'), '/join/ABC234');
     // Not ours, or not an invite.
@@ -45,9 +39,7 @@ void main() {
       '/posts/abc_12',
     );
     expect(
-      InviteLinks.inAppPath(
-        Uri.parse('https://dev.stall10.app/p/'),
-      ),
+      InviteLinks.inAppPath(Uri.parse('https://dev.stall10.app/p/')),
       isNull,
     );
   });

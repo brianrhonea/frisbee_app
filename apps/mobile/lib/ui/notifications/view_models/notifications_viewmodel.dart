@@ -50,7 +50,11 @@ class NotificationsViewModel extends ChangeNotifier {
         .watchFeed(uid)
         .listen(
           (items) {
-            _items = items;
+            // Messages are in Chats, not here.
+            _items = [
+              for (final n in items)
+                if (!n.category.isMessages) n,
+            ];
             _error = null;
             notifyListeners();
           },

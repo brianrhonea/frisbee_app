@@ -163,9 +163,9 @@ class SettingsScreen extends StatelessWidget {
                     onTap: () => _openPage(context, LegalLinks.terms),
                   ),
                   SettingsTile(
-                    icon: Icons.cookie_outlined,
-                    title: 'Cookie Policy',
-                    onTap: () => _openPage(context, LegalLinks.cookies),
+                    icon: Icons.handshake_outlined,
+                    title: 'Community Guidelines',
+                    onTap: () => _openPage(context, LegalLinks.guidelines),
                   ),
                   SettingsTile(
                     icon: Icons.delete_outline,

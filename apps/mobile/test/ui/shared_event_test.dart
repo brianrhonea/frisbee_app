@@ -154,6 +154,32 @@ void main() {
     expect(find.text('Went to ${Routes.event('t1', 'e1')}'), findsOneWidget);
   });
 
+  testWidgets('"At a tournament" opens the tournament, not the post', (
+    tester,
+  ) async {
+    await pumpCard(
+      tester,
+      UserPost(
+        id: 'p2',
+        authorId: 'sam',
+        authorName: 'Sam',
+        body: 'Here!',
+        tournamentKey: 'tournament_host1_t9',
+        tournamentName: 'Spring Fling',
+        createdAt: DateTime(2026, 11, 2, 9),
+      ),
+    );
+    expect(find.text('At Spring Fling'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('post-tournament-tag')));
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Went to ${Uri.parse(Routes.tournament('t9', host: 'host1')).path}',
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets("followers go to the team's page", (tester) async {
     await pumpCard(tester, post('someone-else', event));
     await tester.tap(find.byType(SharedEventCard));

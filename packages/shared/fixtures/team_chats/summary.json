@@ -1,5 +1,5 @@
 {
-  "about": "TeamChatSummary.fromReadable: a team's chat in the inbox. Of the rooms the user can read (canRead), voice channels are left out; a room is unread when lastAt is after its read time (or never read). `unread` is newest first; `open` is the room a tap opens (the only unread one, else the newest, else the first); `subtitle` is what the row says.",
+  "about": "TeamChatSummary.fromReadable: a team's chat in the inbox. Of the rooms the user can read (canRead), voice channels are left out; a room is unread when lastAt is after its read time (or never read). `unread` is newest first; `open` is the room a tap opens (the only unread one, else the newest, else the first); `subtitle` is what the row says. Rooms in `muted` (room ids, muted by the user) are never unread.",
   "cases": [
     {
       "name": "no messages yet",
@@ -229,6 +229,41 @@
       "summary": {
         "rooms": [
           "general"
+        ],
+        "unread": [
+          "general"
+        ],
+        "lastAt": "2026-11-01T09:05:00.000",
+        "open": "general",
+        "subtitle": "New in #general"
+      }
+    },
+    {
+      "name": "a muted room is never unread",
+      "rooms": [
+        {
+          "id": "general",
+          "name": "General",
+          "kind": "text",
+          "lastAt": "2026-11-01T09:00:00.000",
+          "canRead": true
+        },
+        {
+          "id": "rides",
+          "name": "Car Pool",
+          "kind": "text",
+          "lastAt": "2026-11-01T09:05:00.000",
+          "canRead": true
+        }
+      ],
+      "reads": {},
+      "muted": [
+        "rides"
+      ],
+      "summary": {
+        "rooms": [
+          "general",
+          "rides"
         ],
         "unread": [
           "general"

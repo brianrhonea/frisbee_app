@@ -50,7 +50,7 @@ class DirectChatScreen extends StatelessWidget {
             notificationRepository: c.read<NotificationRepository?>(),
           ),
           builder: (context, inbox) => Scaffold(
-            appBar: AppBar(title: const Text('Inbox')),
+            appBar: AppBar(title: const Text('Chats')),
             body: ChatSplit(
               list: InboxList(
                 viewModel: inbox,
@@ -320,6 +320,9 @@ class _DirectChatViewState extends State<DirectChatView> {
                     _ChatAction.add => context.push(
                       Routes.addToGroup(vm.conversationId),
                     ),
+                    _ChatAction.tournament => context.push(
+                      Routes.tournament(vm.tournamentId!),
+                    ),
                     _ChatAction.rename => _rename(),
                     _ChatAction.leave => _confirmLeave(),
                     _ChatAction.archive => vm.toggleArchived.execute(),
@@ -353,20 +356,30 @@ class _DirectChatViewState extends State<DirectChatView> {
                             title: Text('Add people'),
                           ),
                         ),
-                      const PopupMenuItem(
-                        value: _ChatAction.rename,
-                        child: ListTile(
-                          leading: Icon(Icons.edit_outlined),
-                          title: Text('Rename group'),
+                      if (vm.tournamentId != null)
+                        const PopupMenuItem(
+                          value: _ChatAction.tournament,
+                          child: ListTile(
+                            leading: Icon(Icons.emoji_events_outlined),
+                            title: Text('Open tournament'),
+                          ),
                         ),
-                      ),
-                      const PopupMenuItem(
-                        value: _ChatAction.leave,
-                        child: ListTile(
-                          leading: Icon(Icons.logout),
-                          title: Text('Leave group'),
+                      if (vm.canChangeGroup) ...[
+                        const PopupMenuItem(
+                          value: _ChatAction.rename,
+                          child: ListTile(
+                            leading: Icon(Icons.edit_outlined),
+                            title: Text('Rename group'),
+                          ),
                         ),
-                      ),
+                        const PopupMenuItem(
+                          value: _ChatAction.leave,
+                          child: ListTile(
+                            leading: Icon(Icons.logout),
+                            title: Text('Leave group'),
+                          ),
+                        ),
+                      ],
                     ],
                     PopupMenuItem(
                       value: _ChatAction.archive,
@@ -414,7 +427,17 @@ class _DirectChatViewState extends State<DirectChatView> {
   }
 }
 
-enum _ChatAction { members, add, rename, leave, archive, delete, report, block }
+enum _ChatAction {
+  members,
+  add,
+  tournament,
+  rename,
+  leave,
+  archive,
+  delete,
+  report,
+  block,
+}
 
 /// A group's members: who started it, Remove for its creator, and Add.
 class _MembersSheet extends StatelessWidget {

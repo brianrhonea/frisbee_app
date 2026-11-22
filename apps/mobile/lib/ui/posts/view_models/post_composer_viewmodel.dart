@@ -32,11 +32,10 @@ class PostComposerViewModel extends ChangeNotifier {
     if (uid != null) {
       _subs.add(
         followRepository.watchFollows(uid).listen((f) {
-          _tournaments = [
+          _setTournaments([
             for (final x in f)
               if (x.type == FollowType.tournament) x.target,
-          ];
-          notifyListeners();
+          ]);
         }, onError: (Object _) {}),
       );
     }
@@ -83,6 +82,19 @@ class PostComposerViewModel extends ChangeNotifier {
   UserPost? _initial;
   List<FollowTarget> _tournaments = const [];
 
+  /// Followed tournaments from a week before they start to their last day
+  /// (the API's list); a build without it offers them all. An edited
+  /// post's own tag stays on offer (the screen adds it).
+  Future<void> _setTournaments(List<FollowTarget> followed) async {
+    if (!_posts.hasTagTournaments) {
+      _tournaments = followed;
+    } else {
+      final r = await _posts.tagTournaments();
+      _tournaments = r is Ok<List<FollowTarget>> ? r.value : const [];
+    }
+    if (!_disposed) notifyListeners();
+  }
+
   bool get isNew => postId == null;
   bool get loaded => _loaded;
   Object? get loadError => _loadError;
@@ -126,8 +138,11 @@ class PostComposerViewModel extends ChangeNotifier {
         return r;
       });
 
+  bool _disposed = false;
+
   @override
   void dispose() {
+    _disposed = true;
     for (final s in _subs) {
       s.cancel();
     }

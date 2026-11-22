@@ -140,7 +140,10 @@ void main() {
           name: 'Organizers',
           color: 0xFFA8407A,
           position: 1,
-          permissions: {TeamPermission.manageEvents, TeamPermission.manageChats},
+          permissions: {
+            TeamPermission.manageEvents,
+            TeamPermission.manageChats,
+          },
         ),
       },
       memberRoles: const {
@@ -256,7 +259,11 @@ void main() {
     ];
     final posts = FakeUserPostRepository();
     final auth = FakeAuthRepository(user: testUser);
-    appRouter = router(auth, FakePersonalDetailsRepository());
+    appRouter = router(
+      auth,
+      FakePersonalDetailsRepository(),
+      FakeAgreementRepository(),
+    );
     await tester.pumpWidget(
       RepaintBoundary(
         key: shot,

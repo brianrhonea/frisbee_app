@@ -12,6 +12,7 @@ import '../data/services/device_permissions.dart';
 import '../data/services/callable_client.dart';
 import '../data/repositories/auth/auth_repository.dart';
 import '../data/repositories/auth/auth_repository_firebase.dart';
+import '../data/repositories/agreement/agreement_repository.dart';
 import '../data/repositories/personal/personal_repository.dart';
 import '../data/repositories/payment/payment_repository.dart';
 import '../data/repositories/payment/payment_repository_api.dart';
@@ -81,6 +82,7 @@ import '../data/services/youtube_info_service.dart';
 import '../firebase_options.dart';
 import '../data/repositories/moderation/moderation_repository.dart';
 import '../data/repositories/moderation/moderation_repository_api.dart';
+import '../data/repositories/tournament_chat/tournament_chat_repository.dart';
 
 /// Services and repositories backed by Firebase.
 List<SingleChildWidget> get firebaseProviders => [
@@ -134,8 +136,18 @@ List<SingleChildWidget> get firebaseProviders => [
   Provider<CalendarRepository>(
     create: (context) => CalendarRepositoryApi(api: context.read<ApiClient?>()),
   ),
+  Provider<TournamentChatRepository>(
+    create: (context) =>
+        TournamentChatRepositoryApi(api: context.read<ApiClient?>()),
+  ),
   Provider<PaymentRepository>(
     create: (context) => PaymentRepositoryApi(api: context.read<ApiClient?>()),
+  ),
+  ChangeNotifierProvider<AgreementRepository>(
+    create: (context) => AgreementRepositoryApi(
+      api: context.read<ApiClient?>(),
+      auth: context.read<AuthRepository>(),
+    ),
   ),
   ChangeNotifierProvider<PersonalDetailsRepository>(
     create: (context) => PersonalDetailsRepositoryApi(

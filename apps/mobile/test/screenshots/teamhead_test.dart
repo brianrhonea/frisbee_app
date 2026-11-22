@@ -279,7 +279,11 @@ void main() {
     ];
     final posts = FakeUserPostRepository();
     final auth = FakeAuthRepository(user: testUser);
-    appRouter = router(auth, FakePersonalDetailsRepository());
+    appRouter = router(
+      auth,
+      FakePersonalDetailsRepository(),
+      FakeAgreementRepository(),
+    );
     await tester.pumpWidget(
       RepaintBoundary(
         key: shot,

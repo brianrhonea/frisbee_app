@@ -21,6 +21,7 @@ import '../../../data/repositories/payment/payment_repository.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 import '../../follow/view_models/follow_viewmodel.dart';
+import '../../../data/repositories/tournament_chat/tournament_chat_repository.dart';
 
 typedef HostedScore = ({String gameId, int scoreA, int scoreB});
 typedef EntryApplication = ({
@@ -72,9 +73,11 @@ class HostedTournamentViewModel extends ChangeNotifier {
     FollowRepository? followRepository,
     NotificationRepository? notificationRepository,
     PaymentRepository? paymentRepository,
+    TournamentChatRepository? chatRepository,
     DateTime Function()? now,
   }) : _repo = tournamentRepository,
        _paymentsApi = paymentRepository,
+       _chats = chatRepository,
        _teams = teamRepository,
        _posts = postRepository,
        _now = now ?? DateTime.now,
@@ -102,6 +105,7 @@ class HostedTournamentViewModel extends ChangeNotifier {
     setPaymentNote = Command1<void, ({String teamId, String note})>(
       _setPaymentNote,
     );
+    openChat = Command1<String, String?>(_openChat);
     saveSeeds = Command1<void, List<String>>(_saveSeeds);
     publish = Command0<void>(_publish);
     report = Command1<void, HostedScore>(_report);
@@ -176,6 +180,53 @@ class HostedTournamentViewModel extends ChangeNotifier {
   List<TournamentEntry> _entries = const [];
   Map<String, EntryPayment> _payments = const {};
   final PaymentRepository? _paymentsApi;
+  final TournamentChatRepository? _chats;
+
+  /// Opens a chat with the organizers and returns its conversation: the
+  /// Captains' channel (null), or a team's thread ([teamId]).
+  late final Command1<String, String?> openChat;
+
+  Future<Result<String>> _openChat(String? teamId) {
+    final chats = _chats;
+    if (chats == null) {
+      return Future.value(
+        Result.error(Exception("Chats aren't available in this build.")),
+      );
+    }
+    return teamId == null
+        ? chats.openCaptains(tournamentId)
+        : chats.openTeam(tournamentId, teamId);
+  }
+
+  /// Entries the user is a captain of (an admin of the team, or one of its
+  /// listed captains) that are in: applied, accepted or waitlisted
+  /// (tournamentChatStatuses). Their captains are in the chats with the
+  /// organizers; invited teams aren't until they apply.
+  List<TournamentEntry> get myChatEntries => [
+    for (final e in _entries)
+      if (_chatStatuses.contains(e.status) &&
+          (myAdminTeams.any((t) => t.id == e.teamId) ||
+              (e.captainIds.contains(_uid) &&
+                  _myTeams.any((t) => t.id == e.teamId))))
+        e,
+  ];
+
+  static const _chatStatuses = {
+    EntryStatus.applied,
+    EntryStatus.accepted,
+    EntryStatus.waitlisted,
+  };
+
+  /// Whether an entry's captains can message the organizers about it.
+  static bool inChats(TournamentEntry e) => _chatStatuses.contains(e.status);
+
+  /// Whether to show the chats with the organizers: the API is there, the
+  /// tournament is out, and the user organizes it or captains a team in it.
+  bool get offersChats =>
+      (_chats?.available ?? false) &&
+      (_tournament?.status ?? HostedStatus.draft) != HostedStatus.draft &&
+      (_tournament?.takesTeams ?? false) &&
+      (isManager || myChatEntries.isNotEmpty);
   List<Team> _myTeams = const [];
   List<TeamPost> _news = const [];
   String? _divisionId;

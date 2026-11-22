@@ -1,5 +1,5 @@
 "use client";
-import { minimumAge, nameMissing, type PersonalDetailsResponse, type PersonalDetailsStatus } from "@stall10/shared";
+import { type AgreementStatus, agreementPath, minimumAge, nameMissing, type PersonalDetailsResponse, type PersonalDetailsStatus } from "@stall10/shared";
 import type { User } from "firebase/auth";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -9,13 +9,14 @@ import { deleteOwnAccount } from "@/lib/firebase";
 import { useLiveDoc } from "@/lib/live";
 import { signupDraft } from "@/lib/signupDraft";
 import { useAuth } from "./AuthProvider";
+import { AgreeTerms } from "./AgreeTerms";
 import { PersonalDetailsForm } from "./PersonalDetailsForm";
 import "./member.css";
 import { SignUpSteps } from "./SignUpSteps";
 import { stepAsksName, UsernameStep, usernameStepCopy } from "./UsernameStep";
 
 /** Readable without finishing sign-up: the legal pages and help. */
-const open = ["/terms", "/privacy", "/cookies", "/help", "/about", "/delete-account", "/sign-in", "/sign-up"];
+const open = ["/terms", "/privacy", "/cookies", "/guidelines", "/help", "/about", "/delete-account", "/sign-in", "/sign-up"];
 
 const Ctx = createContext<{ status: PersonalDetailsStatus | null; refresh: () => void }>({
   status: null,
@@ -45,6 +46,8 @@ export function PersonalGate({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const path = usePathname();
   const [status, setStatus] = useState<PersonalDetailsStatus | null>(null);
+  // The Community Guidelines and Terms: null while unknown (nobody waits).
+  const [agreed, setAgreed] = useState<boolean | null>(null);
   const [hidePrompt, setHidePrompt] = useState(false);
   // Under 13: the account is removed and signed out, and this stays up.
   const [tooYoung, setTooYoung] = useState<"removing" | "removed" | null>(null);
@@ -66,10 +69,18 @@ export function PersonalGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     latest.current += 1;
     setStatus(null);
-    if (user) {
-      setHidePrompt(dismissed(user.uid));
-      load(user);
-    }
+    setAgreed(null);
+    if (!user) return;
+    setHidePrompt(dismissed(user.uid));
+    load(user);
+    let live = true;
+    callApi<AgreementStatus>(user, agreementPath).then(
+      (a) => live && setAgreed(a.agreed),
+      () => live && setAgreed(null),
+    );
+    return () => {
+      live = false;
+    };
   }, [user, load]);
 
   const refresh = useCallback(() => {
@@ -108,6 +119,8 @@ export function PersonalGate({ children }: { children: ReactNode }) {
         </div>
       ) : (needsUsername || needsName) && !openPath && user ? (
         <NameStep user={user} needsUsername={needsUsername} onDone={() => setNamed((n) => n + 1)} />
+      ) : agreed === false && !openPath && user ? (
+        <AgreeTerms user={user} onDone={() => setAgreed(true)} />
       ) : blocked && user ? (
         <FinishSignUp
           user={user}
