@@ -31,8 +31,8 @@ enum ShellSection {
   events('Schedule', 'Schedule', Icons.event_outlined, Icons.event),
   team('Teams', 'Teams', Icons.groups_outlined, Icons.groups_rounded),
   messages(
-    'Inbox',
-    'Inbox',
+    'Chats',
+    'Chats',
     Icons.chat_bubble_outline_rounded,
     Icons.chat_bubble_rounded,
   ),
@@ -220,7 +220,7 @@ List<Crumb> breadcrumbs(String path, String? Function(String id) teamName) {
     'explore' => [explore],
     'players' => [explore, here('Player')],
     'rankings' => [explore, here('Rankings')],
-    'messages' => [(label: 'Inbox', path: Routes.messages)],
+    'messages' => [(label: 'Chats', path: Routes.messages)],
     'profile' => [
       (label: 'My profile', path: Routes.profile),
       if (parts.length > 1) here(_capitalize(parts[1])),

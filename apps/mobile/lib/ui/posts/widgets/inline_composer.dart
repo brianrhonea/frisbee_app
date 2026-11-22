@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import 'add_photos_button.dart';
+import '../../../domain/models/post_prompts.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/workout.dart';
 import '../../../utils/result.dart';
+import '../../../routing/routes.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/layout.dart';
@@ -16,7 +19,8 @@ import '../view_models/inline_composer_viewmodel.dart';
 /// type and tap Post. The tools under the box add to the same box: Photo
 /// shows the picked photos under the text, Workout the workout's fields.
 /// There's no link tool: web addresses typed or pasted in the text show as
-/// links. With teams to post to, "To" picks
+/// links. The header shows who's posting (the avatar opens their profile)
+/// and, with teams to post to, "Posting to" picks
 /// Everyone or a team, whose post adds a title, a place and Public. The
 /// draft lives in [viewModel], so it outlasts this widget.
 class InlineComposer extends StatefulWidget {
@@ -37,6 +41,10 @@ class InlineComposer extends StatefulWidget {
   State<InlineComposer> createState() => _InlineComposerState();
 }
 
+/// Which prompt the next composer shows (in memory: it goes round within a
+/// session).
+int _promptTurn = 0;
+
 class _InlineComposerState extends State<InlineComposer> {
   InlineComposerViewModel get vm => widget.viewModel;
 
@@ -46,6 +54,9 @@ class _InlineComposerState extends State<InlineComposer> {
   final _bodyFocus = FocusNode();
   final _workoutKey = GlobalKey();
   final _photosKey = GlobalKey();
+
+  /// The empty body's hint: the next of [postPrompts] each time it opens.
+  final _prompt = postPrompt(_promptTurn++);
 
   @override
   void initState() {
@@ -140,87 +151,130 @@ class _InlineComposerState extends State<InlineComposer> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Header: who's posting (the avatar opens their profile) and
+              // who to.
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: PersonAvatar(
-                        name: widget.name,
-                        photoUrl: widget.photoUrl,
-                        radius: 18,
+                    Semantics(
+                      button: true,
+                      label: 'Your profile',
+                      child: InkWell(
+                        key: const Key('composer-avatar'),
+                        customBorder: const CircleBorder(),
+                        onTap: () => context.go(Routes.profile),
+                        child: PersonAvatar(
+                          name: widget.name,
+                          photoUrl: widget.photoUrl,
+                          radius: 20,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (vm.audiences.isNotEmpty)
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: _AudienceChip(
-                                teams: vm.audiences,
-                                selected: team,
-                                enabled: !vm.post.running,
-                                onPick: vm.pickAudience,
-                              ),
-                            ),
-                          if (team != null)
-                            TextField(
-                              controller: _title,
-                              maxLength: 100,
-                              textCapitalization: TextCapitalization.sentences,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                              ),
-                              decoration: field.copyWith(
-                                hintText: 'Title (optional)',
-                                counterText: '',
-                              ),
-                            ),
-                          TextField(
-                            controller: _body,
-                            focusNode: _bodyFocus,
-                            minLines: 1,
-                            maxLines: 8,
-                            keyboardType: TextInputType.multiline,
-                            textCapitalization: TextCapitalization.sentences,
-                            // Keeps the tools and Post above the keyboard.
-                            scrollPadding: const EdgeInsets.only(
-                              top: 20,
-                              bottom: 140,
-                            ),
-                            decoration: field.copyWith(
-                              hintText: team != null
-                                  ? "What's the news for ${team.name}?"
-                                  : vm.workout != null
-                                  ? 'How did it go? (optional)'
-                                  : "What's happening on your sideline?",
+                          Text(
+                            widget.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14.5,
                             ),
                           ),
-                          if (team != null)
-                            TextField(
-                              controller: _place,
-                              maxLength: 200,
-                              decoration: field.copyWith(
-                                hintText: 'Where (optional)',
-                                counterText: '',
-                                prefixIcon: Icon(
-                                  Icons.place_outlined,
-                                  size: 18,
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Text(
+                                'Posting to ',
+                                style: TextStyle(
+                                  fontSize: 12.5,
                                   color: c.muted,
                                 ),
-                                prefixIconConstraints: const BoxConstraints(
-                                  minWidth: 26,
-                                ),
                               ),
-                            ),
+                              if (vm.audiences.isNotEmpty)
+                                Flexible(
+                                  child: _AudienceChip(
+                                    teams: vm.audiences,
+                                    selected: team,
+                                    enabled: !vm.post.running,
+                                    onPick: vm.pickAudience,
+                                  ),
+                                )
+                              else
+                                const Text(
+                                  'Everyone',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
+                  ],
+                ),
+              ),
+              // Body: the post itself.
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (team != null)
+                      TextField(
+                        controller: _title,
+                        maxLength: 100,
+                        textCapitalization: TextCapitalization.sentences,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                        decoration: field.copyWith(
+                          hintText: 'Title (optional)',
+                          counterText: '',
+                        ),
+                      ),
+                    TextField(
+                      key: const Key('composer-body'),
+                      controller: _body,
+                      focusNode: _bodyFocus,
+                      minLines: 2,
+                      maxLines: 8,
+                      keyboardType: TextInputType.multiline,
+                      textCapitalization: TextCapitalization.sentences,
+                      // Keeps the tools and Send above the keyboard.
+                      scrollPadding: const EdgeInsets.only(
+                        top: 20,
+                        bottom: 140,
+                      ),
+                      decoration: field.copyWith(
+                        hintText: team != null
+                            ? "What's the news for ${team.name}?"
+                            : vm.workout != null
+                            ? 'How did it go? (optional)'
+                            : _prompt,
+                      ),
+                    ),
+                    if (team != null)
+                      TextField(
+                        controller: _place,
+                        maxLength: 200,
+                        decoration: field.copyWith(
+                          hintText: 'Where (optional)',
+                          counterText: '',
+                          prefixIcon: Icon(
+                            Icons.place_outlined,
+                            size: 18,
+                            color: c.muted,
+                          ),
+                          prefixIconConstraints: const BoxConstraints(
+                            minWidth: 26,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -311,7 +365,7 @@ class _InlineComposerState extends State<InlineComposer> {
                             }
                           : null,
                       icon: const Icon(Icons.send, size: 16),
-                      label: const Text('Post'),
+                      label: const Text('Send'),
                     ),
                   ],
                 ),
@@ -420,7 +474,7 @@ class _InlineComposerState extends State<InlineComposer> {
   }
 }
 
-/// "To: Everyone ▾": who the post goes to, from a menu.
+/// "Everyone ▾", after "Posting to": who the post goes to, from a menu.
 class _AudienceChip extends StatelessWidget {
   const _AudienceChip({
     required this.teams,
@@ -480,9 +534,7 @@ class _AudienceChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('To ', style: TextStyle(fontSize: 12.5, color: c.muted)),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 180),
+            Flexible(
               child: Text(
                 selected?.name ?? 'Everyone',
                 overflow: TextOverflow.ellipsis,

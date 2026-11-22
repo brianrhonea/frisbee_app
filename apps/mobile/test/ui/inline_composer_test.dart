@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frisbee_app/routing/routes.dart';
+import 'package:frisbee_app/domain/models/post_prompts.dart';
+import 'package:go_router/go_router.dart';
 import 'package:frisbee_app/data/services/image_compressor.dart';
 import 'package:frisbee_app/domain/models/follow.dart';
 import 'package:frisbee_app/domain/models/team.dart';
@@ -273,9 +276,50 @@ void main() {
       return vm;
     }
 
-    Finder postButton() => find.widgetWithText(FilledButton, 'Post');
+    Finder postButton() => find.widgetWithText(FilledButton, 'Send');
     bool postEnabled(WidgetTester tester) =>
         tester.widget<FilledButton>(postButton()).onPressed != null;
+
+    testWidgets('header: who is posting, to whom; the avatar opens the '
+        'profile; the hint is a prompt', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final vm = build();
+      final router = GoRouter(
+        initialLocation: '/home',
+        routes: [
+          GoRoute(
+            path: '/home',
+            builder: (_, _) => Scaffold(
+              body: ListView(
+                children: [InlineComposer(viewModel: vm, name: 'Alex')],
+              ),
+            ),
+          ),
+          GoRoute(
+            path: Routes.profile,
+            builder: (_, _) => const Text('My profile'),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        MaterialApp.router(theme: AppTheme.light, routerConfig: router),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Alex'), findsOneWidget);
+      expect(find.text('Posting to '), findsOneWidget);
+      expect(find.text('Everyone'), findsOneWidget);
+      final hint = tester
+          .widget<TextField>(find.byType(TextField).first)
+          .decoration!
+          .hintText;
+      expect(postPrompts, contains(hint));
+      await tester.tap(find.byKey(const Key('composer-avatar')));
+      await tester.pumpAndSettle();
+      expect(find.text('My profile'), findsOneWidget);
+    });
 
     testWidgets('typing enables Post; posting clears the box', (tester) async {
       final vm = await pump(tester);
@@ -445,7 +489,7 @@ void main() {
       addTearDown(tester.view.resetViewInsets);
       await tester.enterText(find.byType(TextField), 'Line one');
       await tester.pumpAndSettle();
-      final post = tester.getRect(find.widgetWithText(FilledButton, 'Post'));
+      final post = tester.getRect(find.widgetWithText(FilledButton, 'Send'));
       expect(post.bottom, lessThanOrEqualTo(844 - 300));
       expect(post.top, greaterThanOrEqualTo(0));
     });

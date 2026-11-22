@@ -37,7 +37,7 @@ void main() {
             ),
           )
           ..email = 'pat@x.test'
-      ..signUpBirthDate = birth
+          ..signUpBirthDate = birth
           ..savedSignUpBirthDate = savedBirth
           ..failLoad = offline;
     final vm = PersonalDetailsViewModel(

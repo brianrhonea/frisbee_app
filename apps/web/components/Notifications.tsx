@@ -1,7 +1,8 @@
 "use client";
-import { webRoute } from "@stall10/shared";
+import { webParent, webRoute } from "@stall10/shared";
 import { limit, orderBy, where } from "firebase/firestore";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { callApi } from "@/lib/client";
 import { type Doc, useLiveQuery } from "@/lib/live";
@@ -44,11 +45,18 @@ const filters = [
   ["social", "People"],
   ["posts", "Posts"],
   ["team", "Teams and events"],
-  ["messages", "Messages"],
 ] as const;
 type Filter = (typeof filters)[number][0];
 
+/**
+ * Messages (team chat and direct) push and show in Chats with its unread
+ * bubbles, never here; older entries from before are hidden too
+ * (NotificationCategory.isMessages in the app).
+ */
+const isMessages = (n: Notice) => n.category === "chat" || n.category === "directMessages";
+
 function inFilter(n: Notice, f: Filter) {
+  if (isMessages(n)) return false;
   const c = n.category ?? "teamActivity";
   switch (f) {
     case "all":
@@ -57,8 +65,6 @@ function inFilter(n: Notice, f: Filter) {
       return c === "social";
     case "posts":
       return c === "posts";
-    case "messages":
-      return c === "chat" || c === "directMessages";
     case "team":
       return ["teamActivity", "eventChanges", "eventReminders", "meetings"].includes(c);
   }
@@ -77,7 +83,7 @@ export function useUnreadCount(): number {
     [where("read", "==", false), limit(100)],
     "unread",
   );
-  return data?.length ?? 0;
+  return data?.filter((n) => !isMessages(n)).length ?? 0;
 }
 
 /**
@@ -189,6 +195,11 @@ export function Notifications() {
 
 function NoticeRow({ n, onOpen, onClear }: { n: Doc<Notice>; onOpen: () => void; onClear: () => void }) {
   const to = href(n);
+  const router = useRouter();
+  // Back from the page goes to the page it belongs under (a team chat to
+  // its team, a conversation to Chats), not back here: this list's place
+  // in the history becomes that page (openFromNotifications in the app).
+  const parent = to ? webParent(to) : null;
   const title = (
     <>
       <b>{n.title || "Stall 10"}</b>
@@ -207,7 +218,17 @@ function NoticeRow({ n, onOpen, onClear }: { n: Doc<Notice>; onOpen: () => void;
         <span className="notice-dot" aria-hidden="true" />
       )}
       {to ? (
-        <Link href={to} className="notice-main" onClick={onOpen}>
+        <Link
+          href={to}
+          className="notice-main"
+          onClick={(e) => {
+            onOpen();
+            if (!parent || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+            e.preventDefault();
+            router.replace(parent);
+            router.push(to);
+          }}
+        >
           {title}
         </Link>
       ) : (

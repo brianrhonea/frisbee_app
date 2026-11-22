@@ -1,6 +1,6 @@
 "use client";
 import { MuteButton } from "./MuteButton";
-import { directConversationId, groupSizeMax, type GroupAddedResult, typingFreshMs } from "@stall10/shared";
+import { directConversationId, groupSizeMax, mutedConversationKey, type GroupAddedResult, typingFreshMs } from "@stall10/shared";
 import { where } from "firebase/firestore";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -22,31 +22,10 @@ import { loadAtTop, OlderMessages } from "./OlderMessages";
 import { type PickedPerson, PersonPicker } from "./PersonPicker";
 import { isTyping, validId } from "@/lib/text";
 import { useTeamChats } from "./useTeamChats";
+import { useMutedRooms } from "./useUnreadChats";
+import { type Conversation, describe, isGroup, type Mine, ms } from "./conversations";
 import "./member.css";
 
-/** conversations/{id} (Conversation in the app). */
-interface Conversation {
-  /** "tournament": a hosted tournament's chat with its organizers, run by the server (no add, leave or rename). */
-  kind?: "direct" | "group" | "tournament";
-  /** For a tournament chat: the hosted tournament. */
-  tournamentId?: string;
-  name?: string;
-  createdBy?: string;
-  participants?: string[];
-  names?: Record<string, string>;
-  lastMessage?: string;
-  lastMessageAt?: string | null;
-  lastSenderId?: string;
-  readAt?: Record<string, string>;
-  status?: "accepted" | "request" | "declined";
-  requestedOf?: string;
-}
-/** users/{uid}/dmReads/{id}: the member's own read time, archive and clear. */
-interface Mine {
-  readAt?: string;
-  archivedAt?: string;
-  clearedAt?: string;
-}
 interface Message {
   authorId?: string;
   authorName?: string;
@@ -61,37 +40,6 @@ const views = ["inbox", "requests", "archived"] as const;
 type View = (typeof views)[number];
 /** Conversations per page (no index orders them by last message, so "More conversations" reads the next page). */
 const conversationPage = 200;
-const ms = (iso?: string | null) => (iso ? Date.parse(iso) : Number.NaN);
-const isGroup = (c: Doc<Conversation>) => c.kind === "group" || c.id.startsWith("g-");
-
-/** The model's rules (Conversation in the app), for the signed-in [me]. */
-function describe(c: Doc<Conversation>, mine: Mine | undefined, me: string) {
-  const last = ms(c.lastMessageAt);
-  const quietSince = (at?: string) => !!at && (Number.isNaN(last) || last <= ms(at));
-  const requestForMe = c.status === "request" && c.requestedOf === me;
-  const declinedByMe = c.status === "declined" && c.requestedOf === me;
-  const archived = quietSince(mine?.archivedAt);
-  const cleared = quietSince(mine?.clearedAt);
-  const listed = !Number.isNaN(last) || isGroup(c);
-  const shared = ms(c.readAt?.[me]);
-  const own = ms(mine?.readAt);
-  const read = Math.max(Number.isNaN(shared) ? 0 : shared, Number.isNaN(own) ? 0 : own);
-  const unread = !Number.isNaN(last) && !!c.lastSenderId && c.lastSenderId !== me && read < last;
-  const others = (c.participants ?? []).filter((u) => u !== me);
-  const title = isGroup(c) ? c.name || "Group" : c.names?.[others[0] ?? ""] || "Player";
-  return {
-    title,
-    others,
-    requestForMe,
-    pendingFromMe: c.status !== "accepted" && !!c.requestedOf && c.requestedOf !== me,
-    inInbox: listed && !requestForMe && !declinedByMe && !archived && !cleared,
-    inRequests: requestForMe && listed,
-    inArchive: archived && !cleared,
-    unread: unread && !cleared,
-    seen: c.lastSenderId === me && others.length === 1 && !Number.isNaN(last) && ms(c.readAt?.[others[0]!]) >= last,
-  };
-}
-
 /**
  * Messages, like a desktop mail client: the inbox (or requests, or
  * archived) down the left, the open conversation (?c=) beside it. The
@@ -139,6 +87,8 @@ export function Messages() {
   const requests = all.filter(({ c, d }) => d.inRequests && !(!isGroup(c) && blocks.hides(d.others[0]))).length;
   const open = all.find(({ c }) => c.id === openId);
   const teamChats = useTeamChats(user?.uid);
+  // Muted conversations have no unread bubble, as on the Chats tab.
+  const muted = useMutedRooms(user?.uid);
   const shownTeams =
     view === "inbox" ? (teamChats.chats ?? []).filter((c) => !q || (c.team.name ?? "").toLowerCase().includes(q)) : [];
   const headed = shownTeams.length > 0 && shown.length > 0;
@@ -216,7 +166,7 @@ export function Messages() {
               href={`${pathname}?view=${v}`}
               scroll={false}
             >
-              {v === "inbox" ? "Inbox" : v === "requests" ? `Requests${requests ? ` (${requests})` : ""}` : "Archived"}
+              {v === "inbox" ? "Chats" : v === "requests" ? `Requests${requests ? ` (${requests})` : ""}` : "Archived"}
             </Link>
           ))}
         </div>
@@ -289,7 +239,7 @@ export function Messages() {
                   <small className="conv-time">
                     <LocalTime iso={c.lastMessageAt ?? undefined} style="relative" />
                   </small>
-                  {d.unread && <span className="notice-dot" aria-label="Unread" />}
+                  {d.unread && !muted.has(mutedConversationKey(c.id)) && <span className="notice-dot" aria-label="Unread" />}
                 </Link>
               </li>
             ))}

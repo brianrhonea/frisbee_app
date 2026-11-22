@@ -9,6 +9,10 @@ abstract final class Routes {
   /// AuthRepository.needsUsername).
   static const chooseUsername = '/welcome/username';
 
+  /// Agreeing to the Community Guidelines and Terms (everyone, once per
+  /// version; after the username, before personal details).
+  static const agreeTerms = '/welcome/terms';
+
   /// The last step of signing up: personal details (new accounts).
   static const finishSignUp = '/welcome/details';
   static const home = '/home';

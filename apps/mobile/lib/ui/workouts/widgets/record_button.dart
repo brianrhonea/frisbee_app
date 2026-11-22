@@ -11,10 +11,18 @@ import '../../../utils/platform_support.dart';
 /// user can find their way back to it. Nothing on platforms that can't
 /// record.
 class RecordWorkoutButton extends StatelessWidget {
-  const RecordWorkoutButton({super.key, this.style, this.outlined = false});
+  const RecordWorkoutButton({
+    super.key,
+    this.style,
+    this.outlined = false,
+    this.chip = false,
+  });
 
   final ButtonStyle? style;
   final bool outlined;
+
+  /// A small action chip, beside other chips (a profile's Posts).
+  final bool chip;
 
   @override
   Widget build(BuildContext context) {
@@ -39,6 +47,14 @@ class RecordWorkoutButton extends StatelessWidget {
       color: active ? Theme.of(context).colorScheme.error : null,
     );
     void open() => context.push(Routes.recordWorkout);
+    if (chip) {
+      return ActionChip(
+        avatar: Icon(icon.icon, size: 16, color: icon.color),
+        label: Text(label),
+        visualDensity: VisualDensity.compact,
+        onPressed: open,
+      );
+    }
     return outlined
         ? OutlinedButton.icon(
             style: style,

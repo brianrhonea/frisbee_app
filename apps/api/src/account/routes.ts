@@ -14,6 +14,13 @@ export function accountRoutes(app: FastifyInstance, account: AccountService, rev
     await changed(req, caller.uid);
     return result;
   });
+  // The Community Guidelines and Terms (agreements.ts in packages/shared).
+  app.get("/v1/me/agreement", async (req, reply) =>
+    reply.header("cache-control", "private, no-store").send(await account.agreement(requireCaller(req))),
+  );
+  app.put("/v1/me/agreement", async (req, reply) =>
+    reply.header("cache-control", "private, no-store").send(await account.agree(requireCaller(req), req.body)),
+  );
   app.put("/v1/me/read-receipts", async (req, reply) => {
     await account.setReadReceipts(requireCaller(req), req.body);
     return reply.code(204).send();

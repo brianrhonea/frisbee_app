@@ -7,6 +7,16 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.42.0 — 2026-11-22
+
+With app 0.0.46 and web 0.55.0.
+
+- `GET` / `PUT /v1/me/agreement` (`account/`, `agreements.ts` in
+  packages/shared): whether the caller has agreed to the current
+  Community Guidelines and Terms (`termsVersion`), and recording that
+  they have (`users/{uid}.agreedTerms = {version, at}`). An old version
+  is refused (412). Both apps ask before anything else until it's yes.
+
 ## 0.41.0 — 2026-11-22
 
 With app 0.0.45 and web 0.54.0.

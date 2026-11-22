@@ -1,5 +1,5 @@
 "use client";
-import { type InboxRoom, teamChatSummary, type TeamChatSummary } from "@stall10/shared";
+import { type InboxRoom, mutedRoomKey, teamChatSummary, type TeamChatSummary } from "@stall10/shared";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
 import { firestoreDb } from "@/lib/firebase";
@@ -7,6 +7,7 @@ import { type Doc, plain, useLiveQuery } from "@/lib/live";
 import type { ManagedRoom } from "./team/ChatManager";
 import { memberViewer, type TeamDoc } from "./team/TeamContext";
 import { useMyTeams } from "./useMyTeams";
+import { useMutedRooms } from "./useUnreadChats";
 
 export type ChatRoomDoc = Doc<ManagedRoom & InboxRoom>;
 
@@ -31,6 +32,7 @@ export function useTeamChats(uid: string | null | undefined): { chats: TeamChat[
   const teams = useMyTeams(uid);
   const reads = useLiveQuery<{ rooms?: Record<string, string> }>(uid ? `users/${uid}/chatReads` : null, [], uid ?? "");
   const [rooms, setRooms] = useState<Record<string, ChatRoomDoc[]>>({});
+  const muted = useMutedRooms(uid);
 
   // Re-ask when the teams, or the member's roles on them, change.
   const key = (teams.data ?? [])
@@ -78,6 +80,7 @@ export function useTeamChats(uid: string | null | undefined): { chats: TeamChat[
       ...teamChatSummary(
         (rooms[team.id] ?? []).filter((r) => canReadRoom(team, uid, r)).sort(byPosition),
         readsByTeam.get(team.id) ?? {},
+        (roomId) => muted.has(mutedRoomKey(team.id, roomId)),
       ),
     }));
     const at = (iso: string | null) => (iso ? Date.parse(iso) : 0);
@@ -87,7 +90,7 @@ export function useTeamChats(uid: string | null | undefined): { chats: TeamChat[
         at(b.lastAt) - at(a.lastAt) ||
         (a.team.name ?? "").toLowerCase().localeCompare((b.team.name ?? "").toLowerCase()),
     );
-  }, [uid, teams.data, reads.data, rooms]);
+  }, [uid, teams.data, reads.data, rooms, muted]);
 
   return { chats, unread: chats?.filter((c) => c.unread.length > 0).length ?? 0 };
 }

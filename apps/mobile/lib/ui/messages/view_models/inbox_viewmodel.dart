@@ -135,6 +135,7 @@ class InboxViewModel extends ChangeNotifier {
     if (notificationRepository != null && uid.isNotEmpty) {
       _prefsSub = notificationRepository.watchPreferences(uid).listen((p) {
         _prefs = p;
+        _teamChats?.muted = p.mutedRooms;
         notifyListeners();
       }, onError: (Object _) {});
     }
@@ -259,9 +260,10 @@ class InboxViewModel extends ChangeNotifier {
     ];
   }
 
-  /// Unread conversations and team chats, for the Unread filter.
+  /// Unread conversations and team chats, for the Unread filter's count;
+  /// muted ones have no bubble, so they aren't counted.
   int get unreadCount =>
-      allItems.where((i) => i.unread).length + unreadTeamChats;
+      allItems.where((i) => i.unread && !i.muted).length + unreadTeamChats;
 
   String? _selectedKey;
 

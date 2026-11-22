@@ -1295,6 +1295,25 @@ Out of scope: payments, meeting recording, USA Ultimate data.
     `tournament_tag_fixtures.test.ts`, API `post_tags_events.test.ts`, app
     `test/shared_fixtures/tournament_tag_fixtures_test.dart`,
     `inline_composer_test.dart` and `shared_event_test.dart`.
+64. Agree to the Community Guidelines and Terms: [x] app; [x] website.
+    Every member, once per `termsVersion` (`agreements.ts` / `agreement.dart`),
+    after the username step and before About you
+    (`GET`/`PUT /v1/me/agreement`). Tests: API `account.test.ts`, shared
+    `agreement_fixtures.test.ts`, app `auth_redirect_test.dart`,
+    `agree_terms_test.dart` and `shared_fixtures/agreement_fixtures_test.dart`.
+65. Composer header, body and footer: [x] app; [x] website. Avatar (opens
+    the profile), name and "Posting to" with the audience; the post; the
+    tools and Send. Hint from `postPrompts`. Tests: app
+    `inline_composer_test.dart`, shared `post_prompts_fixtures.test.ts`.
+66. Chats, not Inbox; messages only in Chats: [x] app; [x] website.
+    Messages push but have no Notifications entry (functions `feed:
+    false`); the Chats tab's bubble leaves out muted conversations and
+    rooms, and muted rows show no unread dot. Tests: app `shell_test.dart`,
+    functions `notifications/model.test.ts`, shared
+    `team_chats_fixtures.test.ts`.
+67. Back from a notification goes to its parent page: [x] app; [x]
+    website (`openFromNotifications`; `webParent`). Tests: app
+    `open_link_test.dart`, shared `routes.test.ts`.
 
 Libraries the website may add (none today): a small data cache for API
 reads and mutations, the Firestore web SDK for listeners, and LiveKit's

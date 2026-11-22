@@ -1,4 +1,5 @@
 // The caller's name, pictures and notification settings, against fakes.
+import { termsVersion } from "@stall10/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
 import { FakeMediaStorage, FakeStore, FakeTeamRepository, FakeUsers, FakeVerifier } from "./fakes.js";
@@ -10,7 +11,7 @@ function setup() {
   const users = new FakeUsers();
   const media = new FakeMediaStorage();
   const app = buildApp({ verifier: new FakeVerifier(), users, teams: new FakeTeamRepository(), store, media, now: () => now });
-  const call = (method: "PUT" | "DELETE", url: string, body?: object, uid: string | null = "amy") =>
+  const call = (method: "GET" | "PUT" | "DELETE", url: string, body?: object, uid: string | null = "amy") =>
     app.inject({ method, url, ...(body && { payload: body }), headers: uid ? { authorization: `Bearer token:${uid}` } : {} });
   return { store, users, media, call };
 }
@@ -83,6 +84,29 @@ describe("read receipts", () => {
     expect((await s.call("PUT", "/v1/me/read-receipts", { on: false })).statusCode).toBe(204);
     expect(s.store.doc("users/amy")?.readReceipts).toBe(false);
     expect((await s.call("PUT", "/v1/me/read-receipts", { on: "no" })).statusCode).toBe(400);
+  });
+});
+
+describe("the Community Guidelines and Terms", () => {
+  it("records agreeing to the current version, and says so", async () => {
+    expect((await s.call("GET", "/v1/me/agreement")).json()).toEqual({ agreed: false, version: termsVersion });
+    const res = await s.call("PUT", "/v1/me/agreement", { version: termsVersion });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["cache-control"]).toBe("private, no-store");
+    expect(s.store.doc("users/amy")?.agreedTerms).toMatchObject({ version: termsVersion });
+    expect((await s.call("GET", "/v1/me/agreement")).json()).toEqual({ agreed: true, version: termsVersion });
+  });
+
+  it("refuses an old version, a bad body and no sign-in", async () => {
+    expect((await s.call("PUT", "/v1/me/agreement", { version: termsVersion + 1 })).statusCode).toBe(412);
+    expect((await s.call("PUT", "/v1/me/agreement", { version: "1" })).statusCode).toBe(400);
+    expect((await s.call("GET", "/v1/me/agreement", undefined, null)).statusCode).toBe(401);
+    expect(s.store.doc("users/amy")?.agreedTerms).toBeUndefined();
+  });
+
+  it("asks again when the version goes up", async () => {
+    s.store.put("users/amy", { agreedTerms: { version: termsVersion - 1 } });
+    expect((await s.call("GET", "/v1/me/agreement")).json().agreed).toBe(false);
   });
 });
 

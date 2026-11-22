@@ -9,6 +9,7 @@ import '../../../data/repositories/direct_message/direct_message_repository.dart
 import '../../../data/repositories/notification/notification_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
 import '../../../domain/models/app_user.dart';
+import '../../../domain/models/direct_message.dart';
 import '../../../domain/models/notification.dart';
 import '../../../domain/models/team.dart';
 import '../../../utils/command.dart';
@@ -49,15 +50,23 @@ class ShellViewModel extends ChangeNotifier {
       )
       ..add(
         directMessageRepository.watchConversations(uid).listen((c) {
-          final unread = c.where((c) => c.isUnread(uid)).length;
-          if (unread == _unreadMessages) return;
-          _unreadMessages = unread;
-          notifyListeners();
+          _conversations = c;
+          _countMessages(uid);
+        }, onError: (Object _) {}),
+      )
+      ..add(
+        notificationRepository.watchPreferences(uid).listen((p) {
+          _muted = p.mutedRooms;
+          _teamChats?.muted = _muted;
+          _countMessages(uid);
         }, onError: (Object _) {}),
       )
       ..add(
         notificationRepository.watchFeed(uid).listen((n) {
-          final unread = n.where((n) => !n.read).length;
+          // Messages are counted on the Chats tab, not the bell.
+          final unread = n
+              .where((n) => !n.read && !n.category.isMessages)
+              .length;
           if (unread == _unreadNotifications) return;
           _unreadNotifications = unread;
           notifyListeners();
@@ -84,6 +93,23 @@ class ShellViewModel extends ChangeNotifier {
       _teams.where((t) => t.id == id).firstOrNull?.name;
 
   int _unreadMessages = 0;
+  List<Conversation> _conversations = const [];
+  Set<String> _muted = const {};
+
+  /// Unread conversations, leaving out muted ones: muting hides the bubble.
+  void _countMessages(String uid) {
+    final unread = _conversations
+        .where(
+          (c) =>
+              c.isUnread(uid) &&
+              !_muted.contains(NotificationPreferences.conversationKey(c.id)),
+        )
+        .length;
+    if (unread == _unreadMessages) return;
+    _unreadMessages = unread;
+    notifyListeners();
+  }
+
   TeamChatActivity? _teamChats;
   int _unreadTeamChats = 0;
 
@@ -94,8 +120,8 @@ class ShellViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Conversations and team chats with a message the user hasn't opened:
-  /// the Messages tab's badge.
+  /// Conversations and team chats with a message the user hasn't opened,
+  /// not counting muted ones: the Chats tab's badge.
   int get unreadMessages => _unreadMessages + _unreadTeamChats;
 
   int _unreadNotifications = 0;

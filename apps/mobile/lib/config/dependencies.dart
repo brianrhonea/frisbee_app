@@ -12,6 +12,7 @@ import '../data/services/device_permissions.dart';
 import '../data/services/callable_client.dart';
 import '../data/repositories/auth/auth_repository.dart';
 import '../data/repositories/auth/auth_repository_firebase.dart';
+import '../data/repositories/agreement/agreement_repository.dart';
 import '../data/repositories/personal/personal_repository.dart';
 import '../data/repositories/payment/payment_repository.dart';
 import '../data/repositories/payment/payment_repository_api.dart';
@@ -141,6 +142,12 @@ List<SingleChildWidget> get firebaseProviders => [
   ),
   Provider<PaymentRepository>(
     create: (context) => PaymentRepositoryApi(api: context.read<ApiClient?>()),
+  ),
+  ChangeNotifierProvider<AgreementRepository>(
+    create: (context) => AgreementRepositoryApi(
+      api: context.read<ApiClient?>(),
+      auth: context.read<AuthRepository>(),
+    ),
   ),
   ChangeNotifierProvider<PersonalDetailsRepository>(
     create: (context) => PersonalDetailsRepositoryApi(

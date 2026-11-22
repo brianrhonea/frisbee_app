@@ -22,6 +22,11 @@ hat tournaments) or a **school or club** (holds several teams).
      Apple when they share it; Apple lets you hide it), which is the name
      on your profile, posts and team rosters, and a username suggested
      from your name until you change it.
+   - Then **Before you start**: a short summary of the Community
+     Guidelines, with links to them, the Terms of Service and the Privacy
+     Policy. Tick **I've read and agree** and tap **Continue**. Members
+     who joined before this step see it once, the next time they open
+     Stall 10, and everyone sees it again if the terms change.
    - Then **About you**: your legal name (started from the name you just
      gave), date of birth, gender, phone and address, and a parent or
      guardian under 18. Only you see these.
@@ -92,7 +97,7 @@ passes to another member, preferring one with Manage team.
 ## The tabs
 
 Five tabs, in this order on the app's bottom bar and the website's
-sidebar: **Home**, **Explore**, **Events**, **Teams** and **Messages**.
+sidebar: **Home**, **Discover**, **Schedule**, **Teams** and **Chats**.
 Your profile and settings open from your picture in the top corner, and
 notifications from the 🔔 beside it.
 
@@ -102,9 +107,11 @@ notifications from the 🔔 beside it.
   communities, and everything you follow), **Community** (everyone's
   public posts) and **Your teams** (your teams' posts). Newest first;
   pull down or tap Home again for the latest.
-- **Post box** at the top: type and tap **Post**. **Photos +**, **Workout**
-  and **Record** open inside the box. If you run a team, the **To** chip
-  posts to that team instead.
+- **Post box** at the top: your picture and name, with **Posting to**
+  underneath (tap your picture to open your profile). Type (the box
+  suggests something to post about) and tap **Send**. **Photo**,
+  **Workout** and **Record** open inside the box. If you run a team, tap
+  **Everyone** after "Posting to" to post to that team instead.
 - **Your teams** strip under the post box, with **New / Join**.
 - **Up next**: your next team or personal event.
 - **Get started** (new accounts): pick a username, join or create a
@@ -179,11 +186,19 @@ badge; **Clear all** (⋮ menu) removes them.
 **Follow requests** sits at the top of the list, with how many people
 are waiting: **Accept** or **Decline** each one.
 
+Messages aren't in this list: they show in **Chats**, with a bubble on
+the tab. You still get a push notification for each one (turn them off
+under **Team chat** and **Direct messages** in the settings).
+
+Tapping a notification opens its page; back goes to the page it belongs
+under, not back to the list: a team's chat goes back to the team, a
+conversation to Chats, a post to Home. A person or follow requests go
+back to the list.
+
 You're notified about:
 
-- **Team chat**: new messages in rooms you can read. Several messages in
-  one room fold into one notification.
-- **Direct messages**: new private messages.
+- **Team chat** (push only): new messages in rooms you can read.
+- **Direct messages** (push only): new private messages.
 - **Event changes**: team events added, moved, changed or cancelled (not
   RSVPs or reactions).
 - **Event reminders**: a reminder about a day before each team or personal
@@ -201,18 +216,20 @@ open, new ones also pop up as a small bubble at the top.
 Notifications):
 
 - **This device**: tap **Turn on** to get push notifications on your phone,
-  or tablet, even when Stall 10 is closed. Everything also shows under
-  the 🔔. Tapping one opens its page; back goes to where that page
-  belongs (Messages for a message, Home for a post).
+  or tablet, even when Stall 10 is closed. Everything but messages also
+  shows under the 🔔. Tapping one opens its page; back goes to where that
+  page belongs (Chats for a message, Home for a post).
 - **Notify me about**: turn each kind on or off for all your teams. Your
   choices apply on every device you use.
 - **Teams**: change any kind for one team, for example reminders only for
   your club team. **Use my defaults** undoes that.
-- To mute one chat room, open the room's **⋮** menu and tap **Mute notifications**.
+- To mute one chat room, open the room's **⋮** menu and tap **Mute
+  notifications**; to mute a conversation, use its menu in Chats. A muted
+  chat sends no notifications and shows no unread bubble.
 
-### Messages
+### Chats
 
-Open the **Messages** tab for all your chats. Your teams' and
+Open the **Chats** tab for all your chats. Your teams' and
 communities' chats are at the top: each shows which rooms have something
 new ("New in #general"), and a tap takes you straight into that room.
 Your private messages are below them. A badge shows how many chats have
@@ -224,7 +241,7 @@ something new.
   10 MB, the same as team chat. You can delete your own messages.
 - On a computer, conversations are listed on the left with the open one
   on the right. On a phone, a conversation opens full screen; the back
-  arrow returns to Messages.
+  arrow returns to Chats.
 - Press and hold a message to see when it was sent, and to react, reply,
   copy or delete it. On a phone, swipe a message's bubble to the right to
   reply, and drag the conversation to the left to see every message's
@@ -630,7 +647,11 @@ from the right (on a computer, as a panel; click outside to close it).
 - **People you follow**.
 - **Account**: change your **display name**; see your **@username** and
   **email**; **Change password** (or "Forgot it?" for a reset link); **Delete account** (it asks you to type DELETE and confirm
-  your password, or sign in with Google or Apple again).
+  your password, or sign in with Google or Apple again). It works the
+  same on the website (Settings → Account), so you don't need the app.
+- **Legal and your data** (app): the Privacy Policy, Terms of Service,
+  Community Guidelines and Delete account & data. The app sets no
+  cookies, so the Cookie Policy (about the website) is on the website.
 - **Sign out**, and the app version at the bottom.
 
 ## Privacy

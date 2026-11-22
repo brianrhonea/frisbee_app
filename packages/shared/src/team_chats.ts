@@ -39,9 +39,14 @@ export function roomUnread(room: InboxRoom, readAt?: string | null): boolean {
  * ([readable]) and their read times ([reads], room id → time). Checked on
  * fixtures/team_chats/summary.json, which the app writes.
  */
-export function teamChatSummary<R extends InboxRoom>(readable: R[], reads: Record<string, string | null | undefined>): TeamChatSummary<R> {
+export function teamChatSummary<R extends InboxRoom>(
+  readable: R[],
+  reads: Record<string, string | null | undefined>,
+  /** Muted rooms never count as unread: muting hides the bubble too. */
+  muted: (roomId: string) => boolean = () => false,
+): TeamChatSummary<R> {
   const rooms = readable.filter((r) => r.kind !== "voice");
-  const unread = rooms.filter((r) => roomUnread(r, reads[r.id])).sort((a, b) => time(b.lastAt) - time(a.lastAt));
+  const unread = rooms.filter((r) => roomUnread(r, reads[r.id]) && !muted(r.id)).sort((a, b) => time(b.lastAt) - time(a.lastAt));
   let newest: R | null = null;
   for (const r of rooms) {
     const at = time(r.lastAt);

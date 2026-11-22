@@ -260,24 +260,30 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
     final c = AppColors.of(context);
     return [
       if (vm.isMe)
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              FilledButton.icon(
-                onPressed: () => showPostComposer(context),
-                icon: const Icon(Icons.edit_outlined, size: 18),
-                label: const Text('New post'),
-              ),
-              OutlinedButton.icon(
-                onPressed: () => showPostComposer(context, workout: true),
-                icon: const Icon(Icons.directions_run, size: 18),
-                label: const Text('Log a workout'),
-              ),
-              const RecordWorkoutButton(outlined: true),
-            ],
+        // Small chips, not big buttons, with room before the posts.
+        Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ActionChip(
+                  avatar: const Icon(Icons.edit_outlined, size: 16),
+                  label: const Text('New post'),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => showPostComposer(context),
+                ),
+                ActionChip(
+                  avatar: const Icon(Icons.directions_run, size: 16),
+                  label: const Text('Log a workout'),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => showPostComposer(context, workout: true),
+                ),
+                const RecordWorkoutButton(chip: true),
+              ],
+            ),
           ),
         ),
       if (!vm.postsLoaded)
@@ -298,20 +304,23 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
         )
       else
         for (final p in vm.posts)
-          UserPostCard(
+          Padding(
             key: ValueKey(p.id),
-            post: p,
-            loadImage: vm.imageData,
-            onOpen: () => context.push(Routes.post(p.id)),
-            onEdit: vm.isMe
-                ? () => showPostComposer(context, postId: p.id)
-                : null,
-            onDelete: vm.isMe ? () => _deletePost(p.id) : null,
-            actions: vm.actions,
-            onRepost: switch (vm.actions) {
-              final a? => () => repostOrUndo(context, a, p),
-              null => null,
-            },
+            padding: const EdgeInsets.only(bottom: 12),
+            child: UserPostCard(
+              post: p,
+              loadImage: vm.imageData,
+              onOpen: () => context.push(Routes.post(p.id)),
+              onEdit: vm.isMe
+                  ? () => showPostComposer(context, postId: p.id)
+                  : null,
+              onDelete: vm.isMe ? () => _deletePost(p.id) : null,
+              actions: vm.actions,
+              onRepost: switch (vm.actions) {
+                final a? => () => repostOrUndo(context, a, p),
+                null => null,
+              },
+            ),
           ),
     ];
   }

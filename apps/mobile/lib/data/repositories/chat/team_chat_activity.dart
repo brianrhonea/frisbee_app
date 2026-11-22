@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../domain/models/chat.dart';
+import '../../../domain/models/notification.dart';
 import '../../../domain/models/team.dart';
 import '../team/team_repository.dart';
 import 'chat_repository.dart';
@@ -19,18 +20,24 @@ class TeamChatSummary {
 
   /// From the team's [rooms] the user can read ([readable]) and their
   /// read times ([reads], room id → time). Voice channels are left out.
+  ///
+  /// Rooms in [muted] (NotificationPreferences.roomKey) never count as
+  /// unread: muting a room hides its bubble as well as its notifications.
   factory TeamChatSummary.fromReadable(
     Team team,
     Iterable<ChatRoom> readable,
-    Map<String, DateTime> reads,
-  ) {
+    Map<String, DateTime> reads, {
+    Set<String> muted = const {},
+  }) {
     final rooms = [
       for (final r in readable)
         if (!r.isVoice) r,
     ];
     final unread = [
       for (final r in rooms)
-        if (r.unreadSince(reads[r.id])) r,
+        if (r.unreadSince(reads[r.id]) &&
+            !muted.contains(NotificationPreferences.roomKey(team.id, r.id)))
+          r,
     ]..sort((a, b) => b.lastAt!.compareTo(a.lastAt!));
     return TeamChatSummary(team: team, rooms: rooms, unreadRooms: unread);
   }
@@ -123,6 +130,16 @@ class TeamChatActivity extends ChangeNotifier {
 
   bool get loaded => _loaded;
 
+  Set<String> _muted = const {};
+
+  /// Muted rooms and conversations (NotificationPreferences.mutedRooms):
+  /// their unread messages don't count.
+  set muted(Set<String> keys) {
+    if (setEquals(keys, _muted)) return;
+    _muted = keys;
+    if (!_disposed) notifyListeners();
+  }
+
   void _onTeams(List<Team> teams) {
     _teams = teams;
     _loaded = true;
@@ -155,10 +172,15 @@ class TeamChatActivity extends ChangeNotifier {
     final out = <TeamChatSummary>[];
     for (final t in _teams) {
       out.add(
-        TeamChatSummary.fromReadable(t, [
-          for (final r in _rooms[t.id] ?? const <ChatRoom>[])
-            if (r.accessFor(t, uid).canRead) r,
-        ], _reads[t.id] ?? const {}),
+        TeamChatSummary.fromReadable(
+          t,
+          [
+            for (final r in _rooms[t.id] ?? const <ChatRoom>[])
+              if (r.accessFor(t, uid).canRead) r,
+          ],
+          _reads[t.id] ?? const {},
+          muted: _muted,
+        ),
       );
     }
     final epoch = DateTime.fromMillisecondsSinceEpoch(0);

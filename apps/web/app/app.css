@@ -1148,7 +1148,11 @@ a.play-card:hover { border-color: var(--accent); }
 .event-actions { display: flex; gap: 14px; margin-top: 4px; }
 .schedule-filter { margin-bottom: 12px; }
 .event-editor { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
-.form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 12px; align-items: end; }
+/* A label's text and its "(optional)" share one line, so the fields in a row line up. */
+.form-row > label { grid-template-columns: auto 1fr; column-gap: 0.35em; align-items: baseline; }
+.form-row > label > :not(small) { grid-column: 1 / -1; }
+.form-row > label > input, .form-row > label > select { min-width: 0; }
 /* Calendars (Schedule, Settings → Calendars). */
 .cal-dot { display: inline-block; width: 10px; height: 10px; border-radius: 999px; flex: none; margin-right: 8px; vertical-align: 0.05em; }
 .cal-list { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 6px; }
@@ -1699,3 +1703,18 @@ small.fee-note {
   font-weight: 400;
   line-height: 1.4;
 }
+/* Before you start: the Community Guidelines and Terms (AgreeTerms). */
+.agree-points { margin: 0 0 14px; padding-left: 20px; display: grid; gap: 8px; line-height: 1.5; }
+.agree-links { margin: 0 0 18px; color: var(--muted); }
+.auth-card .agree-check { display: flex; gap: 10px; align-items: flex-start; font-weight: 600; color: var(--ink); }
+.agree-check input { margin-top: 3px; width: 18px; height: 18px; flex: none; }
+/* Composer: header (avatar, who's posting, "Posting to"), body, footer (Send). */
+.composer-stacked { flex-direction: column; align-items: stretch; gap: 10px; }
+.composer-head { display: flex; align-items: center; gap: 12px; }
+.composer-avatar { border-radius: 999px; flex: none; }
+.composer-avatar:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.composer-who { display: grid; gap: 2px; min-width: 0; }
+.composer-who > b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.composer-to { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; color: var(--muted); font-size: 0.85rem; }
+.composer-to .audience-chip { margin-bottom: 0; }
+.composer-stacked .composer-bar { margin-left: 0; }

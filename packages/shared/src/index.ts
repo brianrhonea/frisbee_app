@@ -13,6 +13,8 @@ export * from "./follows.js";
 export * from "./tournament_chats.js";
 export * from "./roster.js";
 export * from "./personal.js";
+export * from "./agreements.js";
+export * from "./post_prompts.js";
 export * from "./messages.js";
 export * from "./calendar.js";
 export * from "./ical.js";

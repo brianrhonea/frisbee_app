@@ -5,6 +5,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/data/repositories/chat/team_chat_activity.dart';
 import 'package:frisbee_app/domain/models/chat.dart';
+import 'package:frisbee_app/domain/models/notification.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 
 import 'fixture_file.dart';
@@ -91,6 +92,15 @@ final _cases = <Map<String, Object?>>[
     'rooms': [_room('general', 'General', lastAt: _t1)],
     'reads': {'general': _t0},
   },
+  {
+    'name': 'a muted room is never unread',
+    'rooms': [
+      _room('general', 'General', lastAt: _t0),
+      _room('rides', 'Car Pool', lastAt: _t1),
+    ],
+    'reads': <String, Object?>{},
+    'muted': ['rides'],
+  },
 ];
 
 void main() {
@@ -102,7 +112,8 @@ void main() {
           'room is unread when lastAt is after its read time (or never '
           'read). `unread` is newest first; `open` is the room a tap opens '
           '(the only unread one, else the newest, else the first); '
-          '`subtitle` is what the row says.',
+          '`subtitle` is what the row says. Rooms in `muted` (room ids, '
+          'muted by the user) are never unread.',
       [
         for (final c in _cases)
           () {
@@ -121,7 +132,15 @@ void main() {
               for (final e in (c['reads']! as Map<String, Object?>).entries)
                 e.key: DateTime.parse(e.value! as String),
             };
-            final s = TeamChatSummary.fromReadable(_team, rooms, reads);
+            final s = TeamChatSummary.fromReadable(
+              _team,
+              rooms,
+              reads,
+              muted: {
+                for (final r in (c['muted'] as List<String>?) ?? const [])
+                  NotificationPreferences.roomKey(_team.id, r),
+              },
+            );
             return {
               ...c,
               'summary': {

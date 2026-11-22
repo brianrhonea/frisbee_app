@@ -50,7 +50,7 @@ class DirectChatScreen extends StatelessWidget {
             notificationRepository: c.read<NotificationRepository?>(),
           ),
           builder: (context, inbox) => Scaffold(
-            appBar: AppBar(title: const Text('Inbox')),
+            appBar: AppBar(title: const Text('Chats')),
             body: ChatSplit(
               list: InboxList(
                 viewModel: inbox,

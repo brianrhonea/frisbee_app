@@ -120,4 +120,53 @@ void main() {
       );
     });
   });
+
+  group('agreeing to the guidelines and terms', () {
+    String? go(
+      FakeAgreementRepository a,
+      String location, {
+      FakePersonalDetailsRepository? personal,
+      bool usernameMissing = false,
+    }) => authRedirect(
+      FakeAuthRepository(user: testUser)..usernameMissing = usernameMissing,
+      Uri.parse(location),
+      personal: personal,
+      agreement: a,
+    );
+
+    test('everyone agrees first, then carries on where they were going', () {
+      final a = FakeAgreementRepository(agreed: false);
+      expect(go(a, '/teams/t1'), '${Routes.agreeTerms}?from=%2Fteams%2Ft1');
+      expect(go(a, Routes.home), Routes.agreeTerms);
+      expect(go(a, Routes.agreeTerms), isNull);
+      a.agreed = true;
+      expect(go(a, '${Routes.agreeTerms}?from=/teams/t1'), '/teams/t1');
+      expect(go(a, Routes.agreeTerms), Routes.home);
+      expect(go(a, '/teams/t1'), isNull);
+    });
+
+    test('an unknown answer holds nobody up', () {
+      expect(go(FakeAgreementRepository(agreed: null), '/teams/t1'), isNull);
+    });
+
+    test('after the username, before personal details', () {
+      final a = FakeAgreementRepository(agreed: false);
+      expect(
+        go(a, '/teams/t1', usernameMissing: true),
+        '${Routes.chooseUsername}?from=%2Fteams%2Ft1',
+      );
+      final personal = FakePersonalDetailsRepository(
+        status: const PersonalDetailsStatus(complete: false, required: true),
+      );
+      expect(
+        go(a, '/teams/t1', personal: personal),
+        '${Routes.agreeTerms}?from=%2Fteams%2Ft1',
+      );
+      a.agreed = true;
+      expect(
+        go(a, '/teams/t1', personal: personal),
+        '${Routes.finishSignUp}?from=%2Fteams%2Ft1',
+      );
+    });
+  });
 }

@@ -226,7 +226,11 @@ void main() {
     seedLiveTournament(hosted, now: now, captains: [testUser.uid]);
 
     final auth = FakeAuthRepository(user: testUser);
-    appRouter = router(auth, FakePersonalDetailsRepository());
+    appRouter = router(
+      auth,
+      FakePersonalDetailsRepository(),
+      FakeAgreementRepository(),
+    );
     await tester.pumpWidget(
       RepaintBoundary(
         key: shot,

@@ -1,0 +1,65 @@
+{
+  "about": "The composer's empty-body hints, in order, and which one each turn shows (going round).",
+  "cases": [
+    {
+      "turn": 0,
+      "prompt": "What's happening on the field?",
+      "all": [
+        "What's happening on the field?",
+        "How did practice go?",
+        "Looking for a pickup game?",
+        "Share a highlight from your last game.",
+        "Got a question for other players?",
+        "What are you working on this week?"
+      ]
+    },
+    {
+      "turn": 1,
+      "prompt": "How did practice go?",
+      "all": [
+        "What's happening on the field?",
+        "How did practice go?",
+        "Looking for a pickup game?",
+        "Share a highlight from your last game.",
+        "Got a question for other players?",
+        "What are you working on this week?"
+      ]
+    },
+    {
+      "turn": 5,
+      "prompt": "What are you working on this week?",
+      "all": [
+        "What's happening on the field?",
+        "How did practice go?",
+        "Looking for a pickup game?",
+        "Share a highlight from your last game.",
+        "Got a question for other players?",
+        "What are you working on this week?"
+      ]
+    },
+    {
+      "turn": 6,
+      "prompt": "What's happening on the field?",
+      "all": [
+        "What's happening on the field?",
+        "How did practice go?",
+        "Looking for a pickup game?",
+        "Share a highlight from your last game.",
+        "Got a question for other players?",
+        "What are you working on this week?"
+      ]
+    },
+    {
+      "turn": 13,
+      "prompt": "How did practice go?",
+      "all": [
+        "What's happening on the field?",
+        "How did practice go?",
+        "Looking for a pickup game?",
+        "Share a highlight from your last game.",
+        "Got a question for other players?",
+        "What are you working on this week?"
+      ]
+    }
+  ]
+}

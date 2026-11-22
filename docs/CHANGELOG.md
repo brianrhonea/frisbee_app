@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.46  | 2026-11-22 | `feature/launch-fixes`                  |                     |
 | 0.0.45  | 2026-11-22 | `feature/tournament-fixes`              |                     |
 | 0.0.44  | 2026-11-21 | `feature/payments`                      |                     |
 | 0.0.43  | 2026-11-21 | `feature/report-block`                  |                     |
@@ -58,6 +59,40 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.46 — Agree to the guidelines, Chats, composer header
+
+With web 0.55.0 and API 0.42.0.
+
+- **Before you start** (`AgreementRepository`, `AgreeTermsScreen`,
+  `Routes.agreeTerms`): the router sends every member who hasn't agreed
+  to the current `termsVersion` (`domain/models/agreement.dart`, fixtures
+  in `packages/shared/fixtures/agreements`) there after the username
+  step and before personal details. Unknown (no API, offline) holds
+  nobody up.
+- Settings → Legal and your data: Community Guidelines instead of the
+  Cookie Policy (`LegalLinks.guidelines`); the app sets no cookies.
+- Composer: header (avatar → `Routes.profile`, name, "Posting to" and the
+  audience chip), body, footer with **Send**. The hint goes round
+  `postPrompts` (`domain/models/post_prompts.dart`, fixtures in
+  `packages/shared/fixtures/post_prompts`).
+- The Inbox tab is **Chats**.
+- Messages are push only: `chatNotice` and `directMessageNotice` set
+  `feed: false` (functions `notifications`), so they no longer write a
+  Notifications entry; older entries are hidden
+  (`NotificationCategory.isMessages`) and the bell doesn't count them.
+  Message requests keep their folded entry, hidden the same way.
+- Mute hides the bubble: the Chats badge (`ShellViewModel`), the list's
+  unread count and dots leave out muted conversations, and
+  `TeamChatActivity.muted` / `TeamChatSummary.fromReadable(muted:)` muted
+  rooms (fixture case in `team_chats/summary.json`).
+- Notifications open with `openFromNotifications`: back goes to the page
+  it belongs under (a team chat to its team, a conversation to Chats);
+  people and follow requests still come back to the list.
+- Profile → Posts: New post, Log a workout and Record are small action
+  chips (`RecordWorkoutButton(chip:)`), with space before the posts and
+  between them.
+- Functions: `notifications` (push-only messages).
 
 ## 0.0.45 — Captains' channel, tournament tags
 

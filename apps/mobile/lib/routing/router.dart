@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../data/repositories/auth/auth_repository.dart';
+import '../data/repositories/agreement/agreement_repository.dart';
 import '../data/repositories/personal/personal_repository.dart';
 import '../domain/models/model_utils.dart';
 import '../domain/models/team.dart';
@@ -99,12 +100,13 @@ final _rootKey = GlobalKey<NavigatorState>();
 GoRouter router(
   AuthRepository auth,
   PersonalDetailsRepository personal,
+  AgreementRepository agreement,
 ) => GoRouter(
   navigatorKey: _rootKey,
   initialLocation: Routes.home,
-  refreshListenable: Listenable.merge([auth, personal]),
+  refreshListenable: Listenable.merge([auth, personal, agreement]),
   redirect: (context, state) =>
-      authRedirect(auth, state.uri, personal: personal),
+      authRedirect(auth, state.uri, personal: personal, agreement: agreement),
   routes: [
     GoRoute(
       path: splashPath,
@@ -115,6 +117,7 @@ GoRouter router(
       path: Routes.chooseUsername,
       builder: (_, _) => chooseUsernamePage(),
     ),
+    GoRoute(path: Routes.agreeTerms, builder: (_, _) => agreeTermsPage()),
     GoRoute(
       path: Routes.finishSignUp,
       builder: (_, _) => personalDetailsPage(finishing: true),
@@ -1074,6 +1077,7 @@ String? authRedirect(
   AuthRepository auth,
   Uri uri, {
   PersonalDetailsRepository? personal,
+  AgreementRepository? agreement,
 }) {
   final path = uri.path;
   final from = uri.queryParameters['from'];
@@ -1111,6 +1115,20 @@ String? authRedirect(
     ).toString();
   }
   if (choosing) return from ?? Routes.home;
+  // Everyone agrees to the Community Guidelines and Terms (again when they
+  // change). Only on a definite "not yet"; while unknown nobody waits.
+  final agreeing = path == Routes.agreeTerms;
+  if (agreement?.mustAgree ?? false) {
+    if (agreeing) return null;
+    final target = public || path == splashPath ? from : uri.toString();
+    return Uri(
+      path: Routes.agreeTerms,
+      queryParameters: target == null || target == Routes.home
+          ? null
+          : {'from': target},
+    ).toString();
+  }
+  if (agreeing) return from ?? Routes.home;
   // A new account without personal details: those next. Only on a definite
   // "required and missing"; while it's unknown nobody is held up.
   final finishing = path == Routes.finishSignUp;

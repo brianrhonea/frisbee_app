@@ -678,7 +678,7 @@ void main() {
       expect(find.text('Thursday practice'), findsOneWidget);
       expect(find.text('Coming up'), findsOneWidget);
       expect(find.text('Add event'), findsOneWidget);
-      expect(find.text("What's happening on your sideline?"), findsOneWidget);
+      expect(find.byKey(const Key('composer-body')), findsOneWidget);
       await tester.scrollUntilVisible(
         find.text('Next stop: the postseason'),
         300,
@@ -698,7 +698,7 @@ void main() {
       await tester.pump();
       // Following has the teams' posts too, and the composer, but no strip.
       expect(find.text('Next stop: the postseason'), findsOneWidget);
-      expect(find.text("What's happening on your sideline?"), findsOneWidget);
+      expect(find.byKey(const Key('composer-body')), findsOneWidget);
       expect(find.text('New / Join'), findsNothing);
       expect(tester.takeException(), isNull);
     });
@@ -759,9 +759,9 @@ void main() {
     await tester.tap(feedTab('Following'));
     await tester.pumpAndSettle();
     expect(find.text('Half a thought'), findsOneWidget);
-    await tester.ensureVisible(find.widgetWithText(FilledButton, 'Post'));
+    await tester.ensureVisible(find.widgetWithText(FilledButton, 'Send'));
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Post'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Send'));
     await tester.pump();
     await tester.pump();
     expect(userPosts.posts.single.body, 'Half a thought');
@@ -786,9 +786,7 @@ void main() {
     await tester.pump();
 
     // What's up next sits in a right-hand column beside the feed.
-    final feed = tester.getTopLeft(
-      find.text("What's happening on your sideline?"),
-    );
+    final feed = tester.getTopLeft(find.byKey(const Key('composer-body')));
     final upNext = tester.getTopLeft(find.text('UP NEXT · NORTHSIDE FLYERS'));
     expect(upNext.dx, greaterThan(feed.dx + 400));
     expect(find.text('Coming up'), findsOneWidget);
@@ -832,7 +830,7 @@ void main() {
     expect(find.text('Pickup at the lake, all welcome'), findsOneWidget);
     expect(find.text('Zed Park'), findsOneWidget);
     // Not Your teams or Following: no composer.
-    expect(find.text("What's happening on your sideline?"), findsNothing);
+    expect(find.byKey(const Key('composer-body')), findsNothing);
 
     await tester.tap(find.byIcon(Icons.favorite_border));
     await tester.pump();
