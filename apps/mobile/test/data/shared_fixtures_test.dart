@@ -106,6 +106,28 @@ final _listingCases = <Map<String, Object?>>[
     },
   },
   {
+    'case': 'team that takes join requests (F26)',
+    'team': {
+      'name': 'Rival',
+      'division': 'open',
+      'level': 'college',
+      'city': 'Austin',
+      'ownerId': 'u1',
+      'allowJoinRequests': true,
+    },
+  },
+  {
+    'case': 'a group never lists allowJoinRequests',
+    'team': {
+      'name': 'Open Pickup',
+      'division': 'mixed',
+      'level': 'pickup',
+      'kind': 'community',
+      'requiresApproval': false,
+      'allowJoinRequests': true,
+    },
+  },
+  {
     'case': 'official team without a city',
     'team': {
       'name': 'Stall 10',
@@ -167,6 +189,26 @@ final _roleCases = <Map<String, Object?>>[
       'u2': ['c'],
       'u3': <String>[],
       'left': ['a'],
+    },
+  },
+  {
+    'case': "members' own permissions (memberGrants) count too",
+    'members': ['u1', 'u2'],
+    'roles': {
+      'b': {
+        'name': 'Chat',
+        'color': 0,
+        'position': 0,
+        'perms': ['manageChats'],
+      },
+    },
+    'memberRoles': {
+      'u1': ['b'],
+    },
+    'grants': {
+      'u1': ['manageChats', 'keepStats'],
+      'u2': ['moderate', 'manageTeam'],
+      'left': ['manageMembers'],
     },
   },
 ];
@@ -317,15 +359,36 @@ void main() {
           final roles = parseCustomRoles(c['roles']);
           final memberRoles = parseMemberLists(c['memberRoles'], (s) => s);
           final members = (c['members']! as List).cast<String>();
+          final grants = parseMemberLists(c['grants'], permissionByName);
           return {
             ...c,
             'saved': rolesData(
               roles,
               cleanMemberRoles(memberRoles, roles, members),
+              cleanMemberGrants(grants, members),
             ),
           };
         }(),
     ]);
+  });
+
+  test('role presets match packages/shared/fixtures', () {
+    List<Map<String, Object?>> list(List<RolePreset> presets) => [
+      for (final p in presets)
+        {
+          'id': p.id,
+          'name': p.name,
+          'summary': p.summary,
+          'perms': [
+            for (final x in TeamPermission.values)
+              if (p.permissions.contains(x)) x.name,
+          ],
+        },
+    ];
+    _check('role_presets.json', {
+      'team': list(RolePreset.team),
+      'group': list(RolePreset.group),
+    });
   });
 
   test('profile and username rules match packages/shared/fixtures', () {

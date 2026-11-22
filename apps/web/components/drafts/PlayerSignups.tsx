@@ -187,11 +187,24 @@ function MySignup({ user, tournamentId, tournament: t, divisions }: { user: User
             Edit
           </button>
         )}
-        <button type="button" className="text-btn danger" onClick={withdraw} disabled={busy}>
+        <button type="button" className="text-btn" onClick={withdraw} disabled={busy}>
           Withdraw
         </button>
       </div>
     </section>
+  );
+}
+
+/** A thin bar split by gender match (GenderSplitBar in the app). */
+export function GenderSplit({ mmp, wmp, unknown }: { mmp: number; wmp: number; unknown: number }) {
+  const total = mmp + wmp + unknown;
+  if (!total) return null;
+  return (
+    <div className="draft-split" role="img" aria-label={`${mmp} MMP, ${wmp} WMP${unknown > 0 ? `, ${unknown} not set` : ""}`}>
+      {mmp > 0 && <i className="draft-dot-mmp" style={{ flexGrow: mmp }} />}
+      {wmp > 0 && <i className="draft-dot-wmp" style={{ flexGrow: wmp }} />}
+      {unknown > 0 && <i className="draft-dot-unset" style={{ flexGrow: unknown }} />}
+    </div>
   );
 }
 
@@ -354,6 +367,12 @@ function SignupList({ user, tournamentId, tournament: t, division: d }: { user: 
   const owes = (s: PlayerSignupDoc & { id: string }) => s.status !== "withdrawn" && s.status !== "declined";
   const shown = all.filter((s) => !unpaidOnly || (!!fee && owes(s) && !isPaid(s.id)));
   const count = (st: SignupStatus) => all.filter((x) => x.status === st).length;
+  // Who is still in: the split and average skill count only them.
+  const active = all.filter(owes);
+  const mmp = active.filter((x) => x.gender === "mmp").length;
+  const wmp = active.filter((x) => x.gender === "wmp").length;
+  const avgSkill = active.length ? active.reduce((sum, x) => sum + x.skill, 0) / active.length : null;
+  const pending = count("applied");
   const unpaid = !fee || fee.amountCents === 0 ? 0 : (signups.data ?? []).filter((s) => (s.status === "accepted" || s.status === "applied") && !isPaid(s.id)).length;
 
   async function run(uid: string, fn: () => Promise<unknown>) {
@@ -371,9 +390,50 @@ function SignupList({ user, tournamentId, tournament: t, division: d }: { user: 
           </label>
         )}
       </div>
-      <p className="muted small">
-        {all.length} signed up · {count("accepted")} accepted{count("waitlisted") > 0 ? ` · ${count("waitlisted")} waitlisted` : ""}
-      </p>
+      <div className="draft-summary">
+        <b>
+          {all.length} signed up · {count("accepted")} accepted{count("waitlisted") > 0 ? ` · ${count("waitlisted")} waitlisted` : ""}
+        </b>
+        {all.length > 0 && (
+          <div className="draft-tiles">
+            <div className="draft-tile">
+              <b>{count("accepted")}</b>
+              <span>Accepted</span>
+            </div>
+            {/* New signups are the host's to decide. */}
+            <div className={`draft-tile${pending > 0 ? " draft-tile-due" : ""}`}>
+              <b>{pending}</b>
+              <span>To decide</span>
+            </div>
+            <div className="draft-tile">
+              <b>{count("waitlisted")}</b>
+              <span>Waitlist</span>
+            </div>
+          </div>
+        )}
+        {mmp + wmp > 0 && (
+          <>
+            <GenderSplit mmp={mmp} wmp={wmp} unknown={active.length - mmp - wmp} />
+            <div className="draft-legend">
+              <span>
+                <i className="draft-dot-mmp" aria-hidden />
+                {mmp} MMP
+              </span>
+              <span>
+                <i className="draft-dot-wmp" aria-hidden />
+                {wmp} WMP
+              </span>
+              {active.length > mmp + wmp && (
+                <span>
+                  <i className="draft-dot-unset" aria-hidden />
+                  {active.length - mmp - wmp} not set
+                </span>
+              )}
+              {avgSkill !== null && <span>Avg skill {avgSkill.toFixed(1)}</span>}
+            </div>
+          </>
+        )}
+      </div>
       {signups.error && <p className="form-error">{signups.error}</p>}
       {error && <p className="form-error">{error}</p>}
       {shown.length === 0 ? (
@@ -392,8 +452,10 @@ function SignupList({ user, tournamentId, tournament: t, division: d }: { user: 
             </thead>
             <tbody>
               {shown.map((s) => (
-                <tr key={s.id}>
-                  <td>{s.name}</td>
+                <tr key={s.id} className={s.status === "applied" ? "draft-row-due" : undefined}>
+                  <td>
+                    <b>{s.name}</b>
+                  </td>
                   <td>
                     {s.skill}
                     {s.gender ? ` · ${genderMatchLabels[s.gender]}` : ""}

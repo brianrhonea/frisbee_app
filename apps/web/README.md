@@ -8,16 +8,16 @@ Firebase Hosting used to serve (Hosting now has only the static pages in
 
 | Path | What |
 |---|---|
-| `/` | Visitors: a preview (a few community posts, locked cards, sign-up prompts). Members: their dashboard (profile card, season stats, teams, upcoming events with RSVPs, their feed) from `GET /v1/me/home` |
+| `/` | Visitors: a preview (a few community posts, locked cards, sign-up prompts). Members: their dashboard from `GET /v1/me/home`, with the feed's tabs Your teams (default), Following (once For you) and Everyone (once Community); `?tab=` takes the old names too |
 | `/learn` | Everyone (server-rendered): beginner's guide to the rules of ultimate (an original summary, not the official text) |
 | `/community`, `/posts/[id]` | The public feed and one post |
-| `/teams` | Members: invitations and their teams. Everyone: the team finder (`GET /v1/public/teams?q=`; the top bar's search lands here for visitors) |
+| `/teams` | Members: invitations and their teams (the Teams tab always opens this list; a hub has **All teams** back to it). Everyone: the team finder (`GET /v1/public/teams?q=`) |
 | `/teams/[id]` | Team and group pages; members get the hub (Feed, Schedule, Chat, Roster, More, Settings). Visitors get the feed, public events and, for adult teams (`rosterIsPublic`), the roster's players (`GET /v1/public/teams/:id/roster`, server-rendered) |
 | `/players/[uid]` | Members: profiles (private ones show only their card) |
 | `/teams/new` | Members: create a team, group or school/club community |
-| `/messages` | Members: direct and group conversations |
-| `/events` | Everyone: upcoming public events and tournaments (`GET /v1/public/events`; visitors read it without a token) |
-| `/explore?q=` | Members: player and team search |
+| `/messages` | Members: the Inbox tab, direct and group conversations and team chats |
+| `/explore?q=&only=` | Everyone: **Discover** (it replaced Explore and Events). Search with chips (All, Tournaments, Leagues, Pickup, Teams, Communities; members also People), Live now, Coming up (hosted tournaments and leagues, then public events on a week strip), rankings and shortcuts. The public lists are server-rendered (`/v1/public/tournaments`, `/v1/public/events`). Visitors search teams and communities with `GET /v1/public/teams?q=` and tournaments and events in the browser; members search players and teams with `GET /v1/public/search`. `?only=` takes the app's names (`groups` is Communities, `players` People). `/events` and `/discover` redirect here (`next.config.ts`) |
+| `/schedule` | Members: the Schedule tab, their own calendar |
 | `/rankings?level=&division=` | Everyone: team rankings by Level (Club, College, League, Pickup; never youth) and Division (`GET /v1/public/rankings`, server-rendered for visitors; members read them live). The old `?division=club-mixed` still works. `?kind=players`: members' player ratings |
 | `/about`, `/help`, `/terms`, `/privacy`, `/cookies`, `/delete-account` | Static pages ported from `firebase/hosting` (`content/*.html`, served by `app/[slug]`) |
 | `/join/[code]`, `/g/[id]`, `/p/[id]` | Invite and share link fallbacks; `public/.well-known` opens them in the app |
@@ -32,7 +32,9 @@ Firebase Hosting used to serve (Hosting now has only the static pages in
   rate-limit it as a single visitor; Vercel's firewall limits visitors.
 - **Visitors** see one page of the feed (the API returns no cursor to
   them), team and group pages with their public posts and events, adult
-  teams' rosters, the team finder, Events, tournaments and Learn. Players,
+  teams' rosters, the team finder, Discover (search included, but not
+  players), tournaments and Learn. Their tabs are Discover, Tournaments,
+  Pickup, Communities and Learn (no Teams or Inbox). Players, people
   search, messages and anything of their own ask them to sign up. The
   browser reads public routes without a token for them
   (`getPublicApi` in `lib/client.ts`; the API limits them by IP).

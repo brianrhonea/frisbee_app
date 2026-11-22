@@ -51,6 +51,7 @@ class ChatTab extends StatelessWidget {
                 : ViewModelHost(
                     key: ValueKey('chat-pane-${vm.teamId}-$selected'),
                     create: (c) => ChatRoomViewModel(
+                      outbox: c.read(),
                       teamId: vm.teamId,
                       roomId: selected,
                       teamRepository: c.read(),
@@ -111,26 +112,39 @@ class _RoomListState extends State<RoomList> {
         onStart: _dragStarted,
         onEnd: _dragEnded,
       );
+      final c = AppColors.of(context);
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (vm.canManage)
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 2),
               child: Row(
                 children: [
                   Expanded(
-                    child: FilledButton.tonalIcon(
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(0, 44),
+                      ),
                       onPressed: () =>
                           context.push(Routes.newChatRoom(vm.teamId)),
-                      icon: const Icon(Icons.add),
+                      icon: const Icon(Icons.add, size: 20),
                       label: const Text('New channel'),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  IconButton.outlined(
-                    tooltip: 'New folder',
-                    icon: const Icon(Icons.create_new_folder_outlined),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 44),
+                      foregroundColor: c.ink,
+                      side: BorderSide(color: c.border2),
+                      backgroundColor: c.card,
+                    ),
+                    icon: const Icon(
+                      Icons.create_new_folder_outlined,
+                      size: 20,
+                    ),
+                    label: const Text('New folder'),
                     onPressed: () => _editFolder(context, vm, null),
                   ),
                 ],
@@ -148,7 +162,7 @@ class _RoomListState extends State<RoomList> {
                         : "You haven't been added to any channels yet.",
                   )
                 : ListView(
-                    padding: const EdgeInsets.fromLTRB(8, 8, 8, 24),
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
                     children: [
                       // Somewhere to drop a room to take it out of its
                       // folder, when no room is outside one.
@@ -164,34 +178,54 @@ class _RoomListState extends State<RoomList> {
                             ),
                             drag: drag,
                           ),
-                        if (g.folder == null || !vm.isCollapsed(g.folder!.id))
-                          for (final (i, room) in g.rooms.indexed) ...[
-                            _RoomDropTarget(
-                              viewModel: vm,
-                              folderId: g.folder?.id,
-                              index: i,
-                              siblings: g.rooms,
-                              child: _RoomRow(
-                                room: room,
-                                access: vm.accessTo(room),
-                                audience: vm.audienceOf(room),
-                                selected: room.id == widget.selectedId,
-                                onTap: () => widget.onOpen(room.id),
-                                drag: drag,
-                                menu: vm.canManage
-                                    ? _RoomMenu(
-                                        viewModel: vm,
+                        if (g.rooms.isNotEmpty &&
+                            (g.folder == null || !vm.isCollapsed(g.folder!.id)))
+                          _RoomCard(
+                            children: [
+                              for (final (i, room) in g.rooms.indexed)
+                                Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    if (i > 0)
+                                      Divider(height: 1, color: c.border),
+                                    _RoomDropTarget(
+                                      viewModel: vm,
+                                      folderId: g.folder?.id,
+                                      index: i,
+                                      siblings: g.rooms,
+                                      child: _RoomRow(
                                         room: room,
-                                        first: i == 0,
-                                        last: i == g.rooms.length - 1,
-                                      )
-                                    : null,
-                              ),
-                            ),
-                            if (room.isVoice)
-                              for (final p in vm.voiceParticipants(room))
-                                _VoiceMember(p: p),
-                          ],
+                                        access: vm.accessTo(room),
+                                        audience: vm.audienceOf(room),
+                                        selected: room.id == widget.selectedId,
+                                        unread:
+                                            room.id != widget.selectedId &&
+                                            vm.isUnread(room),
+                                        inVoice: room.isVoice
+                                            ? vm.voiceParticipants(room).length
+                                            : 0,
+                                        onTap: () => widget.onOpen(room.id),
+                                        drag: drag,
+                                        menu: vm.canManage
+                                            ? _RoomMenu(
+                                                viewModel: vm,
+                                                room: room,
+                                                first: i == 0,
+                                                last: i == g.rooms.length - 1,
+                                              )
+                                            : null,
+                                      ),
+                                    ),
+                                    if (room.isVoice)
+                                      for (final p in vm.voiceParticipants(
+                                        room,
+                                      ))
+                                        _VoiceMember(p: p),
+                                  ],
+                                ),
+                            ],
+                          ),
                       ],
                     ],
                   ),
@@ -207,6 +241,33 @@ class _RoomListState extends State<RoomList> {
       );
     },
   );
+}
+
+/// A folder's rooms (or the rooms outside any folder) in one card.
+class _RoomCard extends StatelessWidget {
+  const _RoomCard({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 6),
+      child: Container(
+        decoration: BoxDecoration(
+          color: c.card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: c.border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: children,
+        ),
+      ),
+    );
+  }
 }
 
 /// How rows start and end drags, for chat managers.
@@ -317,10 +378,10 @@ class _UnfiledDropZone extends StatelessWidget {
       )),
       builder: (context, candidates, _) => Container(
         margin: const EdgeInsets.only(bottom: 6),
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: candidates.isEmpty ? null : c.accentSoft,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: c.accent),
         ),
         child: Text(
@@ -379,19 +440,19 @@ class _FolderHeader extends StatelessWidget {
       children: [
         Icon(
           collapsed ? Icons.chevron_right : Icons.expand_more,
-          size: 16,
+          size: 18,
           color: c.muted,
         ),
-        const SizedBox(width: 2),
+        const SizedBox(width: 4),
         Expanded(
           child: Text(
             folder.name.toUpperCase(),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.5,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.6,
               color: lifted ? c.ink : c.muted,
             ),
           ),
@@ -399,7 +460,7 @@ class _FolderHeader extends StatelessWidget {
       ],
     );
     final header = Padding(
-      padding: const EdgeInsets.only(top: 14, bottom: 2),
+      padding: const EdgeInsets.only(top: 10),
       child: Row(
         children: [
           Expanded(
@@ -409,7 +470,7 @@ class _FolderHeader extends StatelessWidget {
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: c.card,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(12),
                   boxShadow: const [
                     BoxShadow(blurRadius: 8, color: Colors.black26),
                   ],
@@ -420,7 +481,10 @@ class _FolderHeader extends StatelessWidget {
                 borderRadius: BorderRadius.circular(6),
                 onTap: () => vm.toggleFolder(folder.id),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 2,
+                    vertical: 6,
+                  ),
                   child: label(),
                 ),
               ),
@@ -604,6 +668,8 @@ class _RoomRow extends StatefulWidget {
     required this.selected,
     required this.onTap,
     required this.drag,
+    this.unread = false,
+    this.inVoice = 0,
     this.menu,
   });
 
@@ -611,6 +677,12 @@ class _RoomRow extends StatefulWidget {
   final ChatAccess access;
   final String audience;
   final bool selected;
+
+  /// It has messages the user hasn't read: bold, with an amber dot.
+  final bool unread;
+
+  /// How many are in this voice channel (known while the user's in it).
+  final int inVoice;
   final VoidCallback onTap;
   final _DragHooks drag;
   final Widget? menu;
@@ -631,27 +703,71 @@ class _RoomRowState extends State<_RoomRow> {
       _ when room.isVoice => Icons.volume_up_rounded,
       _ => Icons.tag,
     };
-    final color = widget.selected || _hover ? c.ink : c.muted;
+    final unread = widget.unread;
+    final strong = widget.selected || unread;
+    final iconColor = strong || _hover ? c.ink : c.muted;
+    final nameColor = strong || _hover ? c.ink : c.ink2;
+    final name = Text(
+      room.isVoice ? room.name : room.handle,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        fontSize: 15,
+        fontWeight: unread
+            ? FontWeight.w800
+            : widget.selected || room.isVoice
+            ? FontWeight.w700
+            : FontWeight.w500,
+        color: nameColor,
+      ),
+    );
     Widget row({bool lifted = false}) => Row(
       children: [
-        Icon(icon, size: 20, color: lifted ? c.ink : color),
-        const SizedBox(width: 8),
+        Icon(icon, size: 20, color: lifted ? c.ink : iconColor),
+        const SizedBox(width: 10),
         Expanded(
-          child: Text(
-            room.isVoice ? room.name : room.handle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 14.5,
-              fontWeight: widget.selected ? FontWeight.w700 : FontWeight.w500,
-              color: lifted ? c.ink : color,
-            ),
-          ),
+          child: !lifted && widget.inVoice > 0
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    name,
+                    Text(
+                      '${widget.inVoice} in voice',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: c.accent,
+                      ),
+                    ),
+                  ],
+                )
+              : name,
         ),
         if (!lifted && widget.access == ChatAccess.read && !room.isVoice)
-          Tooltip(
-            message: 'Read only',
-            child: Icon(Icons.visibility_outlined, size: 15, color: c.muted),
+          Padding(
+            padding: const EdgeInsets.only(left: 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.visibility_outlined, size: 14, color: c.muted),
+                const SizedBox(width: 4),
+                Text(
+                  'Read only',
+                  style: TextStyle(fontSize: 12, color: c.muted),
+                ),
+              ],
+            ),
+          ),
+        if (!lifted && unread)
+          Padding(
+            padding: const EdgeInsets.only(left: 8),
+            child: Icon(
+              Icons.circle,
+              size: 10,
+              color: c.highlight,
+              semanticLabel: 'Unread',
+            ),
           ),
       ],
     );
@@ -669,14 +785,12 @@ class _RoomRowState extends State<_RoomRow> {
               : _hover
               ? c.ink.withValues(alpha: 0.05)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
-          clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: widget.onTap,
             child: SizedBox(
-              height: 38,
+              height: 52,
               child: Padding(
-                padding: EdgeInsets.only(left: 8, right: showMenu ? 0 : 8),
+                padding: EdgeInsets.only(left: 14, right: showMenu ? 2 : 14),
                 child: Row(
                   children: [
                     Expanded(child: row()),
@@ -689,22 +803,20 @@ class _RoomRowState extends State<_RoomRow> {
         ),
       ),
     );
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 2),
-      child: widget.drag.wrap<ChatRoom>(
-        data: room,
-        feedback: Container(
-          height: 40,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            color: c.card,
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: const [BoxShadow(blurRadius: 8, color: Colors.black26)],
-          ),
-          child: row(lifted: true),
+    return widget.drag.wrap<ChatRoom>(
+      data: room,
+      feedback: Container(
+        height: 52,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: c.card,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: c.border),
+          boxShadow: const [BoxShadow(blurRadius: 8, color: Colors.black26)],
         ),
-        child: tile,
+        child: row(lifted: true),
       ),
+      child: tile,
     );
   }
 }
@@ -719,7 +831,7 @@ class _VoiceMember extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(34, 1, 8, 3),
+      padding: const EdgeInsets.fromLTRB(40, 0, 14, 8),
       child: Row(
         children: [
           Container(
@@ -727,13 +839,11 @@ class _VoiceMember extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: p.isSpeaking
-                    ? Colors.green.shade500
-                    : Colors.transparent,
+                color: p.isSpeaking ? c.accent : Colors.transparent,
                 width: 2,
               ),
             ),
-            child: PersonAvatar(name: p.name, photoUrl: p.photoUrl, radius: 10),
+            child: PersonAvatar(name: p.name, photoUrl: p.photoUrl, radius: 11),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -741,10 +851,20 @@ class _VoiceMember extends StatelessWidget {
               p.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 13, color: c.muted),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: p.isSpeaking ? FontWeight.w600 : FontWeight.w400,
+                color: p.isSpeaking ? c.ink : c.ink2,
+              ),
             ),
           ),
-          if (!p.micOn) Icon(Icons.mic_off, size: 14, color: c.muted),
+          if (!p.micOn)
+            Icon(
+              Icons.mic_off,
+              size: 14,
+              color: c.muted,
+              semanticLabel: 'Muted',
+            ),
         ],
       ),
     );
@@ -767,9 +887,7 @@ class _VoiceBar extends StatelessWidget {
     final vm = viewModel;
     final channel = vm.voiceChannel!;
     final status = vm.voiceConnected ? 'Voice Connected' : 'Connecting…';
-    final statusColor = vm.voiceConnected
-        ? Colors.green.shade600
-        : Colors.orange.shade700;
+    final statusColor = vm.voiceConnected ? c.accent : c.muted;
     return Container(
       decoration: BoxDecoration(
         color: c.card,
@@ -815,17 +933,20 @@ class _VoiceBar extends StatelessWidget {
                 : vm.micOn
                 ? 'Mute'
                 : 'Unmute',
-            icon: Icon(
-              vm.micOn ? Icons.mic : Icons.mic_off,
-              color: vm.micOn ? c.ink : Colors.red.shade400,
-            ),
+            icon: Icon(vm.micOn ? Icons.mic : Icons.mic_off, color: c.ink),
             onPressed: vm.voiceConnected && vm.canSpeak
                 ? vm.toggleMic.execute
                 : null,
           ),
-          IconButton(
+          // Leaving, but in ink rather than red: red is kept for live
+          // games.
+          IconButton.outlined(
             tooltip: 'Disconnect',
-            icon: Icon(Icons.call_end, color: Colors.red.shade400),
+            style: IconButton.styleFrom(
+              foregroundColor: c.ink,
+              side: BorderSide(color: c.border2),
+            ),
+            icon: const Icon(Icons.call_end),
             onPressed: vm.leaveVoice.execute,
           ),
         ],

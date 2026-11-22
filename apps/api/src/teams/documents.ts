@@ -1,7 +1,7 @@
 // The documents a new team starts with. Mirrors newTeamDocs in
 // apps/mobile/lib/data/repositories/team/team_repository_firebase.dart;
 // both are checked against packages/shared/fixtures/team_create.json.
-import { type CreateTeamInput, type GroupLocation, isGroupLike, searchKeywords } from "@stall10/shared";
+import { type CreateTeamInput, type GroupLocation, isGroupLike, newTeamSections, searchKeywords } from "@stall10/shared";
 
 export interface Owner {
   uid: string;
@@ -70,6 +70,9 @@ export function newTeamDocuments<T>(
       ...communityFields(t, t.location),
       ...(org && { orgId: org.id, orgName: org.name }),
       ...(t.leagueId != null && { leagueId: t.leagueId }),
+      // A new team starts simple: Playbook, Videos, Stats and Meetings
+      // off until the owner turns them on. Groups have none of them.
+      ...(!isGroupLike(t.kind) && { sections: newTeamSections() }),
       ownerId: owner.uid,
       members: { [owner.uid]: "owner" },
       memberIds: [owner.uid],

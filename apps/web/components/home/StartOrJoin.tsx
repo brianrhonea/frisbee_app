@@ -29,8 +29,8 @@ export function StartOrJoinDialog({ onClose, join = false }: { onClose: () => vo
           </li>
           <li>
             <Link href="/teams/new?kind=community" onClick={onClose}>
-              <b>Start a group</b>
-              <small>A pickup group or league anyone can find and join.</small>
+              <b>Start a pickup community</b>
+              <small>A pickup game or league anyone can find and join.</small>
             </Link>
           </li>
           <li>
@@ -41,7 +41,7 @@ export function StartOrJoinDialog({ onClose, join = false }: { onClose: () => vo
           </li>
           <li>
             <Link href="/explore?only=groups" onClick={onClose}>
-              <b>Find a group</b>
+              <b>Find a community</b>
               <small>Pickup and leagues near you.</small>
             </Link>
           </li>

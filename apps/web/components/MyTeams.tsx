@@ -8,6 +8,7 @@ import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
 import { roleLabel, TeamList } from "./ProfileDashboard";
 import { useMyTeams } from "./useMyTeams";
+import "./member.css";
 
 interface MyTeam {
   name?: string;
@@ -71,7 +72,7 @@ export function MyTeams() {
       <div className="stack">
         <div className="card">
           <p className="muted small">
-            No teams yet. <Link href="/explore">Find a team or group</Link>, or start one below.
+            No teams yet. <Link href="/explore">Find a team or community</Link>, or start one below.
           </p>
         </div>
         <StartOrJoin />

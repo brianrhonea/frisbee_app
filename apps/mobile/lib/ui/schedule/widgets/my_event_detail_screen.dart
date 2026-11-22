@@ -7,9 +7,10 @@ import '../../../routing/routes.dart';
 import '../../core/ui/back_or.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/my_event_detail_viewmodel.dart';
-import 'event_detail_screen.dart' show EventHeader;
+import 'event_detail_screen.dart' show EventHeader, EventNotes;
 
 /// A personal event: details plus edit and delete. Only its owner sees it.
 class MyEventDetailScreen extends StatefulWidget {
@@ -87,11 +88,6 @@ class _MyEventDetailScreenState extends State<MyEventDetailScreen> {
           leading: backOr(context, Routes.schedule),
           title: Text(e.type.label),
           actions: [
-            AddToCalendarButton(
-              event: e,
-              uid: 'me-${e.id}@stall10.app',
-              asIcon: true,
-            ),
             IconButton(
               tooltip: 'Edit',
               icon: const Icon(Icons.edit_outlined),
@@ -109,26 +105,23 @@ class _MyEventDetailScreenState extends State<MyEventDetailScreen> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 720),
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
               children: [
-                EventHeader(event: e),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.lock_outline,
-                      size: 16,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        'Personal event · only you can see it',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ),
-                  ],
+                EventHeader(
+                  event: e,
+                  owner: 'My calendar',
+                  personal: true,
+                  calendarButton: AddToCalendarButton(
+                    event: e,
+                    uid: 'me-${e.id}@stall10.app',
+                  ),
                 ),
+                if (e.notes.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  EventNotes(notes: e.notes),
+                ],
+                const SizedBox(height: 12),
+                const _PrivateNote(),
               ],
             ),
           ),
@@ -136,4 +129,33 @@ class _MyEventDetailScreenState extends State<MyEventDetailScreen> {
       );
     },
   );
+}
+
+/// Who can see a personal event.
+class _PrivateNote extends StatelessWidget {
+  const _PrivateNote();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: c.field,
+        borderRadius: BorderRadius.circular(controlRadius),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.lock_outline, size: 18, color: c.ink2),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Personal event · only you can see it',
+              style: TextStyle(fontSize: 13, color: c.ink2),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

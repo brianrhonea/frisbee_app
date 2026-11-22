@@ -2,13 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../domain/models/chat.dart';
 import '../../../routing/routes.dart';
+import '../../../utils/command.dart';
+import '../../../utils/result.dart';
+import '../../core/ui/error_message.dart';
 import '../../core/ui/layout.dart';
 import '../../core/ui/status_views.dart';
 import '../../core/ui/view_model_host.dart';
 import '../view_models/chat_list_viewmodel.dart';
 import '../view_models/chat_room_viewmodel.dart';
 import '../view_models/voice_channel_viewmodel.dart';
+import 'chat_extras.dart';
+import 'chat_polls.dart';
 import 'chat_layout.dart';
 import 'chat_tab.dart';
 import 'message_thread_view.dart';
@@ -122,7 +128,7 @@ class ChatRoomView extends StatelessWidget {
                   ?team?.name,
                   room.isGeneral
                       ? ((team?.isCommunity ?? false)
-                            ? 'Group chat'
+                            ? 'Community chat'
                             : 'Team chat')
                       : room.name,
                 ].join(' · ')
@@ -220,12 +226,7 @@ class ChatRoomView extends StatelessWidget {
         } else {
           body = SafeArea(
             top: false,
-            child: MessageThreadView(
-              viewModel: vm,
-              emptyMessage: 'Say hello to the team.',
-              readOnlyNotice: 'You can read this room but not post in it.',
-              hintText: 'Message #${room.handle}',
-            ),
+            child: _RoomThread(viewModel: vm, handle: room.handle),
           );
         }
         return Scaffold(appBar: bar, drawer: drawer, body: body);
@@ -235,3 +236,72 @@ class ChatRoomView extends StatelessWidget {
 }
 
 enum _RoomAction { mute, settings }
+
+/// A text room's thread, with its pins (redesign F2), event cards (F3) and
+/// polls (F33): the pinned strip on top, Pin in each message's long-press
+/// sheet for chat managers, and Share an event and Poll in the attach menu.
+class _RoomThread extends StatefulWidget {
+  const _RoomThread({required this.viewModel, required this.handle});
+
+  final ChatRoomViewModel viewModel;
+  final String handle;
+
+  @override
+  State<_RoomThread> createState() => _RoomThreadState();
+}
+
+class _RoomThreadState extends State<_RoomThread> {
+  ChatRoomViewModel get vm => widget.viewModel;
+
+  late final List<Command<void>> _commands = [
+    vm.togglePin,
+    vm.replacePin,
+    vm.shareEvent,
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    for (final c in _commands) {
+      c.addListener(_onCommand);
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final c in _commands) {
+      c.removeListener(_onCommand);
+    }
+    super.dispose();
+  }
+
+  void _onCommand() {
+    for (final c in _commands) {
+      if (c.result case Error(:final error)) {
+        c.clearResult();
+        if (error is PinsFullException) {
+          showReplacePinSheet(context, vm, error.message);
+        } else {
+          showErrorSnackBar(context, error);
+        }
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => MessageThreadView(
+    viewModel: vm,
+    emptyMessage: 'Say hello to the team.',
+    readOnlyNotice: 'You can read this room but not post in it.',
+    hintText: 'Message #${widget.handle}',
+    header: PinnedStrip(viewModel: vm),
+    isPinned: vm.isPinned,
+    eventCard: (_, ChatEventRef e) => ChatEventCard(teamId: vm.teamId, ref: e),
+    pollCard: (m, _) => ChatPollCard(room: vm, message: m),
+    onTogglePin: vm.canPin ? vm.togglePin.execute : null,
+    onShareEvent: vm.canShareEvents
+        ? () => showShareEventSheet(context, vm)
+        : null,
+    onCreatePoll: vm.canPoll ? () => showCreatePollSheet(context, vm) : null,
+  );
+}

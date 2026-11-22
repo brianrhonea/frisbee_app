@@ -16,7 +16,7 @@ export function TeamStrip({ uid }: { uid: string }) {
   if (!live.data) return null;
   const spaces = spacesOf(live.data);
   return (
-    <nav className="team-strip" aria-label="Your teams and groups">
+    <nav className="team-strip" aria-label="Your teams and communities">
       <ul>
         {spaces.map((t) => (
           <li key={t.id}>

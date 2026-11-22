@@ -5,8 +5,11 @@ import '../../../domain/models/follow.dart';
 import '../../../routing/open_link.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/error_message.dart';
+import '../../core/ui/layout.dart' show PersonAvatar, TeamBadge;
 import '../../core/ui/status_views.dart';
+import '../../settings/widgets/settings_widgets.dart';
 import '../view_models/following_viewmodel.dart';
 
 IconData followIcon(FollowType t) => switch (t) {
@@ -67,73 +70,187 @@ class _FollowingScreenState extends State<FollowingScreen> {
     }
   }
 
+  /// The heading a follow sits under.
+  static String _section(FollowType t) => switch (t) {
+    FollowType.user => 'People',
+    FollowType.team => 'Teams and communities',
+    FollowType.tournament => 'Tournaments',
+  };
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: vm,
-    builder: (context, _) => Scaffold(
-      appBar: AppBar(title: const Text('Following')),
-      body: !vm.loaded
-          ? const LoadingView()
-          : vm.error != null
-          ? ErrorView(error: vm.error)
-          : vm.follows.isEmpty
-          ? EmptyView(
-              icon: Icons.people_outline,
-              title: 'Not following anyone yet',
-              message:
-                  'Follow people, teams, groups and tournaments to see '
-                  'their posts on Home.',
-              action: FilledButton.icon(
-                onPressed: () => context.go(Routes.explore()),
-                icon: const Icon(Icons.search),
-                label: const Text('Find teams and groups'),
+    builder: (context, _) {
+      final c = AppColors.of(context);
+      // One card per kind, in the order the list gives them.
+      final sections = <String, List<Follow>>{};
+      for (final f in vm.follows) {
+        (sections[_section(f.type)] ??= []).add(f);
+      }
+      return Scaffold(
+        appBar: settingsAppBar(
+          context,
+          title: const Text('Following'),
+          actions: [
+            if (vm.loaded && vm.follows.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: Center(
+                  child: Text(
+                    '${vm.follows.length}',
+                    style: TextStyle(fontSize: 13, color: c.muted),
+                  ),
+                ),
               ),
-            )
-          : ConstrainedContent(
-              maxWidth: 640,
-              child: ListView(
-                children: [
-                  for (final f in vm.follows)
-                    ListTile(
-                      key: ValueKey(f.key),
-                      leading: Icon(followIcon(f.type)),
-                      title: Text(
-                        f.target.name.isEmpty ? f.type.label : f.target.name,
-                      ),
-                      subtitle: Text(f.type.label),
-                      onTap: () => openFollow(context, f.target),
-                      trailing: PopupMenuButton<_FollowAction>(
-                        tooltip: 'Options for ${f.target.name}',
-                        icon: Icon(
-                          f.notify
-                              ? Icons.notifications_active_outlined
-                              : Icons.more_vert,
+          ],
+        ),
+        body: !vm.loaded
+            ? const LoadingView()
+            : vm.error != null
+            ? ErrorView(error: vm.error)
+            : vm.follows.isEmpty
+            ? EmptyView(
+                icon: Icons.people_outline,
+                title: 'Not following anyone yet',
+                message:
+                    'Follow people, teams, communities and tournaments to see '
+                    'their posts on Home.',
+                action: FilledButton.icon(
+                  onPressed: () => context.go(Routes.explore()),
+                  icon: const Icon(Icons.search),
+                  label: const Text('Find teams and communities'),
+                ),
+              )
+            : ConstrainedContent(
+                maxWidth: 640,
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Text(
+                        'Their posts show on Home. The bell means you get a '
+                        'notification for each new post.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          height: 1.4,
+                          color: c.muted,
                         ),
-                        onSelected: (a) => switch (a) {
-                          _FollowAction.notify => vm.setNotify.execute((
-                            f.key,
-                            !f.notify,
-                          )),
-                          _FollowAction.unfollow => vm.unfollow.execute(f.key),
-                        },
-                        itemBuilder: (_) => [
-                          CheckedPopupMenuItem(
-                            value: _FollowAction.notify,
-                            checked: f.notify,
-                            child: const Text('Post notifications'),
-                          ),
-                          const PopupMenuItem(
-                            value: _FollowAction.unfollow,
-                            child: Text('Unfollow'),
-                          ),
-                        ],
                       ),
                     ),
-                ],
+                    for (final MapEntry(key: title, value: follows)
+                        in sections.entries)
+                      SettingsGroup(
+                        title: title,
+                        children: [
+                          for (final f in follows)
+                            _FollowRow(
+                              key: ValueKey(f.key),
+                              follow: f,
+                              onOpen: () => openFollow(context, f.target),
+                              onAction: (a) => switch (a) {
+                                _FollowAction.notify => vm.setNotify.execute((
+                                  f.key,
+                                  !f.notify,
+                                )),
+                                _FollowAction.unfollow => vm.unfollow.execute(
+                                  f.key,
+                                ),
+                              },
+                            ),
+                        ],
+                      ),
+                  ],
+                ),
               ),
-            ),
-    ),
+      );
+    },
   );
+}
+
+/// One follow: its mark, name and kind, a bell when its posts notify, and
+/// the menu for notifications and Unfollow.
+class _FollowRow extends StatelessWidget {
+  const _FollowRow({
+    super.key,
+    required this.follow,
+    required this.onOpen,
+    required this.onAction,
+  });
+
+  final Follow follow;
+  final VoidCallback onOpen;
+  final ValueChanged<_FollowAction> onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final f = follow;
+    final name = f.target.name.isEmpty ? f.type.label : f.target.name;
+    return ListTile(
+      minTileHeight: 64,
+      contentPadding: const EdgeInsets.only(left: 14, right: 4),
+      leading: switch (f.type) {
+        FollowType.user => PersonAvatar(
+          name: name,
+          photoUrl: f.target.photoUrl,
+        ),
+        FollowType.team => const TeamBadge(),
+        FollowType.tournament => Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: c.accentSoft,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(followIcon(f.type), size: 20, color: c.accentInk),
+        ),
+      },
+      title: Text(
+        name,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w700,
+          color: c.ink,
+        ),
+      ),
+      subtitle: Text(
+        f.type.label,
+        style: TextStyle(fontSize: 12, color: c.muted),
+      ),
+      onTap: onOpen,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (f.notify)
+            Icon(
+              Icons.notifications_active_outlined,
+              size: 20,
+              color: c.accent,
+              semanticLabel: 'Post notifications on',
+            ),
+          PopupMenuButton<_FollowAction>(
+            tooltip: 'Options for ${f.target.name}',
+            icon: Icon(Icons.more_vert, color: c.muted),
+            onSelected: onAction,
+            itemBuilder: (_) => [
+              CheckedPopupMenuItem(
+                value: _FollowAction.notify,
+                checked: f.notify,
+                child: const Text('Post notifications'),
+              ),
+              const PopupMenuItem(
+                value: _FollowAction.unfollow,
+                child: Text('Unfollow'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 enum _FollowAction { notify, unfollow }

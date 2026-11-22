@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../data/repositories/discover/discover_repository.dart';
 import '../domain/models/hosted_tournament.dart' show HostedType;
 import '../ui/core/ui/view_model_host.dart';
 import '../ui/tournaments/view_models/hosted_tournament_form_viewmodel.dart';
@@ -11,6 +12,7 @@ import '../ui/tournaments/view_models/player_signups_viewmodel.dart';
 import '../ui/tournaments/view_models/host_event_viewmodel.dart';
 import '../ui/tournaments/view_models/live_draft_viewmodel.dart';
 import '../ui/tournaments/view_models/team_draft_viewmodel.dart';
+import '../ui/tournaments/widgets/hosted_bracket_screen.dart';
 import '../ui/tournaments/widgets/hosted_tournament_form_screen.dart';
 import '../ui/tournaments/widgets/hosted_tournament_screen.dart';
 import '../ui/tournaments/widgets/hosted_tournaments_list.dart';
@@ -29,6 +31,7 @@ List<GoRoute> hostedTournamentRoutes() => [
       create: (c) => HostedTournamentsViewModel(
         tournamentRepository: c.read(),
         authRepository: c.read(),
+        discoverRepository: c.read<DiscoverRepository?>(),
       ),
       builder: (_, vm) => FindTournamentsScreen(viewModel: vm),
     ),
@@ -89,6 +92,9 @@ List<GoRoute> hostedTournamentRoutes() => [
                 viewModel: vm,
                 signups: signups,
                 fallbackHostId: state.uri.queryParameters['host'],
+                openGameId: state.uri.queryParameters['game'],
+                openDivisionId: state.uri.queryParameters['division'],
+                initialTab: state.uri.queryParameters['tab'],
               ),
             ),
           );
@@ -125,6 +131,27 @@ List<GoRoute> hostedTournamentRoutes() => [
                   authRepository: c.read(),
                 ),
                 builder: (_, vm) => LiveDraftScreen(viewModel: vm),
+              );
+            },
+          ),
+          GoRoute(
+            path: 'bracket/:divisionId',
+            builder: (_, state) {
+              final id = state.pathParameters['tournamentId']!;
+              final division = state.pathParameters['divisionId']!;
+              return ViewModelHost(
+                key: ValueKey('bracket-$id-$division'),
+                create: (c) => HostedTournamentViewModel(
+                  tournamentId: id,
+                  tournamentRepository: c.read(),
+                  teamRepository: c.read(),
+                  authRepository: c.read(),
+                  postRepository: c.read(),
+                  followRepository: c.read(),
+                  notificationRepository: c.read(),
+                ),
+                builder: (_, vm) =>
+                    HostedBracketScreen(viewModel: vm, divisionId: division),
               );
             },
           ),

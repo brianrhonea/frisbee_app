@@ -32,8 +32,8 @@ export default async function PostRoute({ params }: Props) {
   const { postId } = await params;
   const post = await load(postId);
   return (
-    <div className="page">
-      <p>
+    <div className="page post-page">
+      <p className="back-link">
         <Link href="/community" className="muted">
           ← Community
         </Link>

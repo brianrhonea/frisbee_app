@@ -5,6 +5,7 @@
 // signed up, captains, contact or payment details, or player names; the
 // API builds each answer field by field (apps/api/src/tournaments/public.ts).
 import { z } from "zod";
+import type { TournamentSpots } from "./discover.js";
 import type { GroupTournamentListing } from "./group_tournaments.js";
 import type {
   DivisionSummaryDoc,
@@ -45,6 +46,25 @@ export interface PublicHostedCard {
   status: HostedStatus;
   bidFee: PublicFee | null;
   divisions: DivisionSummaryDoc[];
+  /** In the list only: the event's games being played now (isLiveGame), for Discover's "Live now". */
+  liveGames?: PublicLiveGame[];
+  /** In the list only: team spots left while registration is open (tournamentSpots in discover.ts); absent otherwise. */
+  spots?: TournamentSpots;
+}
+
+/** A game being played now, as Discover's "Live now" card shows it: the teams' public names and the running score. */
+export interface PublicLiveGame {
+  divisionId: string;
+  gameId: string;
+  label: string;
+  field: number;
+  teamA: string;
+  teamB: string;
+  nameA: string;
+  nameB: string;
+  scoreA: number;
+  scoreB: number;
+  updatedAt: string;
 }
 
 /** The overview: the card's fields and the rest of the Details card. */
@@ -76,6 +96,7 @@ export interface PublicHostedEntry {
   status: "accepted";
 }
 
+/** A game; its `live` running score never carries who updated it. */
 export type PublicHostedGame = GameDoc & { id: string };
 
 /** `GET /v1/public/tournaments`: upcoming and running published events, soonest first. */

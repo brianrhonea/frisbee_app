@@ -10,6 +10,7 @@ import { MeetingService, meetingRoutes } from "./meetings/service.js";
 import { PaymentService, type PaymentsConfig, paymentRoutes } from "./payments/service.js";
 import type { LiveKitSigner } from "./meetings/signer.js";
 import { VideoService, videoRoutes } from "./videos/service.js";
+import { VideoExtrasService, videoExtrasRoutes } from "./videos/extras.js";
 import { type DraftQueries, listDraftQueries } from "./drafts/repository.js";
 import { type DocQueries, listDocQueries } from "./queries.js";
 import { draftRoutes } from "./drafts/routes.js";
@@ -37,6 +38,9 @@ import { BrowseService } from "./browse/service.js";
 import type { MeRepository } from "./me/repository.js";
 import { meRoutes } from "./me/routes.js";
 import { MeService } from "./me/service.js";
+import type { ExportRepository } from "./export/repository.js";
+import { exportRoutes } from "./export/routes.js";
+import { ExportService } from "./export/service.js";
 import type { RateLimiter } from "./limits/limiter.js";
 import { type LoggerOptions, traceLoggerFactory } from "./logging.js";
 import type { HeicDecoder } from "./media/image.js";
@@ -44,6 +48,9 @@ import { uploadRoutes } from "./media/routes.js";
 import { type TranscodeQueue, UploadService } from "./media/service.js";
 import type { MediaStorage } from "./media/storage.js";
 import { followRoutes } from "./follows/routes.js";
+import { ChatExtrasService } from "./hub/chat_extras.js";
+import { chatExtrasRoutes } from "./hub/chat_extras_routes.js";
+import { TeamPostExtrasService, teamPostExtrasRoutes } from "./hub/team_post_extras.js";
 import { hubRoutes } from "./hub/routes.js";
 import { HubService } from "./hub/service.js";
 import { MemoryRateLimiter } from "./limits/memory.js";
@@ -76,6 +83,8 @@ export interface AppDeps {
   /** The website's public reads (`/v1/public/*`); off when not given. */
   /** The signed-in member's dashboard (`/v1/me/home`); off when not given. */
   me?: { repo: MeRepository; imageUrl: (path: string) => string };
+  /** "Download your data" (`GET /v1/me/export`); with [store], else off. */
+  exports?: ExportRepository;
   browse?: {
     repo: BrowseRepository;
     limiter: RateLimiter;
@@ -191,28 +200,32 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     publicRankingRoutes(app, new PublicRankingService(deps.publicRankings, deps.now), deps.browse);
   }
   if (deps.store) {
-    membershipRoutes(app, new MembershipService(deps.store, deps.users, deps.teams, deps.now, undefined, clubAges));
+    membershipRoutes(app, new MembershipService(deps.store, deps.users, deps.teams, deps.now, undefined, clubAges, deps.queries));
     profileRoutes(app, new ProfileService(deps.store, deps.users), revalidate);
     accountRoutes(app, new AccountService(deps.store, deps.users, deps.media), revalidate);
     const queries = deps.queries ?? listDocQueries(deps.store);
     teamDeletionRoutes(app, new TeamDeletion(deps.store, deps.teams, deps.media, queries));
     if (personal) personalRoutes(app, personal);
+    if (deps.exports) exportRoutes(app, new ExportService(deps.exports, deps.store, deps.users, personal, deps.now));
     const reads = deps.writeLimits !== false ? writes : undefined;
     rosterRoutes(app, new RosterService(deps.store, deps.browse?.photoBuckets ?? []), reads);
     postRoutes(app, new PostService(deps.store, deps.users, deps.now), revalidate, reads);
     postEditorRoutes(app, new PostEditor(deps.store, deps.users, deps.media, deps.now), revalidate);
     followRoutes(app, new FollowService(deps.store, deps.users, deps.now));
     hubRoutes(app, new HubService(deps.store, deps.users, deps.media, deps.now), writes);
+    chatExtrasRoutes(app, new ChatExtrasService(deps.store, deps.users, deps.now), writes);
+    teamPostExtrasRoutes(app, new TeamPostExtrasService(deps.store, deps.users, deps.now), writes);
     const chats = new ChatAdmin(deps.store, deps.teams, deps.media);
     chatAdminRoutes(app, chats, writes);
     discordRoutes(app, new DiscordService(deps.store, chats), writes);
     playbookRoutes(app, new PlaybookService(deps.store), writes);
     meetingRoutes(app, new MeetingService(deps.store, deps.users, deps.teams, deps.livekit, deps.now), writes);
     videoRoutes(app, new VideoService(deps.store, deps.users, deps.media, queries), writes);
+    videoExtrasRoutes(app, new VideoExtrasService(deps.store, deps.users, deps.now), writes);
     draftRoutes(app, new DraftService(deps.store, deps.draftQueries ?? listDraftQueries(deps.store)), writes);
     statsRoutes(app, new StatsService(deps.store, queries), writes);
     groupTournamentRoutes(app, new GroupTournamentService(deps.store, deps.teams, queries), writes);
-    tournamentRoutes(app, new TournamentService(deps.store, queries), writes);
+    tournamentRoutes(app, new TournamentService(deps.store, queries, deps.now), writes);
     paymentRoutes(app, new PaymentService(deps.store, deps.payments, deps.now), deps.writeLimits !== false ? writes : undefined);
     conversationRoutes(app, new ConversationService(deps.store, deps.users, deps.media, deps.now), writes);
     if (deps.calendar) {

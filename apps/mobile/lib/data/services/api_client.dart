@@ -45,6 +45,14 @@ class ApiClient {
 
   static const _timeout = Duration(seconds: 20);
 
+  static const _offline = ApiException(
+    'unavailable',
+    "Couldn't reach the server. Check your connection and try again.",
+  );
+
+  /// The API's address, for the connection check (`GET /health`).
+  Uri get baseUrl => _base;
+
   /// POSTs [body] as JSON to [path] (like `/v1/teams`) and returns the
   /// decoded JSON answer.
   Future<Map<String, Object?>> post(String path, Map<String, Object?> body) =>
@@ -78,12 +86,19 @@ class ApiClient {
     if (user == null) {
       throw const ApiException('unauthenticated', 'Not signed in.');
     }
-    final idToken = await user.getIdToken();
+    final String? idToken;
+    final Map<String, String> appCheck;
+    try {
+      idToken = await user.getIdToken();
+      appCheck = await AppCheck.headers();
+    } on FirebaseAuthException catch (e) {
+      // Offline, an expired token can't be refreshed: that's the
+      // connection, not the account (the offline queue waits for it).
+      if (e.code == 'network-request-failed') throw _offline;
+      rethrow;
+    }
     final request = http.Request(method, _base.resolve(path))
-      ..headers.addAll({
-        'Authorization': 'Bearer $idToken',
-        ...await AppCheck.headers(),
-      });
+      ..headers.addAll({'Authorization': 'Bearer $idToken', ...appCheck});
     if (body != null) {
       request
         ..headers['Content-Type'] = 'application/json'
@@ -95,10 +110,7 @@ class ApiClient {
         await _client.send(request).timeout(timeout),
       ).timeout(timeout);
     } on Exception {
-      throw const ApiException(
-        'unavailable',
-        "Couldn't reach the server. Check your connection and try again.",
-      );
+      throw _offline;
     }
     return _decode(response);
   }

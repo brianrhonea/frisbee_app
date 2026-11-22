@@ -1,6 +1,7 @@
 "use client";
-import type { MemberProfilePage, ProfilePage, StatTotals } from "@stall10/shared";
+import { type MemberProfilePage, type ProfilePage, profileStatsChoice, type StatTotals } from "@stall10/shared";
 import { limit, orderBy, where } from "firebase/firestore";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ApiError, callApi, problem } from "@/lib/client";
 import { type Signal, useChangeSignal } from "@/lib/live";
@@ -37,11 +38,23 @@ export function LivePlayer({ uid }: { uid: string }) {
   const [attempt, setAttempt] = useState(0);
   const unlocked = member ? !member.locked : false;
   const privateDetails = unlocked && member?.profile.private === true;
+  // Every post for the member's own page or a private profile they're an
+  // accepted follower of (the rules check the follow); else public ones
+  // only, which the rules let anyone read (S1).
+  const allPosts = user?.uid === uid || privateDetails;
   const signals: Signal[] | null = user
     ? [
         { doc: `profiles/${uid}` },
         { doc: `users/${user.uid}/follows/user_${uid}` },
-        { collection: "posts", constraints: [where("authorId", "==", uid), orderBy("createdAt", "desc"), limit(20)] },
+        {
+          collection: "posts",
+          constraints: [
+            where("authorId", "==", uid),
+            ...(allPosts ? [] : [where("private", "==", false)]),
+            orderBy("createdAt", "desc"),
+            limit(20),
+          ],
+        },
         // A private profile's details: only once the rules let this member read them.
         ...(privateDetails ? [{ doc: `profiles/${uid}/private/details` }] : []),
       ]
@@ -112,7 +125,25 @@ function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePage; loc
   const { profile, posts } = page;
   const name = profile.name || "Player";
   const first = name.split(" ")[0];
-  const seasons = Object.entries(profile.stats ?? {}).sort(([a], [b]) => b.localeCompare(a));
+  // The Team filter (the app's too): one team's numbers, kept in ?team=.
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const choice = profileStatsChoice(profile, params.get("team"));
+  const pickTeam = (team: string) => {
+    const next = new URLSearchParams(params.toString());
+    if (team) next.set("team", team);
+    else next.delete("team");
+    const q = next.toString();
+    router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+  };
+  const picked = choice.options.find((t) => t.id === choice.team);
+  const seasons = Object.entries(choice.seasons).sort(([a], [b]) => b.localeCompare(a));
+  const career = seasons.reduce<StatTotals>((sum, [, s]) => {
+    const out: StatTotals = { ...sum };
+    for (const [k] of statColumns) out[k] = (sum[k] ?? 0) + (s[k] ?? 0);
+    return out;
+  }, {});
   const follow = <FollowButton targetId={uid} isPrivate={profile.private === true} signUpNext={`/players/${uid}`} />;
   // Follow and Message, as the app's profile header has them.
   const actions = (
@@ -141,7 +172,7 @@ function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePage; loc
   const side = (
     <>
       <ProfileCard profile={profile} actions={actions} />
-      {profile.visibility?.stats !== false && <StatTiles stats={profile.stats} />}
+      {profile.visibility?.stats !== false && <StatTiles stats={choice.seasons} teamName={picked?.name} />}
       {profile.visibility?.teams !== false && (
         <TeamList teams={(profile.teams ?? []).map((t) => ({ id: t.id, name: t.name, subtitle: t.subtitle }))} />
       )}
@@ -153,7 +184,22 @@ function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePage; loc
       <DashboardLayout side={side}>
         {seasons.length > 0 && profile.visibility?.stats !== false && (
           <div className="card">
-            <h2 className="card-title">Career</h2>
+            <div className="card-head">
+              <h2 className="card-title">{picked ? `Career · ${picked.name}` : "Career"}</h2>
+              {choice.options.length > 0 && (
+                <label className="stats-team-filter">
+                  <span className="sr-only">Team</span>
+                  <select value={choice.team ?? ""} onChange={(e) => pickTeam(e.target.value)}>
+                    <option value="">All teams</option>
+                    {choice.options.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </div>
             <div className="table-scroll">
               <table className="stats-table">
                 <thead>
@@ -173,6 +219,14 @@ function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePage; loc
                       ))}
                     </tr>
                   ))}
+                  {seasons.length > 1 && (
+                    <tr className="stats-total">
+                      <td>Career</td>
+                      {statColumns.map(([k]) => (
+                        <td key={k}>{career[k] ?? 0}</td>
+                      ))}
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

@@ -1,8 +1,8 @@
 "use client";
 // Finding hosted tournaments and leagues: upcoming ones anyone signed in
 // can find (FindTournamentsScreen), a host's own list on its hub with what
-// a team plays in (HostedTournamentsSection), and picking who hosts a new
-// one (HostEventScreen).
+// a team plays in (HostedTournamentsSection). Picking who hosts a new one
+// (HostEventScreen) is HostEvent.tsx.
 import {
   type EnteredTournamentDoc,
   entryStatusLabels,
@@ -14,20 +14,20 @@ import {
   type HostedType,
   hostedTypeLabels,
   publishedStatuses,
+  spotsLabel,
   type TournamentDoc,
+  type TournamentSpots,
   divisionLabel,
 } from "@stall10/shared";
 import { limit, orderBy, where } from "firebase/firestore";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
-import type { TeamDoc } from "@/components/team/TeamContext";
 import { type Doc, useLiveQuery } from "@/lib/live";
-import { canOn } from "./useTournament";
 import "./tournaments.css";
+import { useTournamentSpots } from "./useTournamentSpots";
 import { formatDate, startOfToday } from "@/lib/dates";
 import { dayKey, localeFor, useRenderZone } from "@/lib/renderZone";
-import { useMyTeams } from "../useMyTeams";
 
 export const tournamentHref = (id: string) => `/tournaments/${encodeURIComponent(id)}`;
 
@@ -48,15 +48,46 @@ export function datesLabel(startsOn: string | null | undefined, endsOn: string |
 export type CardTournament = Pick<
   Doc<TournamentDoc>,
   "id" | "name" | "hostName" | "hostOfficial" | "kind" | "entryType" | "teamEntry" | "divisions" | "visibility" | "startsOn" | "endsOn" | "location" | "status"
-> & { bidFee: { amountCents: number; currency: string } | null };
+> & {
+  bidFee: { amountCents: number; currency: string } | null;
+  /** A visitor's public card carries its spots left (PublicHostedCard.spots); members' come from useTournamentSpots. */
+  spots?: TournamentSpots;
+};
+
+/**
+ * "3 spots left" while registration is open: turf while there's room,
+ * neutral "Full · waitlist" once there isn't (never amber: that's only
+ * the viewer's own to-dos).
+ */
+export function SpotsLeft({ spots }: { spots: TournamentSpots }) {
+  return <small className={`spots-left${spots.left <= 0 ? " spots-full" : ""}`}>{spotsLabel(spots)}</small>;
+}
 
 export function StatusBadge({ status }: { status: HostedStatus }) {
   return <span className={`pill hosted-status hosted-${status}`}>{hostedStatusLabels[status] ?? status}</span>;
 }
 
+/** The first day as a date tile (month over the day number), in [zone]. */
+function DateTile({ iso, zone }: { iso: string | null | undefined; zone?: string }) {
+  return (
+    <span className="event-date" aria-hidden="true">
+      {iso ? (
+        <>
+          <small>{dayFmt(iso, { month: "short" }, zone)}</small>
+          <b>{dayFmt(iso, { day: "numeric" }, zone)}</b>
+        </>
+      ) : (
+        <b>–</b>
+      )}
+    </span>
+  );
+}
+
 /** One tournament in a list (HostedTournamentCard). */
 export function TournamentCard({ t, showHost = true }: { t: CardTournament; showHost?: boolean }) {
   const zone = useRenderZone();
+  const fetched = useTournamentSpots();
+  const spots = t.spots ?? fetched.get(t.id);
   const type = hostedType(t);
   const fee = t.bidFee;
   const meta = [
@@ -68,6 +99,7 @@ export function TournamentCard({ t, showHost = true }: { t: CardTournament; show
   ].filter(Boolean);
   return (
     <Link href={tournamentHref(t.id)} className="row-card">
+      <DateTile iso={t.startsOn} zone={zone} />
       <span>
         <b>
           {t.name || "Tournament"}
@@ -75,6 +107,7 @@ export function TournamentCard({ t, showHost = true }: { t: CardTournament; show
         </b>
         <small>{[datesLabel(t.startsOn, t.endsOn, zone), t.location].filter(Boolean).join(" · ")}</small>
         {meta.length > 0 && <small>{meta.join(" · ")}</small>}
+        {spots && t.status === "registration" && <SpotsLeft spots={spots} />}
       </span>
       <StatusBadge status={t.status} />
     </Link>
@@ -167,7 +200,7 @@ export function TournamentFinder({ list, visitor }: { list: CardTournament[]; vi
   return (
     <div className="stack">
       <div className="hosted-toolbar">
-        <input type="search" placeholder="Search by name, host or place" value={f.query} onChange={(e) => f.setQuery(e.target.value)} aria-label="Search tournaments" />
+        <input className="search-input" type="search" placeholder="Search by name, host or place" value={f.query} onChange={(e) => f.setQuery(e.target.value)} aria-label="Search tournaments" />
         {!visitor && (
           <Link className="btn btn-primary btn-small" href="/tournaments/host">
             Host an event
@@ -248,71 +281,6 @@ export function HostedTournamentsSection({ teamId, kind, manager, member }: { te
         </p>
       ) : (
         f.shown.map((t) => <TournamentCard key={t.id} t={t} showHost={false} />)
-      )}
-    </div>
-  );
-}
-
-const sections = [
-  { key: "official", title: "Official organizer", blurb: "Events you run for an official organizer like Stall 10 carry its verified badge." },
-  { key: "organization", title: "Your schools and clubs", blurb: "Host for everyone in the school or club, across its teams." },
-  { key: "community", title: "Your community groups", blurb: "Pickup and hat events for the group to sign up to." },
-  { key: "team", title: "Your teams", blurb: "Host as a team, for example your own tournament." },
-] as const;
-
-/** Who can host: the teams, groups and schools or clubs the viewer has Manage events on (HostEventScreen). */
-export function HostEvent() {
-  const { user } = useAuth();
-  const [type, setType] = useState<HostedType>("league");
-  const mine = useMyTeams<TeamDoc & { official?: boolean }>(user?.uid);
-  if (mine.error) return <p className="form-error">{mine.error}</p>;
-  if (!mine.data) return <p className="muted" aria-busy="true">Loading…</p>;
-  const hosts = mine.data.filter((t) => canOn(t, user?.uid, "manageEvents")).sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
-  const of = (key: (typeof sections)[number]["key"]) =>
-    hosts.filter((t) => (key === "official" ? t.official : !t.official && (t.kind ?? "team") === key));
-  return (
-    <div className="stack">
-      <div className="segmented" role="group" aria-label="What to host">
-        {(["league", "tournament", "hat"] as HostedType[]).map((k) => (
-          <button key={k} type="button" className={type === k ? "on" : ""} onClick={() => setType(k)}>
-            {hostedTypeLabels[k]}
-          </button>
-        ))}
-      </div>
-      {hosts.length === 0 ? (
-        <div className="card">
-          <h2 className="card-title">Start a group to host</h2>
-          <p className="muted">
-            Events are run by a team, group or school or club, so they have organizers, a page and followers. Ask to manage
-            events on one you&apos;re in, or start one.
-          </p>
-          <div className="home-actions">
-            <Link className="btn btn-primary btn-small" href="/teams/new">
-              Start a team or group
-            </Link>
-          </div>
-        </div>
-      ) : (
-        sections.map((s) => {
-          const list = of(s.key);
-          if (list.length === 0) return null;
-          return (
-            <section key={s.key} className="stack">
-              <div>
-                <h2 className="section-title">{s.title}</h2>
-                <p className="muted">{s.blurb}</p>
-              </div>
-              {list.map((t) => (
-                <Link key={t.id} className="row-card" href={`/tournaments/new?host=${encodeURIComponent(t.id)}&type=${type}`}>
-                  <span>
-                    <b>{t.name || "Team"}</b>
-                    <small>Host a {hostedTypeLabels[type].toLowerCase()} as {t.name}</small>
-                  </span>
-                </Link>
-              ))}
-            </section>
-          );
-        })
       )}
     </div>
   );

@@ -20,6 +20,7 @@ import {
   leagueGameEvent,
   newEvent,
   newLeagueGameEvent,
+  onlyLiveChanged,
   recordUpdate,
 } from "./model";
 
@@ -132,6 +133,8 @@ export const leagueGameEvents = onDocumentWritten(
     const db = getFirestore();
     const before = event.data?.before.data() as Data | undefined;
     const after = event.data?.after.data() as Data | undefined;
+    // A running score changes nothing on the teams' schedules.
+    if (onlyLiveChanged(before, after)) return;
     const tournamentRef = db.doc(`tournaments/${tournamentId}`);
     const [tournamentSnap, divisionSnap, gameSnap] = await Promise.all([
       tournamentRef.get(),

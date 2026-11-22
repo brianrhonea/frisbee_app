@@ -31,6 +31,70 @@
     }
   },
   {
+    "case": "team that takes join requests (F26)",
+    "team": {
+      "name": "Rival",
+      "division": "open",
+      "level": "college",
+      "city": "Austin",
+      "ownerId": "u1",
+      "allowJoinRequests": true
+    },
+    "listing": {
+      "name": "Rival",
+      "division": "open",
+      "level": "college",
+      "city": "Austin",
+      "allowJoinRequests": true,
+      "keywords": [
+        "r",
+        "ri",
+        "riv",
+        "riva",
+        "rival",
+        "a",
+        "au",
+        "aus",
+        "aust",
+        "austi",
+        "austin"
+      ]
+    }
+  },
+  {
+    "case": "a group never lists allowJoinRequests",
+    "team": {
+      "name": "Open Pickup",
+      "division": "mixed",
+      "level": "pickup",
+      "kind": "community",
+      "requiresApproval": false,
+      "allowJoinRequests": true
+    },
+    "listing": {
+      "name": "Open Pickup",
+      "division": "mixed",
+      "level": "pickup",
+      "city": "",
+      "kind": "community",
+      "description": "",
+      "requiresApproval": false,
+      "location": null,
+      "keywords": [
+        "o",
+        "op",
+        "ope",
+        "open",
+        "p",
+        "pi",
+        "pic",
+        "pick",
+        "picku",
+        "pickup"
+      ]
+    }
+  },
+  {
     "case": "official team without a city",
     "team": {
       "name": "Stall 10",

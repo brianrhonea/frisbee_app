@@ -245,7 +245,8 @@ void main() {
     expect(pushParent('/team-events/t/e'), '/teams/t?section=events');
     expect(pushParent('/team-meetings/t/m/room'), '/teams/t?section=events');
     expect(pushParent('/my-events/e'), '/schedule');
-    expect(pushParent('/tournaments/x'), '/schedule');
+    // Tournaments are found on Discover.
+    expect(pushParent('/tournaments/x'), '/explore');
     expect(pushParent('/group-tournaments/g/x'), '/teams/g');
     expect(pushParent('/messages/a'), isNull);
     expect(pushParent('/teams/t/chats/r'), isNull);

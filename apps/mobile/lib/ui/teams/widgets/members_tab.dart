@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
+import '../../../routing/push_team_route.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
+import '../../core/ui/layout.dart';
 import '../../core/ui/status_views.dart';
 import '../../core/ui/view_model_host.dart';
 import '../view_models/invite_code_viewmodel.dart';
 import '../view_models/team_detail_viewmodel.dart';
 import 'invite_code_card.dart';
 import 'invite_members_dialog.dart';
+import 'member_permissions_dialog.dart';
 import 'roles_screen.dart';
 
 class MembersTab extends StatelessWidget {
@@ -20,6 +25,7 @@ class MembersTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = AppColors.of(context);
     final team = viewModel.team!;
     final members = team.members.entries.toList()
       ..sort((a, b) {
@@ -36,7 +42,11 @@ class MembersTab extends StatelessWidget {
             Align(
               alignment: Alignment.centerLeft,
               child: FilledButton.icon(
-                onPressed: () => showInviteMembers(context, team),
+                onPressed: () async {
+                  await showInviteMembers(context, team);
+                  // Anyone just invited shows under Invites pending.
+                  viewModel.loadInvites.execute();
+                },
                 icon: const Icon(Icons.person_search),
                 label: Text(
                   team.isCommunity ? 'Invite members' : 'Invite players',
@@ -56,46 +66,160 @@ class MembersTab extends StatelessWidget {
             ),
             const SizedBox(height: 16),
           ],
-          if (team.isCommunity && viewModel.joinRequests.isNotEmpty) ...[
+          if (viewModel.joinRequests.isNotEmpty) ...[
             _JoinRequests(viewModel: viewModel),
             const SizedBox(height: 16),
           ],
           _RolesHelp(team: team, isOwner: viewModel.isOwner),
-          const SizedBox(height: 16),
-          Text(
-            '${members.length} member${members.length == 1 ? '' : 's'}',
-            style: Theme.of(context).textTheme.titleSmall,
-          ),
-          const SizedBox(height: 8),
-          for (final m in members)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              onTap: () => context.push(Routes.player(m.key)),
-              leading: CircleAvatar(
-                child: Text(team.nameOf(m.key)[0].toUpperCase()),
-              ),
-              title: Text(
-                team.nameOf(m.key) + (m.key == viewModel.uid ? ' (you)' : ''),
-              ),
-              subtitle: _MemberRoles(team: team, uid: m.key, tier: m.value),
-              trailing: viewModel.canManage(m.key)
-                  ? _MemberMenu(
-                      viewModel: viewModel,
-                      uid: m.key,
-                      name: team.nameOf(m.key),
-                      role: m.value,
-                      team: team,
-                      statKeeper: team.isStatKeeper(m.key),
-                    )
-                  : null,
+          const SizedBox(height: 18),
+          Padding(
+            padding: const EdgeInsets.only(left: 2, bottom: 8),
+            child: Eyebrow(
+              '${members.length} member${members.length == 1 ? '' : 's'}',
             ),
+          ),
+          Card(
+            margin: EdgeInsets.zero,
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                for (final (i, m) in members.indexed) ...[
+                  if (i > 0) Divider(height: 1, color: c.border),
+                  ListTile(
+                    contentPadding: const EdgeInsets.fromLTRB(14, 2, 4, 2),
+                    onTap: () => context.push(Routes.player(m.key)),
+                    leading: PersonAvatar(name: team.nameOf(m.key), radius: 18),
+                    title: Text.rich(
+                      TextSpan(
+                        text: team.nameOf(m.key),
+                        children: [
+                          if (m.key == viewModel.uid)
+                            TextSpan(
+                              text: ' (you)',
+                              style: TextStyle(
+                                color: c.muted,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                        ],
+                      ),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        color: c.ink,
+                      ),
+                    ),
+                    subtitle: _MemberRoles(
+                      team: team,
+                      uid: m.key,
+                      tier: m.value,
+                    ),
+                    trailing: viewModel.canManage(m.key)
+                        ? _MemberMenu(
+                            viewModel: viewModel,
+                            uid: m.key,
+                            name: team.nameOf(m.key),
+                            role: m.value,
+                            team: team,
+                            statKeeper: team.isStatKeeper(m.key),
+                          )
+                        : null,
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (viewModel.canSeeInvites &&
+              viewModel.pendingInvites.isNotEmpty) ...[
+            const SizedBox(height: 18),
+            _PendingInvites(viewModel: viewModel),
+          ],
         ],
       ),
     );
   }
 }
 
-/// People waiting to join a group that requires approval.
+/// "Invites pending": who's been invited and hasn't answered, for those
+/// who invite people, each with who invited them and Withdraw. Neutral:
+/// it's the invitees' move, not the admin's.
+class _PendingInvites extends StatelessWidget {
+  const _PendingInvites({required this.viewModel});
+
+  final TeamDetailViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final invites = viewModel.pendingInvites;
+    final day = DateFormat.MMMd();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 2, bottom: 8),
+          child: Eyebrow('Invites pending · ${invites.length}'),
+        ),
+        Card(
+          margin: EdgeInsets.zero,
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              for (final (i, invite) in invites.indexed) ...[
+                if (i > 0) Divider(height: 1, color: c.border),
+                ListTile(
+                  contentPadding: const EdgeInsets.fromLTRB(14, 2, 4, 2),
+                  leading: PersonAvatar(
+                    name: invite.name,
+                    photoUrl: invite.photoUrl,
+                    radius: 18,
+                  ),
+                  title: Text(
+                    invite.name,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                      color: c.ink,
+                    ),
+                  ),
+                  subtitle: Text(
+                    [
+                      if (invite.invitedByName.isNotEmpty)
+                        'Invited by ${invite.invitedByName}'
+                      else
+                        'Invited',
+                      if (invite.invitedAt case final at?) day.format(at),
+                    ].join(' · '),
+                  ),
+                  trailing: TextButton(
+                    onPressed: viewModel.withdrawInvite.running
+                        ? null
+                        : () async {
+                            if (await confirmDialog(
+                              context,
+                              title: 'Withdraw the invite to ${invite.name}?',
+                              message:
+                                  "They won't be able to join with it any more.",
+                              confirmLabel: 'Withdraw',
+                            )) {
+                              viewModel.withdrawInvite.execute(invite.uid);
+                            }
+                          },
+                    child: const Text('Withdraw'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// People waiting to join a group that requires approval, or a team that
+/// allows join requests (F26). Approving runs the server's join checks
+/// (a club team's age rule among them), so it can be refused.
 class _JoinRequests extends StatelessWidget {
   const _JoinRequests({required this.viewModel});
 
@@ -103,50 +227,65 @@ class _JoinRequests extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final c = AppColors.of(context);
     final requests = viewModel.joinRequests;
-    return Card(
-      color: theme.colorScheme.secondaryContainer,
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${requests.length} '
-              '${requests.length == 1 ? 'person wants' : 'people want'} '
-              'to join',
-              style: theme.textTheme.titleSmall,
+    // Requests are the admin's to act on: the one amber card on the tab.
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 10, 6),
+      decoration: BoxDecoration(
+        color: c.highlightSoft,
+        borderRadius: BorderRadius.circular(cardRadius),
+        border: Border.all(color: c.highlight.withValues(alpha: 0.45)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${requests.length} '
+            '${requests.length == 1 ? 'person wants' : 'people want'} '
+            'to join',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.4,
+              color: c.highlightInk,
             ),
-            for (final r in requests)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: CircleAvatar(
-                  child: Text(r.name.isEmpty ? '?' : r.name[0].toUpperCase()),
-                ),
-                title: Text(r.name.isEmpty ? 'Someone' : r.name),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      tooltip: 'Decline',
-                      icon: const Icon(Icons.close),
-                      onPressed: viewModel.declineJoinRequest.running
-                          ? null
-                          : () => viewModel.declineJoinRequest.execute(r.uid),
-                    ),
-                    FilledButton.tonal(
-                      onPressed: viewModel.approveJoinRequest.running
-                          ? null
-                          : () => viewModel.approveJoinRequest.execute(r),
-                      child: const Text('Approve'),
-                    ),
-                  ],
-                ),
+          ),
+          for (final r in requests)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: PersonAvatar(
+                name: r.name.isEmpty ? '?' : r.name,
+                radius: 18,
               ),
-          ],
-        ),
+              title: Text(
+                r.name.isEmpty ? 'Someone' : r.name,
+                style: TextStyle(fontWeight: FontWeight.w700, color: c.ink),
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextButton(
+                    onPressed: viewModel.declineJoinRequest.running
+                        ? null
+                        : () => viewModel.declineJoinRequest.execute(r.uid),
+                    child: const Text('Decline'),
+                  ),
+                  const SizedBox(width: 4),
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: c.highlight,
+                      foregroundColor: c.onHighlight,
+                    ),
+                    onPressed: viewModel.approveJoinRequest.running
+                        ? null
+                        : () => viewModel.approveJoinRequest.execute(r),
+                    child: const Text('Approve'),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -167,16 +306,30 @@ class _MemberRoles extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final roles = team.rolesOf(uid);
-    final label = team.isStatKeeper(uid)
-        ? '${team.roleLabel(tier)} · Stats'
-        : team.roleLabel(tier);
-    if (roles.isEmpty) return Text(label);
+    // Their own permissions (the owner's switches) by preset name, or
+    // Custom; stats access alone reads as before.
+    final own = tier == TeamRole.player
+        ? team.ownPermissionsOf(uid)
+        : const <TeamPermission>{};
+    final preset = RolePreset.matching(own, team.isCommunity);
+    final label = own.isEmpty
+        ? team.roleLabel(tier)
+        : '${team.roleLabel(tier)} · '
+              '${preset?.id == 'statKeeper' ? 'Stats' : preset?.name ?? 'Custom'}';
+    // Staff tiers (owner, coach, captain) and members with permissions of
+    // their own stand out as a tag; a plain player or member is just text.
+    final Widget tierLabel = tier == TeamRole.player && own.isEmpty
+        ? Text(label)
+        : Tag(label);
+    if (roles.isEmpty) {
+      return Align(alignment: Alignment.centerLeft, child: tierLabel);
+    }
     return Wrap(
       spacing: 10,
       runSpacing: 2,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        Text(label),
+        tierLabel,
         for (final r in roles)
           Row(
             mainAxisSize: MainAxisSize.min,
@@ -300,6 +453,15 @@ class _MemberMenu extends StatelessWidget {
             if (picked != null) {
               vm.setMemberRoles.execute((uid: uid, roleIds: picked));
             }
+          case 'perms':
+            final picked = await showMemberPermissions(
+              context,
+              team: team,
+              uid: uid,
+            );
+            if (picked != null) {
+              vm.setMemberPermissions.execute((uid: uid, permissions: picked));
+            }
           case 'stats':
             vm.setStatKeeper.execute((uid: uid, on: !statKeeper));
           case 'owner':
@@ -307,7 +469,7 @@ class _MemberMenu extends StatelessWidget {
               context,
               title: 'Make $name the owner?',
               message: _isGroup
-                  ? 'They get full control of the group. You become a '
+                  ? 'They get full control of the community. You become a '
                         "member and can't undo this yourself."
                   : 'They get full control of the team. You become a '
                         "player and can't undo this yourself.",
@@ -321,7 +483,7 @@ class _MemberMenu extends StatelessWidget {
               context,
               title: 'Remove $name?',
               message:
-                  'They will lose access to this ${_isGroup ? 'group' : 'team'}.',
+                  'They will lose access to this ${_isGroup ? 'community' : 'team'}.',
               confirmLabel: 'Remove',
               destructive: true,
             )) {
@@ -335,6 +497,10 @@ class _MemberMenu extends StatelessWidget {
           // captains from before roles can still be moved down.
           if (role != TeamRole.player)
             const PopupMenuItem(value: 'role', child: Text('Change role')),
+          // A preset or per-person switches (players and members only:
+          // the owner and legacy coaches and captains have everything).
+          if (vm.canSetPermissions(uid))
+            const PopupMenuItem(value: 'perms', child: Text('Permissions')),
           if (team.roles.isNotEmpty)
             const PopupMenuItem(value: 'roles', child: Text('Assign roles')),
           // Every other role already keeps stats; groups don't keep any.
@@ -350,7 +516,7 @@ class _MemberMenu extends StatelessWidget {
         if (vm.canRemove(uid))
           PopupMenuItem(
             value: 'remove',
-            child: Text('Remove from ${_isGroup ? 'group' : 'team'}'),
+            child: Text('Remove from ${_isGroup ? 'community' : 'team'}'),
           ),
       ],
     );
@@ -421,7 +587,8 @@ class _RolesHelp extends StatelessWidget {
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton.icon(
-                onPressed: () => context.push(Routes.teamRoles(team.id)),
+                onPressed: () =>
+                    pushTeamRoute(context, Routes.teamRoles(team.id)),
                 icon: const Icon(Icons.tune),
                 label: const Text('Manage roles'),
               ),

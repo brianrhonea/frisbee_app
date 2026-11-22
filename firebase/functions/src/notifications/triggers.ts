@@ -30,7 +30,9 @@ import {
   eventChange,
   eventChangeNotice,
   eventViewers,
+  joinApprovedNotice,
   joinRequestNotice,
+  joinRequestRecipients,
   teamInviteNotice,
   calendarInviteNotice,
   meetingCancelledNotice,
@@ -57,6 +59,8 @@ import {
   type TeamDoc,
   teamPostNotice,
   userPostNotice,
+  videoCommentNotice,
+  videoCommentRecipients,
 } from "./model";
 
 const hour = 60 * 60 * 1000;
@@ -231,20 +235,69 @@ export const teamPlay = onDocumentWrittenWithAuthContext(
   },
 );
 
-/** A request to join a group that needs approval: the group's owner. */
+/** A comment on a team video (F5): the video's author (videoCommentRecipients). */
+export const videoComment = onDocumentCreated(
+  "teams/{teamId}/videos/{videoId}/comments/{commentId}",
+  async (event) => {
+    const comment = event.data?.data();
+    if (!comment) return;
+    const { teamId, videoId, commentId } = event.params;
+    const [team, video] = await Promise.all([
+      liveTeam(teamId),
+      getFirestore().doc(`teams/${teamId}/videos/${videoId}`).get(),
+    ]);
+    const videoData = video.data();
+    if (!team || !videoData) return;
+    const recipients = videoCommentRecipients(team, videoData, comment);
+    if (recipients.length === 0) return;
+    await deliver(
+      getFirestore(),
+      getMessaging(),
+      recipients,
+      videoCommentNotice({ teamId, videoId, teamName: teamName(team), video: videoData, comment, commentId }),
+    );
+  },
+);
+
+/**
+ * A request to join a group that needs approval, or a team that allows
+ * requests (F26): the owner and the admins who answer them.
+ */
 export const groupJoinRequest = onDocumentCreated(
   "teams/{teamId}/joinRequests/{userId}",
   async (event) => {
     const request = event.data?.data();
     if (!request) return;
-    const { teamId } = event.params;
+    const { teamId, userId } = event.params;
     const team = await liveTeam(teamId);
-    if (!team?.ownerId) return;
+    if (!team) return;
+    const recipients = joinRequestRecipients(team, userId);
+    if (recipients.length === 0) return;
     await deliver(
       getFirestore(),
       getMessaging(),
-      [team.ownerId],
+      recipients,
       joinRequestNotice({ teamId, teamName: teamName(team), request }),
+    );
+  },
+);
+
+/**
+ * A join request went (F26): if the asker is now a member it was approved
+ * (approving adds them and clears it in one write), so tell them. Declined
+ * or withdrawn requests leave them outside: no push.
+ */
+export const joinRequestApproved = onDocumentDeleted(
+  "teams/{teamId}/joinRequests/{userId}",
+  async (event) => {
+    const { teamId, userId } = event.params;
+    const team = await liveTeam(teamId);
+    if (!team || !(team.memberIds ?? []).includes(userId)) return;
+    await deliver(
+      getFirestore(),
+      getMessaging(),
+      [userId],
+      joinApprovedNotice({ teamId, teamName: teamName(team), group: team.kind === "community" || team.kind === "organization" }),
     );
   },
 );
@@ -341,7 +394,9 @@ export const userPost = onDocumentCreated("posts/{postId}", async (event) => {
   const { postId } = event.params;
   const authorId = String(post.authorId ?? "");
   const reposted = repostOf(post);
-  const followers = await notifyingFollowers(followKeys({ authorId, post }));
+  const privateAuthor =
+    post.private === true || (authorId !== "" && (await getFirestore().doc(`profiles/${authorId}`).get()).get("private") === true);
+  const followers = await notifyingFollowers(followKeys({ authorId, post, privateAuthor }));
   await deliver(
     getFirestore(),
     getMessaging(),
@@ -533,7 +588,8 @@ export const postRemoved = onDocumentDeleted("posts/{postId}", async (event) => 
 
 /**
  * A team or group post: followers of the team, or of the tournament it's
- * about. Members-only posts go only to followers who are members.
+ * about. Members-only posts go only to followers who are members, and so
+ * do public ones while the team's public page is off.
  */
 export const teamPost = onDocumentCreated("teams/{teamId}/posts/{postId}", async (event) => {
   const post = event.data?.data();
@@ -545,7 +601,11 @@ export const teamPost = onDocumentCreated("teams/{teamId}/posts/{postId}", async
   await deliver(
     getFirestore(),
     getMessaging(),
-    postRecipients(followers, String(post.authorId ?? ""), post.public === true ? undefined : team.memberIds ?? []),
+    postRecipients(
+      followers,
+      String(post.authorId ?? ""),
+      post.public === true && team.publicPage !== false ? undefined : team.memberIds ?? [],
+    ),
     teamPostNotice({ teamId, teamName: teamName(team), post }),
   );
 });

@@ -42,6 +42,12 @@ export function membershipRoutes(app: FastifyInstance, m: MembershipService) {
     await m.invite(requireCaller(req), params(req).teamId, req.body);
     return ok;
   });
+  app.get("/v1/teams/:teamId/invites", async (req) => m.pendingInvites(requireCaller(req), params(req).teamId));
+  app.delete("/v1/teams/:teamId/invites/:uid", async (req) => {
+    const { teamId, uid } = params(req);
+    await m.withdrawInvite(requireCaller(req), teamId, uid);
+    return ok;
+  });
   app.post("/v1/me/team-invites/:teamId/accept", async (req) => {
     await m.acceptInvite(requireCaller(req), params(req).teamId);
     return ok;
@@ -67,6 +73,11 @@ export function membershipRoutes(app: FastifyInstance, m: MembershipService) {
     await m.setStatKeeper(requireCaller(req), teamId, uid, req.body);
     return ok;
   });
+  app.put("/v1/teams/:teamId/members/:uid/permissions", async (req) => {
+    const { teamId, uid } = params(req);
+    await m.setMemberPermissions(requireCaller(req), teamId, uid, req.body);
+    return ok;
+  });
   app.post("/v1/teams/:teamId/owner", async (req) => {
     await m.transferOwnership(requireCaller(req), params(req).teamId, req.body);
     return ok;
@@ -80,6 +91,18 @@ export function membershipRoutes(app: FastifyInstance, m: MembershipService) {
   // Details
   app.patch("/v1/teams/:teamId", async (req) => {
     await m.editTeam(requireCaller(req), params(req).teamId, req.body);
+    return ok;
+  });
+  app.put("/v1/teams/:teamId/sections", async (req) => {
+    await m.setSections(requireCaller(req), params(req).teamId, req.body);
+    return ok;
+  });
+  app.put("/v1/teams/:teamId/public-page", async (req) => {
+    await m.setPublicPage(requireCaller(req), params(req).teamId, req.body);
+    return ok;
+  });
+  app.put("/v1/teams/:teamId/allow-join-requests", async (req) => {
+    await m.setAllowJoinRequests(requireCaller(req), params(req).teamId, req.body);
     return ok;
   });
   app.put("/v1/teams/:teamId/listing", async (req) => {

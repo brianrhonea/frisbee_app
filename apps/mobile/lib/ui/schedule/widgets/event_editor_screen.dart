@@ -9,16 +9,20 @@ import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/themes/theme.dart';
 import '../../core/ui/back_or.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/overlay_panel.dart';
+import '../../core/ui/scoreboard.dart' show TeamDot;
 import '../../core/ui/status_views.dart';
 import '../../core/ui/view_model_host.dart';
 import '../../../data/repositories/calendar/calendar_repository.dart';
 import '../../../data/repositories/user_post/user_post_repository.dart';
 import '../view_models/event_editor_viewmodel.dart';
-import 'event_style.dart';
+import '../../core/ui/time_picker.dart';
+import '../../../data/repositories/profile/profile_repository.dart';
+import 'new_shared_calendar_sheet.dart';
 
 /// Opens the event editor over the current page, like the post composer:
 /// a card on wide screens, a bottom sheet on phones. Adds an event to
@@ -44,6 +48,7 @@ Future<String?> showEventEditor(
         authRepository: c.read(),
         postRepository: c.read<UserPostRepository?>(),
         calendarRepository: c.read<CalendarRepository?>(),
+        profileRepository: readOptional<ProfileRepository>(c),
       ),
       builder: (_, vm) =>
           EventEditorScreen(viewModel: vm, inPanel: true, fitContent: fit),
@@ -402,12 +407,15 @@ class _EventFormState extends State<_EventForm> {
   }
 
   Future<void> _pickStart() async {
-    final picked = await showTimePicker(context: context, initialTime: _start);
+    final picked = await showTypedTimePicker(
+      context: context,
+      initialTime: _start,
+    );
     if (picked != null) setState(() => _start = picked);
   }
 
   Future<void> _pickEnd() async {
-    final picked = await showTimePicker(
+    final picked = await showTypedTimePicker(
       context: context,
       initialTime:
           _end ??
@@ -469,6 +477,21 @@ class _EventFormState extends State<_EventForm> {
             picker,
             const SizedBox(height: 16),
           ],
+          const FieldLabel('Type'),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final t in widget.types)
+                ChoiceChip(
+                  showCheckmark: false,
+                  label: Text(t.label),
+                  selected: _type == t,
+                  onSelected: (_) => setState(() => _picked = t),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
           TextFormField(
             controller: _title,
             autofocus: widget.initial.isNew,
@@ -478,20 +501,6 @@ class _EventFormState extends State<_EventForm> {
                 v == null || v.trim().isEmpty ? 'Enter a title' : null,
           ),
           const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final t in widget.types)
-                ChoiceChip(
-                  avatar: Icon(t.icon, size: 18),
-                  label: Text(t.label),
-                  selected: _type == t,
-                  onSelected: (_) => setState(() => _picked = t),
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
           LayoutBuilder(
             builder: (context, c) {
               final date = PickerField(
@@ -570,30 +579,35 @@ class _EventFormState extends State<_EventForm> {
             ),
           ],
           if (widget.allowPoll) ...[
-            if (widget.allowPublic)
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                secondary: const Icon(Icons.public),
-                title: const Text('Public'),
-                subtitle: Text(
-                  _public
-                      ? 'Shown on the team page to anyone who finds the team. '
-                            'RSVPs and polls stay private.'
-                      : 'Only team members can see it',
+            const SizedBox(height: 16),
+            SettingsCard(
+              children: [
+                if (widget.allowPublic)
+                  SwitchListTile(
+                    secondary: const Icon(Icons.public),
+                    title: const Text('Public'),
+                    subtitle: Text(
+                      _public
+                          ? 'Shown on the team page to anyone who finds the team. '
+                                'RSVPs and polls stay private.'
+                          : 'Only team members can see it',
+                    ),
+                    value: _public,
+                    onChanged: (v) => setState(() => _public = v),
+                  ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.poll_outlined),
+                  title: const Text('Add a poll'),
+                  subtitle: const Text(
+                    'e.g. "Who can drive?" or "Pick a jersey"',
+                  ),
+                  value: _hasPoll,
+                  onChanged: _togglePoll,
                 ),
-                value: _public,
-                onChanged: (v) => setState(() => _public = v),
-              ),
-            const Divider(height: 32),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              secondary: const Icon(Icons.poll_outlined),
-              title: const Text('Add a poll'),
-              subtitle: const Text('e.g. "Who can drive?" or "Pick a jersey"'),
-              value: _hasPoll,
-              onChanged: _togglePoll,
+              ],
             ),
             if (_hasPoll) ...[
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _question,
                 maxLength: 200,
@@ -639,7 +653,7 @@ class _EventFormState extends State<_EventForm> {
                   ),
                 ),
               SwitchListTile(
-                contentPadding: EdgeInsets.zero,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 4),
                 title: const Text('Allow multiple choices'),
                 value: _multiple,
                 onChanged: (v) => setState(() => _multiple = v),
@@ -652,24 +666,28 @@ class _EventFormState extends State<_EventForm> {
             ],
           ],
           if (widget.allowShare) ...[
-            const Divider(height: 32),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              secondary: const Icon(Icons.campaign_outlined),
-              title: const Text('Share with followers'),
-              subtitle: Text(
-                widget.allowPoll
-                    ? 'Posts it on your profile, so the people who follow '
-                          "you and the team's members see it in their feed. "
-                          'RSVPs and notes stay here.'
-                    : 'Posts it on your profile, so the people who follow '
-                          'you see it in their feed. RSVPs and notes stay '
-                          'here.',
-              ),
-              value: _share,
-              onChanged: (v) => setState(() => _share = v),
+            const SizedBox(height: 16),
+            SettingsCard(
+              children: [
+                SwitchListTile(
+                  secondary: const Icon(Icons.campaign_outlined),
+                  title: const Text('Share with followers'),
+                  subtitle: Text(
+                    widget.allowPoll
+                        ? 'Posts it on your profile, so the people who follow '
+                              "you and the team's members see it in their feed. "
+                              'RSVPs and notes stay here.'
+                        : 'Posts it on your profile, so the people who follow '
+                              'you see it in their feed. RSVPs and notes stay '
+                              'here.',
+                  ),
+                  value: _share,
+                  onChanged: (v) => setState(() => _share = v),
+                ),
+              ],
             ),
-            if (_share)
+            if (_share) ...[
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _shareMessage,
                 minLines: 1,
@@ -680,9 +698,13 @@ class _EventFormState extends State<_EventForm> {
                   hintText: 'Come out and play!',
                 ),
               ),
+            ],
           ],
           const SizedBox(height: 24),
           FilledButton(
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(50),
+            ),
             onPressed: widget.saving ? null : _submit,
             child: widget.saving
                 ? const SizedBox.square(
@@ -742,37 +764,69 @@ class _SchedulePicker extends StatelessWidget {
 
   final EventEditorViewModel viewModel;
 
+  Future<void> _newCalendar(BuildContext context) async {
+    final made = await showNewSharedCalendarSheet(
+      context,
+      search: viewModel.searchPeople,
+    );
+    if (made == null) return;
+    await viewModel.createCalendar.execute(made);
+    final cmd = viewModel.createCalendar;
+    if (cmd.error && context.mounted) showErrorSnackBar(context, cmd.result);
+    cmd.clearResult();
+  }
+
   @override
   Widget build(BuildContext context) {
     final vm = viewModel;
+    final c = AppColors.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Add to', style: Theme.of(context).textTheme.labelLarge),
-        const SizedBox(height: 8),
+        const FieldLabel('Add to'),
         Wrap(
           spacing: 8,
           runSpacing: 8,
           children: [
             ChoiceChip(
-              avatar: const Icon(Icons.person_outline, size: 18),
+              showCheckmark: false,
+              avatar: TeamDot(color: c.personal),
               label: const Text('My calendar'),
               selected: vm.isMyCalendar,
               onSelected: (_) => vm.setSchedule(null),
             ),
-            for (final c in vm.editableCalendars)
+            for (final cal in vm.editableCalendars)
               ChoiceChip(
-                avatar: Icon(Icons.circle, size: 14, color: c.color.color),
-                label: Text(c.label),
-                selected: vm.calendarId == c.id,
-                onSelected: (_) => vm.setCalendar(c.id),
+                showCheckmark: false,
+                avatar: TeamDot(color: cal.color.color),
+                label: Text(cal.label),
+                selected: vm.calendarId == cal.id,
+                onSelected: (_) => vm.setCalendar(cal.id),
               ),
             for (final t in vm.editableTeams)
               ChoiceChip(
-                avatar: const Icon(Icons.groups_outlined, size: 18),
+                showCheckmark: false,
+                avatar: TeamDot(color: c.team),
                 label: Text(t.name),
                 selected: vm.teamId == t.id,
                 onSelected: (_) => vm.setSchedule(t.id),
+              ),
+            // Share it with people without setting up a calendar first.
+            if (vm.canCreateCalendar)
+              ListenableBuilder(
+                listenable: vm.createCalendar,
+                builder: (context, _) => ActionChip(
+                  avatar: vm.createCalendar.running
+                      ? const SizedBox.square(
+                          dimension: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.person_add_alt_outlined, size: 18),
+                  label: const Text('New shared calendar'),
+                  onPressed: vm.createCalendar.running
+                      ? null
+                      : () => _newCalendar(context),
+                ),
               ),
           ],
         ),
@@ -786,9 +840,9 @@ class _SchedulePicker extends StatelessWidget {
               : vm.isOrganization
               ? 'Choose below who in the community sees it and can RSVP.'
               : vm.isCommunity
-              ? 'Everyone in the group will see this event and can RSVP.'
+              ? 'Everyone in the community will see this event and can RSVP.'
               : 'Everyone on the team will see this event and can RSVP.',
-          style: Theme.of(context).textTheme.bodySmall,
+          style: TextStyle(fontSize: 12, color: c.muted),
         ),
       ],
     );
@@ -819,15 +873,13 @@ class _AudiencePicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Who sees it', style: theme.textTheme.titleSmall),
-        const SizedBox(height: 4),
+        const FieldLabel('Who sees it'),
         Text(
           'Admins who manage events always see it.',
-          style: theme.textTheme.bodySmall,
+          style: TextStyle(fontSize: 12, color: AppColors.of(context).muted),
         ),
         const SizedBox(height: 8),
         Wrap(
@@ -845,4 +897,48 @@ class _AudiencePicker extends StatelessWidget {
       ],
     );
   }
+}
+
+/// A small label above a group of form controls, e.g. "Type".
+class FieldLabel extends StatelessWidget {
+  const FieldLabel(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Text(
+      text,
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w700,
+        color: AppColors.of(context).ink2,
+      ),
+    ),
+  );
+}
+
+/// Switches and other settings in a card, one per row with a line between.
+class SettingsCard extends StatelessWidget {
+  const SettingsCard({super.key, required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    child: ListTileTheme(
+      data: const ListTileThemeData(
+        contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+      ),
+      child: Column(
+        children: [
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0) const Divider(height: 1),
+            children[i],
+          ],
+        ],
+      ),
+    ),
+  );
 }

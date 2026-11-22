@@ -1,8 +1,9 @@
 import {
-  chatReactionChoices,
+  isChatReaction,
   chatReactionRequestSchema,
   eventReactionRequestSchema,
   eventVotesRequestSchema,
+  nextRsvpNotes,
   rsvpRequestSchema,
   type SaveTeamEventResult,
   type SaveTeamPostResult,
@@ -10,6 +11,8 @@ import {
   saveTeamEventRequestSchema,
   saveTeamPostRequestSchema,
   sendChatMessageRequestSchema,
+  sharedEventPreview,
+  chatPollPreview,
   teamPostImagesMax,
   teamPostTournamentKeyMax,
 } from "@stall10/shared";
@@ -30,6 +33,8 @@ const p = {
   publicEvent: (t: string, id: string) => `teams/${t}/publicEvents/${id}`,
   room: (t: string, r: string) => `teams/${t}/chats/${r}`,
   message: (t: string, r: string, id: string) => `teams/${t}/chats/${r}/messages/${id}`,
+  /** The caller's read times for a team's rooms (rooms.{roomId}); private to them. */
+  reads: (uid: string, t: string) => `users/${uid}/chatReads/${t}`,
 };
 
 const denied = (m: string) => new ApiError("permission_denied", m);
@@ -283,10 +288,12 @@ export class HubService {
   }
 
   async setRsvp(caller: Caller, rawTeam: unknown, rawEvent: unknown, body: unknown): Promise<void> {
-    const { status } = parseBody(rsvpRequestSchema, body);
+    const { status, note } = parseBody(rsvpRequestSchema, body);
     const uid = caller.uid;
     await this.respond(caller, rawTeam, rawEvent, (event) => ({
       rsvps: status ? { ...mapOf(event.rsvps), [uid]: status } : without(event.rsvps, uid),
+      // The note goes with the answer: left out keeps it, taking the answer back drops it.
+      rsvpNotes: nextRsvpNotes(event.rsvpNotes, uid, status !== null, note),
       // Only those going react or vote.
       ...(status !== "going" && { reactions: without(event.reactions, uid), votes: without(event.votes, uid) }),
     }));
@@ -348,7 +355,16 @@ export class HubService {
         id: req.replyTo,
         authorId: clip(String(quoted.authorId ?? ""), 128),
         authorName: clip(String(quoted.authorName ?? ""), 80),
-        text: clip(String(quoted.text ?? ""), 200),
+        // A shared event or a poll has no text: quote its card's title (F3) or question (F33).
+        text: clip(
+          String(quoted.text ?? "") ||
+            (quoted.event
+              ? sharedEventPreview(String(mapOf(quoted.event).title ?? ""))
+              : quoted.poll
+                ? chatPollPreview(String(mapOf(quoted.poll).question ?? ""))
+                : ""),
+          200,
+        ),
       };
     }
     const me = await authorOf(this.store, this.users, caller);
@@ -364,8 +380,23 @@ export class HubService {
         createdAt: serverTime,
         ...(replyTo && { replyTo }),
       });
+      // The inbox's unread dots: when the room last had a message (a time,
+      // never the text), and the sender has read their own.
+      tx.update(p.room(teamId, roomId), { lastAt: serverTime });
+      tx.merge(p.reads(caller.uid, teamId), { rooms: { [roomId]: serverTime } });
     });
     return { id };
+  }
+
+  /** Marks a room read for the caller (users/{uid}/chatReads/{teamId}), for their unread dots. */
+  async markRoomRead(caller: Caller, rawTeam: unknown, rawRoom: unknown): Promise<void> {
+    const teamId = docIdParam(rawTeam);
+    const roomId = docIdParam(rawRoom);
+    const [team, room] = await Promise.all([this.store.get(p.team(teamId)), this.store.get(p.room(teamId, roomId))]);
+    if (!team || !room || !isMember(team, caller.uid) || !canReadRoom(team, caller.uid, room)) throw noRoom();
+    await this.store.transact(async (tx) => {
+      tx.merge(p.reads(caller.uid, teamId), { rooms: { [roomId]: serverTime } });
+    });
   }
 
   /** reactsOnlyAsMe(): anyone who can read the room sets or clears their own emoji. */
@@ -374,8 +405,8 @@ export class HubService {
     const roomId = docIdParam(rawRoom);
     const id = docIdParam(rawMessage);
     const { emoji } = parseBody(chatReactionRequestSchema, body);
-    if (emoji !== null && !(chatReactionChoices as readonly string[]).includes(emoji)) {
-      throw new ApiError("invalid_argument", "Pick one of the reactions.");
+    if (emoji !== null && !isChatReaction(emoji)) {
+      throw new ApiError("invalid_argument", "Pick one emoji.");
     }
     await this.store.transact(async (tx) => {
       const [team, room, message] = await Promise.all([
@@ -413,6 +444,9 @@ export class HubService {
         ((can(team, uid, "moderate") || can(team, uid, "manageChats")) && reads);
       if (!allowed) throw reads ? denied("You can only delete your own messages.") : noRoom();
       tx.delete(p.message(teamId, roomId, id));
+      // Its pin goes with it (F2).
+      const pins = strings(room.pins);
+      if (pins.includes(id)) tx.update(p.room(teamId, roomId), { pins: pins.filter((x) => x !== id) });
       return message;
     });
     if (message) {

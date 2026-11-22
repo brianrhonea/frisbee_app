@@ -18,11 +18,9 @@ abstract final class Routes {
   static const createCommunity = '/teams/new?kind=organization';
   static const searchTeams = '/teams/search';
 
-  /// The Events tab: the user's schedule.
+  /// The Schedule tab: the user's own calendar. The old
+  /// `/schedule?view=find` (events to find) opens Discover.
   static const schedule = '/schedule';
-
-  /// The Events tab's tournaments and leagues to find.
-  static const findEvents = '/schedule?view=find';
   static const profile = '/profile';
 
   /// People asking to follow the user's private profile, from the top of
@@ -48,7 +46,10 @@ abstract final class Routes {
   /// `context.push`, so back returns to it.
   static String personOver(String uid) => '/people/$uid';
 
-  /// Explore, the app-wide search: players, teams and groups. [query] fills the search; [only] picks a filter.
+  /// Discover, the app-wide search and the place to find tournaments,
+  /// leagues, teams, communities and players. [query] fills the search;
+  /// [only] picks a filter. Its path is still `/explore` (old links), and
+  /// `/discover` opens it too.
   static String explore({String? query, ExploreFilter? only}) {
     final q = query?.trim() ?? '';
     final params = {'q': ?(q.isEmpty ? null : q), 'only': ?only?.name};
@@ -59,6 +60,9 @@ abstract final class Routes {
   }
 
   static const explorePath = '/explore';
+
+  /// Another name for [explorePath], as the website calls the tab.
+  static const discoverPath = '/discover';
 
   /// Stall 10's rankings, as the website links them: [query] is
   /// `{level: club, division: mixed}` for a team ranking, or
@@ -143,6 +147,13 @@ abstract final class Routes {
       '/teams/$teamId/chats/$roomId/settings';
   static String play(String teamId, String playId) =>
       '/teams/$teamId/plays/$playId';
+
+  /// The playbook's whiteboard: a blank one, or a saved sketch. Push it, so
+  /// back returns to the playbook.
+  static String newWhiteboard(String teamId) =>
+      '/teams/$teamId/whiteboards/new';
+  static String whiteboard(String teamId, String playId) =>
+      '/teams/$teamId/whiteboards/$playId';
   // Event pages sit outside the tab shell so they open over whatever tab
   // they're pushed from, and back returns there. Open them with
   // `context.push`, not `go`.
@@ -166,9 +177,25 @@ abstract final class Routes {
   static const tournaments = '/tournaments';
 
   /// [host] (a group id) opens that group's hat tournament [id] instead
-  /// if there's no hosted tournament [id].
-  static String tournament(String id, {String? host}) =>
-      '$tournaments/$id${host == null ? '' : '?host=${Uri.encodeQueryComponent(host)}'}';
+  /// if there's no hosted tournament [id]. [game] (in [division]) opens on
+  /// the Schedule tab with that game's sheet, where captains report and
+  /// confirm scores; [tab] (`schedule` or `results`) picks the tab.
+  static String tournament(
+    String id, {
+    String? host,
+    String? game,
+    String? division,
+    String? tab,
+  }) {
+    final query = {
+      'host': ?host,
+      'division': ?division,
+      'game': ?game,
+      'tab': ?tab,
+    };
+    return '$tournaments/$id'
+        '${query.isEmpty ? '' : '?${Uri(queryParameters: query).query}'}';
+  }
 
   /// Pick which group or club hosts a new tournament, hat tournament or
   /// league.
@@ -188,6 +215,11 @@ abstract final class Routes {
   /// The captains' live draft for a division.
   static String tournamentLiveDraft(String id, String divisionId) =>
       '$tournaments/$id/live-draft/$divisionId';
+
+  /// A division's bracket on its own page (the website's
+  /// `/tournaments/:id/bracket?division=`).
+  static String tournamentBracket(String id, String divisionId) =>
+      '$tournaments/$id/bracket/$divisionId';
 
   // Community group tournament pages open over the tabs, like video pages;
   // use `context.push`.
@@ -216,6 +248,9 @@ abstract final class Routes {
 
   // Team meetings, over the shell like events; use `context.push`.
   static const teamMeetingsPath = '/team-meetings';
+
+  /// The team's Meetings list (live, upcoming and past).
+  static String teamMeetings(String teamId) => '$teamMeetingsPath/$teamId';
   static String newMeeting(String teamId, {DateTime? day}) => Uri(
     path: '$teamMeetingsPath/$teamId/new',
     queryParameters: day == null
@@ -265,5 +300,8 @@ abstract final class Routes {
   static String seasonStats(String teamId) => '/teams/$teamId/stats/season';
 }
 
-/// Explore's result filters.
-enum ExploreFilter { teams, groups, players, tournaments }
+/// Discover's filters, by their `?only=` names (kept for old links):
+/// [tournaments] (tournaments and hat tournaments), [leagues], [pickup]
+/// (pickup communities), [teams], [groups] (shown as Communities: pickup
+/// communities, schools and clubs) and [players].
+enum ExploreFilter { teams, groups, players, tournaments, leagues, pickup }

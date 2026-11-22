@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -384,6 +385,25 @@ class AuthRepositoryFirebase extends AuthRepository {
       // The login is already gone; the auth state follows on its own.
       _log.warning('Sign-out after deleting the account failed', e);
     }
+  });
+
+  @override
+  Future<Result<String>> exportData() => guard(() async {
+    final api = _api;
+    if (api == null) {
+      throw const ApiException(
+        'unavailable',
+        "Couldn't reach the server. Try again later.",
+      );
+    }
+    // Gathering everything takes a while for a busy account.
+    final data = await api.send(
+      'GET',
+      '/v1/me/export',
+      null,
+      const Duration(seconds: 90),
+    );
+    return const JsonEncoder.withIndent('  ').convert(data);
   });
 
   String? _signedOutNotice;

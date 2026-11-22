@@ -112,5 +112,9 @@
 	<string>Keep recording your run or ride while your phone is locked.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Record sound with your videos, and talk in team meetings.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Add team events to a calendar you choose.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Suggest places when you add an event to your calendar.</string>
 </dict>
 </plist>

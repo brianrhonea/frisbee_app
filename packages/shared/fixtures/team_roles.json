@@ -91,5 +91,67 @@
         ]
       }
     }
+  },
+  {
+    "case": "members' own permissions (memberGrants) count too",
+    "members": [
+      "u1",
+      "u2"
+    ],
+    "roles": {
+      "b": {
+        "name": "Chat",
+        "color": 0,
+        "position": 0,
+        "perms": [
+          "manageChats"
+        ]
+      }
+    },
+    "memberRoles": {
+      "u1": [
+        "b"
+      ]
+    },
+    "grants": {
+      "u1": [
+        "manageChats",
+        "keepStats"
+      ],
+      "u2": [
+        "moderate",
+        "manageTeam"
+      ],
+      "left": [
+        "manageMembers"
+      ]
+    },
+    "saved": {
+      "roles": {
+        "b": {
+          "name": "Chat",
+          "color": 0,
+          "position": 0,
+          "perms": [
+            "manageChats"
+          ]
+        }
+      },
+      "memberRoles": {
+        "u1": [
+          "b"
+        ]
+      },
+      "memberPerms": {
+        "u1": [
+          "manageChats",
+          "keepStats"
+        ],
+        "u2": [
+          "manageTeam",
+          "moderate"
+        ]
+      }
+    }
   }
 ]

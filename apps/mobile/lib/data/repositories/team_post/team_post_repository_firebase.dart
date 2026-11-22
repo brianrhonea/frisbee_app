@@ -4,11 +4,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/chat.dart';
+import '../../../domain/models/outbox.dart';
 import '../../../domain/models/team_post.dart';
 import '../../../utils/result.dart';
+import '../../services/api_client.dart';
 import '../../services/attachment_storage.dart';
 import '../../services/firestore_utils.dart';
 import '../../services/shared_streams.dart';
+import '../outbox/outbox_repository.dart';
 import 'team_post_repository.dart';
 
 /// Posts live in `teams/{teamId}/posts`; their photos in Cloud Storage
@@ -20,9 +23,40 @@ class TeamPostRepositoryFirebase implements TeamPostRepository {
     required AttachmentStorage attachments,
     FirebaseFirestore? firestore,
     SharedStreams? sharedStreams,
-  }) : _files = attachments,
+    OutboxRepository? outbox,
+    ApiClient? api,
+  }) : _api = api,
+       _files = attachments,
        _db = firestore ?? FirebaseFirestore.instance,
-       _shared = sharedStreams ?? SharedStreams.instance;
+       _shared = sharedStreams ?? SharedStreams.instance,
+       _outbox = outbox {
+    outbox?.register(
+      OutboxKind.teamPost,
+      OutboxHandler(
+        send: (job, files, author) => _save(
+          job.target,
+          PostDraft(
+            post: TeamPost.fromMap(
+              '',
+              Map<String, dynamic>.from(
+                job.payload['post'] as Map? ?? const {},
+              ),
+            ),
+            newImages: files,
+          ),
+          author,
+          newId: job.id,
+        ),
+        sent: (job) => existsOnServer(_posts(job.target).doc(job.id)),
+      ),
+    );
+  }
+
+  /// Holds new posts made offline until they can go out.
+  final OutboxRepository? _outbox;
+
+  /// Pins and comments go through the API (redesign F24).
+  final ApiClient? _api;
 
   final AttachmentStorage _files;
   final FirebaseFirestore _db;
@@ -107,9 +141,37 @@ class TeamPostRepositoryFirebase implements TeamPostRepository {
     String teamId,
     PostDraft draft,
     AppUser author,
-  ) => guard(() async {
+  ) {
+    final outbox = _outbox;
+    // Only new posts wait offline; an edit needs the post as it stands.
+    if (outbox == null ||
+        !draft.post.isNew ||
+        draft.newImages.any((i) => i.tooLarge)) {
+      return _save(teamId, draft, author);
+    }
+    final id = _posts(teamId).doc().id;
+    return outbox.submit(
+      kind: OutboxKind.teamPost,
+      id: id,
+      target: teamId,
+      label: 'Team post',
+      payload: {'post': draft.post.toEditableMap()},
+      files: draft.newImages,
+      sendNow: () => _save(teamId, draft, author, newId: id),
+    );
+  }
+
+  /// Saves [draft]; a new post gets [newId] (the queue's) or a fresh id.
+  Future<Result<void>> _save(
+    String teamId,
+    PostDraft draft,
+    AppUser author, {
+    String? newId,
+  }) => guard(() async {
     final post = draft.post;
-    final ref = post.isNew ? _posts(teamId).doc() : _posts(teamId).doc(post.id);
+    final ref = post.isNew
+        ? _posts(teamId).doc(newId)
+        : _posts(teamId).doc(post.id);
     final before = post.isNew
         ? const <ChatAttachment>[]
         : TeamPost.fromMap(ref.id, plainData((await ref.get()).data())).images;
@@ -161,4 +223,89 @@ class TeamPostRepositoryFirebase implements TeamPostRepository {
   @override
   Future<Result<Uint8List>> downloadImage(ChatAttachment image) =>
       guard(() => _files.download(image));
+
+  // Pins and comments (redesign F24) ------------------------------------
+
+  static const _noApi =
+      'Pins and comments need a newer app version. Update the app to use them.';
+
+  ApiClient get _client =>
+      _api ?? (throw const ApiException('unavailable', _noApi));
+
+  String _postPath(String teamId, String postId) =>
+      '/v1/teams/${Uri.encodeComponent(teamId)}/posts/'
+      '${Uri.encodeComponent(postId)}';
+
+  @override
+  bool get canUseFeedExtras => _api != null;
+
+  @override
+  Stream<List<TeamPost>> watchPinnedPosts(
+    String teamId, {
+    bool publicOnly = false,
+  }) => _shared.get('pinnedPosts/$teamId/$publicOnly', () {
+    // Firestore leaves out posts without pinnedAt. Non-members filter on
+    // `public` (public + pinnedAt has a composite index).
+    final q = publicOnly
+        ? _posts(teamId).where('public', isEqualTo: true)
+        : _posts(teamId);
+    return countedSnapshots(
+      q.orderBy('pinnedAt', descending: true).limit(TeamPost.pinsMax),
+      'teamPosts',
+    ).map(
+      (snap) => [
+        for (final d in snap.docs) TeamPost.fromMap(d.id, plainData(d.data())),
+      ],
+    );
+  });
+
+  @override
+  Future<Result<void>> pinPost(String teamId, String postId, {String? unpin}) =>
+      guard(
+        () =>
+            _client.put('${_postPath(teamId, postId)}/pin', {'unpin': ?unpin}),
+      );
+
+  @override
+  Future<Result<void>> unpinPost(String teamId, String postId) =>
+      guard(() => _client.delete('${_postPath(teamId, postId)}/pin'));
+
+  @override
+  Stream<List<TeamPostComment>> watchComments(String teamId, String postId) =>
+      _shared.get(
+        'teamPostComments/$teamId/$postId',
+        () =>
+            countedSnapshots(
+              _posts(teamId)
+                  .doc(postId)
+                  .collection('comments')
+                  .orderBy('createdAt', descending: true)
+                  .limit(TeamPostComment.shown),
+              'teamPostComments',
+            ).map(
+              (snap) => [
+                for (final d in snap.docs.reversed)
+                  TeamPostComment.fromMap(d.id, plainData(d.data())),
+              ],
+            ),
+      );
+
+  @override
+  Future<Result<void>> addComment(String teamId, String postId, String body) =>
+      guard(
+        () => _client.post('${_postPath(teamId, postId)}/comments', {
+          'body': body,
+        }),
+      );
+
+  @override
+  Future<Result<void>> deleteComment(
+    String teamId,
+    String postId,
+    String commentId,
+  ) => guard(
+    () => _client.delete(
+      '${_postPath(teamId, postId)}/comments/${Uri.encodeComponent(commentId)}',
+    ),
+  );
 }

@@ -105,9 +105,12 @@ service firebase.storage {
         return firestore.exists(postPath())
           && firestore.get(postPath()).data.public == true;
       }
+      // A private group, or a team whose "Public team page" is off
+      // (publicPage false; showsPublic in firestore.rules).
       function privateGroup(t) {
-        return t.get('kind', 'team') in ['community', 'organization']
-          && t.get('requiresApproval', false) == true;
+        return (t.get('kind', 'team') in ['community', 'organization']
+          && t.get('requiresApproval', false) == true)
+          || t.get('publicPage', true) == false;
       }
 
       allow get: if (request.auth != null
@@ -137,18 +140,31 @@ service firebase.storage {
     }
 
     // Photos on people's own posts (posts in firestore.rules), uploaded
-    // into the author's folder before the post is saved. Posts are public
-    // to anyone signed in, and so are their photos. Website visitors
-    // without an account see them too unless the author's profile is
-    // private (the `browse` functions leave those posts out).
+    // into the author's folder before the post is saved. Seen like the
+    // post: by anyone, website visitors too, unless the author's profile
+    // is private; then by the author and their accepted followers only.
+    // (Checked on the profile, not the post: the photo is uploaded before
+    // the post exists.)
     match /users/{userId}/posts/{postId}/{upload}/{fileName} {
       function publicAuthor() {
         let profile = /databases/(default)/documents/profiles/$(userId);
         return firestore.exists(profile)
           && firestore.get(profile).data.get('private', false) == false;
       }
+      function privateAuthor() {
+        let profile = /databases/(default)/documents/profiles/$(userId);
+        return firestore.exists(profile)
+          && firestore.get(profile).data.get('private', false) == true;
+      }
+      function ownerOrFollower() {
+        return request.auth.uid == userId
+          || firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)/follows/$('user_' + userId));
+      }
 
-      allow get: if request.auth != null || publicAuthor();
+      // Signed in: any author without a private profile (as canSeePost
+      // in firestore.rules), or a private one's own photos and followers.
+      allow get: if publicAuthor()
+        || (request.auth != null && (!privateAuthor() || ownerOrFollower()));
       allow create, update: if request.auth != null
         && request.auth.uid == userId
         && request.resource.size <= 10 * 1024 * 1024

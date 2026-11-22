@@ -2,22 +2,113 @@ import 'package:flutter/material.dart';
 
 import '../../core/themes/theme.dart';
 
+/// The bar on settings pages: the card colour with a hairline under it and
+/// a 17/700 title.
+PreferredSizeWidget settingsAppBar(
+  BuildContext context, {
+  required Widget title,
+  List<Widget>? actions,
+  bool automaticallyImplyLeading = true,
+}) {
+  final c = AppColors.of(context);
+  return AppBar(
+    title: title,
+    actions: actions,
+    automaticallyImplyLeading: automaticallyImplyLeading,
+    backgroundColor: c.card,
+    // Close to the back arrow, as in the mockups.
+    titleSpacing: ModalRoute.of(context)?.impliesAppBarDismissal ?? false
+        ? 4
+        : null,
+    titleTextStyle: TextStyle(
+      fontFamily: appFont,
+      fontSize: 17,
+      fontWeight: FontWeight.w700,
+      letterSpacing: -0.2,
+      color: c.ink,
+    ),
+    shape: Border(bottom: BorderSide(color: c.border)),
+  );
+}
+
 /// A settings page: a back arrow, a title and grouped rows on the page
 /// background, as on a phone's settings app.
 class SettingsPage extends StatelessWidget {
-  const SettingsPage({super.key, required this.title, required this.children});
+  const SettingsPage({
+    super.key,
+    required this.title,
+    this.actions,
+    required this.children,
+  });
 
   final String title;
+
+  /// On the right of the bar, e.g. a count.
+  final List<Widget>? actions;
   final List<Widget> children;
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(title)),
+    appBar: settingsAppBar(context, title: Text(title), actions: actions),
     body: SafeArea(
       top: false,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
         children: children,
+      ),
+    ),
+  );
+}
+
+/// A small uppercase heading over a settings card, e.g. "APPEARANCE".
+class SettingsHeading extends StatelessWidget {
+  const SettingsHeading(this.text, {super.key, this.trailing});
+
+  final String text;
+
+  /// After the heading, e.g. a count of invites.
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+    child: Semantics(
+      header: true,
+      child: Row(
+        children: [
+          Flexible(
+            child: Text(
+              text.toUpperCase(),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.6,
+                color: AppColors.of(context).muted,
+              ),
+            ),
+          ),
+          if (trailing case final t?) ...[const SizedBox(width: 8), t],
+        ],
+      ),
+    ),
+  );
+}
+
+/// A note under a settings card, e.g. what a switch does.
+class SettingsFooter extends StatelessWidget {
+  const SettingsFooter(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+    child: Text(
+      text,
+      style: TextStyle(
+        fontSize: 12,
+        height: 1.4,
+        color: AppColors.of(context).muted,
       ),
     ),
   );
@@ -28,11 +119,15 @@ class SettingsGroup extends StatelessWidget {
   const SettingsGroup({
     super.key,
     this.title,
+    this.titleTrailing,
     this.footer,
     required this.children,
   });
 
   final String? title;
+
+  /// After the title, e.g. a count.
+  final Widget? titleTrailing;
 
   /// A note under the card, e.g. what a switch does.
   final String? footer;
@@ -42,40 +137,62 @@ class SettingsGroup extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     return Padding(
-      padding: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.only(top: 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (title case final t?)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-              child: Text(
-                t.toUpperCase(),
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.6,
-                  color: c.muted,
-                ),
+          if (title case final t?) SettingsHeading(t, trailing: titleTrailing),
+          Card(
+            // Rows (switches and radios too) in the settings type sizes.
+            child: ListTileTheme.merge(
+              titleTextStyle: TextStyle(
+                fontFamily: appFont,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: c.ink,
+              ),
+              subtitleTextStyle: TextStyle(
+                fontFamily: appFont,
+                fontSize: 12,
+                height: 1.35,
+                color: c.muted,
+              ),
+              child: Column(
+                children: [
+                  for (final (i, row) in children.indexed) ...[
+                    if (i > 0) const Divider(),
+                    row,
+                  ],
+                ],
               ),
             ),
-          Card(
-            child: Column(
-              children: [
-                for (final (i, row) in children.indexed) ...[
-                  if (i > 0) const Divider(indent: 56),
-                  row,
-                ],
-              ],
-            ),
           ),
-          if (footer case final f?)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
-              child: Text(f, style: TextStyle(fontSize: 12, color: c.muted)),
-            ),
+          if (footer case final f?) SettingsFooter(f),
         ],
       ),
+    );
+  }
+}
+
+/// A row's icon on a small rounded tile, as the leading of settings rows
+/// (and of switches and radios beside them).
+class SettingsIcon extends StatelessWidget {
+  const SettingsIcon(this.icon, {super.key, this.color});
+
+  final IconData icon;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        color: c.field,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(icon, size: 18, color: color ?? c.ink2),
     );
   }
 }
@@ -103,7 +220,7 @@ class SettingsTile extends StatelessWidget {
   final VoidCallback? onTap;
   final bool opensPage;
 
-  /// For "Delete account" and the like.
+  /// A colour for the icon and label.
   final Color? color;
 
   @override
@@ -114,13 +231,18 @@ class SettingsTile extends StatelessWidget {
     final long = (value?.length ?? 0) > 22 && subtitle == null;
     final side = long ? null : value;
     return ListTile(
-      leading: Icon(icon, color: color ?? c.ink),
+      minTileHeight: 52,
+      leading: SettingsIcon(icon, color: color),
       title: Text(
         title,
-        style: TextStyle(fontWeight: FontWeight.w600, color: color),
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          color: color ?? c.ink,
+        ),
       ),
       subtitle: subtitle != null
-          ? Text(subtitle!)
+          ? Text(subtitle!, style: TextStyle(color: c.muted, fontSize: 12))
           : long
           ? Text(value!, style: TextStyle(color: c.muted, fontSize: 13))
           : null,

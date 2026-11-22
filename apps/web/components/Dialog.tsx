@@ -37,7 +37,11 @@ export function Dialog({
       close.current();
     };
     // Closed by the browser anyway (some close a dialog on a second Esc).
-    const onClosed = () => close.current();
+    // Not a close queued before it was opened again (React's dev double
+    // effects close and reopen it at once).
+    const onClosed = () => {
+      if (!d.open) close.current();
+    };
     d.addEventListener("cancel", onCancel);
     d.addEventListener("close", onClosed);
     return () => {

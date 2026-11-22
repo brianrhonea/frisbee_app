@@ -165,6 +165,20 @@ class MeetingRepositoryFirebase implements MeetingRepository {
   ) => guard(
     () => _meetings(teamId).doc(meetingId).update({
       FieldPath(['rsvps', uid]): answer?.name ?? FieldValue.delete(),
+      // The note goes with the answer (firestore.rules validRsvpNote).
+      if (answer == null) FieldPath(['rsvpNotes', uid]): FieldValue.delete(),
+    }),
+  );
+
+  @override
+  Future<Result<void>> setRsvpNote(
+    String teamId,
+    String meetingId,
+    String uid,
+    String note,
+  ) => guard(
+    () => _meetings(teamId).doc(meetingId).update({
+      FieldPath(['rsvpNotes', uid]): note.isEmpty ? FieldValue.delete() : note,
     }),
   );
 

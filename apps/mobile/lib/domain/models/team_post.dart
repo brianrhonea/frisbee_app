@@ -19,11 +19,17 @@ class TeamPost {
     this.authorName = '',
     this.createdAt,
     this.updatedAt,
+    this.pinnedAt,
+    this.commentCount = 0,
   });
 
   /// Limits firestore.rules enforces too; keep them in step.
   static const maxLinks = 5;
   static const maxImages = 4;
+
+  /// Most pinned posts on a team's feed (`teamPostPinsMax` in
+  /// `@stall10/shared` team_posts.ts; the API holds it).
+  static const pinsMax = 3;
 
   /// Empty id means the post has not been saved yet.
   final String id;
@@ -46,7 +52,17 @@ class TeamPost {
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
+  /// When a team admin pinned it (redesign F24); null when not pinned.
+  /// Only the API sets it.
+  final DateTime? pinnedAt;
+
+  /// Comments on it, kept by the `follows-teamPostCommentCount` function
+  /// (missing reads as 0); nobody writes it.
+  final int commentCount;
+
   bool get isNew => id.isEmpty;
+
+  bool get isPinned => pinnedAt != null;
 
   /// A post needs text or at least one photo.
   bool get hasContent => body.trim().isNotEmpty || images.isNotEmpty;
@@ -78,6 +94,8 @@ class TeamPost {
     authorName: authorName,
     createdAt: createdAt,
     updatedAt: updatedAt,
+    pinnedAt: pinnedAt,
+    commentCount: commentCount,
   );
 
   factory TeamPost.fromMap(String id, Map<String, dynamic> map) => TeamPost(
@@ -96,6 +114,11 @@ class TeamPost {
     authorName: map['authorName'] as String? ?? '',
     createdAt: parseDate(map['createdAt']),
     updatedAt: parseDate(map['updatedAt']),
+    pinnedAt: parseDate(map['pinnedAt']),
+    commentCount: switch (map['commentCount']) {
+      final num n when n > 0 => n.toInt(),
+      _ => 0,
+    },
   );
 
   /// Fields editors may change.
@@ -131,6 +154,71 @@ class TeamPost {
     // The scheme in lower case ("Https://…" too), as the server's check wants.
     return uri.scheme + withScheme.substring(uri.scheme.length);
   }
+}
+
+/// A team feed in order (`arrangeTeamFeed` in `@stall10/shared`): the
+/// pinned posts first, newest pin first (at most [TeamPost.pinsMax]), then
+/// the rest newest first. [pinned] and [recent] may overlap; each post
+/// shows once, [recent]'s copy winning, so a post unpinned since [pinned]
+/// was read drops to the rest.
+({List<TeamPost> pinned, List<TeamPost> rest}) arrangeTeamFeed(
+  Iterable<TeamPost> pinned,
+  Iterable<TeamPost> recent,
+) {
+  final byId = <String, TeamPost>{
+    for (final p in [...pinned, ...recent]) p.id: p,
+  };
+  final far = DateTime(9999);
+  final top = byId.values.where((p) => p.isPinned).toList()
+    ..sort((a, b) => (b.pinnedAt ?? far).compareTo(a.pinnedAt ?? far));
+  final shown = top.take(TeamPost.pinsMax).toList();
+  final ids = {for (final p in shown) p.id};
+  final rest = [
+    for (final p in byId.values)
+      if (!ids.contains(p.id)) p,
+  ]..sort(TeamPost.newestFirst);
+  return (pinned: shown, rest: rest);
+}
+
+/// "Comment", "1 comment", "4 comments" (`teamPostCommentLabel`).
+String teamPostCommentLabel(int count) => switch (count) {
+  <= 0 => 'Comment',
+  1 => '1 comment',
+  _ => '$count comments',
+};
+
+/// A comment on a team post (redesign F24):
+/// `teams/{teamId}/posts/{postId}/comments/{id}`. Members read them; the
+/// API writes them; its author or a team admin deletes one.
+class TeamPostComment {
+  const TeamPostComment({
+    required this.id,
+    required this.authorId,
+    required this.authorName,
+    required this.body,
+    this.createdAt,
+  });
+
+  /// Longest comment (`teamPostCommentLimits.body`).
+  static const maxLength = 1000;
+
+  /// The newest this many show, oldest first (the rules' cap).
+  static const shown = 100;
+
+  final String id;
+  final String authorId;
+  final String authorName;
+  final String body;
+  final DateTime? createdAt;
+
+  factory TeamPostComment.fromMap(String id, Map<String, dynamic> map) =>
+      TeamPostComment(
+        id: id,
+        authorId: map['authorId'] as String? ?? '',
+        authorName: map['authorName'] as String? ?? '',
+        body: map['body'] as String? ?? '',
+        createdAt: parseDate(map['createdAt']),
+      );
 }
 
 /// A post as written in the editor: the post plus photos picked but not yet

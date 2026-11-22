@@ -6,11 +6,13 @@ import '../../../domain/models/app_user.dart';
 import '../../../domain/models/chat.dart';
 import '../../../domain/models/direct_message.dart';
 import '../../../domain/models/model_utils.dart';
+import '../../../domain/models/outbox.dart';
 import '../../../utils/result.dart';
 import '../../services/api_search.dart';
 import '../../services/attachment_storage.dart';
 import '../../services/firestore_utils.dart';
 import '../../services/shared_streams.dart';
+import '../outbox/outbox_repository.dart';
 import 'direct_message_repository.dart';
 import '../../../domain/models/username.dart';
 
@@ -30,10 +32,30 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
     FirebaseFirestore? firestore,
     SharedStreams? sharedStreams,
     ApiSearch? search,
+    OutboxRepository? outbox,
   }) : _files = attachments,
        _db = firestore ?? FirebaseFirestore.instance,
        _shared = sharedStreams ?? SharedStreams.instance,
-       _search = search;
+       _search = search,
+       _outbox = outbox {
+    outbox?.register(
+      OutboxKind.directMessage,
+      OutboxHandler(
+        send: (job, files, author) => _send(
+          job.target,
+          job.id,
+          author: author,
+          text: job.payload['text'] as String? ?? '',
+          attachments: files,
+          replyTo: MessageReply.fromMap(job.payload['replyTo']),
+        ),
+        sent: (job) => existsOnServer(_messages(job.target).doc(job.id)),
+      ),
+    );
+  }
+
+  /// Holds messages sent offline until they can go out.
+  final OutboxRepository? _outbox;
 
   /// Searches through the rate-limited Cloud Function when it's turned on.
   final ApiSearch? _search;
@@ -373,6 +395,37 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
     required String text,
     List<NewAttachment> attachments = const [],
     MessageReply? replyTo,
+  }) {
+    // The id is picked now and kept, so a retry can't post it twice.
+    final messageId = _messages(id).doc().id;
+    Future<Result<void>> now() => _send(
+      id,
+      messageId,
+      author: author,
+      text: text,
+      attachments: attachments,
+      replyTo: replyTo,
+    );
+    final outbox = _outbox;
+    if (outbox == null || attachments.any((a) => a.tooLarge)) return now();
+    return outbox.submit(
+      kind: OutboxKind.directMessage,
+      id: messageId,
+      target: id,
+      label: 'Message',
+      payload: {'text': text, 'replyTo': replyTo?.toMap()},
+      files: attachments,
+      sendNow: now,
+    );
+  }
+
+  Future<Result<void>> _send(
+    String id,
+    String messageId, {
+    required AppUser author,
+    required String text,
+    List<NewAttachment> attachments = const [],
+    MessageReply? replyTo,
   }) => guard(
     () => muteAware(_db, author.uid, () async {
       for (final a in attachments) {
@@ -383,7 +436,7 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
           );
         }
       }
-      final ref = _messages(id).doc();
+      final ref = _messages(id).doc(messageId);
       final uploaded = await _files.upload(
         'conversations/$id/${author.uid}/${ref.id}',
         attachments,

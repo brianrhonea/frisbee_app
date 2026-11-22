@@ -10,7 +10,7 @@ import { getPublic, tags } from "@/lib/api";
 export const metadata: Metadata = {
   title: { absolute: "Stall 10 — your ultimate team, in one place" },
   description:
-    "Teams, schedules, stats and pickup for ultimate frisbee. Find players, teams and groups near you, and learn to play.",
+    "Teams, schedules, stats and pickup for ultimate frisbee. Find players, teams and communities near you, and learn to play.",
 };
 
 /** How much of the community a visitor sees before signing up. */
@@ -53,8 +53,8 @@ export default async function Home() {
               </Link>
             </div>
             <p className="muted small">
-              Or look around first: <Link href="/teams#find">find a team</Link>,{" "}
-              <Link href="/events">see what&apos;s coming up</Link> or <Link href="/learn">learn to play</Link>.
+              Or look around first: <Link href="/explore?only=teams">find a team</Link>,{" "}
+              <Link href="/explore#coming-up">see what&apos;s coming up</Link> or <Link href="/learn">learn to play</Link>.
             </p>
           </section>
 

@@ -1,0 +1,524 @@
+/* Team hub (/teams/[id]/…): the "Turf & Disc" restyle (redesign W3).
+   Imported by app/teams/[teamId]/layout.tsx. Every rule starts with
+   .team-hub so it wins over the shared base rules in app.css whatever
+   order the sheets load in, and never reaches other pages. Colours come
+   from the tokens in app/site.css only. */
+
+/* --- Header: badge, name, meta line, actions (TeamBanner.tsx) ---------- */
+.team-hub .team-head {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px 16px; align-items: start;
+  padding: 4px 0 14px; margin: 0; border: 0; border-radius: 0; background: none;
+}
+.team-hub .team-head h1 {
+  margin: 0; font-size: clamp(1.4rem, 2.6vw, 1.75rem); font-weight: 800; letter-spacing: -0.03em; line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.team-hub .team-head p { margin: 2px 0 0; }
+.team-hub .team-banner-text { min-width: 0; padding-top: 2px; }
+.team-hub .team-meta {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; margin: 3px 0 0;
+  color: var(--muted); font-size: 0.9rem;
+}
+.team-hub .team-meta > * + *::before { content: "·"; margin: 0 7px; color: var(--muted); font-weight: 400; }
+.team-hub .team-meta > .pill::before { content: none; }
+.team-hub .team-meta > .pill { margin: 0 0 0 10px; padding: 2px 9px; font-size: 0.74rem; }
+.team-hub .team-meta .member-count { color: var(--muted); font-weight: 500; font-size: inherit; gap: 6px; }
+.team-hub .team-meta .member-count:hover { color: var(--ink); }
+.team-hub .team-meta .avatar-stack .avatar { font-size: 9px !important; }
+.team-hub .team-head .team-about-wrap { margin-top: 8px; }
+.team-hub .team-head .team-about { color: var(--ink-soft); font-size: 0.92rem; white-space: pre-wrap; }
+.team-hub .team-head .invite-only { margin-top: 8px; }
+.team-hub .team-banner-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; padding-top: 6px; }
+.team-hub .team-banner-actions .btn-small { min-height: 40px; padding: 0 16px; border-radius: var(--radius-control); }
+.team-hub .team-banner-actions .follow { display: inline-flex; align-items: center; gap: 8px; }
+.team-hub .team-gear {
+  width: 40px; height: 40px; border-radius: var(--radius-control); border: 1px solid var(--line-2);
+  background: var(--card); color: var(--ink);
+}
+.team-hub .team-gear.on { background: var(--accent-soft); border-color: transparent; color: var(--accent-ink); }
+
+/* The initials badge (TeamBadge.tsx): team blue rounded square, turf
+   circle for a community, navy circle for a school or club. */
+.team-hub .team-badge, .team-badge {
+  display: inline-grid; place-items: center; flex: none; line-height: 1;
+  border-radius: 27%; background: var(--team); color: var(--on-board);
+  font-family: var(--font-score); font-weight: 800; letter-spacing: 0.01em;
+}
+.team-badge.community { border-radius: 50%; background: var(--accent); color: var(--on-accent); }
+.team-badge.organization { border-radius: 50%; background: var(--board); color: var(--on-board); }
+/* White initials need a deeper blue than dark mode's light --team. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .team-badge.team { background: color-mix(in srgb, var(--team) 55%, var(--board)); }
+}
+:root[data-theme="dark"] .team-badge.team { background: color-mix(in srgb, var(--team) 55%, var(--board)); }
+
+/* Back to the Teams list. */
+.team-hub .team-back { margin: 0 0 8px; font-size: 0.86rem; }
+.team-hub .team-back a { color: var(--accent); }
+.team-hub .team-back a:hover { color: var(--accent-ink); }
+
+/* --- Tabs (TeamNav.tsx): ink when on, a 3px turf underline -------------- */
+.team-hub .team-tabs-bar { gap: 2px; margin-bottom: 20px; border-bottom: 1px solid var(--line); }
+.team-hub .team-tabs { gap: 2px; }
+.team-hub .team-tabs a, .team-hub .team-more-button {
+  padding: 12px 14px 11px; color: var(--muted); font-weight: 600; font-size: 0.95rem;
+  border-bottom: 3px solid transparent; margin-bottom: -1px;
+}
+.team-hub .team-tabs a:hover, .team-hub .team-more-button:hover { color: var(--ink); }
+.team-hub .team-tabs a.active, .team-hub .team-more-button.active { color: var(--ink); font-weight: 700; border-bottom-color: var(--accent); }
+.team-hub .team-more-menu { padding: 6px; border-radius: 14px; min-width: 200px; }
+.team-hub .team-more-menu a { border-radius: 10px; padding: 9px 12px; }
+.team-hub .team-more-menu a.active { background: var(--accent-soft); color: var(--accent-ink); }
+
+@media (max-width: 720px) {
+  .team-hub .team-head { grid-template-columns: auto minmax(0, 1fr); }
+  .team-hub .team-banner-actions { grid-column: 1 / -1; justify-content: flex-start; padding-top: 0; }
+}
+@media (max-width: 560px) {
+  .team-hub .team-head .team-badge { width: 48px !important; height: 48px !important; font-size: 22px !important; }
+  .team-hub .team-tabs a, .team-hub .team-more-button { padding: 11px 10px 10px; }
+}
+
+/* --- Shared bits: date tiles, type dots, RSVP pills, role pills -------- */
+.team-hub .date-tile {
+  display: grid; place-items: center; align-content: center; gap: 1px; flex: none;
+  width: 48px; height: 50px; border-radius: var(--radius-control);
+  background: var(--accent-soft); color: var(--accent-ink); line-height: 1;
+}
+.team-hub .date-tile small { font-size: 0.66rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.team-hub .date-tile b { font-family: var(--font-score); font-weight: 800; font-size: 1.55rem; letter-spacing: -0.01em; }
+.team-hub .type-dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--team);
+  margin-right: 7px; vertical-align: 0.1em; flex: none;
+}
+.team-hub .rsvp-pill {
+  display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px;
+  background: var(--field); color: var(--ink-soft); font-size: 0.76rem; font-weight: 700; white-space: nowrap;
+}
+.team-hub .rsvp-pill.going { background: var(--accent-soft); color: var(--accent-ink); }
+.team-hub .rsvp-pill.notGoing { color: var(--muted); }
+.team-hub .rsvp-pill.needs { background: var(--disc); color: var(--on-disc); }
+.team-hub .role-pill {
+  display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 0.74rem; font-weight: 600;
+  border: 1px solid var(--line-2); color: var(--ink-soft); white-space: nowrap;
+}
+.team-hub .role-pill.lead { border-color: transparent; background: var(--accent-soft); color: var(--accent-ink); font-weight: 700; }
+.team-hub .section-label {
+  margin: 0; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+}
+
+/* --- Schedule (TeamSchedule.tsx): rows with date tiles in one card ----- */
+.team-hub .sched-tools { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.team-hub .sched-tools .schedule-new { margin: 0; }
+.team-hub .sched-card { padding: 0; overflow: hidden; }
+.team-hub .sched-list { gap: 0; }
+.team-hub .sched-list > li + li { border-top: 1px solid var(--line); }
+.team-hub .sched-list a.team-sched-row {
+  display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 14px; align-items: center;
+  padding: 12px 16px; border-radius: 0; color: var(--ink);
+}
+.team-hub .sched-list a.team-sched-row:hover { background: var(--bg-2); }
+.team-hub .sched-list a.team-sched-row.active { background: var(--field); box-shadow: inset 3px 0 0 var(--accent); }
+.team-hub .sched-main { display: grid; min-width: 0; gap: 2px; }
+.team-hub .sched-main b { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-hub .sched-main small { color: var(--muted); font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-hub .rsvp-line { display: flex; align-items: center; gap: 10px; }
+.team-hub .rsvp-line > small { color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
+/* Today (and a live meeting): the scoreboard navy. */
+.team-hub .sched-list a.team-sched-row.today { background: var(--board); color: var(--on-board); }
+.team-hub .sched-list a.team-sched-row.today small, .team-hub .sched-list a.team-sched-row.today .rsvp-line > small { color: var(--board-muted); }
+.team-hub .sched-list a.team-sched-row.today .date-tile { background: var(--board-2); color: var(--on-board); }
+.team-hub .sched-list a.team-sched-row.today .type-dot { background: var(--on-board); }
+.team-hub .sched-list a.team-sched-row.today.active { box-shadow: inset 3px 0 0 var(--accent); }
+.team-hub .schedule-meeting .type-dot { background: var(--personal); }
+.team-hub .sched-card + .pager { margin-top: 12px; }
+
+/* The open event. */
+.team-hub .event-detail { padding: 20px; }
+.team-hub .event-detail-head .type-chip { display: inline-flex; align-items: center; margin: 0; background: var(--field); color: var(--ink-soft); }
+.team-hub .event-detail-head .type-chip .type-dot { margin-right: 6px; vertical-align: 0; }
+.team-hub .event-detail h2 { margin: 12px 0 4px; font-size: 1.45rem; font-weight: 800; letter-spacing: -0.02em; }
+.team-hub .event-detail a { color: var(--accent); }
+.team-hub .rsvp-ask { margin: 14px 0 4px; padding: 12px 14px; border-radius: 14px; background: var(--bg-2); }
+.team-hub .rsvp-ask.needs { background: var(--disc-soft); }
+.team-hub .rsvp-ask-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 8px; font-weight: 700; font-size: 0.9rem; }
+.team-hub .rsvp-ask.needs .rsvp-ask-title { color: var(--disc-ink); }
+.team-hub .rsvp-ask .rsvp-buttons { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; margin: 0; padding: 0; gap: 6px; background: none; border: 0; border-radius: 0; }
+.team-hub .rsvp-ask .rsvp-buttons button {
+  min-height: 40px; padding: 6px 8px; border-radius: var(--radius-control); background: var(--card);
+  border: 1px solid var(--line-2); color: var(--ink); font-weight: 700;
+}
+.team-hub .rsvp-ask .rsvp-buttons button.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); box-shadow: none; }
+.team-hub .rsvp-columns { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; border-top: 0; padding-top: 4px; }
+.team-hub .rsvp-group { min-width: 0; }
+.team-hub .rsvp-group h3 {
+  display: grid; justify-items: center; gap: 2px; margin: 0 0 8px; padding: 10px 4px; border-radius: var(--radius-control);
+  background: var(--field); font-size: 0.74rem; font-weight: 700; color: var(--muted); text-align: center;
+}
+.team-hub .rsvp-group h3 b { font-family: var(--font-score); font-weight: 800; font-size: 1.6rem; line-height: 1; color: var(--ink); }
+.team-hub .rsvp-group.going h3 { background: var(--accent-soft); color: var(--accent-ink); }
+.team-hub .rsvp-group.going h3 b { color: var(--accent-ink); }
+.team-hub .rsvp-group ul { font-size: 0.84rem; overflow-wrap: anywhere; }
+@media (max-width: 560px) {
+  .team-hub .rsvp-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .team-hub .sched-list a.team-sched-row { grid-template-columns: 44px minmax(0, 1fr); gap: 12px; padding: 12px; }
+  .team-hub .sched-list a.team-sched-row .rsvp-line { grid-column: 2; }
+  .team-hub .date-tile { width: 44px; height: 46px; }
+}
+
+/* --- Feed (TeamFeed.tsx, TeamPostCard.tsx, TeamPostComposer.tsx) -------- */
+.team-hub .hub-feed { grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; }
+.team-hub .hub-feed > section.stack { gap: 14px; }
+.team-hub .hub-feed > aside { display: grid; gap: 14px; }
+.team-hub .team-compose-open {
+  display: flex; align-items: center; min-height: 56px; padding: 14px 18px; border: 1px solid var(--line);
+  color: var(--muted); font-size: 0.95rem;
+}
+.team-hub .team-compose-open:hover { border-color: var(--line-2); color: var(--ink); background: var(--card); }
+.team-hub .team-composer input:not([type="checkbox"]):not([type="file"]),
+.team-hub .team-composer textarea { border: 0; border-radius: var(--radius-control); background: var(--field); }
+.team-hub .team-composer .composer-bar .btn-small { min-height: 38px; border-radius: var(--radius-control); }
+.team-hub .post { border-radius: var(--radius); padding: 18px 20px; }
+.team-hub .post > .post-images { margin: 12px -20px 0; }
+.team-hub .team-post-who b { font-size: 1.02rem; font-weight: 800; letter-spacing: -0.01em; }
+.team-hub .post .post-tag { margin: 0 0 0 auto; background: var(--field); color: var(--ink-soft); }
+.team-hub .post .post-admin { margin-left: auto; }
+.team-hub .post .post-tag + .post-admin { margin-left: 12px; }
+.team-hub .post .post-admin .text-btn { color: var(--muted); text-decoration: none; font-weight: 600; }
+.team-hub .post .post-admin .text-btn:hover { color: var(--ink); }
+.team-hub .post-place {
+  display: inline-flex; align-items: center; gap: 6px; margin: 10px 0 0 !important; padding: 5px 12px;
+  border-radius: 999px; background: var(--field); color: var(--ink-soft); font-weight: 600; font-size: 0.82rem;
+}
+.team-hub .post-place::before {
+  content: ""; width: 7px; height: 7px; border-radius: 50%; border: 2px solid var(--accent);
+}
+.team-hub .card-head .small, .team-hub .card-head a { color: var(--accent); font-weight: 600; text-decoration: none; }
+.team-hub .card-head a:hover { text-decoration: underline; }
+.team-hub .coming-list { display: grid; }
+.team-hub a.coming-row {
+  display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 12px; align-items: center;
+  padding: 10px 0; color: var(--ink); text-decoration: none;
+}
+.team-hub a.coming-row + a.coming-row { border-top: 1px solid var(--line); }
+.team-hub a.coming-row .date-tile { width: 44px; height: 46px; }
+.team-hub a.coming-row:hover b { text-decoration: underline; }
+.team-hub .member-preview-list { gap: 4px; margin: 0; }
+.team-hub .member-preview-list > li { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px 0; }
+.team-hub .member-preview-list .person { flex: 1; font-weight: 600; font-size: 0.92rem; }
+.team-hub .member-preview-actions:has(> :first-child) { margin-top: 12px; }
+.team-hub .member-preview-actions { justify-content: flex-end; }
+@media (max-width: 1000px) {
+  .team-hub .hub-feed { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* --- Chat (TeamChat.tsx, ChatManager.tsx, meetings/VoiceRoom.tsx) ------- */
+.team-hub .chat-split { grid-template-columns: minmax(220px, 260px) minmax(0, 1fr); }
+.team-hub .chat-rooms.card { padding: 14px 10px; gap: 4px; }
+.team-hub .chat-rooms-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 8px 4px; }
+.team-hub .chat-rooms-head .card-title { margin: 0; }
+.team-hub a.chat-manage-link { display: inline; margin: 0; color: var(--accent); font-weight: 600; font-size: 0.84rem; text-decoration: none; }
+.team-hub a.chat-manage-link:hover { text-decoration: underline; }
+.team-hub .chat-folder-group + .chat-folder-group { margin-top: 6px; }
+.team-hub .chat-folder { margin: 10px 8px 4px; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; color: var(--muted); }
+.team-hub .chat-rooms .hub-items { gap: 2px; }
+.team-hub .hub-items a.chat-room {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px;
+  color: var(--ink-soft); font-weight: 500;
+}
+.team-hub .hub-items a.chat-room:hover { background: var(--field); color: var(--ink); }
+.team-hub .hub-items a.chat-room.active { background: var(--accent-soft); color: var(--accent-ink); font-weight: 700; }
+.team-hub .hub-items a.chat-room.unread { color: var(--ink); font-weight: 800; }
+.team-hub .hub-items a.chat-room.voice { font-weight: 700; }
+.team-hub .chat-room-icon { width: 16px; flex: none; text-align: center; color: var(--muted); font-weight: 700; }
+.team-hub a.chat-room.active .chat-room-icon { color: var(--accent-ink); }
+.team-hub .chat-room-name { display: grid; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.team-hub .chat-in-voice { color: var(--accent); font-size: 0.74rem; font-weight: 700; }
+/* Unread: an amber dot (amber is for what's yours: unread). */
+.team-hub .chat-room .notice-dot { margin: 0 0 0 auto; width: 9px; height: 9px; background: var(--disc); }
+.team-hub .chat-thread .thread { border-radius: var(--radius); }
+.team-hub .chat-thread .thread-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 18px; }
+.team-hub .chat-thread .thread-head h2 { font-size: 1.05rem; font-weight: 800; }
+.team-hub .chat-thread .message-meta b { font-weight: 700; }
+.team-hub .chat-thread .message-reactions span { border: 1px solid var(--line-2); background: var(--card); font-weight: 600; }
+.team-hub .chat-thread .message-reactions span.mine { background: var(--accent-soft); border-color: transparent; color: var(--accent-ink); }
+.team-hub .voice-room { display: grid; gap: 12px; }
+.team-hub .voice-room .thread-head { padding: 0 0 10px; }
+/* Room access: None / Read / Read & write. */
+.team-hub .access-row { flex-wrap: wrap; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.team-hub .access-picker { flex-wrap: nowrap; }
+.team-hub .access-picker button { padding: 5px 12px; font-size: 0.84rem; white-space: nowrap; }
+.team-hub .access-picker button.on { background: var(--accent); color: var(--on-accent); box-shadow: none; }
+@media (max-width: 860px) {
+  .team-hub .chat-split { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 420px) {
+  .team-hub .access-picker button { padding: 5px 9px; font-size: 0.8rem; }
+}
+
+/* --- Roster (TeamRosterView.tsx): a table of players, member rows ------- */
+.team-hub .toolbar .search-input { flex: 1; min-width: 200px; border: 0; border-radius: var(--radius-control); background: var(--field); }
+.team-hub .roster-table { width: 100%; border-collapse: collapse; }
+.team-hub .roster-table th {
+  padding: 10px 12px; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+}
+.team-hub .roster-table td { padding: 10px 12px; }
+.team-hub .roster-table tbody tr:hover { background: var(--bg-2); }
+.team-hub .roster-table td.num { font-family: var(--font-score); font-weight: 800; font-size: 1.25rem; text-align: left; width: 3em; }
+.team-hub .roster-table th.num { text-align: left; }
+.team-hub .roster-table .person { font-weight: 700; }
+.team-hub .roster-table .person small { font-weight: 500; }
+.team-hub .member-grid.member-rows { grid-template-columns: minmax(0, 1fr); gap: 0; }
+.team-hub .member-rows > li + li { border-top: 1px solid var(--line); }
+.team-hub .member-rows .member-card {
+  display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 12px; align-items: center;
+  padding: 10px 4px; border: 0; border-radius: 0;
+}
+.team-hub .member-rows .member-card:hover { background: var(--bg-2); }
+.team-hub .member-rows .member-card > span:nth-child(2) { display: grid; min-width: 0; }
+.team-hub .member-rows .member-card b { font-weight: 700; }
+.team-hub .member-rows .member-roles { justify-content: flex-end; align-items: center; gap: 4px; }
+.team-hub .member-rows .member-roles .pill { margin: 0; padding: 2px 9px; font-size: 0.74rem; }
+@media (max-width: 480px) {
+  .team-hub .member-rows .member-card { grid-template-columns: 36px minmax(0, 1fr); }
+  .team-hub .member-rows .member-roles { grid-column: 2; justify-content: flex-start; }
+}
+.team-hub .event-place { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.team-hub .event-place a { font-weight: 700; text-decoration: none; }
+.team-hub .event-place a:hover { text-decoration: underline; }
+.team-hub .event-notes { margin: 12px 0; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); }
+.team-hub .event-notes h3 { margin: 0; font-size: 0.82rem; font-weight: 800; color: var(--muted); }
+.team-hub .event-notes .post-body { margin-top: 4px; }
+.team-hub .rsvp-ask .rsvp-buttons button { display: grid; justify-items: center; gap: 0; line-height: 1.2; }
+.team-hub .rsvp-ask .rsvp-buttons .rsvp-count { font-size: 0.74rem; font-weight: 600; opacity: 0.8; }
+
+/* --- Play diagrams (playbook/PlayField.tsx): content colours, as the
+   app's field painter: offense blue, defense navy (no red: red is only
+   for live games), cone orange. Built from the site tokens; move these
+   to site.css's token blocks if they're wanted elsewhere. */
+.team-hub {
+  --play-offense: color-mix(in srgb, var(--team) 85%, var(--board));
+  --play-defense: var(--board);
+  --play-cone: color-mix(in srgb, var(--disc) 72%, var(--live));
+  --play-on-piece: var(--on-board);
+  /* Pen strokes (drawings), as the app's FieldColors pens. */
+  --play-pen-ink: #14213A;
+  --play-pen-turf: #7FDDB4;
+  --play-pen-amber: #FFB627;
+  --play-pen-white: #FFFFFF;
+}
+.team-hub .field-pen { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.team-hub .field-pen.ink { stroke: var(--play-pen-ink); }
+.team-hub .field-pen.turf { stroke: var(--play-pen-turf); }
+.team-hub .field-pen.amber { stroke: var(--play-pen-amber); }
+.team-hub .field-pen.white { stroke: var(--play-pen-white); }
+.team-hub .field-el.offense circle { fill: var(--play-offense); }
+.team-hub .field-el.defense circle { fill: var(--play-defense); }
+.team-hub .field-el.cone path { fill: var(--play-cone); }
+.team-hub .field-el.offense text, .team-hub .field-el.defense text { fill: var(--play-on-piece); }
+.team-hub .field-el circle, .team-hub .field-el path { stroke: var(--play-on-piece); stroke-width: 0.3; }
+.team-hub .field-el.disc circle { stroke: var(--board); }
+.team-hub .play-tool-icon.offense { background: var(--play-offense); }
+.team-hub .play-tool-icon.defense { background: var(--play-defense); }
+.team-hub .play-tool-icon.cone { background: var(--play-cone); }
+
+/* --- Playbook (TeamParts.tsx Playbook, playbook/PlayEditor.tsx) -------- */
+.team-hub .playbook-sections { display: grid; gap: 24px; }
+.team-hub .playbook-section { display: grid; gap: 12px; }
+.team-hub .playbook-section-head { display: flex; align-items: baseline; gap: 10px; margin: 0; font-size: 1.15rem; font-weight: 800; letter-spacing: -0.02em; }
+.team-hub .playbook-section-head .muted { font-size: 0.85rem; font-weight: 600; letter-spacing: 0; }
+.team-hub .play-grid { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+.team-hub a.play-card { padding: 0; overflow: hidden; display: grid; align-content: start; }
+.team-hub a.play-card:hover { border-color: var(--accent); }
+.team-hub .play-card .field { border-radius: 0; }
+.team-hub .play-card h3 { margin: 12px 14px 0; font-weight: 800; font-size: 0.98rem; }
+.team-hub .play-card p { margin: 2px 14px 0; }
+.team-hub .play-card > :last-child { margin-bottom: 14px; }
+.team-hub .play-viewer, .team-hub .play-editor-main { gap: 12px; }
+.team-hub .play-viewer .field, .team-hub .play-editor-main .field { border-radius: 12px; }
+.team-hub .play-btn { border-radius: 999px; min-width: 44px; min-height: 40px; }
+.team-hub .play-caption {
+  display: grid; gap: 2px; margin: 0; padding: 10px 14px; border-radius: 12px; text-align: left;
+  background: var(--accent-soft); color: var(--ink); font-weight: 500;
+}
+.team-hub .play-caption small { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-ink); }
+.team-hub .play-steps { gap: 8px; }
+.team-hub .play-step {
+  min-height: 40px; padding: 6px 14px; border-radius: var(--radius-control); border: 1px solid var(--line-2);
+  background: var(--card); color: var(--ink); font-weight: 700;
+}
+.team-hub .play-step.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.team-hub .play-tool { border-radius: 10px; border-color: var(--line); background: var(--card); font-weight: 600; }
+.team-hub .play-tool.on { background: var(--accent-soft); border-color: transparent; color: var(--accent-ink); }
+.team-hub .play-tool-icon.throw_ { border-top-color: var(--disc); }
+
+/* --- Meetings (meetings/MeetingsList.tsx, MeetingPage.tsx, MeetingRoom.tsx) */
+.team-hub .meeting-rows { gap: 0; }
+.team-hub .meeting-row { padding: 10px 0; }
+.team-hub .meeting-row-main { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 14px; align-items: center; }
+.team-hub .meeting-row-text { display: grid; gap: 2px; min-width: 0; }
+.team-hub .meeting-row-text b { font-weight: 700; }
+.team-hub .meeting-kind { margin: 0 0 10px; }
+.team-hub .meeting-kind .meeting-badge { background: var(--field); border-color: transparent; font-weight: 700; }
+.team-hub .meeting-summary .card-title { font-size: 1.35rem; letter-spacing: -0.02em; }
+.team-hub .meeting-when { margin: 0 0 4px; font-weight: 700; }
+.team-hub .meeting-summary .post-admin { margin-left: auto; gap: 8px; }
+.team-hub .meeting-rsvp .rsvp-buttons {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; padding: 0; border: 0; background: none; border-radius: 0; margin-bottom: 8px;
+}
+.team-hub .meeting-rsvp .rsvp-buttons button {
+  min-height: 42px; border-radius: var(--radius-control); border: 1px solid var(--line-2); background: var(--card); color: var(--ink); font-weight: 700;
+}
+.team-hub .meeting-rsvp .rsvp-buttons button.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); box-shadow: none; }
+/* Unanswered: it's yours to do. */
+.team-hub .meeting-rsvp.needs { background: var(--disc-soft); border-color: transparent; }
+.team-hub .meeting-rsvp.needs .card-title { color: var(--disc-ink); }
+
+/* The room: the call on navy surfaces; Leave and End are neutral. */
+.team-hub .meeting-call .call-stage-wrap {
+  padding: 12px; border-radius: var(--radius); background: var(--board); color: var(--on-board);
+}
+.team-hub .meeting-call .call-tile { background: var(--board-2); }
+.team-hub .meeting-call .call-tile.speaking { border-color: var(--accent); }
+.team-hub .meeting-call .call-tile-face .avatar { background: var(--board); color: var(--on-board); }
+.team-hub .meeting-call .call-controls {
+  padding: 10px; border-radius: var(--radius); background: var(--board);
+}
+.team-hub .meeting-call .call-controls .btn { min-height: 40px; border-radius: 999px; background: var(--board-2); color: var(--on-board); border: 1px solid transparent; }
+.team-hub .meeting-call .call-controls .btn[aria-pressed="true"]:not(.off) { background: var(--accent-soft); color: var(--accent-ink); }
+.team-hub .meeting-call .call-controls .btn.off { background: transparent; border-color: var(--board-muted); color: var(--board-muted); }
+.team-hub .meeting-call .call-controls .call-leave { background: var(--card); color: var(--ink); }
+.team-hub .meeting-call .call-controls .call-end { background: transparent; border-color: var(--board-muted); color: var(--on-board); }
+.team-hub .meeting-call .call-head .card-title { font-size: 1.2rem; font-weight: 800; }
+.team-hub .call-requests { background: var(--disc-soft); border-color: transparent; }
+.team-hub .call-requests .card-title { color: var(--disc-ink); text-transform: uppercase; font-size: 0.78rem; letter-spacing: 0.06em; }
+.team-hub .voice-room .call-people .speaking { color: var(--accent); }
+
+/* --- Settings, roles, invites, join requests, communities --------------- */
+.team-hub .settings-stack { gap: 16px; }
+.team-hub .danger-zone { border-color: var(--line); }
+.team-hub .danger-zone .card-title { color: var(--ink); }
+.team-hub .join-requests.waiting { background: var(--disc-soft); border-color: transparent; }
+.team-hub .join-requests.waiting .card-title { color: var(--disc-ink); }
+.team-hub .people-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.team-hub .person-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.team-hub .person-row .person { font-weight: 700; min-width: 0; }
+.team-hub .role-list > li { padding: 12px 0; }
+.team-hub .role-list .text-btn { color: var(--ink-soft); }
+.team-hub .role-list .text-btn:hover { color: var(--ink); }
+.team-hub .invite-code-card { background: var(--accent-soft); }
+.team-hub .invite-code-big { font-family: var(--font-score); font-size: 2rem; letter-spacing: 0.06em; }
+.team-hub .team-list .team-row { padding: 6px 0; }
+.team-hub .discord-import .card-head { margin-bottom: 6px; }
+.team-hub .community-teams .team-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; list-style: none; margin: 0; padding: 0; }
+.team-hub .community-teams .team-row { padding: 12px; border: 1px solid var(--line); border-radius: 14px; }
+.team-hub .community-teams .team-row > a { display: flex; align-items: center; gap: 12px; color: var(--ink); text-decoration: none; min-width: 0; }
+.team-hub .community-teams .team-row > a > span { display: grid; min-width: 0; }
+.team-hub .community-teams .team-row b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-hub .community-teams .team-row:hover { border-color: var(--line-2); }
+
+/* Fixes after the first look. */
+.team-hub .sched-split { grid-template-columns: minmax(0, 1.35fr) minmax(300px, 1fr); }
+.team-hub .rsvp-ask .rsvp-buttons, .team-hub .meeting-rsvp .rsvp-buttons { display: grid; width: 100%; justify-self: stretch; box-sizing: border-box; }
+.team-hub .member-rows .member-card > .member-roles { display: flex; flex-wrap: wrap; }
+@media (max-width: 860px) {
+  .team-hub .sched-split { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Settings › Sections and the new team's hint (F21). */
+.team-hub .team-sections .switch-row input:disabled { opacity: 0.5; cursor: not-allowed; }
+.team-hub .team-sections .switch-row-locked { cursor: default; }
+.team-hub .team-sections .switch-row b { font-weight: 700; }
+.team-hub .team-sections .switch-row small { font-size: 0.82rem; }
+.team-hub .section-off .card-title { margin-bottom: 6px; }
+.team-hub .sections-hint {
+  display: flex; align-items: center; gap: 4px; border-radius: 16px; background: var(--accent-soft); color: var(--accent-ink);
+}
+.team-hub .sections-hint > a {
+  flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; padding: 10px 4px 10px 14px;
+  color: inherit; text-decoration: none; font-size: 0.85rem; font-weight: 600;
+}
+.team-hub .sections-hint > a:hover span { text-decoration: underline; }
+.team-hub .sections-hint > a svg { flex: none; }
+.team-hub .sections-hint-close {
+  flex: none; width: 36px; height: 36px; margin-right: 4px; border: 0; border-radius: 999px; background: transparent;
+  color: inherit; font-size: 1.25rem; line-height: 1; cursor: pointer;
+}
+.team-hub .sections-hint-close:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
+.team-hub .sections-hint a:focus-visible, .team-hub .sections-hint-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Quick stat tiles at the top of the feed (F18): amber only while there's chat to read. */
+.team-hub .stat-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.team-hub .stat-tile {
+  display: grid; gap: 2px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius-control);
+  background: var(--card); color: var(--ink); text-decoration: none; min-width: 0;
+}
+.team-hub .stat-tile:hover { background: var(--field); }
+.team-hub .stat-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.team-hub .stat-tile-top { font-weight: 700; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.team-hub .stat-tile-top b { font-family: var(--font-score); font-size: 1.65rem; font-weight: 800; line-height: 1; margin-right: 4px; }
+.team-hub .stat-tile small { color: var(--muted); font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.team-hub .stat-tile-new { background: var(--disc-soft); border-color: color-mix(in srgb, var(--disc) 45%, transparent); color: var(--disc-ink); }
+.team-hub .stat-tile-new:hover { background: var(--disc-soft); filter: brightness(0.98); }
+
+/* The roster's O-line / D-line groups, Edit lines and invites pending (F23). */
+.team-hub .line-group-title { margin: 14px 0 6px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.team-hub .line-group-title:first-of-type { margin-top: 4px; }
+.team-hub .lines-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.team-hub .lines-bar p { flex: 1; margin: 0; min-width: 12em; }
+.team-hub .line-picker { display: inline-flex; border: 1px solid var(--line-2); border-radius: 999px; overflow: hidden; }
+.team-hub .line-picker button {
+  border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 0.8rem; font-weight: 700; padding: 5px 11px; cursor: pointer;
+}
+.team-hub .line-picker button + button { border-left: 1px solid var(--line-2); }
+.team-hub .line-picker button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+.team-hub .line-picker button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.team-hub .roster-role { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.team-hub .invite-rows { list-style: none; margin: 0; padding: 0; }
+.team-hub .invite-rows li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+.team-hub .invite-rows li:first-child { border-top: 0; }
+.team-hub .invite-rows li > span { flex: 1; min-width: 0; display: grid; }
+
+/* More's rows: a line on what's there, then Manage and Leave (F28). */
+.team-hub .team-more-menu a small { display: block; color: var(--muted); font-weight: 500; font-size: 0.78rem; margin-top: 1px; }
+.team-hub .team-more-menu a.active small { color: inherit; opacity: 0.8; }
+.team-hub .team-more-menu { min-width: 240px; }
+.team-hub .team-more-menu .team-more-sep { border-top: 1px solid var(--line); margin: 4px 0; }
+.team-hub .team-more-leave {
+  display: block; width: 100%; text-align: left; border: 0; background: transparent; font: inherit; font-weight: 600;
+  color: var(--ink); padding: 9px 12px; border-radius: 10px; cursor: pointer;
+}
+.team-hub .team-more-leave:hover { background: var(--field); }
+.team-hub .team-more-leave:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.team-hub .team-more-menu .post-error { display: block; padding: 4px 12px; }
+.team-hub .team-more-note { display: block; padding: 6px 12px; color: var(--muted); font-size: 0.78rem; max-width: 240px; }
+/* The community page (F27): the next pickup card, its chat rooms and organizers. Amber only for "RSVP needed" and unread rooms. */
+.team-hub .pickup-card .card-head { align-items: center; }
+.team-hub .pickup-event { display: flex; gap: 14px; align-items: center; color: inherit; text-decoration: none; padding: 4px 0; }
+.team-hub .pickup-event:hover b { text-decoration: underline; }
+.team-hub .pickup-event .date-tile { flex-shrink: 0; }
+.team-hub .pickup-info { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.team-hub .pickup-info b { font-size: 1rem; font-weight: 700; }
+.team-hub .pickup-info small { font-size: 0.8rem; color: var(--muted); }
+.team-hub .pickup-info small.pickup-going { color: var(--accent-ink); font-weight: 700; }
+.team-hub .pickup-card .rsvp-ask { margin: 12px 0 0; }
+.team-hub .pickup-empty { display: grid; gap: 8px; justify-items: start; }
+.team-hub .pickup-empty p { margin: 0; }
+.team-hub .pickup-join { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 12px 0 0; }
+.team-hub .community-rooms { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.team-hub .community-rooms a {
+  display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: var(--radius-control);
+  color: var(--ink-soft); text-decoration: none; font-size: 0.9rem;
+}
+.team-hub .community-rooms a:hover { background: var(--field); }
+.team-hub .community-rooms a.unread { color: var(--ink); font-weight: 700; }
+.team-hub .community-rooms .room-hash { color: var(--muted); font-weight: 700; }
+.team-hub .community-rooms .room-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-hub .community-rooms .unread-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--disc); flex: none; }
+.team-hub .organizer-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.team-hub .organizer-list li { display: flex; align-items: center; gap: 10px; }
+.team-hub .organizer-list .person { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none; }
+.team-hub .organizer-list .person > span { display: grid; min-width: 0; }
+.team-hub .organizer-list .person b { font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-hub .organizer-role { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.team-hub .organizer-message { display: grid; justify-items: end; gap: 4px; }

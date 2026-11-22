@@ -7,36 +7,131 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
-## 0.29.0 — 2026-11-16
+## 0.36.0 — 2026-11-20
 
-Online payments for tournament and league fees (Stripe Connect). Off
-until `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` and
-`PAYMENTS_RETURN_URL` (or `WEB_SITE_URL`) are set (DEPLOY.md,
-"Payments"); without them the routes below say payments aren't set up.
+With app 0.0.39 and web 0.48.0.
+
+**Changed**
+- Chat reactions (`PUT .../messages/:messageId/reaction` for team rooms
+  and conversations) take any one emoji (`isChatReaction` in
+  `packages/shared`), not only the website's old list of eight, so the
+  app's quick reactions and the emoji picker's choices are accepted.
+  Anything else is still 400.
+
+## 0.35.0 — 2026-11-20
+
+Redesign features, second batch, with app 0.0.38 and web 0.47.0.
+Details in `docs/product-spec.md` §8.1 items 35–44.
 
 **Added**
-- `GET /v1/teams/:id/payouts` and `POST /v1/teams/:id/payouts/link`: the
-  host's owner connects a Stripe account (made once per team; the host
-  pays Stripe's fees, Stripe covers losses, full Dashboard) and gets a
-  single-use onboarding link back to the website's `/payments/payouts`.
-- `GET /v1/tournaments/:id/pay[?team=]` and `POST
-  /v1/tournaments/:id/checkout`: whether the caller can pay a team's bid
-  or spot fee (the team's admins) or their own entry fee (a signed-up
-  player) online, and a Stripe Checkout session for it: a direct charge
-  on the host's account with Stall 10's fee (`PLATFORM_FEE_BPS`,
-  `PLATFORM_FEE_FIXED_CENTS`, 1% + $1 by default) as the application
-  fee. The amount comes from the tournament, never the request.
-- `POST /v1/payments/stripe/webhook` (Connect endpoint, signed, raw
-  body, each event handled once): a completed payment marks
-  `tournaments/{id}/payments/{payer}` paid with the host's own three
-  fields; a second payment for something already paid is refunded in
-  full; a full refund in the host's Dashboard un-marks it (unless the
-  host has since marked it by hand) and refunds Stall 10's fee; expired
-  sessions, disputes and account updates are recorded.
-- Server-only collections, outside tournaments so deletions keep the
-  money records: `payoutAccounts`, `stripeAccounts`, `charges`,
-  `stripePayments`, `stripeEvents`. No client rules match them.
-- The `stripe` SDK (23.1.0).
+- Video notes, clips and comments: `POST /v1/teams/:id/videos/:videoId/comments`,
+  `DELETE .../comments/:commentId` (author or manageTeam); `PUT
+  .../videos/:videoId/event` tags a video to a team event (`{eventId |
+  null}`). Removing a video deletes its comments.
+- Roster lines: `PUT /v1/teams/:id/roster-lines` (manageTeam, teams
+  only). Pending invites: `GET /v1/teams/:id/invites`, `DELETE
+  /v1/teams/:id/invites/:uid`; invites now record `teamId`.
+- Chat polls: `POST /v1/teams/:id/chats/:roomId/polls`, `PUT
+  .../messages/:messageId/vote`, `POST .../messages/:messageId/close-poll`.
+- Team posts: `PUT|DELETE /v1/teams/:id/posts/:postId/pin` (up to 3,
+  swap), `POST /v1/teams/:id/posts/:postId/comments`, `DELETE
+  .../comments/:commentId`. Public team pages list pinned posts first
+  with `pinnedAt`.
+- Permissions: `PUT /v1/teams/:id/members/:uid/permissions` (owner;
+  `memberGrants`, included in `memberPerms`).
+- Team join requests: `PUT /v1/teams/:id/allow-join-requests`; the
+  existing join-request endpoints now serve teams that allow them, with
+  the club age rule at request and approval.
+
+**Changed**
+- Download your data adds video notes/comments (with team, video and
+  times), poll votes and polls posted, roster lines, and waiting join
+  requests.
+- Reply quotes of a poll say "📊 question".
+
+## 0.34.0 — 2026-11-20
+
+Redesign features, with app 0.0.37 and web 0.46.0. Details in
+`docs/product-spec.md` §8.1 items 26–34.
+
+**Added**
+- Live running scores: `POST`/`DELETE
+  /v1/tournaments/:id/divisions/:divisionId/games/:gameId/live`
+  (either team's captain or the host's event managers, on the game's
+  day, scheduled games only). Public games carry `live`; public list
+  cards carry `liveGames` (updated in the last 3 hours).
+- `PUT /v1/teams/:id/sections` (owner): Playbook, Videos, Stats,
+  Meetings switches; new teams start with them off.
+- `PUT /v1/teams/:id/public-page` (manageTeam): `publicPage: false` on
+  the team and its listing; off, outsiders get the card only and its
+  hosted events and rankings leave the public lists.
+- Team rooms: `PUT|DELETE .../messages/:id/pin` (up to 10 a room, swap
+  on the 11th) and `POST .../event-shares` (event card messages).
+- `GET /v1/me/export`: the caller's own data as a JSON attachment, once
+  per 10 minutes (`limits/{uid}.exportedAt`).
+- `spots` on public tournament list cards (each division's cap less its
+  accepted teams) while registration is open.
+
+**Changed**
+- RSVPs to team events and meetings take an optional `note` (140
+  characters; left out keeps it, taking the answer back removes it).
+- Plays take `kind` (`play` | `whiteboard`) and `drawings`; a save that
+  leaves them out keeps the stored ones.
+
+## 0.33.0 — 2026-11-19
+
+**Added**
+- `PUT /v1/teams/:teamId/chats/:roomId/read`: marks a room read for the
+  caller (`users/{uid}/chatReads/{teamId}`, `rooms.{roomId}`), only in
+  rooms they can read.
+
+**Changed**
+- Sending a team chat message also stamps the room's `lastAt` (a time,
+  never the text) and marks the room read for the sender, in the same
+  transaction.
+
+## 0.32.0 — 2026-11-19
+
+**Added**
+- Profiles (`/v1/players/:uid`, `profileView`) include `teamStats` (team
+  id → season → totals) when the player shows both stats and teams.
+  `PUT /v1/me/profile/visibility` deletes it when either is hidden, and
+  making a profile private moves it with the rest (`privateProfileFields`).
+
+## 0.31.1 — 2026-11-19
+
+**Changed**
+- Error messages say "community" where they said "group" (hat
+  tournaments, joining one that needs approval, its events and roster),
+  matching the app 0.0.30 and website 0.40.0 wording. Group messages
+  keep "group".
+
+## 0.31.0 — 2026-11-17
+
+Private profiles' posts (security review S1).
+
+**Changed**
+- `POST /v1/posts` and `PUT /v1/posts/:id/repost` stamp `private` on the
+  new post from the author's profile (the `follows` functions keep it in
+  step when a profile turns private or public).
+- Liking a post, commenting on it and liking its comments check what the
+  rules' `canSeePost` does: a private post is for its author and accepted
+  followers only (403 otherwise; a repost and its original both count).
+- A private profile's post can't be reposted (412), and `GET
+  /v1/posts/state` says `canRepost: false` for one (unless already
+  reposted, so it can be taken back).
+
+## 0.30.0 — 2026-11-16
+
+The offline queue's comments. Deploy before web 0.38.0, which sends an
+`id` with every new comment (older clients don't, and keep working).
+0.29.0 is the payments branch's.
+
+**Changed**
+- `POST /v1/posts/:id/comments` takes an optional `id` (the app or site
+  picks it when the member sends), so a comment resent from the offline
+  queue is never posted twice: a second send with the same id answers
+  409 `already_exists`.
 
 ## 0.28.0 — 2026-11-16
 

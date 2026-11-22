@@ -68,6 +68,9 @@ describe("webRoute", () => {
     expect(webRoute("/teams/t1?section=more")).toBe("/teams/t1");
     expect(webRoute("/teams/t1?section=..%2Fsettings")).toBe("/teams/t1");
     expect(webRoute("/teams/t1?section=constructor")).toBe("/teams/t1");
+    expect(webRoute("/teams/t1/whiteboards/w1")).toBe("/teams/t1/whiteboards/w1");
+    expect(webRoute("/teams/t1/whiteboards/new")).toBe("/teams/t1/whiteboards/new");
+    expect(webRoute("/teams/t1/whiteboards/..")).not.toBe("/teams/t1/whiteboards/..");
     expect(webRoute("/team-videos/t1/v1")).toBe("/teams/t1/videos/v1");
     expect(webRoute("/teams/t1/stats/games/g1")).toBe("/teams/t1/stats/games/g1");
     expect(webRoute("/teams/t1/stats/tournaments/x1")).toBe("/teams/t1/stats/tournaments/x1");
@@ -79,6 +82,7 @@ describe("webRoute", () => {
     expect(webRoute("/tournaments/new?host=g1&type=hat&x=1")).toBe("/tournaments/new?host=g1&type=hat");
     expect(webRoute("/tournaments/x1")).toBe("/tournaments/x1");
     expect(webRoute("/tournaments/x1?host=g%201")).toBe("/tournaments/x1?host=g%201");
+    expect(webRoute("/tournaments/x1/bracket/d1")).toBe("/tournaments/x1/bracket?division=d1");
     expect(webRoute("/tournaments/x1/edit")).toBe("/tournaments/x1/edit");
     expect(webRoute("/tournaments/x1/signups")).toBe("/tournaments/x1/signups");
     // As in the app: draft/ is the host's balanced draft, live-draft/ the captains'.

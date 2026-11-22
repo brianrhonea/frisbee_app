@@ -27,4 +27,23 @@ describe("plays", () => {
     expect(savePlayRequestSchema.safeParse({ ...base, steps: [{ id: "s", paths: { ghost: [] } }] }).success).toBe(false);
     expect(savePlayRequestSchema.safeParse({ ...base, category: "trick" }).success).toBe(false);
   });
+
+  it("carry an optional kind and pen strokes; whiteboards have no steps", () => {
+    const base = { name: "Chalk talk", category: "offense", elements: play.elements };
+    const stroke = { id: "k1", color: "turf", points: [{ x: 0.1, y: 0.1 }, { x: 0.3, y: 0.4 }] };
+    const parsed = savePlayRequestSchema.parse({ ...base, kind: "whiteboard", drawings: [stroke] });
+    expect(parsed.kind).toBe("whiteboard");
+    expect(parsed.drawings).toEqual([stroke]);
+    // Left out, they stay out (the API keeps what the play already has).
+    const plain = savePlayRequestSchema.parse(base);
+    expect(plain.kind).toBeUndefined();
+    expect(plain.drawings).toBeUndefined();
+    expect(savePlayRequestSchema.safeParse({ ...base, kind: "whiteboard", steps: play.steps }).success).toBe(false);
+    expect(savePlayRequestSchema.safeParse({ ...base, kind: "sketch" }).success).toBe(false);
+    expect(savePlayRequestSchema.safeParse({ ...base, drawings: [{ ...stroke, color: "red" }] }).success).toBe(false);
+    expect(savePlayRequestSchema.safeParse({ ...base, drawings: [{ ...stroke, points: [stroke.points[0]] }] }).success).toBe(false);
+    const long = Array.from({ length: 201 }, (_, i) => ({ x: i / 201, y: 0.5 }));
+    expect(savePlayRequestSchema.safeParse({ ...base, drawings: [{ ...stroke, points: long }] }).success).toBe(false);
+    expect(savePlayRequestSchema.safeParse({ ...base, drawings: Array.from({ length: 101 }, (_, i) => ({ ...stroke, id: `k${i}` })) }).success).toBe(false);
+  });
 });

@@ -11,7 +11,13 @@ export function ThemeToggle() {
   // Unknown until mounted: the server can't see the visitor's choice. System
   // needs nothing here: site.css follows prefers-color-scheme itself.
   const [choice, setChoice] = useState<ThemeChoice | null>(null);
-  useEffect(() => setChoice(currentChoice()), []);
+  useEffect(() => {
+    setChoice(currentChoice());
+    // Follow changes made elsewhere (Settings › Appearance sets data-theme on <html>).
+    const watch = new MutationObserver(() => setChoice(currentChoice()));
+    watch.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => watch.disconnect();
+  }, []);
 
   const now = choice ?? "system";
   const next = order[(order.indexOf(now) + 1) % order.length]!;

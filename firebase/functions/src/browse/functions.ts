@@ -138,8 +138,14 @@ export const profile = onCall(options, async (req) => {
 });
 
 /**
+ * A private group's listing, or a team's whose "Public team page" is off
+ * (publicPage false, as the API's isPrivateHost): its card only.
+ */
+const hidesPage = (listing: Data | undefined) => isPrivateGroup(listing) || listing?.publicPage === false;
+
+/**
  * A team or group's public page: its listing and, unless it's a private
- * group, its public posts and upcoming public events.
+ * group or its page is off, its public posts and upcoming public events.
  */
 export const team = onCall(options, async (req) => {
   await admit(req);
@@ -149,7 +155,7 @@ export const team = onCall(options, async (req) => {
   const listing = await db.doc(`teamDirectory/${id}`).get();
   if (!listing.exists) throw new HttpsError("not-found", "No such team.");
   const data = listing.data() as Data;
-  if (isPrivateGroup(data)) return { listing: plain(listingView(data)), posts: [], events: [] };
+  if (hidesPage(data)) return { listing: plain(listingView(data)), posts: [], events: [] };
   const [posts, events] = await Promise.all([
     db.collection(`teams/${id}/posts`).where("public", "==", true).orderBy("createdAt", "desc").limit(pageSize).get(),
     db
@@ -198,7 +204,7 @@ export const events = onCall(options, async (req) => {
     events: eventSnap.docs.flatMap((d) => {
       const teamId = d.ref.parent.parent?.id ?? "";
       const listing = listings.get(teamId);
-      if (isPrivateGroup(listing)) return [];
+      if (hidesPage(listing)) return [];
       return [{ id: d.id, teamId, teamName: listing?.name ?? "", data: plain(eventView(d.data())) }];
     }),
     // Group tournaments' public summaries (TournamentListing), but not a

@@ -33,7 +33,7 @@ export function GameRow({ teamId, game, onDelete }: { teamId: string; game: Stat
           <b>vs {game.opponent || "Opponent"}</b>
           <small className="muted">{dateTime(game.date)}</small>
         </span>
-        <span className="st-score">
+        <span className={`st-score${gameWon(game) === false ? " st-score-lost" : ""}`}>
           {ourScore(game)}–{theirScore(game)}
         </span>
         <span className={`st-badge st-${b.tone}`}>{b.text}</span>
@@ -91,7 +91,9 @@ export function StatsHome() {
   const nameOf = nameMap(players.data);
   const wins = all.filter((g) => gameWon(g) === true).length;
   const losses = all.filter((g) => gameWon(g) === false).length;
-  const leaders = ranked(statSheetOfGames(all)).slice(0, 3);
+  const sheet = statSheetOfGames(all);
+  const leaders = ranked(sheet).slice(0, 3);
+  const pct = (v: number | null) => (v === null ? "–" : `${Math.round(v * 100)}%`);
   const standalone = all.filter((g) => g.tournamentId === null);
 
   const del = async (path: string, message: string) => {
@@ -109,7 +111,7 @@ export function StatsHome() {
               New game
             </button>
             <button type="button" className="btn btn-small" onClick={() => setAdding("tournament")}>
-              New tournament
+              Track a tournament
             </button>
           </>
         )}
@@ -134,22 +136,36 @@ export function StatsHome() {
 
       <section className="card st-season">
         <div className="st-season-head">
-          <div>
-            <small className="muted">Season</small>
-            <b className="st-record">
-              {wins}–{losses}
-            </b>
-          </div>
+          <small className="st-eyebrow">Season</small>
           <Link href={statsUrl(teamId, "/season")} className="btn btn-small">
             Season stats
           </Link>
+        </div>
+        <div className="st-numbers">
+          <div>
+            <b className="st-record">
+              {wins}–{losses}
+            </b>
+            <small>Record</small>
+          </div>
+          <div>
+            <b>{pct(sheet.team.oEfficiency)}</b>
+            <small>O efficiency</small>
+          </div>
+          <div>
+            <b>{pct(sheet.team.breakRate)}</b>
+            <small>Break rate</small>
+          </div>
         </div>
         {leaders.length > 0 && (
           <>
             <h3 className="card-title">Top +/-</h3>
             <ol className="st-leaders">
-              {leaders.map((p) => (
+              {leaders.map((p, i) => (
                 <li key={p.playerId}>
+                  <span className="st-rank" aria-hidden>
+                    {i + 1}
+                  </span>
                   <span>{nameOf(p.playerId)}</span>
                   <small className="muted">
                     {p.goals}G {p.assists}A {p.handBlocks + p.breakups}D
@@ -162,9 +178,9 @@ export function StatsHome() {
         )}
       </section>
 
-      <h3 className="section-title">Tournaments</h3>
+      <h3 className="section-title">Tournament stats</h3>
       {tournaments.data.length === 0 ? (
-        <p className="empty">No tournaments yet.</p>
+        <p className="empty">No tournaments tracked yet.</p>
       ) : (
         <ul className="game-list">
           {tournaments.data.map((t) => {

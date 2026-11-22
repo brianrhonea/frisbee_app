@@ -21,6 +21,7 @@ import 'package:frisbee_app/ui/messages/view_models/direct_chat_viewmodel.dart';
 import 'package:frisbee_app/ui/messages/view_models/group_members_viewmodel.dart';
 import 'package:frisbee_app/ui/messages/view_models/inbox_viewmodel.dart';
 import 'package:frisbee_app/ui/messages/widgets/direct_chat_screen.dart';
+import 'package:frisbee_app/ui/chat/widgets/reaction_bubble.dart';
 import 'package:frisbee_app/ui/messages/widgets/inbox_screen.dart';
 import 'package:frisbee_app/utils/result.dart';
 
@@ -687,6 +688,160 @@ void main() {
     expect(find.byIcon(Icons.circle), findsOneWidget);
   });
 
+  group('team chats in the inbox', () {
+    final at = DateTime(2026, 11, 1, 9);
+
+    void seed() {
+      teams.teams['t1'] = Team(
+        id: 't1',
+        name: 'Northside Flyers',
+        division: Division.mixed,
+        level: CompetitionLevel.club,
+        ownerId: 'coach',
+        members: {'coach': TeamRole.owner, testUser.uid: TeamRole.player},
+      );
+      teams.teams['t2'] = Team(
+        id: 't2',
+        name: 'Quiet Pickup',
+        kind: TeamKind.community,
+        division: Division.mixed,
+        level: CompetitionLevel.pickup,
+        ownerId: 'org',
+        members: {'org': TeamRole.owner, testUser.uid: TeamRole.player},
+      );
+      chats
+        ..rooms['general'] = ChatRoom.general()
+        ..teamOf['r:general'] = 't1'
+        ..rooms['rides'] = const ChatRoom(
+          id: 'rides',
+          name: 'Carpool',
+          readRoles: {ChatAudience.everyone},
+          writeRoles: {ChatAudience.everyone},
+        )
+        ..teamOf['r:rides'] = 't1'
+        // Coaches only: never listed or counted for a player.
+        ..rooms['staff'] = const ChatRoom(
+          id: 'staff',
+          name: 'Staff',
+          readRoles: {'coach'},
+          writeRoles: {'coach'},
+        )
+        ..teamOf['r:staff'] = 't1'
+        ..rooms['lobby'] = ChatRoom.general().withName('Lobby')
+        ..teamOf['r:lobby'] = 't2';
+      chats
+        ..stampRoom('general', at)
+        ..stampRoom('rides', at.add(const Duration(minutes: 5)))
+        ..stampRoom('staff', at.add(const Duration(minutes: 9)));
+    }
+
+    InboxViewModel withTeams() => InboxViewModel(
+      directMessageRepository: dms,
+      authRepository: auth,
+      teamRepository: teams,
+      chatRepository: chats,
+    );
+
+    test('lists every team chat, unread first, with the rooms that have '
+        'new messages; reading a room clears it', () async {
+      seed();
+      final vm = withTeams();
+      addTearDown(vm.dispose);
+      await pumpEventQueue();
+      expect(vm.teamChats.map((s) => s.team.name), [
+        'Northside Flyers',
+        'Quiet Pickup',
+      ]);
+      final flyers = vm.teamChats.first;
+      expect(flyers.subtitle, 'New in #carpool and #general');
+      expect(flyers.rooms.map((r) => r.id), isNot(contains('staff')));
+      expect(flyers.lastAt, at.add(const Duration(minutes: 5)));
+      expect(vm.teamChats.last.subtitle, 'No messages yet');
+      expect(vm.unreadCount, 1);
+
+      await chats.markRead('t1', 'rides', testUser.uid);
+      await pumpEventQueue();
+      expect(vm.teamChats.first.subtitle, 'New in #general');
+      expect(vm.teamChats.first.openRoom!.id, 'general');
+      await chats.markRead('t1', 'general', testUser.uid);
+      await pumpEventQueue();
+      expect(vm.teamChats.first.subtitle, 'Team chat');
+      expect(vm.unreadCount, 0);
+    });
+
+    test('the Unread filter keeps unread team chats; search matches team '
+        'names; requests and archived list none', () async {
+      seed();
+      final vm = withTeams();
+      addTearDown(vm.dispose);
+      await pumpEventQueue();
+      vm.setFilter(InboxFilter.unread);
+      expect(vm.teamChats.map((s) => s.team.id), ['t1']);
+      vm
+        ..setFilter(InboxFilter.all)
+        ..setQuery('pickup');
+      expect(vm.teamChats.map((s) => s.team.id), ['t2']);
+      vm
+        ..setQuery('')
+        ..setFilter(InboxFilter.archived);
+      expect(vm.teamChats, isEmpty);
+    });
+
+    testWidgets('the inbox shows team chats above direct messages; a tap '
+        'opens the room and back returns', (tester) async {
+      tester.view.physicalSize = const Size(390, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      seed();
+      dms.conversations['a_u1'] = Conversation(
+        id: 'a_u1',
+        participants: const ['a', 'u1'],
+        names: const {'a': 'Avery Jones'},
+        lastMessage: 'See you at practice',
+        lastMessageAt: DateTime(2026, 10, 1),
+        lastSenderId: 'a',
+      );
+      final vm = withTeams();
+      addTearDown(vm.dispose);
+      final router = GoRouter(
+        initialLocation: '/messages',
+        routes: [
+          GoRoute(
+            path: '/messages',
+            builder: (_, _) => InboxScreen(viewModel: vm),
+          ),
+          GoRoute(
+            path: '/teams/:t/chats/:r',
+            builder: (_, s) => Scaffold(
+              appBar: AppBar(),
+              body: Text('room ${s.pathParameters['r']}'),
+            ),
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        withRepos(
+          MaterialApp.router(theme: AppTheme.light, routerConfig: router),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Team chats'), findsOneWidget);
+      expect(find.text('Direct messages'), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.text('Northside Flyers')).dy,
+        lessThan(tester.getTopLeft(find.text('Avery Jones')).dy),
+      );
+      expect(find.text('New in #carpool and #general'), findsOneWidget);
+      await tester.tap(find.text('Northside Flyers'));
+      await tester.pumpAndSettle();
+      // Two unread rooms: the newest.
+      expect(find.text('room rides'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.text('Team chats'), findsOneWidget);
+    });
+  });
+
   testWidgets('a request shows Accept and Delete instead of the composer, '
       'and sits under Requests', (tester) async {
     tester.view.physicalSize = const Size(390, 800);
@@ -734,7 +889,7 @@ void main() {
     );
     await tester.pump();
     expect(find.text('Avery'), findsNothing);
-    await tester.tap(find.text('Requests (1)'));
+    await tester.tap(find.text('Requests'));
     await tester.pump();
     expect(find.text('Avery'), findsOneWidget);
   });
@@ -941,6 +1096,15 @@ void main() {
 
     await tester.longPress(find.text('Pickup at 6?').first);
     await tester.pumpAndSettle();
+    // The sheet says when it was sent, so the time isn't only behind the
+    // drag-left gesture.
+    expect(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.textContaining(RegExp(r'\d:\d\d\s[AP]M')),
+      ),
+      findsOneWidget,
+    );
     await tester.tap(find.text('😂'));
     await tester.pumpAndSettle();
     expect(vm.messages.single.reactionOf(testUser.uid), '😂');
@@ -964,6 +1128,94 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Profile a'), findsOneWidget);
+  });
+
+  testWidgets('double-tap a message for a bubble of reactions over it; '
+      'its + offers every emoji', (tester) async {
+    await dms.openConversation(
+      testUser,
+      const UserProfile(uid: 'a', name: 'Avery'),
+    );
+    await dms.sendMessage(
+      'a_u1',
+      author: const AppUser(uid: 'a', displayName: 'Avery'),
+      text: 'Pickup at 6?',
+    );
+    final vm = DirectChatViewModel(
+      conversationId: 'a_u1',
+      directMessageRepository: dms,
+      authRepository: auth,
+      filePicker: FakeFilePickerService(),
+    );
+    addTearDown(vm.dispose);
+    await tester.pumpWidget(
+      withRepos(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: DirectChatScreen(viewModel: vm),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    Future<void> doubleTap() async {
+      final at = tester.getCenter(find.text('Pickup at 6?').first);
+      await tester.tapAt(at);
+      await tester.pump(const Duration(milliseconds: 60));
+      await tester.tapAt(at);
+      await tester.pumpAndSettle();
+    }
+
+    await doubleTap();
+    final bubble = find.byType(ReactionBubble);
+    expect(bubble, findsOneWidget);
+    // It sits just above the message.
+    expect(
+      tester.getBottomLeft(bubble).dy,
+      lessThanOrEqualTo(tester.getTopLeft(find.text('Pickup at 6?').first).dy),
+    );
+    for (final e in quickReactions) {
+      expect(find.bySemanticsLabel('React $e'), findsOneWidget);
+    }
+    await tester.tap(find.bySemanticsLabel('React ‼️'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ReactionBubble), findsNothing);
+    expect(vm.messages.single.reactionOf(testUser.uid), '‼️');
+
+    // The +: any emoji, by group.
+    await doubleTap();
+    await tester.tap(find.bySemanticsLabel('More emoji'));
+    await tester.pumpAndSettle();
+    expect(find.text('Smileys'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('🐐'),
+      200,
+      scrollable: find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.tap(find.text('🐐'));
+    await tester.pumpAndSettle();
+    expect(vm.messages.single.reactionOf(testUser.uid), '🐐');
+
+    // Theirs from the + shows in the bubble, so it can be taken back.
+    await doubleTap();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(ReactionBubble),
+        matching: find.text('🐐'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(vm.messages.single.reactionOf(testUser.uid), isNull);
+
+    // Tapping outside closes it without reacting.
+    await doubleTap();
+    await tester.tapAt(const Offset(5, 5));
+    await tester.pumpAndSettle();
+    expect(find.byType(ReactionBubble), findsNothing);
+    expect(vm.messages.single.reactionOf(testUser.uid), isNull);
   });
 
   testWidgets('on a phone, back from a conversation goes to Messages', (

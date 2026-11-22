@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../domain/models/hosted_tournament.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/hosted_tournament_form_viewmodel.dart';
@@ -46,11 +47,13 @@ class _HostedTournamentFormScreenState
   void initState() {
     super.initState();
     vm.save.addListener(_onSave);
+    vm.publish.addListener(_onPublish);
   }
 
   @override
   void dispose() {
     vm.save.removeListener(_onSave);
+    vm.publish.removeListener(_onPublish);
     for (final c in [
       _name,
       _location,
@@ -79,6 +82,139 @@ class _HostedTournamentFormScreenState
     }
   }
 
+  void _onPublish() {
+    final r = vm.publish.result;
+    if (r is Ok<String>) {
+      vm.publish.clearResult();
+      if (vm.isNew) {
+        context.pushReplacement(Routes.tournament(r.value));
+      } else {
+        context.pop();
+      }
+    } else if (vm.publish.error) {
+      showErrorSnackBar(context, r);
+      vm.publish.clearResult();
+      // Created but not published: open the draft rather than create it
+      // again from here.
+      if (vm.createdDraftId case final id?) {
+        context.pushReplacement(Routes.tournament(id));
+      }
+    }
+  }
+
+  /// The last step: everything at a glance, each part with Edit to go
+  /// back to its step, and what's still missing.
+  List<Widget> _review(AppColors c) {
+    final f = DateFormat('EEE, MMM d, y');
+    final end = vm.endsOn;
+    final why = vm.problem;
+    String money(int? cents) => cents == null
+        ? 'amount missing'
+        : '${(cents / 100).toStringAsFixed(cents % 100 == 0 ? 0 : 2)} '
+              '${vm.currency}';
+    final rows = <(int, String, String)>[
+      (
+        0,
+        'Details',
+        [
+          if (vm.name.trim().isEmpty) 'No name yet' else vm.name.trim(),
+          vm.isLeague ? 'League' : 'Tournament',
+        ].join(' · '),
+      ),
+      (
+        1,
+        'When & where',
+        [
+          end == null || DateUtils.isSameDay(end, vm.startsOn)
+              ? f.format(vm.startsOn)
+              : '${f.format(vm.startsOn)} – ${f.format(end)}',
+          if (vm.location.trim().isNotEmpty) vm.location.trim(),
+        ].join(' · '),
+      ),
+      (
+        2,
+        'Who can play',
+        [
+          vm.takesPlayers ? 'Players sign up' : 'Teams apply',
+          if (vm.teamEntry) 'teams can reserve a spot',
+          vm.visibility.label,
+        ].join(' · '),
+      ),
+      (
+        3,
+        'Format & divisions',
+        [
+          vm.isLeague ? 'Weekly' : vm.settings.format.label,
+          '${vm.settings.playersOnField}v${vm.settings.playersOnField}',
+          '${vm.divisions.length} '
+              '${vm.divisions.length == 1 ? 'division' : 'divisions'}',
+        ].join(' · '),
+      ),
+      (
+        4,
+        'Fees',
+        !vm.hasFee
+            ? 'No fee'
+            : [
+                '${vm.feeName}: ${money(vm.feeCents)}',
+                if (vm.teamEntry) 'team spot: ${money(vm.teamFeeCents)}',
+              ].join(' · '),
+      ),
+    ];
+    return _formStep(
+      c,
+      number: HostedTournamentFormViewModel.steps.length,
+      title: 'Review',
+      children: [
+        for (final (i, title, value) in rows)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: c.muted,
+                        ),
+                      ),
+                      Text(
+                        value,
+                        style: TextStyle(fontSize: 14.5, color: c.ink),
+                      ),
+                    ],
+                  ),
+                ),
+                TextButton(
+                  style: TextButton.styleFrom(foregroundColor: c.accent),
+                  onPressed: () => vm.goTo(i),
+                  child: Text('Edit', semanticsLabel: 'Edit $title'),
+                ),
+              ],
+            ),
+          ),
+        if (why != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              why,
+              key: const Key('form-problem'),
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: c.highlightInk,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   /// Copies an existing tournament into the fields once it loads.
   void _fill() {
     if (_filled || (!vm.isNew && vm.existing == null)) return;
@@ -91,17 +227,38 @@ class _HostedTournamentFormScreenState
     _teamFee.text = vm.teamFeeAmount;
   }
 
-  /// New events pick a type once: a tournament or a league, and whether
-  /// teams apply or players sign up (players on a tournament make it a hat
-  /// tournament). An existing one just shows what it is.
+  /// New events pick a type once: a tournament or a league (see also
+  /// [_entryPicker]). An existing one just shows what it is.
   Widget _typePicker(ThemeData theme) {
     if (!vm.isNew) {
       return Padding(
-        padding: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Wrap(spacing: 8, children: [Chip(label: Text(vm.kind.label))]),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: SegmentedButton<HostedKind>(
+        segments: [
+          for (final k in HostedKind.values)
+            ButtonSegment(value: k, label: Text(k.label)),
+        ],
+        selected: {vm.kind},
+        onSelectionChanged: (s) => vm.setKind(s.first),
+      ),
+    );
+  }
+
+  /// Whether teams apply or players sign up (players on a tournament make
+  /// it a hat tournament), and how player teams are made.
+  Widget _entryPicker(ThemeData theme) {
+    final c = AppColors.of(context);
+    if (!vm.isNew) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
         child: Wrap(
           spacing: 8,
           children: [
-            Chip(label: Text(vm.kind.label)),
             Chip(
               label: Text(vm.takesPlayers ? 'Players sign up' : 'Teams apply'),
             ),
@@ -110,17 +267,8 @@ class _HostedTournamentFormScreenState
       );
     }
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SegmentedButton<HostedKind>(
-          segments: [
-            for (final k in HostedKind.values)
-              ButtonSegment(value: k, label: Text(k.label)),
-          ],
-          selected: {vm.kind},
-          onSelectionChanged: (s) => vm.setKind(s.first),
-        ),
-        const SizedBox(height: 8),
         SegmentedButton<TournamentEntryType>(
           segments: const [
             ButtonSegment(
@@ -136,7 +284,7 @@ class _HostedTournamentFormScreenState
           onSelectionChanged: (s) => vm.setEntryType(s.first),
         ),
         Padding(
-          padding: const EdgeInsets.only(top: 4, bottom: 8),
+          padding: const EdgeInsets.only(top: 6, bottom: 8),
           child: Text(switch ((vm.kind, vm.entryType)) {
             (HostedKind.tournament, TournamentEntryType.teams) =>
               'A weekend tournament for teams that apply.',
@@ -149,7 +297,7 @@ class _HostedTournamentFormScreenState
               'A weekly league: players sign up on their own and are '
                   'drafted onto teams, which become real teams with chat '
                   'and a roster.',
-          }, style: theme.textTheme.bodySmall),
+          }, style: TextStyle(fontSize: 12.5, color: c.muted)),
         ),
         if (vm.entryType == TournamentEntryType.players) ...[
           SwitchListTile(
@@ -163,6 +311,7 @@ class _HostedTournamentFormScreenState
             value: vm.teamEntry,
             onChanged: vm.setTeamEntry,
           ),
+          const SizedBox(height: 4),
           SegmentedButton<DraftMode>(
             segments: [
               for (final m in DraftMode.values)
@@ -172,13 +321,13 @@ class _HostedTournamentFormScreenState
             onSelectionChanged: (s) => vm.setDraftMode(s.first),
           ),
           Padding(
-            padding: const EdgeInsets.only(top: 4, bottom: 8),
+            padding: const EdgeInsets.only(top: 6, bottom: 8),
             child: Text(
               vm.draftMode == DraftMode.captains
                   ? 'You choose the captains, who take turns picking '
                         'players in a live draft. Each captain owns their team.'
                   : 'The app deals teams evened out by skill and gender.',
-              style: theme.textTheme.bodySmall,
+              style: TextStyle(fontSize: 12.5, color: c.muted),
             ),
           ),
         ],
@@ -317,7 +466,7 @@ class _HostedTournamentFormScreenState
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([vm, vm.save]),
+      listenable: Listenable.merge([vm, vm.save, vm.publish]),
       builder: (context, _) {
         if (!vm.loaded) {
           return Scaffold(appBar: AppBar(), body: const LoadingView());
@@ -330,283 +479,554 @@ class _HostedTournamentFormScreenState
         }
         _fill();
         final theme = Theme.of(context);
+        final c = AppColors.of(context);
         final host = vm.host;
         final f = DateFormat('EEE, MMM d, y');
         final end = vm.endsOn;
+        final small = TextStyle(fontSize: 12.5, color: c.muted);
+        final busy = vm.save.running || vm.publish.running;
+        Widget dateField({
+          required String label,
+          required String value,
+          required IconData icon,
+          required VoidCallback onTap,
+        }) => Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(controlRadius),
+            onTap: onTap,
+            child: InputDecorator(
+              decoration: InputDecoration(
+                labelText: label,
+                suffixIcon: Icon(icon, size: 20),
+              ),
+              child: Text(value),
+            ),
+          ),
+        );
         return Scaffold(
           appBar: AppBar(
-            title: Text(
-              vm.isNew
-                  ? 'Host ${vm.isLeague ? 'a league' : 'a tournament'}'
-                  : 'Edit ${vm.isLeague ? 'league' : 'tournament'}',
-            ),
-            actions: [
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: FilledButton(
-                  onPressed: vm.save.running || vm.problem != null
-                      ? null
-                      : vm.save.execute,
-                  child: Text(vm.isNew ? 'Create' : 'Save'),
-                ),
-              ),
-            ],
-          ),
-          body: ConstrainedContent(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 48),
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text(
+                  vm.isNew
+                      ? 'Host ${vm.isLeague ? 'a league' : 'a tournament'}'
+                      : 'Edit ${vm.isLeague ? 'league' : 'tournament'}',
+                ),
                 if (host != null)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.groups_outlined),
-                    title: Text('Hosted by ${host.name}'),
-                    subtitle: vm.canHost
-                        ? null
-                        : const Text(
-                            'Only members who manage events can host.',
-                          ),
-                  ),
-                _typePicker(theme),
-                TextField(
-                  controller: _name,
-                  maxLength: 100,
-                  textCapitalization: TextCapitalization.words,
-                  decoration: const InputDecoration(
-                    labelText: 'Name',
-                    hintText: 'e.g. Spring Fling',
-                  ),
-                  onChanged: (v) {
-                    vm.name = v;
-                    setState(() {});
-                  },
-                ),
-                if (vm.isLeague) ...[
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.calendar_month_outlined),
-                    title: const Text('First night'),
-                    subtitle: Text(
-                      end == null
-                          ? f.format(vm.startsOn)
-                          : '${f.format(vm.startsOn)} – ${f.format(end)}',
-                    ),
-                    onTap: () async {
-                      final d = await showDatePicker(
-                        context: context,
-                        initialDate: vm.startsOn,
-                        firstDate: DateTime(vm.startsOn.year - 1),
-                        lastDate: DateTime(vm.startsOn.year + 2),
-                        helpText: 'First night of the season',
-                      );
-                      if (d != null) vm.setFirstNight(d);
-                    },
-                  ),
-                  ..._seasonSettings(theme),
-                ] else
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.date_range_outlined),
-                    title: const Text('Dates'),
-                    subtitle: Text(
-                      end == null
-                          ? f.format(vm.startsOn)
-                          : '${f.format(vm.startsOn)} – ${f.format(end)}',
-                    ),
-                    onTap: () async {
-                      final range = await showDateRangePicker(
-                        context: context,
-                        initialDateRange: DateTimeRange(
-                          start: vm.startsOn,
-                          end: end ?? vm.startsOn,
-                        ),
-                        firstDate: DateTime(vm.startsOn.year - 1),
-                        lastDate: DateTime(vm.startsOn.year + 2),
-                        helpText: 'First and last day',
-                      );
-                      if (range != null) vm.setDates(range.start, range.end);
-                    },
-                  ),
-                TextField(
-                  controller: _location,
-                  maxLength: 200,
-                  decoration: const InputDecoration(
-                    labelText: 'Location',
-                    hintText: 'Fields or park, city',
-                    prefixIcon: Icon(Icons.place_outlined),
-                  ),
-                  onChanged: (v) => vm.location = v,
-                ),
-                TextField(
-                  controller: _description,
-                  maxLength: 2000,
-                  minLines: 3,
-                  maxLines: 8,
-                  decoration: const InputDecoration(
-                    labelText: 'About',
-                    hintText: 'Format, parking, food, contacts…',
-                    alignLabelWithHint: true,
-                    helperText: publicDetailsHint,
-                    helperMaxLines: 3,
-                  ),
-                  onChanged: (v) => vm.description = v,
-                ),
-                EventFormatSection(viewModel: vm),
-                const SizedBox(height: 16),
-                Text('Who can play', style: theme.textTheme.titleSmall),
-                const SizedBox(height: 8),
-                SegmentedButton<TournamentVisibility>(
-                  segments: [
-                    for (final v in TournamentVisibility.values)
-                      ButtonSegment(value: v, label: Text(v.label)),
-                  ],
-                  selected: {vm.visibility},
-                  onSelectionChanged: (s) => vm.setVisibility(s.first),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    '${vm.visibility.summary}. The page, schedule, results '
-                    'and news are public either way.',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(vm.feeName),
-                  subtitle: Text(
-                    vm.teamEntry
-                        ? 'What each player who signs up pays, and what a '
-                              'team pays to reserve a spot. They pay you '
-                              'directly; you mark them paid.'
-                        : vm.takesPlayers
-                        ? 'What each player pays to sign up. Players pay '
-                              'you directly; you mark them paid.'
-                        : 'What each team pays to hold its spot. Teams pay '
-                              'you directly; you mark them paid.',
-                  ),
-                  value: vm.hasFee,
-                  onChanged: vm.setHasFee,
-                ),
-                if (vm.hasFee) ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: TextField(
-                          controller: _fee,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          decoration: InputDecoration(
-                            labelText: vm.teamEntry ? 'Per player' : 'Amount',
-                            hintText: '250',
-                            errorText:
-                                _fee.text.isNotEmpty && vm.feeCents == null
-                                ? 'Enter an amount'
-                                : null,
-                          ),
-                          onChanged: (v) {
-                            vm.feeAmount = v;
-                            setState(() {});
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          initialValue: vm.currency,
-                          decoration: const InputDecoration(
-                            labelText: 'Currency',
-                          ),
-                          items: [
-                            for (final c in {..._currencies, vm.currency})
-                              DropdownMenuItem(value: c, child: Text(c)),
-                          ],
-                          onChanged: (v) =>
-                              v == null ? null : vm.setCurrency(v),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (vm.teamEntry)
-                    TextField(
-                      controller: _teamFee,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: 'Per team spot',
-                        hintText: '300',
-                        errorText:
-                            _teamFee.text.isNotEmpty && vm.teamFeeCents == null
-                            ? 'Enter an amount'
-                            : null,
-                      ),
-                      onChanged: (v) {
-                        vm.teamFeeAmount = v;
-                        setState(() {});
-                      },
-                    ),
-                  TextField(
-                    controller: _instructions,
-                    maxLength: 500,
-                    maxLines: 3,
-                    minLines: 1,
-                    decoration: const InputDecoration(
-                      labelText: 'How to pay',
-                      hintText:
-                          'e.g. Venmo @club-treasurer with your team name',
-                    ),
-                    onChanged: (v) => vm.feeInstructions = v,
-                  ),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.event_available_outlined),
-                    title: const Text('Due'),
-                    subtitle: Text(
-                      vm.feeDue == null
-                          ? 'No due date'
-                          : DateFormat.yMMMd().format(vm.feeDue!),
-                    ),
-                    trailing: vm.feeDue == null
-                        ? null
-                        : IconButton(
-                            tooltip: 'Clear',
-                            icon: const Icon(Icons.close),
-                            onPressed: () => vm.setFeeDue(null),
-                          ),
-                    onTap: () async {
-                      final d = await showDatePicker(
-                        context: context,
-                        initialDate:
-                            vm.feeDue ??
-                            vm.startsOn.subtract(const Duration(days: 14)),
-                        firstDate: DateTime(vm.startsOn.year - 1),
-                        lastDate: vm.endsOn ?? vm.startsOn,
-                      );
-                      if (d != null) {
-                        vm.setFeeDue(DateTime(d.year, d.month, d.day, 23, 59));
-                      }
-                    },
-                  ),
-                ],
-                if (vm.isNew)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 16),
-                    child: Text(
-                      'It starts as a draft only your managers see. Open '
-                      'registration on its page when you are ready for '
-                      '${vm.takesPlayers ? 'signups' : 'teams'}.',
-                      style: theme.textTheme.bodySmall,
+                  Text(
+                    'Hosted by ${host.name}',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
+                      color: c.muted,
                     ),
                   ),
               ],
             ),
           ),
+          bottomNavigationBar: DecoratedBox(
+            decoration: BoxDecoration(
+              color: c.card,
+              border: Border(top: BorderSide(color: c.border)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (vm.onReview && vm.isDraft)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(
+                          'Save draft keeps it to your managers. Publish puts '
+                          'it on the website and opens registration for '
+                          '${vm.takesPlayers ? 'signups' : 'teams'}.',
+                          textAlign: TextAlign.center,
+                          style: small,
+                        ),
+                      ),
+                    Row(
+                      children: [
+                        if (vm.step > 0) ...[
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: vm.back,
+                              child: const Text('Back'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                        ],
+                        Expanded(
+                          flex: 2,
+                          child: !vm.onReview
+                              ? FilledButton(
+                                  key: const Key('form-next'),
+                                  onPressed: vm.next,
+                                  child: Text(
+                                    'Next: '
+                                    '${HostedTournamentFormViewModel.steps[vm.step + 1]}',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                )
+                              : vm.isDraft
+                              ? FilledButton(
+                                  key: const Key('form-publish'),
+                                  onPressed: busy || vm.problem != null
+                                      ? null
+                                      : vm.publish.execute,
+                                  child: const Text('Publish'),
+                                )
+                              : FilledButton(
+                                  onPressed: busy || vm.problem != null
+                                      ? null
+                                      : vm.save.execute,
+                                  child: const Text('Save'),
+                                ),
+                        ),
+                      ],
+                    ),
+                    // Saving never needs the last step.
+                    if (vm.isDraft || !vm.onReview)
+                      TextButton(
+                        key: const Key('form-save'),
+                        style: TextButton.styleFrom(foregroundColor: c.accent),
+                        onPressed: busy || vm.problem != null
+                            ? null
+                            : vm.save.execute,
+                        child: Text(vm.isDraft ? 'Save draft' : 'Save'),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          body: ConstrainedContent(
+            child: ListView(
+              // Each step starts at its top.
+              key: ValueKey('form-step-${vm.step}'),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+              children: [
+                if (host != null && !vm.canHost)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(
+                      'Only members who manage events can host.',
+                      style: TextStyle(fontSize: 13, color: c.highlightInk),
+                    ),
+                  ),
+                _StepHeader(viewModel: vm),
+                ...switch (vm.step) {
+                  0 => _formStep(
+                    c,
+                    number: 1,
+                    title: 'Details',
+                    children: [
+                      _typePicker(theme),
+                      TextField(
+                        controller: _name,
+                        maxLength: 100,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: const InputDecoration(
+                          labelText: 'Name',
+                          hintText: 'e.g. Spring Fling',
+                        ),
+                        onChanged: (v) {
+                          vm.name = v;
+                          setState(() {});
+                        },
+                      ),
+                      const SizedBox(height: 4),
+                      TextField(
+                        controller: _description,
+                        maxLength: 2000,
+                        minLines: 3,
+                        maxLines: 8,
+                        decoration: const InputDecoration(
+                          labelText: 'About',
+                          hintText: 'Format, parking, food, contacts…',
+                          alignLabelWithHint: true,
+                          helperText: publicDetailsHint,
+                          helperMaxLines: 3,
+                        ),
+                        onChanged: (v) => vm.description = v,
+                      ),
+                    ],
+                  ),
+                  1 => _formStep(
+                    c,
+                    number: 2,
+                    title: 'When & where',
+                    children: [
+                      if (vm.isLeague) ...[
+                        dateField(
+                          label: 'First night',
+                          icon: Icons.calendar_month_outlined,
+                          value: end == null
+                              ? f.format(vm.startsOn)
+                              : '${f.format(vm.startsOn)} – ${f.format(end)}',
+                          onTap: () async {
+                            final d = await showDatePicker(
+                              context: context,
+                              initialDate: vm.startsOn,
+                              firstDate: DateTime(vm.startsOn.year - 1),
+                              lastDate: DateTime(vm.startsOn.year + 2),
+                              helpText: 'First night of the season',
+                            );
+                            if (d != null) vm.setFirstNight(d);
+                          },
+                        ),
+                        ..._seasonSettings(theme),
+                        const SizedBox(height: 8),
+                      ] else
+                        dateField(
+                          label: 'Dates',
+                          icon: Icons.date_range_outlined,
+                          value: end == null
+                              ? f.format(vm.startsOn)
+                              : '${f.format(vm.startsOn)} – ${f.format(end)}',
+                          onTap: () async {
+                            final range = await showDateRangePicker(
+                              context: context,
+                              initialDateRange: DateTimeRange(
+                                start: vm.startsOn,
+                                end: end ?? vm.startsOn,
+                              ),
+                              firstDate: DateTime(vm.startsOn.year - 1),
+                              lastDate: DateTime(vm.startsOn.year + 2),
+                              helpText: 'First and last day',
+                            );
+                            if (range != null) {
+                              vm.setDates(range.start, range.end);
+                            }
+                          },
+                        ),
+                      TextField(
+                        controller: _location,
+                        maxLength: 200,
+                        decoration: const InputDecoration(
+                          labelText: 'Location',
+                          hintText: 'Fields or park, city',
+                          prefixIcon: Icon(Icons.place_outlined),
+                        ),
+                        onChanged: (v) => vm.location = v,
+                      ),
+                    ],
+                  ),
+                  2 => _formStep(
+                    c,
+                    number: 3,
+                    title: 'Who can play',
+                    children: [
+                      _entryPicker(theme),
+                      SegmentedButton<TournamentVisibility>(
+                        segments: [
+                          for (final v in TournamentVisibility.values)
+                            ButtonSegment(value: v, label: Text(v.label)),
+                        ],
+                        selected: {vm.visibility},
+                        onSelectionChanged: (s) => vm.setVisibility(s.first),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                          '${vm.visibility.summary}. The page, schedule, '
+                          'results and news are public either way.',
+                          style: small,
+                        ),
+                      ),
+                    ],
+                  ),
+                  3 => _formStep(
+                    c,
+                    number: 4,
+                    title: 'Format & divisions',
+                    children: EventFormatSection(viewModel: vm).parts(context),
+                  ),
+                  4 => _formStep(
+                    c,
+                    number: 5,
+                    title: 'Fees',
+                    children: [
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(vm.feeName),
+                        subtitle: Text(
+                          vm.teamEntry
+                              ? 'What each player who signs up pays, and what '
+                                    'a team pays to reserve a spot. They pay '
+                                    'you directly; you mark them paid.'
+                              : vm.takesPlayers
+                              ? 'What each player pays to sign up. Players pay '
+                                    'you directly; you mark them paid.'
+                              : 'What each team pays to hold its spot. Teams '
+                                    'pay you directly; you mark them paid.',
+                        ),
+                        value: vm.hasFee,
+                        onChanged: vm.setHasFee,
+                      ),
+                      if (vm.hasFee) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: TextField(
+                                controller: _fee,
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
+                                decoration: InputDecoration(
+                                  labelText: vm.teamEntry
+                                      ? 'Per player'
+                                      : 'Amount',
+                                  hintText: '250',
+                                  errorText:
+                                      _fee.text.isNotEmpty &&
+                                          vm.feeCents == null
+                                      ? 'Enter an amount'
+                                      : null,
+                                ),
+                                onChanged: (v) {
+                                  vm.feeAmount = v;
+                                  setState(() {});
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                initialValue: vm.currency,
+                                isExpanded: true,
+                                decoration: const InputDecoration(
+                                  labelText: 'Currency',
+                                ),
+                                items: [
+                                  for (final c in {..._currencies, vm.currency})
+                                    DropdownMenuItem(value: c, child: Text(c)),
+                                ],
+                                onChanged: (v) =>
+                                    v == null ? null : vm.setCurrency(v),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (vm.teamEntry) ...[
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _teamFee,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: 'Per team spot',
+                              hintText: '300',
+                              errorText:
+                                  _teamFee.text.isNotEmpty &&
+                                      vm.teamFeeCents == null
+                                  ? 'Enter an amount'
+                                  : null,
+                            ),
+                            onChanged: (v) {
+                              vm.teamFeeAmount = v;
+                              setState(() {});
+                            },
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _instructions,
+                          maxLength: 500,
+                          maxLines: 3,
+                          minLines: 1,
+                          decoration: const InputDecoration(
+                            labelText: 'How to pay',
+                            hintText:
+                                'e.g. Venmo @club-treasurer with your team name',
+                          ),
+                          onChanged: (v) => vm.feeInstructions = v,
+                        ),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.event_available_outlined),
+                          title: const Text('Due'),
+                          subtitle: Text(
+                            vm.feeDue == null
+                                ? 'No due date'
+                                : DateFormat.yMMMd().format(vm.feeDue!),
+                          ),
+                          trailing: vm.feeDue == null
+                              ? null
+                              : IconButton(
+                                  tooltip: 'Clear',
+                                  icon: const Icon(Icons.close),
+                                  onPressed: () => vm.setFeeDue(null),
+                                ),
+                          onTap: () async {
+                            final d = await showDatePicker(
+                              context: context,
+                              initialDate:
+                                  vm.feeDue ??
+                                  vm.startsOn.subtract(
+                                    const Duration(days: 14),
+                                  ),
+                              firstDate: DateTime(vm.startsOn.year - 1),
+                              lastDate: vm.endsOn ?? vm.startsOn,
+                            );
+                            if (d != null) {
+                              vm.setFeeDue(
+                                DateTime(d.year, d.month, d.day, 23, 59),
+                              );
+                            }
+                          },
+                        ),
+                      ],
+                    ],
+                  ),
+                  _ => _review(c),
+                },
+              ],
+            ),
+          ),
         );
       },
+    );
+  }
+}
+
+/// One numbered part of the form, as a card ("2  When & where") cut
+/// into rows, so the list lays out (and scrolls to) each field.
+List<Widget> _formStep(
+  AppColors c, {
+  required int number,
+  required String title,
+  required List<Widget> children,
+}) {
+  const radius = Radius.circular(cardRadius);
+  Widget slice(Widget child, {bool top = false, bool bottom = false}) =>
+      Container(
+        decoration: BoxDecoration(
+          color: c.card,
+          borderRadius: BorderRadius.vertical(
+            top: top ? radius : Radius.zero,
+            bottom: bottom ? radius : Radius.zero,
+          ),
+        ),
+        padding: EdgeInsets.fromLTRB(16, top ? 14 : 0, 16, bottom ? 16 : 0),
+        child: child,
+      );
+  return [
+    slice(
+      top: true,
+      Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: Row(
+          children: [
+            Container(
+              width: 26,
+              height: 26,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: c.chipOn,
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                '$number',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: c.onChipOn,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Semantics(
+                header: true,
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
+                    color: c.ink,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+    for (final child in children) slice(child),
+    slice(bottom: true, const SizedBox.shrink()),
+    const SizedBox(height: 12),
+  ];
+}
+
+/// Where the form is: "Step 2 of 6 · When & where" over a bar of the
+/// steps; a step's segment jumps to it.
+class _StepHeader extends StatelessWidget {
+  const _StepHeader({required this.viewModel});
+
+  final HostedTournamentFormViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = viewModel;
+    final c = AppColors.of(context);
+    const steps = HostedTournamentFormViewModel.steps;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Step ${vm.step + 1} of ${steps.length} · ${steps[vm.step]}',
+            key: const Key('form-step'),
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: c.ink2,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              for (final (i, title) in steps.indexed)
+                Expanded(
+                  child: Semantics(
+                    button: true,
+                    label: 'Step ${i + 1}: $title',
+                    selected: i == vm.step,
+                    child: InkWell(
+                      onTap: () => vm.goTo(i),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 2,
+                          vertical: 6,
+                        ),
+                        child: Container(
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: i <= vm.step ? c.accent : c.border,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

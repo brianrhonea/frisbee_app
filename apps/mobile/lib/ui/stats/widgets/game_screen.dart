@@ -4,8 +4,10 @@ import 'package:intl/intl.dart';
 
 import '../../../domain/models/roster_player.dart';
 import '../../../domain/models/stats.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
+import '../../core/ui/scoreboard.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/game_tracker_viewmodel.dart';
 import 'line_picker.dart';
@@ -323,8 +325,10 @@ class _TrackTab extends StatelessWidget {
             // Pinned so the buttons never scroll away mid-point.
             if (tracking || pickingLine || undoOnly)
               Material(
-                elevation: 3,
-                color: Theme.of(context).colorScheme.surfaceContainer,
+                color: AppColors.of(context).card,
+                shape: Border(
+                  top: BorderSide(color: AppColors.of(context).border),
+                ),
                 child: SafeArea(
                   top: false,
                   child: Padding(
@@ -401,13 +405,34 @@ class _Scoreboard extends StatelessWidget {
   Widget build(BuildContext context) {
     final vm = viewModel;
     final game = vm.game!;
-    final theme = Theme.of(context);
-    final score = theme.textTheme.displaySmall?.copyWith(
-      fontWeight: FontWeight.w800,
+    final c = AppColors.of(context);
+    // Navy scoreboard: the game is live (or just finished) on this screen.
+    final label = TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w700,
+      color: c.onFeature,
     );
-    return Card.filled(
+    final soft = TextStyle(
+      fontSize: 11,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 0.8,
+      color: c.onFeatureMuted,
+    );
+    final onBoard = ButtonStyle(
+      foregroundColor: WidgetStateProperty.resolveWith(
+        (s) => s.contains(WidgetState.disabled)
+            ? c.onFeatureMuted.withValues(alpha: 0.6)
+            : c.onFeature,
+      ),
+      backgroundColor: WidgetStatePropertyAll(c.featureHighlight),
+      side: const WidgetStatePropertyAll(BorderSide.none),
+    );
+    return Material(
+      color: c.feature,
+      borderRadius: BorderRadius.circular(cardRadius),
+      clipBehavior: Clip.antiAlias,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
         child: Column(
           children: [
             Row(
@@ -416,20 +441,45 @@ class _Scoreboard extends StatelessWidget {
                 Expanded(
                   child: Column(
                     children: [
-                      Text('Us', style: theme.textTheme.labelLarge),
-                      Text('${game.ourScore}', style: score),
+                      Text('Us', style: label),
+                      ScoreText(
+                        '${game.ourScore}',
+                        size: 52,
+                        color: c.onFeature,
+                      ),
                     ],
                   ),
                 ),
                 Column(
                   children: [
-                    Text(
-                      vm.over ? 'FINAL' : 'Point ${vm.pointNumber}',
-                      style: theme.textTheme.labelLarge,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (!vm.over && vm.points.isNotEmpty) ...[
+                          const LiveDot(),
+                          const SizedBox(width: 6),
+                        ],
+                        Text(
+                          vm.over ? 'FINAL' : 'Point ${vm.pointNumber}',
+                          style: soft,
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     ActionChip(
-                      avatar: const Icon(Icons.flag_outlined, size: 16),
+                      backgroundColor: c.featureHighlight,
+                      side: BorderSide.none,
+                      labelStyle: TextStyle(
+                        fontFamily: appFont,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: c.onFeature,
+                      ),
+                      avatar: Icon(
+                        Icons.flag_outlined,
+                        size: 16,
+                        color: c.onFeature,
+                      ),
                       label: Text('Game to ${game.gameTo}'),
                       onPressed: vm.canEdit
                           ? () => editGameTo(context, vm)
@@ -442,12 +492,22 @@ class _Scoreboard extends StatelessWidget {
                     children: [
                       Text(
                         game.opponent,
-                        style: theme.textTheme.labelLarge,
+                        style: label,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      Text('${game.theirScore}', style: score),
+                      ScoreText(
+                        '${game.theirScore}',
+                        size: 52,
+                        color: c.onFeature,
+                      ),
                       TextButton.icon(
+                        style: TextButton.styleFrom(
+                          foregroundColor: c.onFeature,
+                          disabledForegroundColor: c.onFeatureMuted.withValues(
+                            alpha: 0.6,
+                          ),
+                        ),
                         onPressed: vm.canOpponentScore ? vm.theyScored : null,
                         icon: const Icon(Icons.add, size: 18),
                         label: const Text('Opp score'),
@@ -461,6 +521,28 @@ class _Scoreboard extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: SegmentedButton<Side>(
+                style: ButtonStyle(
+                  backgroundColor: WidgetStateProperty.resolveWith(
+                    (s) => s.contains(WidgetState.selected)
+                        ? c.accent
+                        : c.featureHighlight,
+                  ),
+                  foregroundColor: WidgetStateProperty.resolveWith(
+                    (s) => s.contains(WidgetState.selected)
+                        ? c.onAccent
+                        : s.contains(WidgetState.disabled)
+                        ? c.onFeatureMuted.withValues(alpha: 0.6)
+                        : c.onFeature,
+                  ),
+                  iconColor: WidgetStateProperty.resolveWith(
+                    (s) => s.contains(WidgetState.selected)
+                        ? c.onAccent
+                        : c.onFeatureMuted,
+                  ),
+                  side: WidgetStatePropertyAll(
+                    BorderSide(color: c.featureHighlight),
+                  ),
+                ),
                 segments: const [
                   ButtonSegment(
                     value: Side.offense,
@@ -484,6 +566,7 @@ class _Scoreboard extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
+                  style: onBoard,
                   onPressed: () => openTimeouts(context, vm),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -525,7 +608,7 @@ class _GameOver extends StatelessWidget {
       false => 'We lost',
       null => 'Tied',
     };
-    return Card.outlined(
+    return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -533,7 +616,7 @@ class _GameOver extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.flag),
+                Icon(Icons.flag, color: AppColors.of(context).accent),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -587,7 +670,7 @@ class _LineupCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final vm = viewModel;
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final c = AppColors.of(context);
     final side = vm.nextSide;
     final last = vm.lastLineFor(side);
     final picked = vm.draftLine;
@@ -595,7 +678,7 @@ class _LineupCard extends StatelessWidget {
     bool showing(List<String> ids) =>
         ids.length == picked.length && ids.every(picked.contains);
     final previous = vm.points.lastOrNull;
-    return Card.outlined(
+    return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -611,9 +694,8 @@ class _LineupCard extends StatelessWidget {
                             : 'We scored! Now we pull.'
                       : '${vm.game!.opponent} scored. We receive.',
                   style: theme.textTheme.labelLarge?.copyWith(
-                    color: result == PointResult.weScored
-                        ? Colors.green.shade700
-                        : scheme.error,
+                    fontWeight: FontWeight.w700,
+                    color: result == PointResult.weScored ? c.accent : c.ink2,
                   ),
                 ),
               ),
@@ -637,9 +719,14 @@ class _LineupCard extends StatelessWidget {
                 for (final l in lines)
                   ChoiceChip(
                     avatar: CircleAvatar(
+                      backgroundColor: c.accentSoft,
+                      foregroundColor: c.accentInk,
                       child: Text(
                         l.side?.short ?? '•',
-                        style: const TextStyle(fontSize: 11),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                     label: Text(l.name),
@@ -725,10 +812,12 @@ class _StartBar extends StatelessWidget {
         Text(
           '$count/${StatLine.size}',
           style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
+            fontFamily: scoreFont,
+            fontSize: 26,
+            fontWeight: FontWeight.w800,
             color: vm.draftReady
-                ? Colors.green.shade600
-                : theme.colorScheme.primary,
+                ? AppColors.of(context).accent
+                : AppColors.of(context).muted,
           ),
         ),
         const SizedBox(width: 12),
@@ -889,29 +978,25 @@ class _Banner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final c = AppColors.of(context);
+    // Amber when the next tap is the user's to do; field grey otherwise.
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: highlight
-            ? scheme.tertiaryContainer
-            : scheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(10),
+        color: highlight ? c.highlightSoft : c.field,
+        borderRadius: BorderRadius.circular(controlRadius),
       ),
       child: Row(
         children: [
-          Icon(
-            icon,
-            size: 20,
-            color: highlight ? scheme.onTertiaryContainer : null,
-          ),
+          Icon(icon, size: 20, color: highlight ? c.highlightInk : c.muted),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               text,
               style: TextStyle(
-                color: highlight ? scheme.onTertiaryContainer : null,
-                fontWeight: highlight ? FontWeight.w600 : null,
+                fontSize: 13.5,
+                color: highlight ? c.highlightInk : c.ink2,
+                fontWeight: highlight ? FontWeight.w700 : FontWeight.w600,
               ),
             ),
           ),
@@ -1027,16 +1112,21 @@ class _PlayerTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final c = AppColors.of(context);
     final p = player;
-    final fg = holding ? scheme.onPrimary : scheme.onSurface;
+    final fg = holding ? c.onAccent : c.ink;
     return Opacity(
       opacity: dimmed ? 0.55 : 1,
       child: Material(
-        color: holding ? scheme.primary : scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(14),
+        color: holding ? c.accent : c.card,
+        shape: RoundedSuperellipseBorder(
+          borderRadius: BorderRadius.circular(controlRadius + 2),
+          side: holding ? BorderSide.none : BorderSide(color: c.border2),
+        ),
         child: InkWell(
-          borderRadius: BorderRadius.circular(14),
+          customBorder: RoundedSuperellipseBorder(
+            borderRadius: BorderRadius.circular(controlRadius + 2),
+          ),
           onTap: onTap,
           child: Stack(
             children: [
@@ -1054,6 +1144,8 @@ class _PlayerTile extends StatelessWidget {
                           p?.number == null ? '–' : '#${p!.number}',
                           textAlign: TextAlign.center,
                           style: theme.textTheme.headlineSmall?.copyWith(
+                            fontFamily: scoreFont,
+                            fontSize: 30,
                             color: fg,
                             fontWeight: FontWeight.w800,
                           ),
@@ -1068,6 +1160,7 @@ class _PlayerTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: fg,
+                        fontWeight: FontWeight.w600,
                         height: 1.15,
                       ),
                     ),
@@ -1097,7 +1190,6 @@ class _OffenseActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final vm = viewModel;
-    final scheme = Theme.of(context).colorScheme;
     final hasDisc = vm.holder != null;
     return Row(
       children: [
@@ -1109,20 +1201,19 @@ class _OffenseActions extends StatelessWidget {
             label: 'Score',
             icon: Icons.sports_score,
             enabled: vm.canScore,
-            color: Colors.green.shade600,
+            tone: _Tone.good,
             filled: true,
           ),
         ),
         const SizedBox(width: 8),
         Expanded(
           child: OutlinedButton(
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(56),
-              foregroundColor: scheme.error,
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-            ),
+            style: _bigOutline(context),
             onPressed: hasDisc ? vm.throwaway : null,
-            child: const Text('Throwaway', textAlign: TextAlign.center),
+            child: const FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text('Throwaway', textAlign: TextAlign.center),
+            ),
           ),
         ),
         const SizedBox(width: 8),
@@ -1132,12 +1223,29 @@ class _OffenseActions extends StatelessWidget {
             kind: StatKind.drop,
             label: 'Drop',
             enabled: hasDisc,
-            color: scheme.error,
+            tone: _Tone.bad,
           ),
         ),
       ],
     );
   }
+}
+
+/// A big neutral outlined button for the tracker's action bar.
+ButtonStyle _bigOutline(BuildContext context, {double height = 56}) {
+  final c = AppColors.of(context);
+  return OutlinedButton.styleFrom(
+    minimumSize: Size.fromHeight(height),
+    foregroundColor: c.ink,
+    backgroundColor: c.card,
+    side: BorderSide(color: c.border2),
+    padding: const EdgeInsets.symmetric(horizontal: 6),
+    textStyle: const TextStyle(
+      fontFamily: appFont,
+      fontSize: 14,
+      fontWeight: FontWeight.w700,
+    ),
+  );
 }
 
 class _DefenseActions extends StatelessWidget {
@@ -1148,7 +1256,7 @@ class _DefenseActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final vm = viewModel;
-    final scheme = Theme.of(context).colorScheme;
+    final c = AppColors.of(context);
     return Column(
       children: [
         if (vm.canPull) ...[
@@ -1172,7 +1280,7 @@ class _DefenseActions extends StatelessWidget {
                 viewModel: vm,
                 kind: StatKind.breakup,
                 label: 'D +1',
-                color: Colors.green.shade700,
+                tone: _Tone.good,
               ),
             ),
             const SizedBox(width: 8),
@@ -1181,7 +1289,7 @@ class _DefenseActions extends StatelessWidget {
                 viewModel: vm,
                 kind: StatKind.handBlock,
                 label: 'Hand block +2',
-                color: Colors.green.shade700,
+                tone: _Tone.good,
               ),
             ),
             const SizedBox(width: 8),
@@ -1190,7 +1298,7 @@ class _DefenseActions extends StatelessWidget {
                 viewModel: vm,
                 kind: StatKind.beat,
                 label: 'Got beat −1',
-                color: scheme.error,
+                tone: _Tone.bad,
               ),
             ),
           ],
@@ -1202,6 +1310,8 @@ class _DefenseActions extends StatelessWidget {
               child: FilledButton.tonalIcon(
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(52),
+                  backgroundColor: c.accentSoft,
+                  foregroundColor: c.accentInk,
                 ),
                 onPressed: vm.weGotIt,
                 icon: const Icon(Icons.swap_horiz),
@@ -1210,12 +1320,8 @@ class _DefenseActions extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: scheme.error,
-                  foregroundColor: scheme.onError,
-                  minimumSize: const Size.fromHeight(52),
-                ),
+              child: OutlinedButton.icon(
+                style: _bigOutline(context, height: 52),
                 onPressed: vm.theyScored,
                 icon: const Icon(Icons.sentiment_dissatisfied_outlined),
                 label: const Text('They scored'),
@@ -1228,13 +1334,16 @@ class _DefenseActions extends StatelessWidget {
   }
 }
 
+/// Good plays are turf; mistakes are plain ink (red is only for live).
+enum _Tone { good, bad }
+
 /// Toggle for actions credited to the next player tapped.
 class _ArmButton extends StatelessWidget {
   const _ArmButton({
     required this.viewModel,
     required this.kind,
     required this.label,
-    required this.color,
+    required this.tone,
     this.icon,
     this.enabled = true,
     this.filled = false,
@@ -1243,7 +1352,7 @@ class _ArmButton extends StatelessWidget {
   final GameTrackerViewModel viewModel;
   final StatKind kind;
   final String label;
-  final Color color;
+  final _Tone tone;
   final IconData? icon;
   final bool enabled;
 
@@ -1252,14 +1361,35 @@ class _ArmButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = AppColors.of(context);
     final armed = viewModel.armed == kind;
     final solid = armed || filled;
+    final (Color color, Color onColor) = tone == _Tone.good
+        ? (c.accent, c.onAccent)
+        : (c.chipOn, c.onChipOn);
     final style = OutlinedButton.styleFrom(
       minimumSize: const Size.fromHeight(56),
-      foregroundColor: solid ? Colors.white : color,
-      backgroundColor: solid ? color : null,
-      side: BorderSide(color: color, width: armed ? 3 : 1),
+      foregroundColor: solid
+          ? onColor
+          : tone == _Tone.good
+          ? c.accentInk
+          : c.ink,
+      backgroundColor: solid ? color : c.card,
+      disabledBackgroundColor: solid ? color.withValues(alpha: 0.4) : null,
+      side: BorderSide(
+        color: armed
+            ? c.highlight
+            : solid || tone == _Tone.good
+            ? color
+            : c.border2,
+        width: armed ? 3 : 1,
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 6),
+      textStyle: const TextStyle(
+        fontFamily: appFont,
+        fontSize: 14,
+        fontWeight: FontWeight.w700,
+      ),
     );
     final text = Text(armed ? '$label…' : label, textAlign: TextAlign.center);
     final onPressed = enabled ? () => viewModel.arm(kind) : null;
@@ -1274,66 +1404,72 @@ class _ArmButton extends StatelessWidget {
   }
 }
 
-/// Label, icon and color for a play in the point log.
-(String, IconData, Color) _playStyle(StatKind kind, ColorScheme scheme) =>
-    switch (kind) {
-      StatKind.pull => ('PULL', Icons.sports, scheme.tertiary),
-      StatKind.pickup => (
-        'PICKUP',
-        Icons.pan_tool_alt_outlined,
-        scheme.onSurfaceVariant,
-      ),
-      StatKind.catch_ => ('CATCH', Icons.swap_horiz, scheme.primary),
-      StatKind.goal => ('GOAL', Icons.emoji_events, Colors.green.shade700),
-      StatKind.throwaway => ('THROWAWAY', Icons.call_missed, scheme.error),
-      StatKind.drop => ('DROP', Icons.south, scheme.error),
-      StatKind.handBlock => ('HAND BLOCK', Icons.front_hand, Colors.indigo),
-      StatKind.breakup => ('BLOCK', Icons.shield, Colors.indigo),
-      StatKind.beat => ('BEAT', Icons.directions_run, Colors.orange.shade800),
-      StatKind.theirTurnover => ('THEIR TURN', Icons.swap_vert, Colors.indigo),
-      StatKind.sub => ('SUB', Icons.sync_alt, scheme.onSurfaceVariant),
-    };
+/// How a play is tagged in the point log.
+enum _PlayTone { good, bad, plain }
 
-/// A colored tag such as GOAL or DROP.
+/// Label, icon and tone for a play in the point log.
+(String, IconData, _PlayTone) _playStyle(StatKind kind) => switch (kind) {
+  StatKind.pull => ('PULL', Icons.sports, _PlayTone.plain),
+  StatKind.pickup => ('PICKUP', Icons.pan_tool_alt_outlined, _PlayTone.plain),
+  StatKind.catch_ => ('CATCH', Icons.swap_horiz, _PlayTone.good),
+  StatKind.goal => ('GOAL', Icons.emoji_events, _PlayTone.good),
+  StatKind.throwaway => ('THROWAWAY', Icons.call_missed, _PlayTone.bad),
+  StatKind.drop => ('DROP', Icons.south, _PlayTone.bad),
+  StatKind.handBlock => ('HAND BLOCK', Icons.front_hand, _PlayTone.good),
+  StatKind.breakup => ('BLOCK', Icons.shield, _PlayTone.good),
+  StatKind.beat => ('BEAT', Icons.directions_run, _PlayTone.bad),
+  StatKind.theirTurnover => ('THEIR TURN', Icons.swap_vert, _PlayTone.good),
+  StatKind.sub => ('SUB', Icons.sync_alt, _PlayTone.plain),
+};
+
+/// A tag such as GOAL or DROP.
 class _PlayTag extends StatelessWidget {
   const _PlayTag({
     required this.label,
     required this.icon,
-    required this.color,
+    this.tone = _PlayTone.plain,
   });
 
   final String label;
   final IconData icon;
-  final Color color;
+  final _PlayTone tone;
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: 108,
-    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.12),
-      borderRadius: BorderRadius.circular(6),
-    ),
-    child: Row(
-      children: [
-        Icon(icon, size: 14, color: color),
-        const SizedBox(width: 4),
-        Expanded(
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.fade,
-            softWrap: false,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.4,
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final (bg, fg) = switch (tone) {
+      _PlayTone.good => (c.accentSoft, c.accentInk),
+      _PlayTone.bad => (c.field, c.ink),
+      _PlayTone.plain => (c.field, c.muted),
+    };
+    return Container(
+      width: 108,
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: fg),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.fade,
+              softWrap: false,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: fg,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.4,
+              ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }
 
 /// Every point of the game, newest first: who played, each play tagged by
@@ -1434,11 +1570,7 @@ class _TimeoutRow extends StatelessWidget {
     padding: const EdgeInsets.symmetric(vertical: 4),
     child: Row(
       children: [
-        _PlayTag(
-          label: 'TIMEOUT',
-          icon: Icons.timer_outlined,
-          color: Colors.amber.shade800,
-        ),
+        const _PlayTag(label: 'TIMEOUT', icon: Icons.timer_outlined),
         const SizedBox(width: 10),
         Expanded(
           child: Text(
@@ -1468,16 +1600,17 @@ class _PointCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final vm = viewModel;
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final ac = AppColors.of(context);
     final p = vm.points[index];
+    // The point being played is live; scores are turf, theirs plain.
     final (label, color) = switch (p.result) {
       PointResult.weScored when p.startedOn == Side.defense => (
         'Break',
-        Colors.green.shade800,
+        ac.accent,
       ),
-      PointResult.weScored => ('Score', Colors.green.shade700),
-      PointResult.theyScored => ('Opp score', scheme.error),
-      null => ('In play', scheme.tertiary),
+      PointResult.weScored => ('Score', ac.accent),
+      PointResult.theyScored => ('Opp score', ac.ink2),
+      null => ('In play', ac.liveInk),
     };
     final passes = p.actions.where((a) => a.kind == StatKind.catch_).length;
     final turns = p.actions.where((a) => a.turnsOver).length;
@@ -1498,7 +1631,7 @@ class _PointCard extends StatelessWidget {
 
     for (final (k, a) in p.actions.indexed) {
       addTimeouts(k);
-      var (tag, icon, c) = _playStyle(a.kind, scheme);
+      var (tag, icon, tone) = _playStyle(a.kind);
       // A goal by a line that started on D is a break.
       if (a.kind == StatKind.goal && p.startedOn == Side.defense) {
         tag = 'BREAK';
@@ -1509,7 +1642,7 @@ class _PointCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _PlayTag(label: tag, icon: icon, color: c),
+              _PlayTag(label: tag, icon: icon, tone: tone),
               const SizedBox(width: 10),
               Expanded(child: Text(vm.describe(a))),
             ],
@@ -1526,7 +1659,7 @@ class _PointCard extends StatelessWidget {
                   ? '↳ Our disc. We\'re on O.'
                   : '↳ Their disc. We\'re on D.',
               style: theme.textTheme.labelMedium?.copyWith(
-                color: scheme.onSurfaceVariant,
+                color: ac.muted,
                 fontStyle: FontStyle.italic,
               ),
             ),
@@ -1536,19 +1669,31 @@ class _PointCard extends StatelessWidget {
     }
     addTimeouts(p.actions.length);
 
-    return Card.outlined(
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
       clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
         initiallyExpanded: expanded,
+        shape: const Border(),
+        collapsedShape: const Border(),
         leading: CircleAvatar(
           backgroundColor: p.startedOn == Side.offense
-              ? scheme.primaryContainer
-              : scheme.secondaryContainer,
-          child: Text(p.startedOn.short),
+              ? ac.accentSoft
+              : ac.field,
+          foregroundColor: p.startedOn == Side.offense ? ac.accentInk : ac.ink2,
+          child: Text(
+            p.startedOn.short,
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
         ),
         title: Text(
           'Point ${index + 1} · '
           '${p.startedOn == Side.offense ? 'O line' : 'D line'}',
+          style: TextStyle(
+            fontSize: 14.5,
+            fontWeight: FontWeight.w700,
+            color: ac.ink,
+          ),
         ),
         subtitle: Text.rich(
           TextSpan(
@@ -1572,7 +1717,7 @@ class _PointCard extends StatelessWidget {
             ],
           ),
         ),
-        trailing: Text(score, style: theme.textTheme.titleMedium),
+        trailing: ScoreText(score, size: 22),
         expandedCrossAxisAlignment: CrossAxisAlignment.start,
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         children: [

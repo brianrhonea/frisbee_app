@@ -11,7 +11,9 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { deleteOwnAccount } from "@/lib/firebase";
 import { useAuth } from "../AuthProvider";
+import { AppearanceSetting } from "./AppearanceSetting";
 import { ChangePassword } from "./ChangePassword";
+import { DownloadData } from "./DownloadData";
 import { isSignInCancelled, popupBlockedMessage } from "@/lib/auth_errors";
 
 type Method = "password" | "google.com" | "apple.com";
@@ -33,7 +35,7 @@ function problem(e: unknown): string {
   return "Couldn't delete your account. Try again, or contact us.";
 }
 
-/** Settings → Account: who they're signed in as, changing their password, and deleting the account and its data. */
+/** Settings → Account: who they're signed in as, changing their password, downloading their data, and deleting the account and its data. */
 export function AccountSettings() {
   const { user } = useAuth();
   const router = useRouter();
@@ -71,6 +73,7 @@ export function AccountSettings() {
 
   return (
     <div className="stack">
+      <AppearanceSetting />
       <div className="card">
         <h2 className="card-title">Account</h2>
         <p>
@@ -89,6 +92,7 @@ export function AccountSettings() {
           </div>
         )
       )}
+      <DownloadData user={me} />
       <div className="card danger-zone">
         <h2 className="card-title">Delete account</h2>
         <p className="muted small">
@@ -97,7 +101,7 @@ export function AccountSettings() {
           admin. Messages other people sent you stay, under &quot;Deleted user&quot;. It can&apos;t be undone.
         </p>
         {!open ? (
-          <button className="btn btn-danger" type="button" onClick={() => setOpen(true)}>
+          <button className="btn btn-ink" type="button" onClick={() => setOpen(true)}>
             Delete account…
           </button>
         ) : (
@@ -129,7 +133,7 @@ export function AccountSettings() {
               <button className="btn" type="button" disabled={busy} onClick={() => setOpen(false)}>
                 Cancel
               </button>
-              <button className="btn btn-danger" type="submit" disabled={busy}>
+              <button className="btn btn-ink" type="submit" disabled={busy}>
                 {busy ? "Deleting…" : "Delete my account"}
               </button>
             </div>

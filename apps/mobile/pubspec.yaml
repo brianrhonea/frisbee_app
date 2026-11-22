@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 0.0.27+27
+version: 0.0.40+40
 
 environment:
   sdk: ^3.11.0
@@ -59,12 +59,16 @@ dependencies:
   flutter_map: ^8.3.2
   latlong2: ^0.10.1
   share_plus: ^13.3.1
+  add_2_calendar: 3.0.1 # 3.1.x needs Android Gradle Plugin 9
   geolocator: ^14.1.2
   image: ^4.12.0
   firebase_app_check: ^0.5.1
   firebase_app_installations: ^0.5.1
   image_picker: ^1.2.4
   permission_handler: 12.0.1
+  connectivity_plus: ^7.3.1 # 7.3.2 needs a newer dbus than geolocator allows
+  path_provider: ^2.1.6
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:
@@ -110,6 +114,17 @@ flutter:
           weight: 700
         - asset: assets/fonts/Inter-ExtraBold.ttf
           weight: 800
+    # Scores, big numbers, date badges and the wordmark. SIL Open Font
+    # License (assets/fonts/BarlowCondensed-OFL.txt).
+    - family: Barlow Condensed
+      fonts:
+        - asset: assets/fonts/BarlowCondensed-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/BarlowCondensed-ExtraBold.ttf
+          weight: 800
+        - asset: assets/fonts/BarlowCondensed-ExtraBoldItalic.ttf
+          weight: 800
+          style: italic
 
   # The Stall 10 logo (see lib/ui/core/ui/brand.dart).
   assets:

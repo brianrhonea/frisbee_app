@@ -9,6 +9,7 @@ import '../../../data/repositories/meeting/meeting_repository.dart';
 import '../../../data/repositories/playbook/play_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
 import '../../../domain/models/meeting.dart';
+import '../../../domain/models/pending_invite.dart';
 import '../../../domain/models/play.dart';
 import '../../../domain/models/roster_player.dart';
 import '../../../domain/models/team.dart';
@@ -19,6 +20,7 @@ import '../../../utils/result.dart';
 typedef RoleChange = ({String uid, TeamRole role});
 typedef StatsAccess = ({String uid, bool on});
 typedef MemberRoles = ({String uid, Set<String> roleIds});
+typedef MemberPermissions = ({String uid, Set<TeamPermission> permissions});
 
 /// Backs the team sections: Team Events, Roster, Playbook and Members.
 /// The team home page has its own `TeamHomeViewModel`.
@@ -49,6 +51,9 @@ class TeamDetailViewModel extends ChangeNotifier {
     setStatKeeper = Command1<void, StatsAccess>(
       (c) => _teams.setStatKeeper(teamId, c.uid, on: c.on),
     );
+    setMemberPermissions = Command1<void, MemberPermissions>(
+      (c) => _teams.setMemberPermissions(teamId, c.uid, c.permissions),
+    );
     transferOwnership = Command1<void, String>(
       (newOwner) => _teams.transferOwnership(
         teamId,
@@ -75,6 +80,9 @@ class TeamDetailViewModel extends ChangeNotifier {
     declineJoinRequest = Command1<void, String>(
       (uid) => _teams.declineJoinRequest(teamId, uid),
     );
+    saveLines = Command0<void>(_saveLines);
+    loadInvites = Command0<void>(_loadInvites);
+    withdrawInvite = Command1<void, String>(_withdrawInvite);
 
     _subs = [
       _teams.watchTeam(teamId).listen((t) {
@@ -129,16 +137,20 @@ class TeamDetailViewModel extends ChangeNotifier {
   StreamSubscription<List<GroupJoinRequest>>? _requestSub;
   List<GroupJoinRequest> _joinRequests = const [];
 
-  /// People asking to join the group, for owners and organizers.
+  /// People asking to join the group or team, for those who manage
+  /// members.
   List<GroupJoinRequest> get joinRequests => _joinRequests;
 
   late final Command1<void, GroupJoinRequest> approveJoinRequest;
   late final Command1<void, String> declineJoinRequest;
 
-  /// Only members who can manage members may read join requests.
+  /// Only members who can manage members may read join requests: a
+  /// group's that approves who joins, or a team's that allows them (F26).
   void _watchJoinRequests() {
     final team = _team;
-    if (team != null && team.isCommunity && canManageMembers) {
+    if (team != null &&
+        (team.isCommunity || team.allowJoinRequests) &&
+        canManageMembers) {
       _requestSub ??= _teams.watchJoinRequests(teamId).listen((r) {
         _joinRequests = r;
         notifyListeners();
@@ -244,12 +256,123 @@ class TeamDetailViewModel extends ChangeNotifier {
     userId: uid,
   );
 
+  /// Whether the user puts players on lines ("Edit lines"): a team's
+  /// admins who change the roster (manageTeam, as the API checks).
+  bool get canEditLines => canEdit && _team?.kind == TeamKind.team;
+
+  Map<String, RosterLine?>? _draftLines;
+
+  /// Whether the roster is in "Edit lines" mode.
+  bool get editingLines => _draftLines != null;
+
+  /// A player's line: the one picked while editing, else theirs.
+  RosterLine? lineOf(RosterPlayer p) {
+    final draft = _draftLines;
+    return draft != null && draft.containsKey(p.id) ? draft[p.id] : p.line;
+  }
+
+  /// The roster grouped O-line, D-line, Both lines, Unassigned; empty
+  /// while no one has a line (or while editing), for one plain list.
+  List<({RosterLine? line, List<RosterPlayer> players})> get lineGroups =>
+      editingLines ? const [] : groupByLine(visibleRoster);
+
+  void startEditingLines() {
+    if (!canEditLines) return;
+    _draftLines = {};
+    notifyListeners();
+  }
+
+  void cancelEditingLines() {
+    _draftLines = null;
+    notifyListeners();
+  }
+
+  /// Picks [line] for [p] while editing; picking theirs again clears it.
+  void pickLine(RosterPlayer p, RosterLine line) {
+    final draft = _draftLines;
+    if (draft == null) return;
+    draft[p.id] = lineOf(p) == line ? null : line;
+    notifyListeners();
+  }
+
+  /// Saves the lines changed while editing, then leaves the mode.
+  late final Command0<void> saveLines;
+
+  Future<Result<void>> _saveLines() async {
+    final draft = _draftLines;
+    if (draft == null) return const Result.ok(null);
+    final byId = {for (final p in _roster) p.id: p};
+    final changed = {
+      for (final e in draft.entries)
+        if (byId.containsKey(e.key) && byId[e.key]!.line != e.value)
+          e.key: e.value,
+    };
+    if (changed.isNotEmpty) {
+      final result = await _teams.setRosterLines(teamId, changed);
+      if (result is Error) return result;
+    }
+    _draftLines = null;
+    notifyListeners();
+    return const Result.ok(null);
+  }
+
+  /// Whether the user sees who's invited and hasn't answered: those who
+  /// may invite people (manageMembers).
+  bool get canSeeInvites => canManageMembers;
+
+  List<PendingInvite> _invites = const [];
+
+  /// "Invites pending": who's invited and hasn't answered, newest first.
+  List<PendingInvite> get pendingInvites => _invites;
+
+  /// (Re)reads [pendingInvites]: when Members opens (an API call, so not
+  /// for every section), and after inviting someone.
+  late final Command0<void> loadInvites;
+
+  /// Takes back an invite, by the invitee's uid.
+  late final Command1<void, String> withdrawInvite;
+
+  Future<Result<void>> _loadInvites() async {
+    if (!canSeeInvites) return const Result.ok(null);
+    final result = await _teams.pendingInvites(teamId);
+    if (result case Ok(:final value)) {
+      _invites = value;
+      notifyListeners();
+      return const Result.ok(null);
+    }
+    return result as Error<List<PendingInvite>>;
+  }
+
+  Future<Result<void>> _withdrawInvite(String uid) async {
+    final result = await _teams.withdrawInvite(teamId, uid);
+    if (result is Ok) {
+      _invites = [
+        for (final i in _invites)
+          if (i.uid != uid) i,
+      ];
+      notifyListeners();
+    }
+    return result;
+  }
+
   /// Flips a player's Paid mark.
   void togglePaid(RosterPlayer p) =>
       savePlayer.execute(p.copyWith(paid: !p.paid));
 
   List<Play> _playList = const [];
-  List<Play> get plays => _playList;
+
+  /// The playbook's plays, without saved whiteboards.
+  List<Play> get plays => [
+    for (final p in _playList)
+      if (!p.isWhiteboard) p,
+  ];
+
+  /// Saved whiteboard sketches, listed under the playbook's Whiteboard
+  /// switch.
+  List<Play> get whiteboards => [
+    for (final p in _playList)
+      if (p.isWhiteboard) p,
+  ];
 
   List<TeamEvent> _teamEvents = const [];
 
@@ -296,6 +419,10 @@ class TeamDetailViewModel extends ChangeNotifier {
   TeamRole? get myRole => _team?.roleOf(uid);
   bool get canEdit => _team?.canEdit(uid) ?? false;
 
+  /// Whether the team has Meetings on (Settings › Sections); new teams
+  /// start without it, so New adds an event straight away.
+  bool get meetingsOn => _team?.hasSection(OptionalSection.meetings) ?? true;
+
   /// Invite, approve and remove members.
   bool get canManageMembers =>
       _team?.has(uid, TeamPermission.manageMembers) ?? false;
@@ -333,6 +460,17 @@ class TeamDetailViewModel extends ChangeNotifier {
 
   /// Gives a player stats access, or takes it away. Owner only.
   late final Command1<void, StatsAccess> setStatKeeper;
+
+  /// The owner's per-person switches: a member's own permissions.
+  late final Command1<void, MemberPermissions> setMemberPermissions;
+
+  /// Whether the owner may set [memberUid]'s own permissions: a player
+  /// (or a group's member), not the owner nor a legacy coach or captain,
+  /// whose tier already has every permission.
+  bool canSetPermissions(String memberUid) =>
+      isOwner &&
+      memberUid != uid &&
+      _team?.roleOf(memberUid) == TeamRole.player;
 
   /// Hands the team to the given member; the owner becomes a player.
   late final Command1<void, String> transferOwnership;

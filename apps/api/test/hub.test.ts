@@ -163,6 +163,26 @@ describe("team events", () => {
       });
     });
 
+    it("keeps a short note with the answer, cleaned, and drops it with the answer", async () => {
+      const put = (body: object) => s.call("PUT", "/v1/teams/t1/events/e1/rsvp", body, "player");
+      s.store.put("teams/t1/events/e1", { ...s.store.doc("teams/t1/events/e1"), rsvpNotes: { coach: "Bringing discs" } });
+      expect((await put({ status: "going", note: "  Late\n15\u0007 min  " })).statusCode).toBe(204);
+      expect(s.store.doc("teams/t1/events/e1")?.rsvpNotes).toEqual({ coach: "Bringing discs", player: "Late 15 min" });
+      // Changing the answer without a note keeps it.
+      await put({ status: "maybe" });
+      expect(s.store.doc("teams/t1/events/e1")?.rsvpNotes).toEqual({ coach: "Bringing discs", player: "Late 15 min" });
+      // An empty note removes it.
+      await put({ status: "maybe", note: "   " });
+      expect(s.store.doc("teams/t1/events/e1")?.rsvpNotes).toEqual({ coach: "Bringing discs" });
+      await put({ status: "going", note: "Driving" });
+      // Taking the answer back takes the note with it, whatever the body says.
+      await put({ status: null, note: "Still here" });
+      expect(s.store.doc("teams/t1/events/e1")).toMatchObject({ rsvps: { coach: "going" }, rsvpNotes: { coach: "Bringing discs" } });
+      expect((await put({ status: "going", note: "x".repeat(141) })).statusCode).toBe(400);
+      expect((await put({ status: "going", note: 5 })).statusCode).toBe(400);
+      expect((await put({ status: "going", note: "x".repeat(140) })).statusCode).toBe(204);
+    });
+
     it("refuses outsiders, reactions and votes before going, and bad votes", async () => {
       expect((await s.call("PUT", "/v1/teams/t1/events/e1/rsvp", { status: "going" }, "stranger")).statusCode).toBe(404);
       expect((await s.call("PUT", "/v1/teams/t1/events/e1/rsvp", { status: "yes" }, "player")).statusCode).toBe(400);
@@ -214,6 +234,23 @@ describe("team chat", () => {
     });
   });
 
+  it("stamps the room's lastAt and marks it read for the sender, never storing the text on the room", async () => {
+    await s.call("POST", "/v1/teams/t1/chats/general/messages", { text: "hi" }, "player");
+    const room = s.store.doc("teams/t1/chats/general")!;
+    expect(room.lastAt).toEqual(new Date(now));
+    expect(Object.keys(room)).not.toContain("lastMessage");
+    expect(s.store.doc("users/player/chatReads/t1")).toEqual({ rooms: { general: new Date(now) } });
+  });
+
+  it("marks a room read for the caller, only in rooms they can read", async () => {
+    s.store.put("users/player/chatReads/t1", { rooms: { news: new Date(1) } });
+    expect((await s.call("PUT", "/v1/teams/t1/chats/general/read", undefined, "player")).statusCode).toBe(204);
+    expect(s.store.doc("users/player/chatReads/t1")).toEqual({ rooms: { news: new Date(1), general: new Date(now) } });
+    expect((await s.call("PUT", "/v1/teams/t1/chats/coaches/read", undefined, "player")).statusCode).toBe(404);
+    expect((await s.call("PUT", "/v1/teams/t1/chats/general/read", undefined, "stranger")).statusCode).toBe(404);
+    expect((await s.call("PUT", "/v1/teams/t1/chats/gone/read", undefined, "player")).statusCode).toBe(404);
+  });
+
   it("refuses rooms the caller can't read or write, outsiders and muted members", async () => {
     expect((await s.call("POST", "/v1/teams/t1/chats/coaches/messages", { text: "hi" }, "player")).statusCode).toBe(404);
     expect((await s.call("POST", "/v1/teams/t1/chats/news/messages", { text: "hi" }, "player")).statusCode).toBe(403);
@@ -235,6 +272,10 @@ describe("team chat", () => {
     expect((await s.call("PUT", "/v1/teams/t1/chats/general/messages/m1/reaction", { emoji: "👍" }, "player")).statusCode).toBe(204);
     expect(s.store.doc("teams/t1/chats/general/messages/m1")?.reactions).toEqual({ coach: "🔥", player: "👍" });
     expect((await s.call("PUT", "/v1/teams/t1/chats/general/messages/m1/reaction", { emoji: "hello" }, "player")).statusCode).toBe(400);
+    // Any one emoji, not only the quick ones (the bubble's +).
+    expect((await s.call("PUT", "/v1/teams/t1/chats/general/messages/m1/reaction", { emoji: "🐐" }, "player")).statusCode).toBe(204);
+    expect(s.store.doc("teams/t1/chats/general/messages/m1")?.reactions).toEqual({ coach: "🔥", player: "🐐" });
+    expect((await s.call("PUT", "/v1/teams/t1/chats/general/messages/m1/reaction", { emoji: "ok 👍" }, "player")).statusCode).toBe(400);
     expect((await s.call("PUT", "/v1/teams/t1/chats/general/messages/m1/reaction", { emoji: null }, "player")).statusCode).toBe(204);
     expect(s.store.doc("teams/t1/chats/general/messages/m1")?.reactions).toEqual({ coach: "🔥" });
     s.store.put("teams/t1/chats/coaches/messages/m2", { authorId: "coach", text: "secret" });

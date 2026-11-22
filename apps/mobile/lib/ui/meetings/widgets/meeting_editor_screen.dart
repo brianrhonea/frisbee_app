@@ -6,11 +6,14 @@ import '../../../domain/models/meeting.dart';
 import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/back_or.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
-import '../../schedule/widgets/event_editor_screen.dart' show PickerField;
+import '../../schedule/widgets/event_editor_screen.dart'
+    show FieldLabel, PickerField, SettingsCard;
 import '../view_models/meeting_editor_viewmodel.dart';
+import '../../core/ui/time_picker.dart';
 
 class MeetingEditorScreen extends StatefulWidget {
   const MeetingEditorScreen({super.key, required this.viewModel});
@@ -140,12 +143,15 @@ class _MeetingFormState extends State<_MeetingForm> {
   }
 
   Future<void> _pickStart() async {
-    final picked = await showTimePicker(context: context, initialTime: _start);
+    final picked = await showTypedTimePicker(
+      context: context,
+      initialTime: _start,
+    );
     if (picked != null) setState(() => _start = picked);
   }
 
   Future<void> _pickEnd() async {
-    final picked = await showTimePicker(
+    final picked = await showTypedTimePicker(
       context: context,
       initialTime:
           _end ??
@@ -185,7 +191,7 @@ class _MeetingFormState extends State<_MeetingForm> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final c = AppColors.of(context);
     final loc = MaterialLocalizations.of(context);
     // People already invited by their role don't need picking.
     final pickable = [
@@ -251,12 +257,11 @@ class _MeetingFormState extends State<_MeetingForm> {
               alignLabelWithHint: true,
             ),
           ),
-          const Divider(height: 32),
-          Text('Who can see and join', style: theme.textTheme.titleMedium),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
+          const FieldLabel('Who can see and join'),
           Text(
             'Owners, coaches and captains are always invited.',
-            style: theme.textTheme.bodySmall,
+            style: TextStyle(fontSize: 12, color: c.muted),
           ),
           const SizedBox(height: 8),
           Wrap(
@@ -277,33 +282,43 @@ class _MeetingFormState extends State<_MeetingForm> {
             ],
           ),
           if (pickable.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text('Or pick people', style: theme.textTheme.labelLarge),
-            for (final m in pickable)
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-                title: Text(m.name),
-                subtitle: Text(m.role.label),
-                value: _users.contains(m.uid),
-                onChanged: (on) => _toggleUser(m.uid, on ?? false),
-              ),
-          ],
-          const Divider(height: 32),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            secondary: const Icon(Icons.how_to_reg_outlined),
-            title: const Text('Require admin approval to join'),
-            subtitle: Text(
-              _requireApproval
-                  ? 'Invitees wait in the lobby until an admin lets them in.'
-                  : 'Invitees can join as soon as the meeting starts.',
+            const SizedBox(height: 16),
+            const FieldLabel('Or pick people'),
+            SettingsCard(
+              children: [
+                for (final m in pickable)
+                  CheckboxListTile(
+                    dense: true,
+                    title: Text(m.name),
+                    subtitle: Text(m.role.label),
+                    value: _users.contains(m.uid),
+                    onChanged: (on) => _toggleUser(m.uid, on ?? false),
+                  ),
+              ],
             ),
-            value: _requireApproval,
-            onChanged: (v) => setState(() => _requireApproval = v),
+          ],
+          const SizedBox(height: 16),
+          SettingsCard(
+            children: [
+              SwitchListTile(
+                secondary: const Icon(Icons.how_to_reg_outlined),
+                title: const Text('Require admin approval to join'),
+                subtitle: Text(
+                  _requireApproval
+                      ? 'Invitees wait in the lobby until an admin lets them '
+                            'in.'
+                      : 'Invitees can join as soon as the meeting starts.',
+                ),
+                value: _requireApproval,
+                onChanged: (v) => setState(() => _requireApproval = v),
+              ),
+            ],
           ),
           const SizedBox(height: 24),
           FilledButton(
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(50),
+            ),
             onPressed: widget.saving ? null : _submit,
             child: widget.saving
                 ? const SizedBox.square(

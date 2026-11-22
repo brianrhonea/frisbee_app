@@ -1,9 +1,12 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/data/repositories/discord/discord_import_repository.dart';
 import 'package:frisbee_app/domain/models/chat.dart';
 import 'package:frisbee_app/domain/models/discord_import.dart';
 import 'package:frisbee_app/domain/models/team.dart';
+import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/teams/view_models/discord_import_viewmodel.dart';
+import 'package:frisbee_app/ui/teams/widgets/discord_import_screen.dart';
 import 'package:frisbee_app/utils/result.dart';
 
 import '../testing/fakes.dart';
@@ -299,6 +302,122 @@ void main() {
       vm.dispose();
     });
 
+    test('the owner picks which channels to import', () async {
+      teams.teams['t1'] = teamWith({'u1': TeamRole.owner});
+      final vm = load();
+      addTearDown(vm.dispose);
+      await pumpEventQueue();
+      vm.setLink('https://discord.new/abc123');
+      await vm.preview.execute();
+
+      // Everything is ticked to start with, grouped as Discord shows it.
+      expect(vm.pickedCount, 4);
+      expect(vm.channelGroups.map((g) => g.name), [null, 'Info', 'Team']);
+      expect(vm.channelGroups.map((g) => g.rooms), [
+        [3],
+        [0],
+        [1, 2],
+      ]);
+
+      // Untick the whole Info category and one Team channel.
+      vm.setGroupPicked(vm.channelGroups[1], false);
+      vm.setPicked(1, false);
+      expect(vm.isPicked(0), isFalse);
+      expect(vm.pickedCount, 2);
+      expect(vm.import!.rooms.map((r) => r.name), [
+        'handlers-only',
+        'off-topic',
+      ]);
+      // Info has no channel left, so it isn't made; roles all still come.
+      expect(vm.import!.folders.map((f) => f.name), ['Team']);
+      expect(vm.import!.newRoles, hasLength(3));
+
+      await vm.apply.execute();
+      await pumpEventQueue();
+      expect(vm.apply.error, isFalse);
+      expect(
+        chats.rooms.values.map((r) => r.name),
+        unorderedEquals(['General', 'handlers-only', 'off-topic']),
+      );
+      expect(chats.folders.values.map((f) => f.name), ['Team']);
+
+      // None leaves only what's already there: nothing new to import.
+      vm.setAllPicked(false);
+      expect(vm.import!.rooms, isEmpty);
+      expect(vm.canApply, isFalse);
+      // The rest can still come later.
+      vm.setAllPicked(true);
+      expect(vm.import!.rooms.map((r) => r.name), ['announcements', 'general']);
+      expect(vm.canApply, isTrue);
+      // Out of range is ignored.
+      vm.setPicked(99, true);
+      expect(vm.pickedCount, 4);
+    });
+
+    test('a new link starts the picking over', () async {
+      teams.teams['t1'] = teamWith({'u1': TeamRole.owner});
+      final vm = load();
+      addTearDown(vm.dispose);
+      await pumpEventQueue();
+      vm.setLink('https://discord.new/abc123');
+      await vm.preview.execute();
+      vm.setAllPicked(false);
+      vm.setLink('https://discord.new/other');
+      expect(vm.picking, isNull);
+      await vm.preview.execute();
+      expect(vm.pickedCount, 4);
+    });
+
+    testWidgets('the screen lists channels by category with All and None', (
+      tester,
+    ) async {
+      // Tall enough that every channel is on screen.
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      teams.teams['t1'] = teamWith({'u1': TeamRole.owner});
+      final vm = load();
+      addTearDown(vm.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: DiscordImportScreen(viewModel: vm),
+        ),
+      );
+      await tester.pump();
+      await tester.enterText(find.byType(TextField), 'https://discord.new/a');
+      await tester.pump();
+      await tester.tap(find.text('Preview'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pick channels'), findsOneWidget);
+      expect(find.textContaining('4 of 4 text channels picked'), findsOne);
+      expect(find.text('INFO'), findsOneWidget);
+      expect(find.text('TEAM'), findsOneWidget);
+      expect(find.text('# handlers-only'), findsOneWidget);
+
+      await tester.tap(find.text('None'));
+      await tester.pump();
+      expect(find.textContaining('0 of 4 text channels picked'), findsOne);
+      expect(vm.import!.rooms, isEmpty);
+
+      // A category's box ticks all its channels.
+      await tester.tap(find.text('TEAM'));
+      await tester.pump();
+      expect(vm.import!.rooms.map((r) => r.name), ['general', 'handlers-only']);
+      await tester.tap(find.text('# general'));
+      await tester.pump();
+      expect(vm.import!.rooms.map((r) => r.name), ['handlers-only']);
+      final team = tester.widget<CheckboxListTile>(
+        find.widgetWithText(CheckboxListTile, 'TEAM'),
+      );
+      expect(team.value, isNull);
+
+      await tester.tap(find.text('All'));
+      await tester.pump();
+      expect(vm.pickedCount, 4);
+    });
+
     test('only the owner may import', () async {
       teams.teams['t1'] = teamWith({'o': TeamRole.owner, 'u1': TeamRole.coach});
       final vm = load();
@@ -401,6 +520,90 @@ void main() {
       // Sending it back to the community instead is up to the owner.
       vm.setDestination(2, null);
       expect(vm.split!.destinations[2], isNull);
+    },
+  );
+
+  test(
+    'unticked channels never go to a team or move out of the community',
+    () async {
+      final teams = FakeTeamRepository();
+      final chats = FakeChatRepository();
+      final discord = FakeDiscordImportRepository(teams, chats);
+      teams.teams['org'] = Team(
+        id: 'org',
+        name: 'Rockets',
+        division: Division.mixed,
+        level: CompetitionLevel.club,
+        ownerId: 'u1',
+        kind: TeamKind.organization,
+        members: const {'u1': TeamRole.owner},
+        roles: const {
+          'a': CustomRole(id: 'a', name: 'Admin'),
+          'h': CustomRole(id: 'h', name: 'Handlers', position: 1),
+        },
+        linkedTeams: const {
+          'woof': LinkedTeam(id: 'woof', name: 'Woof', roles: {'h'}),
+        },
+      );
+      teams.teams['woof'] = const Team(
+        id: 'woof',
+        name: 'Woof',
+        division: Division.open,
+        level: CompetitionLevel.club,
+        ownerId: 'u1',
+        members: {'u1': TeamRole.owner},
+        orgId: 'org',
+        orgLinked: true,
+      );
+      // An earlier import put handlers-only in the community chat.
+      chats.folders['fT'] = const ChatFolder(id: 'fT', name: 'Team');
+      chats.teamOf['f:fT'] = 'org';
+      chats.rooms['old'] = const ChatRoom(
+        id: 'old',
+        name: 'handlers-only',
+        folderId: 'fT',
+      );
+      chats.teamOf['r:old'] = 'org';
+
+      final vm = DiscordImportViewModel(
+        teamId: 'org',
+        teamRepository: teams,
+        chatRepository: chats,
+        discordImportRepository: discord,
+        authRepository: FakeAuthRepository(user: testUser),
+      );
+      addTearDown(vm.dispose);
+      await pumpEventQueue();
+      vm.setLink('https://discord.new/abc');
+      await vm.preview.execute();
+      expect(vm.moving.map((r) => r.id), ['old']);
+
+      // A destination set before unticking is kept for when it's ticked
+      // again, by the room it was set on.
+      vm.setDestination(3, 'woof');
+      vm.setPicked(2, false);
+      expect(vm.picking!.plan.rooms.map((r) => r.name), [
+        'announcements',
+        'general',
+        'off-topic',
+      ]);
+      expect(vm.split!.destinations, [null, null, 'woof']);
+      expect(vm.moving, isEmpty);
+      expect(vm.emptied, isEmpty);
+      expect(vm.teamImports.single.import.rooms.map((r) => r.name), [
+        'off-topic',
+      ]);
+
+      await vm.apply.execute();
+      expect(vm.apply.error, isFalse);
+      expect(chats.rooms.containsKey('old'), isTrue);
+      expect(
+        chats.roomsOf('woof').map((r) => r.name),
+        isNot(contains('handlers-only')),
+      );
+
+      vm.setPicked(2, true);
+      expect(vm.split!.destinations, [null, null, 'woof', 'woof']);
     },
   );
 }

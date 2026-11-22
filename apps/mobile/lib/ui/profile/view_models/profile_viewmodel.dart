@@ -10,6 +10,7 @@ import '../../../data/repositories/profile/profile_repository.dart';
 import '../../../data/repositories/theme/theme_repository.dart';
 import '../../../domain/models/direct_message.dart';
 import '../../../domain/models/app_user.dart';
+import '../../../domain/models/data_export.dart';
 import '../../../domain/models/follow.dart';
 import '../../../domain/models/player_profile.dart';
 import '../../../utils/command.dart';
@@ -26,7 +27,9 @@ class ProfileViewModel extends ChangeNotifier {
     required DirectMessageRepository directMessageRepository,
     ProfileRepository? profileRepository,
     FollowRepository? followRepository,
+    DateTime Function()? clock,
   }) : _auth = authRepository,
+       _clock = clock ?? DateTime.now,
        _theme = themeRepository,
        _notifications = notificationRepository,
        _dms = directMessageRepository,
@@ -41,6 +44,7 @@ class ProfileViewModel extends ChangeNotifier {
       return _auth.signOut();
     });
     deleteAccount = Command1<void, String?>(_deleteAccount);
+    downloadData = Command0<DataExportFile>(_downloadData);
     changePassword = Command1<void, (String, String)>(
       (p) => _auth.changePassword(current: p.$1, next: p.$2),
     );
@@ -229,6 +233,22 @@ class ProfileViewModel extends ChangeNotifier {
 
   /// Takes the user's password, or null for Google and Apple accounts.
   late final Command1<void, String?> deleteAccount;
+
+  final DateTime Function() _clock;
+
+  /// "Download your data": fetches the file for the screen to share or
+  /// save (the API allows one every 10 minutes).
+  late final Command0<DataExportFile> downloadData;
+
+  Future<Result<DataExportFile>> _downloadData() async {
+    final result = await _auth.exportData();
+    return switch (result) {
+      Ok(:final value) => Result.ok(
+        DataExportFile(name: DataExportFile.fileName(_clock()), json: value),
+      ),
+      Error(:final error) => Result.error(error),
+    };
+  }
 
   /// Whether the account has a password to change (not Google or Apple
   /// only).

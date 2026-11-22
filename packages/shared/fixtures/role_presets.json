@@ -1,0 +1,92 @@
+{
+  "team": [
+    {
+      "id": "member",
+      "name": "Member",
+      "summary": "Plays, chats and RSVPs; no admin rights",
+      "perms": []
+    },
+    {
+      "id": "statKeeper",
+      "name": "Stat keeper",
+      "summary": "Tracks games and edits stats",
+      "perms": [
+        "keepStats"
+      ]
+    },
+    {
+      "id": "captain",
+      "name": "Captain",
+      "summary": "Runs events and chat rooms, moderates and keeps stats",
+      "perms": [
+        "manageChats",
+        "manageEvents",
+        "moderate",
+        "keepStats"
+      ]
+    },
+    {
+      "id": "coach",
+      "name": "Coach",
+      "summary": "Runs the team, its members, events and stats",
+      "perms": [
+        "manageTeam",
+        "manageMembers",
+        "manageEvents",
+        "keepStats"
+      ]
+    },
+    {
+      "id": "admin",
+      "name": "Admin",
+      "summary": "Every permission; only the owner can do more",
+      "perms": [
+        "manageTeam",
+        "manageMembers",
+        "manageChats",
+        "manageEvents",
+        "moderate",
+        "keepStats"
+      ]
+    }
+  ],
+  "group": [
+    {
+      "id": "member",
+      "name": "Member",
+      "summary": "Joins in, chats and RSVPs; no admin rights",
+      "perms": []
+    },
+    {
+      "id": "moderator",
+      "name": "Moderator",
+      "summary": "Runs chat rooms and deletes other people's messages",
+      "perms": [
+        "manageChats",
+        "moderate"
+      ]
+    },
+    {
+      "id": "organizer",
+      "name": "Organizer",
+      "summary": "Runs events and chat rooms and moderates",
+      "perms": [
+        "manageChats",
+        "manageEvents",
+        "moderate"
+      ]
+    },
+    {
+      "id": "admin",
+      "name": "Admin",
+      "summary": "Every permission; only the owner can do more",
+      "perms": [
+        "manageTeam",
+        "manageMembers",
+        "manageChats",
+        "manageEvents",
+        "moderate"
+      ]
+    }
+  ]
+}

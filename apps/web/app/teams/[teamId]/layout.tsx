@@ -1,15 +1,17 @@
-import { isYouthTeam, rosterIsPublic } from "@stall10/shared";
+import { allowsJoinRequests, isYouthTeam, publicPageOn, rosterIsPublic } from "@stall10/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Avatar } from "@/components/Avatar";
+import { AllTeamsLink } from "@/components/team/AllTeamsLink";
 import { ForVisitors } from "@/components/ForVisitors";
 import { InviteProvider } from "@/components/team/InviteDialog";
-import { InviteOnlyHint, MemberCount, TeamAbout, TeamAddress, TeamBannerActions, TeamName } from "@/components/team/TeamBanner";
+import { SectionGate } from "@/components/team/SectionGate";
+import { InviteOnlyHint, TeamAbout, TeamAddress, TeamBannerActions, TeamHeadBadge, TeamMeta, TeamName } from "@/components/team/TeamBanner";
 import { TeamProvider } from "@/components/team/TeamContext";
 import { TeamNav } from "@/components/team/TeamNav";
 import { listingSubtitle } from "@/lib/site";
 import { loadTeam } from "@/lib/teamPage";
+import "@/components/team/team_hub.css";
 
 type Props = { params: Promise<{ teamId: string }>; children: ReactNode };
 
@@ -23,9 +25,10 @@ export async function generateMetadata({ params }: Omit<Props, "children">): Pro
 }
 
 /**
- * A team or group's hub (spec §4): who it is across the top (Invite for
- * member managers, the member count, a two-line description), its sections
- * as tabs, the open section below. Server-rendered from the public page,
+ * A team or group's hub (spec §4): a compact header as in the app (the
+ * initials badge, the name, a meta line with the member count, a two-line
+ * description; Invite for member managers, Message, Settings), its
+ * sections as tabs, the open section below. Server-rendered from the public page,
  * so visitors and search engines see it; members get live sections. One
  * invite dialog (InviteProvider) serves the whole hub.
  */
@@ -37,19 +40,23 @@ export default async function TeamLayout({ params, children }: Props) {
   const group = kind !== "team";
   // isPrivateGroup in the rules: a group that approves joins.
   const privateGroup = group && team.requiresApproval === true;
+  // A team whose "Public team page" is off (publicPageOn): its card only.
+  const privatePage = !group && !publicPageOn(team);
   const subtitle = listingSubtitle(team);
+  // "Allow join requests" (F26): outsiders may ask to join this team.
+  const joinRequests = !group && allowsJoinRequests(team);
 
   return (
-    <TeamProvider teamId={teamId} name={name} kind={kind} privateGroup={privateGroup} youth={isYouthTeam(team)} publicRoster={rosterIsPublic(team)}>
+    <TeamProvider teamId={teamId} name={name} kind={kind} privateGroup={privateGroup} privatePage={privatePage} joinRequests={joinRequests} youth={isYouthTeam(team)} publicRoster={rosterIsPublic(team)}>
       <InviteProvider>
         <div className="page page-wide team-hub">
-          <header className="team-banner">
-            <Avatar name={name} size={72} />
+          <AllTeamsLink />
+          <header className="team-banner team-head">
+            <TeamHeadBadge />
             <div className="team-banner-text">
               <TeamName />
-              {subtitle && <p className="muted">{subtitle}</p>}
+              <TeamMeta subtitle={subtitle} />
               <TeamAddress address={team.location?.address} />
-              <MemberCount />
               {team.description && <TeamAbout text={team.description} />}
               <InviteOnlyHint />
             </div>
@@ -59,14 +66,16 @@ export default async function TeamLayout({ params, children }: Props) {
           </header>
           <ForVisitors>
             <div className="cta-card">
-              <p>{group ? "Join this group on Stall 10." : "Follow this team and keep up with its season on Stall 10."}</p>
+              <p>{group ? "Join this community on Stall 10." : "Follow this team and keep up with its season on Stall 10."}</p>
               <Link className="btn btn-primary btn-small" href={`/sign-up?next=${encodeURIComponent(`/teams/${teamId}`)}`}>
                 {group ? "Sign up to join" : "Sign up free"}
               </Link>
             </div>
           </ForVisitors>
           <TeamNav />
-          <div className="team-section">{children}</div>
+          <div className="team-section">
+            <SectionGate>{children}</SectionGate>
+          </div>
         </div>
       </InviteProvider>
     </TeamProvider>

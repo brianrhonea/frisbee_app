@@ -68,7 +68,15 @@ describe("posts", () => {
       authorId: "me",
       authorName: "Mia Member",
       authorPhotoUrl: "https://img/m.jpg",
+      private: false,
     });
+  });
+
+  it("stamps a private profile's post private (followers only)", async () => {
+    s.store.put("profiles/me", { name: "Mia", private: true });
+    const res = await s.call("POST", "/v1/posts", { body: "Just for followers" });
+    expect(res.statusCode).toBe(201);
+    expect(s.store.doc(`posts/${res.json().id}`)?.private).toBe(true);
   });
 
   it("needs words or a photo, and refuses bad links", async () => {
@@ -205,6 +213,18 @@ describe("comments", () => {
     s.store.put("posts/p", { kind: "text", authorId: "pat", body: "post" });
   });
 
+  it("on a private profile's post: its author and accepted followers only (S1)", async () => {
+    s.store.put("posts/secret", { kind: "text", authorId: "pat", body: "post", private: true });
+    s.store.put("posts/secret/comments/c", { body: "Hi", authorId: "pat", likedBy: [] });
+    expect((await s.call("POST", "/v1/posts/secret/comments", { body: "Let me in" })).statusCode).toBe(403);
+    expect((await s.call("PUT", "/v1/posts/secret/comments/c/like")).statusCode).toBe(403);
+    s.store.put("users/me/follows/user_pat", { key: "user_pat" });
+    expect((await s.call("POST", "/v1/posts/secret/comments", { body: "Following now" })).statusCode).toBe(201);
+    expect((await s.call("PUT", "/v1/posts/secret/comments/c/like")).statusCode).toBe(200);
+    // The author's own.
+    expect((await s.call("POST", "/v1/posts/secret/comments", { body: "Thanks" }, "pat")).statusCode).toBe(201);
+  });
+
   it("comments and replies one level deep", async () => {
     const top = (await s.call("POST", "/v1/posts/p/comments", { body: " Nice " })).json().id;
     expect(s.store.doc(`posts/p/comments/${top}`)).toMatchObject({ body: "Nice", authorId: "me", authorName: "Mia Member" });
@@ -218,6 +238,16 @@ describe("comments", () => {
     // Replying to a reply answers the top-level comment and says whose.
     const again = (await s.call("POST", "/v1/posts/p/comments", { body: "Ha", replyTo: reply })).json().id;
     expect(s.store.doc(`posts/p/comments/${again}`)).toMatchObject({ parentId: top, replyToName: "Sam" });
+  });
+
+  it("takes the app's id once, so a resend can't post it twice", async () => {
+    const first = await s.call("POST", "/v1/posts/p/comments", { id: "c-queued", body: "Offline hi" });
+    expect(first.json().id).toBe("c-queued");
+    expect(s.store.doc("posts/p/comments/c-queued")).toMatchObject({ body: "Offline hi", authorId: "me" });
+    const again = await s.call("POST", "/v1/posts/p/comments", { id: "c-queued", body: "Offline hi" });
+    expect(again.statusCode).toBe(409);
+    expect(again.json().error.code).toBe("already_exists");
+    expect((await s.call("POST", "/v1/posts/p/comments", { id: "bad/id", body: "x" })).statusCode).toBe(400);
   });
 
   it("refuses empty comments, missing posts and reposts", async () => {

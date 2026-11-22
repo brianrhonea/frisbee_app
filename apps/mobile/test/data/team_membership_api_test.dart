@@ -263,13 +263,29 @@ void main() {
         () => repo().unlinkTeam('org1', 't1'),
         (method: 'DELETE', path: '/v1/teams/org1/linked-teams/t1', body: null),
       ),
+      'setSections': (
+        () => repo().setSections('t1', {
+          OptionalSection.playbook: true,
+          OptionalSection.meetings: false,
+        }),
+        (
+          method: 'PUT',
+          path: '/v1/teams/t1/sections',
+          body: {'playbook': true, 'meetings': false},
+        ),
+      ),
     };
 
     for (final MapEntry(key: name, value: (run, expected)) in cases.entries) {
       test('$name calls the API and writes nothing itself', () async {
         expect(await run(), isA<Ok<Object?>>());
         expect(sent.map(_m), [_m(expected)]);
-        expect((await db.collection('teams').get()).docs, isEmpty);
+        expect(
+          (await db.collection('teams').get()).docs.map(
+            (d) => d.data()['name'],
+          ),
+          isNot(contains('Austin Mixed')),
+        );
       });
     }
 
@@ -332,6 +348,35 @@ void main() {
   });
 
   group('the Firestore fallback', () {
+    test('without the API, a club team says why it needs the server, not '
+        '"no permission" (only the API checks ages)', () async {
+      final r = await repo(api: false).createTeam(
+        const NewTeam(
+          name: 'Austin Mixed',
+          division: Division.mixed,
+          level: CompetitionLevel.club,
+        ),
+        const AppUser(uid: 'u1', displayName: 'Pat'),
+      );
+      expect(r, isA<Error<String>>());
+      expect('${(r as Error).error}', contains('Club teams need a connection'));
+      expect(
+        (await db.collection('teams').get()).docs.map((d) => d.data()['name']),
+        isNot(contains('Austin Mixed')),
+      );
+
+      // Other levels still work without it.
+      final pickup = await repo(api: false).createTeam(
+        const NewTeam(
+          name: 'Austin Pickup Squad',
+          division: Division.mixed,
+          level: CompetitionLevel.pickup,
+        ),
+        const AppUser(uid: 'u1', displayName: 'Pat'),
+      );
+      expect(pickup, isA<Ok<String>>());
+    });
+
     setUp(() async {
       await db.doc('teams/t1').set({
         'name': 'Pickup',
@@ -369,6 +414,22 @@ void main() {
       expect(r, isA<Ok<void>>());
       expect(sent, isEmpty);
       expect((await db.doc('teams/t1').get()).exists, isFalse);
+    });
+
+    test('setSections with the flag off updates only those switches', () async {
+      await db.doc('teams/t1').set({
+        'name': 'Haze',
+        'sections': {'playbook': false, 'videos': false},
+      });
+      final r = await repo(
+        flags: FeatureFlags.fixed({'use_api_membership': false}),
+      ).setSections('t1', {OptionalSection.playbook: true});
+      expect(r, isA<Ok<void>>());
+      expect(sent, isEmpty);
+      expect((await db.doc('teams/t1').get()).get('sections'), {
+        'playbook': true,
+        'videos': false,
+      });
     });
 
     test('so do builds without an API', () async {

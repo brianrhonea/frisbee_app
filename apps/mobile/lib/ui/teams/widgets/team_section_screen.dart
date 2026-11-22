@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../data/repositories/discover/discover_repository.dart';
 import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
@@ -65,9 +66,21 @@ enum TeamSection {
       league ? const [chat, members] : _forKind(kind);
 
   /// [team]'s sections: a league team ([Team.isLeagueTeam]) only has its
-  /// chat and members.
-  static List<TeamSection> forTeam(Team team) =>
-      forKind(team.kind, league: team.isLeagueTeam);
+  /// chat and members, and the owner may have turned some off
+  /// ([Team.hasSection]; new teams start without Playbook, Videos and
+  /// Stats).
+  static List<TeamSection> forTeam(Team team) => [
+    for (final s in forKind(team.kind, league: team.isLeagueTeam))
+      if (s.optional == null || team.hasSection(s.optional!)) s,
+  ];
+
+  /// The switch in Settings › Sections this section follows, if any.
+  OptionalSection? get optional => switch (this) {
+    playbook => OptionalSection.playbook,
+    videos => OptionalSection.videos,
+    stats => OptionalSection.stats,
+    _ => null,
+  };
 
   static List<TeamSection> _forKind(TeamKind kind) => switch (kind) {
     TeamKind.team => values.where((s) => s != teams).toList(),
@@ -96,6 +109,10 @@ enum TeamTab {
   feed('Feed'),
   schedule('Schedule'),
   chat('Chat'),
+
+  /// A team's tournaments, out of More while it has one ahead
+  /// (`hasTournamentAhead`); otherwise they stay under More.
+  tournaments('Tournaments'),
   roster('Roster'),
 
   /// A community's teams (a school or club's), beside its members.
@@ -108,30 +125,38 @@ enum TeamTab {
   /// The More tab's `?section=`: a list of the sections it holds.
   static const morePath = 'more';
 
-  /// The tab [section] is under; the feed for the overview (null).
-  static TeamTab of(TeamSection? section) => switch (section) {
-    null => feed,
-    TeamSection.events => schedule,
-    TeamSection.chat => chat,
-    TeamSection.roster || TeamSection.members => roster,
-    TeamSection.teams => teams,
-    TeamSection.playbook ||
-    TeamSection.videos ||
-    TeamSection.stats ||
-    TeamSection.tournaments => more,
-  };
+  /// The tab [section] is under; the feed for the overview (null). With
+  /// [promoted], Tournaments is a tab of its own rather than under More.
+  static TeamTab of(TeamSection? section, {bool promoted = false}) =>
+      switch (section) {
+        null => feed,
+        TeamSection.events => schedule,
+        TeamSection.chat => chat,
+        TeamSection.roster || TeamSection.members => roster,
+        TeamSection.teams => teams,
+        TeamSection.tournaments => promoted ? tournaments : more,
+        TeamSection.playbook || TeamSection.videos || TeamSection.stats => more,
+      };
 
   /// The tabs of a page with [sections] (from [TeamSection.forTeam]), in
-  /// order: the feed, then each tab with a section under it.
-  static List<TeamTab> forSections(List<TeamSection> sections) => [
+  /// order: the feed, then each tab with a section under it. With
+  /// [tournamentsTab] (a team with a tournament ahead), Tournaments
+  /// follows Chat.
+  static List<TeamTab> forSections(
+    List<TeamSection> sections, {
+    bool tournamentsTab = false,
+  }) => [
     feed,
-    for (final t in [schedule, chat, roster, teams, more])
-      if (sections.any((s) => of(s) == t)) t,
+    for (final t in [schedule, chat, tournaments, roster, teams, more])
+      if (sections.any((s) => of(s, promoted: tournamentsTab) == t)) t,
   ];
 
-  /// The sections listed under More on a page with [sections].
-  static List<TeamSection> moreSections(List<TeamSection> sections) =>
-      sections.where((s) => of(s) == more).toList();
+  /// The sections listed under More on a page with [sections]; not
+  /// Tournaments when it's a tab of its own ([tournamentsTab]).
+  static List<TeamSection> moreSections(
+    List<TeamSection> sections, {
+    bool tournamentsTab = false,
+  }) => sections.where((s) => of(s, promoted: tournamentsTab) == more).toList();
 
   /// Where the tab opens. Roster opens on the members, who every kind has;
   /// a team's players are beside them.
@@ -139,6 +164,7 @@ enum TeamTab {
     feed => Routes.team(teamId),
     schedule => TeamSection.events.route(teamId),
     chat => TeamSection.chat.route(teamId),
+    tournaments => TeamSection.tournaments.route(teamId),
     roster => TeamSection.members.route(teamId),
     teams => TeamSection.teams.route(teamId),
     more => Routes.teamSection(teamId, morePath),
@@ -170,10 +196,13 @@ class _TeamSectionBodyState extends State<TeamSectionBody> {
     vm.setMemberRole,
     vm.transferOwnership,
     vm.setStatKeeper,
+    vm.setMemberPermissions,
     vm.removeMember,
     vm.deletePlay,
     vm.approveJoinRequest,
     vm.declineJoinRequest,
+    vm.saveLines,
+    vm.withdrawInvite,
   ];
 
   @override
@@ -181,6 +210,10 @@ class _TeamSectionBodyState extends State<TeamSectionBody> {
     super.initState();
     for (final c in _commands) {
       c.addListener(_onCommand);
+    }
+    // Invites pending, under Members, for those who invite people.
+    if (widget.section == TeamSection.members && vm.canSeeInvites) {
+      vm.loadInvites.execute();
     }
   }
 
@@ -240,6 +273,7 @@ class _TeamSectionBodyState extends State<TeamSectionBody> {
         tournamentRepository: c.read(),
         teamRepository: c.read(),
         authRepository: c.read(),
+        discoverRepository: c.read<DiscoverRepository?>(),
       ),
       builder: (_, hosted) => vm.team?.kind != TeamKind.community
           ? HostedTournamentsSection(viewModel: hosted)
@@ -311,13 +345,23 @@ class TeamSectionScreen extends StatelessWidget {
           );
         }
         if (!TeamSection.forTeam(team).contains(section)) {
+          final o = section.optional;
+          final off =
+              o != null &&
+              !team.hasSection(o) &&
+              TeamSection.forKind(
+                team.kind,
+                league: team.isLeagueTeam,
+              ).contains(section);
           return Scaffold(
             appBar: AppBar(leading: leading),
             body: EmptyView(
               icon: section.icon,
-              title: 'Not here',
-              message:
-                  "A ${team.kind.noun} doesn't have ${section.label.toLowerCase()}.",
+              title: off ? '${section.label} is off' : 'Not here',
+              message: off
+                  ? 'The owner can turn it on in Settings › Sections.'
+                  : "A ${team.kind.noun} doesn't have "
+                        '${section.label.toLowerCase()}.',
             ),
           );
         }

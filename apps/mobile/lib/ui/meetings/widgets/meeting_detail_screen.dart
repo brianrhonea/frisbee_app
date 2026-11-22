@@ -6,11 +6,17 @@ import '../../../domain/models/meeting.dart';
 import '../../../domain/models/team_event.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/back_or.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
+import '../../core/ui/layout.dart' show DateBadge, SectionCard;
+import '../../core/ui/scoreboard.dart' show NeedsYouPill, TeamDot;
 import '../../core/ui/status_views.dart';
+import '../../schedule/widgets/event_detail_screen.dart'
+    show DetailIcon, DetailLines;
 import '../../schedule/widgets/event_style.dart';
+import '../../schedule/widgets/rsvp_widgets.dart';
 import '../view_models/meeting_detail_viewmodel.dart';
 
 class MeetingDetailScreen extends StatefulWidget {
@@ -25,7 +31,11 @@ class MeetingDetailScreen extends StatefulWidget {
 class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
   MeetingDetailViewModel get vm => widget.viewModel;
 
-  late final List<Command<void>> _commands = [vm.setRsvp, vm.deleteMeeting];
+  late final List<Command<void>> _commands = [
+    vm.setRsvp,
+    vm.saveNote,
+    vm.deleteMeeting,
+  ];
 
   @override
   void initState() {
@@ -122,27 +132,48 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 720),
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
               children: [
-                _Header(meeting: m, needsApproval: vm.needsApproval),
-                const SizedBox(height: 16),
-                if (!m.isEnded)
-                  FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(52),
-                    ),
-                    onPressed: () => context.push(
-                      Routes.meetingRoom(vm.teamId, vm.meetingId),
-                    ),
-                    icon: const Icon(Icons.meeting_room_outlined),
-                    label: Text(
-                      m.isLive ? 'Join meeting room' : 'Go to meeting room',
+                _Header(
+                  meeting: m,
+                  teamName: vm.teamName,
+                  needsApproval: vm.needsApproval,
+                  roomButton: m.isEnded
+                      ? null
+                      : FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size.fromHeight(48),
+                          ),
+                          onPressed: () => context.push(
+                            Routes.meetingRoom(vm.teamId, vm.meetingId),
+                          ),
+                          icon: const Icon(Icons.meeting_room_outlined),
+                          label: Text(
+                            m.isLive
+                                ? 'Join meeting room'
+                                : 'Go to meeting room',
+                          ),
+                        ),
+                ),
+                if (m.notes.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  SectionCard(
+                    title: 'Agenda',
+                    padding: const EdgeInsets.all(14),
+                    child: Text(
+                      m.notes,
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.5,
+                        color: AppColors.of(context).ink2,
+                      ),
                     ),
                   ),
-                const SizedBox(height: 20),
+                ],
+                const SizedBox(height: 12),
                 if (!m.isEnded) ...[
                   _RsvpCard(viewModel: vm),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 12),
                 ],
                 _Responses(viewModel: vm),
               ],
@@ -155,58 +186,95 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.meeting, required this.needsApproval});
+  const _Header({
+    required this.meeting,
+    required this.teamName,
+    required this.needsApproval,
+    required this.roomButton,
+  });
 
   final TeamMeeting meeting;
+  final String? teamName;
   final bool needsApproval;
+
+  /// "Go to meeting room", until the meeting ends.
+  final Widget? roomButton;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final c = AppColors.of(context);
     final m = meeting;
-    final color = EventType.meeting.color(theme.colorScheme);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: color.withValues(alpha: 0.15),
-              foregroundColor: color,
-              child: Icon(EventType.meeting.icon),
+    return SectionCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              TeamDot(color: c.team),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  [?teamName, EventType.meeting.label].join(' · '),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: c.muted,
+                  ),
+                ),
+              ),
+              if (m.isLive || m.isEnded) MeetingStatusBadge(meeting: m),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            m.title,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
+              height: 1.2,
+              color: c.ink,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(m.title, style: theme.textTheme.headlineSmall),
-            ),
-            if (m.isLive || m.isEnded) MeetingStatusBadge(meeting: m),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              DateBadge(date: m.startsAt, size: 48),
+              const SizedBox(width: 12),
+              Expanded(
+                child: DetailLines(
+                  DateFormat.yMMMMEEEEd().format(m.startsAt),
+                  eventTimeRange(m.toEvent()),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const DetailIcon(Icons.groups_outlined),
+              const SizedBox(width: 12),
+              Expanded(
+                child: DetailLines(
+                  m.audience,
+                  m.requireApproval
+                      ? (needsApproval
+                            ? 'An admin lets you in once you ask to join.'
+                            : 'Invitees wait for an admin to let them in.')
+                      : 'Invitees can join once it starts.',
+                ),
+              ),
+            ],
+          ),
+          if (roomButton case final button?) ...[
+            const SizedBox(height: 14),
+            button,
           ],
-        ),
-        const SizedBox(height: 12),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.schedule),
-          title: Text(DateFormat.yMMMMEEEEd().format(m.startsAt)),
-          subtitle: Text(eventTimeRange(m.toEvent())),
-        ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.groups_outlined),
-          title: Text(m.audience),
-          subtitle: Text(
-            m.requireApproval
-                ? (needsApproval
-                      ? 'An admin lets you in once you ask to join.'
-                      : 'Invitees wait for an admin to let them in.')
-                : 'Invitees can join once it starts.',
-          ),
-        ),
-        if (m.notes.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(m.notes, style: theme.textTheme.bodyMedium),
-          ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -219,16 +287,33 @@ class MeetingStatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final c = AppColors.of(context);
     final live = meeting.isLive;
-    return Chip(
-      visualDensity: VisualDensity.compact,
-      avatar: Icon(
-        live ? Icons.circle : Icons.check,
-        size: 12,
-        color: live ? Colors.red : scheme.outline,
+    // A live meeting is turf: red is only for live games.
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: live ? c.accentSoft : c.field,
+        borderRadius: BorderRadius.circular(999),
       ),
-      label: Text(live ? 'Live' : 'Ended'),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (live)
+            TeamDot(color: c.accent)
+          else
+            Icon(Icons.check, size: 12, color: c.muted),
+          const SizedBox(width: 5),
+          Text(
+            live ? 'Live' : 'Ended',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: live ? c.accentInk : c.ink2,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -238,55 +323,48 @@ class _RsvpCard extends StatelessWidget {
 
   final MeetingDetailViewModel viewModel;
 
+  // The buttons follow the commands too, or they stay off after a save.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: Listenable.merge([viewModel.setRsvp, viewModel.saveNote]),
+    builder: (context, _) => _card(context),
+  );
+
+  Widget _card(BuildContext context) {
     final vm = viewModel;
-    final theme = Theme.of(context);
     final r = vm.responses;
-    return Card.filled(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('Will you attend?', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 12),
-            SegmentedButton<MeetingRsvp>(
-              segments: [
-                for (final a in MeetingRsvp.values)
-                  ButtonSegment(
-                    value: a,
-                    label: Text(a.label),
-                    icon: Icon(a.asEventRsvp.icon),
-                  ),
-              ],
-              selected: {?vm.myRsvp},
-              emptySelectionAllowed: true,
-              showSelectedIcon: false,
-              onSelectionChanged: vm.setRsvp.running
-                  ? null
-                  : (s) => vm.setRsvp.execute(s.firstOrNull),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              vm.myRsvp == MeetingRsvp.attending
-                  ? "We'll notify you when it starts."
-                  : 'Attending? You get a notification when it starts.',
-              style: theme.textTheme.bodySmall,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              [
-                for (final a in MeetingRsvp.values)
-                  '${r[a]!.length} ${a.label.toLowerCase()}',
-                '${vm.noResponse.length} no reply',
-              ].join(' · '),
-              style: theme.textTheme.bodySmall,
-              textAlign: TextAlign.center,
+    return SectionCard(
+      title: 'Will you attend?',
+      action: vm.needsRsvp ? const NeedsYouPill('Needs RSVP') : null,
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          RsvpChoice<MeetingRsvp>(
+            options: [
+              for (final a in MeetingRsvp.values)
+                (value: a, label: a.label, count: r[a]!.length),
+            ],
+            selected: vm.myRsvp,
+            onChanged: vm.setRsvp.running ? null : vm.setRsvp.execute,
+          ),
+          // A note goes with an answer, and goes when it's taken back.
+          if (vm.myRsvp != null) ...[
+            const SizedBox(height: 10),
+            RsvpNoteField(
+              note: vm.myNote,
+              onSave: vm.saveNote.running ? null : vm.saveNote.execute,
             ),
           ],
-        ),
+          const SizedBox(height: 8),
+          Text(
+            vm.myRsvp == MeetingRsvp.attending
+                ? "We'll notify you when it starts."
+                : 'Attending? You get a notification when it starts.',
+            style: TextStyle(fontSize: 12, color: AppColors.of(context).muted),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }
@@ -299,40 +377,25 @@ class _Responses extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final r = viewModel.responses;
-    final groups = [
-      for (final a in MeetingRsvp.values)
-        (a.label, a.asEventRsvp.icon, a.asEventRsvp.color(scheme), r[a]!),
-      ('No reply', Icons.hourglass_empty, scheme.outline, viewModel.noResponse),
-    ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Invited (${viewModel.inviteeCount})',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        for (final (label, icon, color, names) in groups)
-          ExpansionTile(
-            tilePadding: EdgeInsets.zero,
-            leading: Icon(icon, color: color),
-            title: Text('$label (${names.length})'),
-            initiallyExpanded: label == MeetingRsvp.attending.label,
-            expandedAlignment: Alignment.centerLeft,
-            childrenPadding: const EdgeInsets.only(bottom: 8),
-            children: [
-              if (names.isEmpty)
-                const Text('Nobody yet.')
-              else
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [for (final n in names) Chip(label: Text(n))],
-                ),
-            ],
+    final r = viewModel.responders;
+    return SectionCard(
+      title: 'Invited (${viewModel.inviteeCount})',
+      padding: const EdgeInsets.all(14),
+      child: RsvpResponses(
+        groups: [
+          for (final a in MeetingRsvp.values)
+            (
+              label: a.label,
+              people: r[a]!,
+              tone: a == MeetingRsvp.attending ? RsvpTone.yes : RsvpTone.other,
+            ),
+          (
+            label: 'No reply',
+            people: withoutNotes(viewModel.noResponse),
+            tone: RsvpTone.none,
           ),
-      ],
+        ],
+      ),
     );
   }
 }

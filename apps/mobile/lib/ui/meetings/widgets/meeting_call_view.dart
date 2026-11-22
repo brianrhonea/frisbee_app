@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 
 import '../../../data/services/meeting_call.dart';
 import '../../chat/widgets/message_thread_view.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
+import '../../core/ui/scoreboard.dart' show TeamDot;
 import '../../videos/widgets/synced_video_player.dart';
 import '../view_models/meeting_room_viewmodel.dart';
 import '../view_models/watch_together_viewmodel.dart';
@@ -147,9 +149,6 @@ class _MeetingCallViewState extends State<MeetingCallView> {
             child: const Text('Leave'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('End for everyone'),
           ),
@@ -179,16 +178,15 @@ class _MeetingCallViewState extends State<MeetingCallView> {
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, c) {
       final wide = c.maxWidth >= _wide;
-      final theme = ThemeData(
-        brightness: Brightness.dark,
-        colorSchemeSeed: Theme.of(context).colorScheme.primary,
-      );
+      // The call is always on the dark scoreboard surface.
+      final stage = AppColors.of(context).feature;
+      final theme = AppTheme.dark;
       return Theme(
         data: theme,
         child: ListenableBuilder(
           listenable: Listenable.merge([vm, ?vm.chat, ?_watch]),
           builder: (context, _) => Scaffold(
-            backgroundColor: const Color(0xFF111316),
+            backgroundColor: stage,
             body: SafeArea(
               child: Column(
                 children: [
@@ -245,23 +243,28 @@ class _TopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final vm = viewModel;
+    final c = AppColors.of(context);
     final waiting = vm.pendingRequests.length;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
       child: Row(
         children: [
-          const Icon(Icons.circle, size: 10, color: Colors.red),
+          TeamDot(color: c.accent),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               vm.meeting?.title ?? 'Meeting',
-              style: Theme.of(context).textTheme.titleMedium,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: c.onFeature,
+              ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
           Text(
             '${vm.participants.length} in call',
-            style: Theme.of(context).textTheme.bodySmall,
+            style: TextStyle(fontSize: 12, color: c.onFeatureMuted),
           ),
           if (vm.isAdmin && (vm.meeting?.requireApproval ?? false))
             IconButton(
@@ -352,7 +355,7 @@ class _Stage extends StatelessWidget {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: ColoredBox(
-              color: Colors.black,
+              color: AppColors.of(context).feature,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -432,12 +435,13 @@ class ParticipantTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = participant;
     final camera = p.camera;
+    final c = AppColors.of(context);
     return Material(
-      color: const Color(0xFF23262B),
+      color: c.featureHighlight,
       shape: RoundedSuperellipseBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(cardRadius),
         side: p.isSpeaking
-            ? const BorderSide(color: Colors.greenAccent, width: 3)
+            ? BorderSide(color: c.accent, width: 3)
             : BorderSide.none,
       ),
       clipBehavior: Clip.antiAlias,
@@ -484,31 +488,38 @@ class _NameTag extends StatelessWidget {
   final IconData? icon;
 
   @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: BoxDecoration(
-      color: Colors.black54,
-      borderRadius: BorderRadius.circular(6),
-    ),
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon case final icon?) ...[
-            Icon(icon, size: 14, color: Colors.white),
-            const SizedBox(width: 4),
-          ],
-          Flexible(
-            child: Text(
-              text,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white, fontSize: 12),
-            ),
-          ),
-        ],
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: c.feature.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(999),
       ),
-    ),
-  );
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon case final icon?) ...[
+              Icon(icon, size: 14, color: c.onFeature),
+              const SizedBox(width: 4),
+            ],
+            Flexible(
+              child: Text(
+                text,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: c.onFeature,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _Controls extends StatelessWidget {
@@ -592,6 +603,7 @@ class _Controls extends StatelessWidget {
           ),
           CallToggle(
             on: false,
+            highlightOn: true,
             onIcon: Icons.settings,
             offIcon: Icons.settings_outlined,
             tooltip: 'Audio and video settings',
@@ -599,10 +611,12 @@ class _Controls extends StatelessWidget {
           ),
           Tooltip(
             message: 'Leave',
+            // Neutral, not red: red is only for live games.
             child: FilledButton(
               style: FilledButton.styleFrom(
-                backgroundColor: Colors.red.shade600,
-                foregroundColor: Colors.white,
+                backgroundColor: AppColors.of(context).card,
+                foregroundColor: AppColors.of(context).ink,
+                side: BorderSide(color: AppColors.of(context).border2),
                 minimumSize: const Size(72, 48),
               ),
               onPressed: onLeave,
@@ -615,8 +629,8 @@ class _Controls extends StatelessWidget {
   }
 }
 
-/// A round call button. Off is shown in red for the mic and camera, so
-/// it's clear at a glance; [highlightOn] instead lights up when on.
+/// A round call button. Off is shown in white for the mic and camera, so
+/// it's clear at a glance; [highlightOn] instead lights up turf when on.
 class CallToggle extends StatelessWidget {
   const CallToggle({
     super.key,
@@ -639,15 +653,15 @@ class CallToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final c = AppColors.of(context);
     final Color background;
     final Color foreground;
     if (highlightOn) {
-      background = on ? scheme.primary : Colors.white24;
-      foreground = on ? scheme.onPrimary : Colors.white;
+      background = on ? c.accent : c.featureHighlight;
+      foreground = on ? c.onAccent : c.onFeature;
     } else {
-      background = on ? Colors.white24 : Colors.red.shade600;
-      foreground = Colors.white;
+      background = on ? c.featureHighlight : c.onFeature;
+      foreground = on ? c.onFeature : c.feature;
     }
     return IconButton.filled(
       tooltip: tooltip,

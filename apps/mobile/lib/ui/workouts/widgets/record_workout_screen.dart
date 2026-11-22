@@ -7,7 +7,9 @@ import '../../../data/services/location_service.dart';
 import '../../../domain/models/workout.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
+import '../../core/ui/scoreboard.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../../posts/widgets/post_composer.dart';
@@ -154,7 +156,6 @@ class _RecordWorkoutScreenState extends State<RecordWorkoutScreen> {
         ),
       );
     }
-    final theme = Theme.of(context);
     final here = vm.here;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -207,9 +208,10 @@ class _RecordWorkoutScreenState extends State<RecordWorkoutScreen> {
             ],
           ),
         ),
+        // Flat, with a hairline on top, like the app's other bottom bars.
         Material(
-          elevation: 8,
-          color: theme.colorScheme.surface,
+          color: AppColors.of(context).card,
+          shape: Border(top: BorderSide(color: AppColors.of(context).border)),
           child: SafeArea(
             top: false,
             child: Padding(
@@ -320,35 +322,21 @@ class _Stats extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final muted = theme.textTheme.labelMedium?.copyWith(
-      color: theme.colorScheme.onSurfaceVariant,
-    );
-    const tabular = [FontFeature.tabularFigures()];
+    final c = AppColors.of(context);
+    final muted = TextStyle(fontSize: 12, color: c.muted);
     final speed = vm.activity.showsSpeed;
+    // The numbers in the score face, like a scoreboard.
     Widget stat(String label, String value) => Expanded(
       child: Column(
         children: [
-          Text(
-            value,
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w700,
-              fontFeatures: tabular,
-            ),
-          ),
+          ScoreText(value, size: 28),
           Text(label, style: muted),
         ],
       ),
     );
     return Column(
       children: [
-        Text(
-          vm.timeLabel,
-          style: theme.textTheme.displayMedium?.copyWith(
-            fontWeight: FontWeight.w800,
-            fontFeatures: tabular,
-          ),
-        ),
+        ScoreText(vm.timeLabel, size: 56),
         Text('Time', style: muted),
         const SizedBox(height: 12),
         Row(

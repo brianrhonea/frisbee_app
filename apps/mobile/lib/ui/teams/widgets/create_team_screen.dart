@@ -55,7 +55,7 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
       appBar: AppBar(
         title: Text(switch (widget.kind) {
           TeamKind.team => 'New team',
-          TeamKind.community => 'New community group',
+          TeamKind.community => 'New pickup community',
           TeamKind.organization => 'New school or club',
         }),
       ),

@@ -60,6 +60,7 @@ class DiscordImportRepositoryFirebase implements DiscordImportRepository {
           ...rolesData(
             import.roles,
             cleanMemberRoles(team.memberRoles, import.roles, team.members.keys),
+            cleanMemberGrants(team.memberGrants, team.members.keys),
           ),
           'orgRoles': ?orgRoles,
         });

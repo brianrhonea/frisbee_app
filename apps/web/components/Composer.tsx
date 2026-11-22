@@ -16,6 +16,7 @@ import { type ClipboardEvent, type DragEvent, type FormEvent, useEffect, useRef,
 import { where } from "firebase/firestore";
 import Link from "next/link";
 import { callApi, problem } from "@/lib/client";
+import { queuedNotice, submitOutbox } from "@/lib/outbox";
 import { useLiveQuery } from "@/lib/live";
 import { newId, photoProblem, uploadPhoto } from "@/lib/upload";
 import { useAuth } from "./AuthProvider";
@@ -152,6 +153,7 @@ export function Composer({
   const [place, setPlace] = useState("");
   const [isPublic, setPublic] = useState(false);
   const [posted, setPosted] = useState<Audience | null>(null);
+  const [queued, setQueued] = useState<string | null>(null);
   const text = useRef<HTMLTextAreaElement>(null);
   const files = useRef<HTMLInputElement>(null);
   const repost = editing?.kind === "repost";
@@ -269,6 +271,7 @@ export function Composer({
   async function submitTeam(to: Audience, links: string[]) {
     setBusy(true);
     setError(null);
+    setQueued(null);
     const req: SaveTeamPostRequest = {
       title: title.trim(),
       body,
@@ -278,9 +281,19 @@ export function Composer({
       uploadIds: photos.flatMap((p) => (p.kind === "new" && p.uploadId ? [p.uploadId] : [])),
     };
     try {
-      await callApi(me, `/v1/teams/${encodeURIComponent(to.id)}/posts`, { method: "POST", body: { ...req, id: postId } });
+      const done = await submitOutbox(me, {
+        kind: "teamPost",
+        id: postId,
+        target: to.id,
+        label: "Team post",
+        path: `/v1/teams/${encodeURIComponent(to.id)}/posts`,
+        body: { ...req },
+        preview: req.title || body.trim(),
+        files: req.uploadIds?.length ?? 0,
+      });
       reset();
-      setPosted(to);
+      if (done === "queued") setQueued(queuedNotice("Team post"));
+      else setPosted(to);
       onTeamPosted?.(to.id);
     } catch (err) {
       setError(problem(err));
@@ -302,6 +315,7 @@ export function Composer({
     if (typeof w === "string") return setError(w);
     setBusy(true);
     setError(null);
+    setQueued(null);
     const payload = {
       body,
       links: repost ? [] : links,
@@ -311,15 +325,27 @@ export function Composer({
       ...(!repost && (editing || tag) && { tournament: tag }),
     };
     try {
-      const result = editing
-        ? await callApi<SavePostResult>(me, `/v1/posts/${encodeURIComponent(editing.id)}`, {
-            method: "PATCH",
-            body: payload,
-          })
-        : await callApi<SavePostResult>(me, "/v1/posts", {
-            method: "POST",
-            body: { ...payload, id: postId, ...(w && { workout: w }) },
-          });
+      // Only new posts wait offline; an edit needs the post as it stands.
+      let result: SavePostResult;
+      if (editing) {
+        result = await callApi<SavePostResult>(me, `/v1/posts/${encodeURIComponent(editing.id)}`, {
+          method: "PATCH",
+          body: payload,
+        });
+      } else {
+        const done = await submitOutbox(me, {
+          kind: "userPost",
+          id: postId,
+          target: "posts",
+          label: "Post",
+          path: "/v1/posts",
+          body: { ...payload, ...(w && { workout: w }) },
+          preview: body.trim(),
+          files: payload.uploadIds.length,
+        });
+        if (done === "queued") setQueued(queuedNotice("Post"));
+        result = { id: postId, images: [] };
+      }
       if (!editing) {
         reset();
         setPosted(null);
@@ -459,6 +485,11 @@ export function Composer({
         {error && (
           <p className="form-error" role="alert">
             {error}
+          </p>
+        )}
+        {queued && (
+          <p className="muted small" role="status">
+            {queued}
           </p>
         )}
         {posted && (

@@ -113,11 +113,18 @@ class TeamsViewModel extends ChangeNotifier {
     if (user == null) return;
     _sub?.cancel();
     _invitesSub?.cancel();
-    _invitesSub = _teams.watchMyInvites(user.uid).listen((invites) {
-      _invites = invites;
-      _watchInviteListings();
-      notifyListeners();
-    }, onError: (Object _) {});
+    _invitesSub = _teams
+        .watchMyInvites(user.uid)
+        .listen(
+          (invites) {
+            _invites = invites;
+            _watchInviteListings();
+            notifyListeners();
+          },
+          onError: (Object _) {
+            notifyListeners();
+          },
+        );
     _loading = true;
     _error = null;
     _sub = _teams

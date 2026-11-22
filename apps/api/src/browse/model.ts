@@ -140,6 +140,8 @@ export function profileView(profile: Data): Data {
     visibility: { stats: shows("stats"), teams: shows("teams"), games: shows("games") },
     ...(shows("teams") ? pick(profile, ["teams"]) : {}),
     ...(shows("stats") ? pick(profile, ["stats"]) : {}),
+    // Per-team stats say which teams they're on, so only with both shown.
+    ...(shows("stats") && shows("teams") ? pick(profile, ["teamStats"]) : {}),
     ...(shows("games") ? pick(profile, ["games"]) : {}),
   };
 }
@@ -159,6 +161,7 @@ export function listingView(listing: Data): Data {
     "description",
     "requiresApproval",
     "location",
+    "allowJoinRequests",
   ]);
 }
 
@@ -183,7 +186,7 @@ export function isPublicTeamPost(post: Data): boolean {
   return post.public === true;
 }
 
-const teamPostFields = ["title", "body", "location", "links", "images", "authorId", "authorName", "public", "tournamentKey", "createdAt", "updatedAt"] as const;
+const teamPostFields = ["title", "body", "location", "links", "images", "authorId", "authorName", "public", "tournamentKey", "createdAt", "updatedAt", "pinnedAt"] as const;
 
 /** A team's public home-page post, without who reacted. */
 export function teamPostView(post: Data): Data {

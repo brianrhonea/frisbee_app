@@ -1,42 +1,54 @@
+import type { EventsPage, PublicHostedList } from "@stall10/shared";
 import type { Metadata } from "next";
-import { Explore } from "@/components/explore/Explore";
-import { type ExploreFilter, exploreFilters } from "@/components/explore/filters";
+import { Discover } from "@/components/explore/Explore";
+import { parseFilter } from "@/components/explore/filters";
 import { ForVisitors } from "@/components/ForVisitors";
-import { MembersOnly } from "@/components/MembersOnly";
-import Link from "next/link";
+import { getPublicOrNull } from "@/lib/api";
+import { loadTournaments } from "@/lib/tournamentPage";
+
+// Rendered per request (the API answers themselves are cached for a minute),
+// so an API outage during a build can't be baked into the page.
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Explore",
-  description: "Search for ultimate players, teams, pickup groups and tournaments on Stall 10.",
+  title: "Discover",
+  description: "Find ultimate tournaments, leagues, pickup, teams and communities on Stall 10. No account needed to look around.",
 };
 
 type Props = { searchParams: Promise<{ q?: string | string[]; only?: string | string[] }> };
 
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
-/** Members only: search runs in the browser with their token. */
-export default async function ExplorePage({ searchParams }: Props) {
+/** Public events and tournaments for the page, or null when the API can't answer (the browser asks again). */
+async function loadEvents(): Promise<EventsPage | null> {
+  try {
+    return await getPublicOrNull<EventsPage>("/v1/public/events");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Discover (the app's Discover tab; it was Explore and Events): search and
+ * everything coming up, for members and visitors alike. The public lists
+ * are server-rendered, so visitors and search engines see them without
+ * waiting for sign-in; player search stays members only.
+ */
+export default async function DiscoverPage({ searchParams }: Props) {
   const params = await searchParams;
   const q = first(params.q)?.trim().slice(0, 100) ?? "";
-  const raw = first(params.only);
-  const only = exploreFilters.includes(raw as ExploreFilter) ? (raw as ExploreFilter) : null;
-  const query = new URLSearchParams({ ...(q && { q }), ...(only && { only }) }).toString();
-  const next = query ? `/explore?${query}` : "/explore";
+  const only = parseFilter(first(params.only));
+  const [list, events] = await Promise.all([loadTournaments(), loadEvents()]);
   return (
     <div className="page">
       <div className="page-head">
-        <h1>Explore</h1>
-        <p>Find your next point. Players, teams, pickup groups and tournaments.</p>
-      </div>
-      <MembersOnly next={next} what="Sign up free or log in to search for players, teams, pickup groups and tournaments.">
-        <Explore initialQuery={q} initialFilter={only} />
-      </MembersOnly>
-      <ForVisitors>
-        <p className="muted">
-          No account needed for the <Link href="/rankings">team rankings</Link> or{" "}
-          <Link href="/tournaments">tournaments and leagues</Link>.
+        <h1>Discover</h1>
+        <p>
+          Tournaments, leagues, pickup, teams and communities.
+          <ForVisitors> No account needed to look around.</ForVisitors>
         </p>
-      </ForVisitors>
+      </div>
+      <Discover initialQuery={q} initialFilter={only} tournaments={list?.tournaments ?? null} events={events} />
     </div>
   );
 }

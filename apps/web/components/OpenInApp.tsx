@@ -25,7 +25,7 @@ export function OpenInApp({ kind, id }: { kind: LinkKind; id: string }) {
     kind === "p"
       ? "See this post on Stall 10"
       : kind === "g"
-        ? "You're invited to a group on Stall 10"
+        ? "You're invited to a community on Stall 10"
         : "You're invited to join a team on Stall 10";
   return (
     <section className="center-card">
@@ -45,7 +45,7 @@ export function OpenInApp({ kind, id }: { kind: LinkKind; id: string }) {
       )}
       {kind === "g" && (
         <p>
-          <Link href={`/teams/${encodeURIComponent(id)}`}>See the group on the web</Link>
+          <Link href={`/teams/${encodeURIComponent(id)}`}>See the community on the web</Link>
         </p>
       )}
       <p className="muted">No app yet?</p>

@@ -213,4 +213,68 @@ void main() {
       expect(vm.editingSetup, isTrue);
     });
   });
+
+  test(
+    'keeps pen strokes from the whiteboard; erase, clear and undo',
+    () async {
+      plays.plays['p1'] = const Play(
+        id: 'p1',
+        name: 'From the board',
+        drawings: [
+          PlayDrawing(
+            id: 'k1',
+            color: DrawingColor.amber,
+            points: [FieldPoint(0.1, 0.1), FieldPoint(0.4, 0.4)],
+          ),
+          PlayDrawing(
+            id: 'k2',
+            points: [FieldPoint(0.6, 0.1), FieldPoint(0.6, 0.9)],
+          ),
+        ],
+      );
+      final vm = create(playId: 'p1');
+      await pumpEventQueue();
+      expect(vm.hasDiagram, isTrue);
+      vm.deleteItem('k1');
+      expect(vm.play.drawings.map((d) => d.id), ['k2']);
+      vm.undo();
+      expect(vm.play.drawings, hasLength(2));
+      vm.clearDiagram();
+      expect(vm.play.drawings, isEmpty);
+      vm.undo();
+      await vm.save.execute();
+      // Saved whole: the strokes go back with the play.
+      expect(plays.plays['p1']!.drawings, hasLength(2));
+      expect(plays.plays['p1']!.drawings.first.color, DrawingColor.amber);
+    },
+  );
+
+  test('stored plays carry kind and drawings only when set', () {
+    const plain = Play(id: 'a', name: 'Plain');
+    expect(plain.toMap().keys, isNot(contains('kind')));
+    expect(plain.toMap().keys, isNot(contains('drawings')));
+    final board = Play.fromMap('w', {
+      'name': 'Board',
+      'kind': 'whiteboard',
+      'drawings': [
+        {
+          'id': 'k1',
+          'color': 'turf',
+          'points': [
+            {'x': 0.1, 'y': 0.2},
+            {'x': 0.3, 'y': 0.4},
+          ],
+        },
+      ],
+    });
+    expect(board.isWhiteboard, isTrue);
+    expect(board.drawings.single.color, DrawingColor.turf);
+    expect(board.toMap()['kind'], 'whiteboard');
+    expect(
+      Play.fromMap('w', board.toMap()).drawings.single.points,
+      hasLength(2),
+    );
+    // Unknown values fall back.
+    expect(Play.fromMap('x', {'kind': 'sketch'}).kind, PlayKind.play);
+  });
 }

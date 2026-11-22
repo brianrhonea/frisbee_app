@@ -9,6 +9,7 @@ import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/disc_icon.dart';
 import '../../core/ui/error_message.dart';
+import '../../core/ui/layout.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/notifications_viewmodel.dart';
 import '../../../routing/open_link.dart';
@@ -147,36 +148,61 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         maxWidth: 720,
         child: Column(
           children: [
-            requests,
-            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: _GroupCard(children: [requests]),
+            ),
             Expanded(child: empty),
           ],
         ),
       );
     }
+    Widget tile(AppNotification n) => _NotificationTile(
+      item: n,
+      onTap: () => _open(n),
+      following: switch (n.followBack) {
+        final f? => vm.isFollowing(f.uid),
+        null => false,
+      },
+      onFollowBack: vm.canFollowBack(n) ? () => vm.followBack.execute(n) : null,
+      followingBack: vm.followBack.running,
+    );
+    // Grouped by day: what came in today, then everything earlier.
+    final now = DateTime.now();
+    final today = [
+      for (final n in items)
+        if (n.createdAt case final at? when DateUtils.isSameDay(at, now)) n,
+    ];
+    final earlier = [
+      for (final n in items)
+        if (!today.contains(n)) n,
+    ];
+    final waiting = vm.followRequestCount > 0;
     return ConstrainedContent(
       maxWidth: 720,
-      child: ListView.separated(
-        padding: const EdgeInsets.only(bottom: 24),
-        itemCount: items.length + (requests == null ? 0 : 1),
-        separatorBuilder: (_, _) =>
-            const Divider(height: 1, indent: 16, endIndent: 16),
-        itemBuilder: (_, j) {
-          if (requests != null && j == 0) return requests;
-          final i = requests == null ? j : j - 1;
-          return _NotificationTile(
-            item: items[i],
-            onTap: () => _open(items[i]),
-            following: switch (items[i].followBack) {
-              final f? => vm.isFollowing(f.uid),
-              null => false,
-            },
-            onFollowBack: vm.canFollowBack(items[i])
-                ? () => vm.followBack.execute(items[i])
-                : null,
-            followingBack: vm.followBack.running,
-          );
-        },
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        children: [
+          // Follow requests waiting are the user's to do: amber, on top.
+          if (requests != null) ...[
+            if (waiting)
+              _GroupHeader(
+                'Needs you · ${vm.followRequestCount}',
+                needsYou: true,
+              )
+            else
+              const SizedBox(height: 8),
+            _GroupCard(children: [requests]),
+          ],
+          if (today.isNotEmpty) ...[
+            const _GroupHeader('Today'),
+            _GroupCard(children: [for (final n in today) tile(n)]),
+          ],
+          if (earlier.isNotEmpty) ...[
+            const _GroupHeader('Earlier'),
+            _GroupCard(children: [for (final n in earlier) tile(n)]),
+          ],
+        ],
       ),
     );
   }
@@ -197,6 +223,98 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 }
 
+/// A group's label above its card, e.g. "TODAY"; "Needs you" in amber
+/// with a dot.
+class _GroupHeader extends StatelessWidget {
+  const _GroupHeader(this.label, {this.needsYou = false});
+
+  final String label;
+  final bool needsYou;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(2, 12, 2, 8),
+      child: Row(
+        children: [
+          if (needsYou) ...[
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: c.highlight,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 7),
+          ],
+          Expanded(
+            child: Semantics(
+              header: true,
+              child: Text(
+                label.toUpperCase(),
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8,
+                  color: needsYou ? c.highlightInk : c.muted,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A group's entries on one card, with hairlines between them.
+class _GroupCard extends StatelessWidget {
+  const _GroupCard({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final (i, child) in children.indexed) ...[
+            if (i > 0) Divider(height: 1, color: c.border),
+            child,
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// A category's icon in a small round disc, leading a row.
+class _IconDisc extends StatelessWidget {
+  const _IconDisc({
+    required this.icon,
+    required this.color,
+    required this.background,
+  });
+
+  final IconData icon;
+  final Color color;
+  final Color background;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 36,
+    height: 36,
+    decoration: BoxDecoration(color: background, shape: BoxShape.circle),
+    child: Icon(icon, size: 18, color: color),
+  );
+}
+
 /// The first entry: people asking to follow the user's private profile.
 class _FollowRequestsTile extends StatelessWidget {
   const _FollowRequestsTile({required this.count, required this.onTap});
@@ -209,9 +327,10 @@ class _FollowRequestsTile extends StatelessWidget {
     final c = AppColors.of(context);
     return ListTile(
       onTap: onTap,
-      leading: Icon(
-        Icons.person_add_alt,
-        color: count > 0 ? c.accent : c.muted,
+      leading: _IconDisc(
+        icon: Icons.person_add_alt,
+        color: count > 0 ? c.highlightInk : c.muted,
+        background: count > 0 ? c.highlightSoft : c.field,
       ),
       title: Text(
         'Follow requests',
@@ -227,12 +346,8 @@ class _FollowRequestsTile extends StatelessWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (count > 0)
-            Badge(
-              label: Text('$count'),
-              backgroundColor: c.accent,
-              textColor: c.onAccent,
-            ),
+          // Waiting on the user: an amber count.
+          if (count > 0) CountPill(count),
           const SizedBox(width: 4),
           Icon(Icons.chevron_right, color: c.muted),
         ],
@@ -270,21 +385,11 @@ class _NotificationTile extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        // Compact rows without category icons (a deliberate choice).
+        padding: const EdgeInsets.fromLTRB(16, 10, 14, 10),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Unread: a small dot, in a fixed gutter so titles line up.
-            SizedBox(
-              width: 14,
-              height: 18,
-              child: unread
-                  ? Align(
-                      alignment: Alignment.centerLeft,
-                      child: Icon(Icons.circle, size: 8, color: c.accent),
-                    )
-                  : null,
-            ),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -317,6 +422,11 @@ class _NotificationTile extends StatelessWidget {
                             color: unread ? c.accent : c.muted,
                           ),
                         ),
+                      ],
+                      // Unread: a small turf dot after the time.
+                      if (unread) ...[
+                        const SizedBox(width: 6),
+                        Icon(Icons.circle, size: 8, color: c.accent),
                       ],
                     ],
                   ),
@@ -368,7 +478,7 @@ class _NotificationTile extends StatelessWidget {
     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
     padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 12)),
     textStyle: const WidgetStatePropertyAll(
-      TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+      TextStyle(fontFamily: appFont, fontSize: 13, fontWeight: FontWeight.w600),
     ),
   );
 

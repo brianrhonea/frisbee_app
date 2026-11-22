@@ -49,6 +49,7 @@ void main() {
           'c': {'m'},
         },
         {'h': handlers, 'm': mods},
+        const {},
       );
       expect(perms, {
         'a': {
@@ -58,6 +59,39 @@ void main() {
         },
         'c': {TeamPermission.moderate, TeamPermission.manageMembers},
       });
+    });
+
+    test("adds each member's own permissions (memberGrants)", () {
+      final perms = memberPermsFor(
+        {
+          'a': {'h'},
+        },
+        {'h': handlers},
+        {
+          'a': {TeamPermission.keepStats},
+          'b': {TeamPermission.manageEvents},
+        },
+      );
+      expect(perms, {
+        'a': {TeamPermission.manageChats, TeamPermission.keepStats},
+        'b': {TeamPermission.manageEvents},
+      });
+    });
+
+    test('cleanMemberGrants keeps members with permissions only', () {
+      expect(
+        cleanMemberGrants(
+          {
+            'a': {TeamPermission.moderate},
+            'b': <TeamPermission>{},
+            'left': {TeamPermission.manageTeam},
+          },
+          ['a', 'b'],
+        ),
+        {
+          'a': {TeamPermission.moderate},
+        },
+      );
     });
 
     test('cleanMemberRoles keeps members and live roles only', () {
@@ -83,6 +117,7 @@ void main() {
         {
           'a': {'m', 'h'},
         },
+        const {},
       );
       expect((data['roles'] as Map).keys, containsAll(['h', 'm']));
       expect(data['memberRoles'], {
@@ -166,6 +201,79 @@ void main() {
       for (final kind in TeamKind.values) {
         expect(TeamRole.rolesFor(kind), [TeamRole.owner, TeamRole.player]);
       }
+    });
+  });
+
+  group('RolePreset', () {
+    test('team presets go from nothing to every permission', () {
+      expect(RolePreset.team.first.permissions, isEmpty);
+      expect(RolePreset.team.last.permissions, TeamPermission.values.toSet());
+      expect(RolePreset.team.map((p) => p.name), contains('Captain'));
+    });
+
+    test("groups' presets never keep stats", () {
+      for (final p in RolePreset.group) {
+        expect(p.permissions, isNot(contains(TeamPermission.keepStats)));
+      }
+    });
+
+    test('presets are all different, so each set names one', () {
+      for (final list in [RolePreset.team, RolePreset.group]) {
+        for (final a in list) {
+          for (final b in list) {
+            if (a != b) {
+              expect(
+                a.permissions.length == b.permissions.length &&
+                    a.permissions.containsAll(b.permissions),
+                isFalse,
+              );
+            }
+          }
+        }
+      }
+    });
+
+    test('matching names the preset, or null for Custom', () {
+      expect(
+        RolePreset.matching({
+          TeamPermission.keepStats,
+          TeamPermission.moderate,
+          TeamPermission.manageEvents,
+          TeamPermission.manageChats,
+        }, false)?.name,
+        'Captain',
+      );
+      expect(RolePreset.matching({}, false)?.name, 'Member');
+      expect(RolePreset.matching({TeamPermission.moderate}, false), isNull);
+      expect(
+        RolePreset.matching({
+          TeamPermission.manageChats,
+          TeamPermission.moderate,
+        }, true)?.name,
+        'Moderator',
+      );
+    });
+
+    test('own and role permissions are told apart', () {
+      final team = Team.fromMap('t1', {
+        'name': 'Ring',
+        'ownerId': 'o',
+        'members': {'o': 'owner', 'p': 'player'},
+        'roles': {'h': handlers.toMap()},
+        'memberRoles': {
+          'p': ['h'],
+        },
+        'memberGrants': {
+          'p': ['keepStats', 'bogus'],
+        },
+        'memberPerms': {
+          'p': ['manageChats', 'keepStats'],
+        },
+        'statKeepers': <String>[],
+      });
+      expect(team.ownPermissionsOf('p'), {TeamPermission.keepStats});
+      expect(team.rolePermissionsOf('p'), {TeamPermission.manageChats});
+      expect(team.has('p', TeamPermission.keepStats), isTrue);
     });
   });
 }

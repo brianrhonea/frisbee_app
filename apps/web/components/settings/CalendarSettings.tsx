@@ -136,7 +136,7 @@ export function CalendarSettings() {
   );
 }
 
-function ColorPicker({ value, onChange, disabled }: { value: CalendarColor; onChange: (c: CalendarColor) => void; disabled?: boolean }) {
+export function ColorPicker({ value, onChange, disabled }: { value: CalendarColor; onChange: (c: CalendarColor) => void; disabled?: boolean }) {
   return (
     <div className="cal-colors" role="radiogroup" aria-label="Color">
       {calendarColors.map((c) => (

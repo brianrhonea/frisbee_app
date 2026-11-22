@@ -21,6 +21,8 @@ import 'data/services/app_check.dart';
 import 'data/services/shared_preferences_service.dart';
 import 'firebase_options.dart';
 import 'routing/router.dart';
+import 'ui/outbox/view_models/outbox_viewmodel.dart';
+import 'ui/outbox/widgets/offline_banner.dart';
 import 'ui/core/themes/theme.dart';
 import 'ui/core/ui/brand.dart';
 import 'ui/core/ui/tap_outside_unfocus.dart';
@@ -66,6 +68,9 @@ Future<void> main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   // Before anything talks to Firebase, so every request carries a token.
   await AppCheck.activate();
+  // Offline, uploads would otherwise retry for 10 minutes before failing;
+  // the offline queue keeps what didn't go out and tries again later.
+  FirebaseStorage.instance.setMaxUploadRetryTime(const Duration(minutes: 1));
   if (_memoryCache) {
     FirebaseFirestore.instance.settings = const Settings(
       persistenceEnabled: false,
@@ -107,6 +112,7 @@ class _FrisbeeAppState extends State<FrisbeeApp> {
   late final NotificationRepository _notifications = context.read();
   late final GoRouter _router = router(_auth, context.read());
   late final MeetingAlertsViewModel _meetingAlerts;
+  late final OutboxViewModel _outbox = OutboxViewModel(outbox: context.read());
   late final InAppNoticesViewModel _notices = InAppNoticesViewModel(
     authRepository: _auth,
     notificationRepository: _notifications,
@@ -162,6 +168,7 @@ class _FrisbeeAppState extends State<FrisbeeApp> {
     _opened?.cancel();
     _meetingAlerts.dispose();
     _notices.dispose();
+    _outbox.dispose();
     _router.dispose();
     super.dispose();
   }
@@ -183,7 +190,13 @@ class _FrisbeeAppState extends State<FrisbeeApp> {
         child: InAppNoticeBubble(
           viewModel: _notices,
           onOpen: _router.openLink,
-          child: child ?? const SizedBox.shrink(),
+          child: OfflineBanner(
+            viewModel: _outbox,
+            messengerKey: _messengerKey,
+            navigatorContext: () =>
+                _router.routerDelegate.navigatorKey.currentContext,
+            child: child ?? const SizedBox.shrink(),
+          ),
         ),
       ),
     ),

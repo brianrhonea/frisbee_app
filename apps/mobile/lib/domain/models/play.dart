@@ -16,6 +16,14 @@ enum ElementKind { offense, defense, disc, cone }
 
 enum ArrowKind { cut, throw_ }
 
+/// A play to run, or a saved whiteboard sketch (pieces and pen strokes, no
+/// steps) listed under the playbook's Whiteboard switch.
+enum PlayKind { play, whiteboard }
+
+/// Pen colours for freehand strokes, stored by name so each platform draws
+/// its own shade.
+enum DrawingColor { ink, turf, amber, white }
+
 /// A point on the field, normalized to 0–1 in both axes so diagrams scale to
 /// any canvas size. x runs along the field width, y along its length.
 class FieldPoint {
@@ -97,6 +105,34 @@ class PlayArrow {
   };
 }
 
+/// A freehand pen stroke, as drawn on the whiteboard.
+class PlayDrawing {
+  const PlayDrawing({
+    required this.id,
+    required this.points,
+    this.color = DrawingColor.ink,
+  });
+
+  final String id;
+  final DrawingColor color;
+  final List<FieldPoint> points;
+
+  factory PlayDrawing.fromMap(Map<String, dynamic> map) => PlayDrawing(
+    id: map['id'] as String? ?? '',
+    color: enumByName(DrawingColor.values, map['color'], DrawingColor.ink),
+    points: [
+      for (final p in (map['points'] as List? ?? const []))
+        FieldPoint.fromMap(Map<String, dynamic>.from(p)),
+    ],
+  );
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'color': color.name,
+    'points': [for (final p in points) p.toMap()],
+  };
+}
+
 /// One beat of an animated play. Elements listed in [paths] move during the
 /// step; everyone else holds position.
 class PlayStep {
@@ -146,6 +182,8 @@ class Play {
     this.elements = const [],
     this.arrows = const [],
     this.steps = const [],
+    this.kind = PlayKind.play,
+    this.drawings = const [],
     this.updatedAt,
     this.updatedBy,
   });
@@ -161,10 +199,22 @@ class Play {
   /// Animation beats after the setup ([elements] positions). Empty for a
   /// static diagram.
   final List<PlayStep> steps;
+
+  /// [PlayKind.whiteboard] for a saved whiteboard sketch.
+  final PlayKind kind;
+
+  /// Freehand pen strokes, drawn under the arrows and pieces.
+  final List<PlayDrawing> drawings;
   final DateTime? updatedAt;
   final String? updatedBy;
 
+  /// Caps shared with the rules and `playLimits` (packages/shared).
+  static const maxElements = 100;
+  static const maxDrawings = 100;
+  static const maxDrawingPoints = 200;
+
   bool get isNew => id.isEmpty;
+  bool get isWhiteboard => kind == PlayKind.whiteboard;
 
   Play copyWith({
     String? id,
@@ -174,6 +224,8 @@ class Play {
     List<PlayElement>? elements,
     List<PlayArrow>? arrows,
     List<PlayStep>? steps,
+    PlayKind? kind,
+    List<PlayDrawing>? drawings,
   }) => Play(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -182,6 +234,8 @@ class Play {
     elements: elements ?? this.elements,
     arrows: arrows ?? this.arrows,
     steps: steps ?? this.steps,
+    kind: kind ?? this.kind,
+    drawings: drawings ?? this.drawings,
     updatedAt: updatedAt,
     updatedBy: updatedBy,
   );
@@ -207,6 +261,11 @@ class Play {
       for (final st in (map['steps'] as List? ?? const []))
         PlayStep.fromMap(Map<String, dynamic>.from(st)),
     ],
+    kind: enumByName(PlayKind.values, map['kind'], PlayKind.play),
+    drawings: [
+      for (final d in (map['drawings'] as List? ?? const []))
+        PlayDrawing.fromMap(Map<String, dynamic>.from(d)),
+    ],
     updatedAt: parseDate(map['updatedAt']),
     updatedBy: map['updatedBy'] as String?,
   );
@@ -218,6 +277,9 @@ class Play {
     'elements': [for (final e in elements) e.toMap()],
     'arrows': [for (final a in arrows) a.toMap()],
     'steps': [for (final st in steps) st.toMap()],
+    // Only when set, so a plain play's doc keeps its original fields.
+    if (kind != PlayKind.play) 'kind': kind.name,
+    if (drawings.isNotEmpty) 'drawings': [for (final d in drawings) d.toMap()],
   };
 
   // ---- Animation timeline ----------------------------------------------

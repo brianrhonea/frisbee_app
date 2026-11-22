@@ -4,6 +4,9 @@ export function SiteFooter() {
   return (
     <footer className="site-footer">
       <div className="wrap">
+        <span className="footer-mark" aria-hidden="true">
+          STALL 10
+        </span>
         <span>
           © {new Date().getFullYear()} Stall 10 <span className="version">· web v{process.env.NEXT_PUBLIC_APP_VERSION}</span>
         </span>

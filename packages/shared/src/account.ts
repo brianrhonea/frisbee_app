@@ -48,7 +48,7 @@ export const notificationCategoryInfo: Record<NotificationCategory, { label: str
   directMessages: { label: "Direct messages", description: "New private messages", perTeam: false },
   eventChanges: { label: "Event changes", description: "Team events added, changed or cancelled", perTeam: true },
   eventReminders: { label: "Event reminders", description: "A reminder a day before each team or personal event", perTeam: true },
-  teamActivity: { label: "Team activity", description: "New and updated plays, and requests to join your groups", perTeam: true },
+  teamActivity: { label: "Team activity", description: "New and updated plays, and requests to join your communities", perTeam: true },
   meetings: { label: "Meetings", description: "Meeting invites, and when a meeting you're attending starts", perTeam: true },
   posts: {
     label: "Posts you follow",

@@ -39,7 +39,7 @@ class RankingsScreen extends StatelessWidget {
             children: [
               if (!mobile)
                 const PageHeader(
-                  eyebrow: 'Explore',
+                  eyebrow: 'Discover',
                   title: 'Rankings',
                   subtitle:
                       'Teams from public tournaments, players from logged '

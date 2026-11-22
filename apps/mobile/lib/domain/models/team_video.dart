@@ -84,6 +84,7 @@ class TeamVideo {
     this.authorName = '',
     this.createdAt,
     this.updatedAt,
+    this.eventId = '',
   });
 
   /// Limits firestore.rules enforces too; keep them in step.
@@ -114,6 +115,11 @@ class TeamVideo {
   final String authorName;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+
+  /// The team event it's tagged to (redesign F6); empty when untagged. Set
+  /// through the API only (`PUT .../videos/:id/event`), never by the
+  /// editor's writes.
+  final String eventId;
 
   bool get isNew => id.isEmpty;
 
@@ -174,6 +180,7 @@ class TeamVideo {
     authorName: authorName,
     createdAt: createdAt,
     updatedAt: updatedAt,
+    eventId: eventId,
   );
 
   factory TeamVideo.fromMap(String id, Map<String, dynamic> map) => TeamVideo(
@@ -189,6 +196,7 @@ class TeamVideo {
     authorName: map['authorName'] as String? ?? '',
     createdAt: parseDate(map['createdAt']),
     updatedAt: parseDate(map['updatedAt']),
+    eventId: map['eventId'] as String? ?? '',
   );
 
   /// Fields editors may change. The file is set once, when the video is

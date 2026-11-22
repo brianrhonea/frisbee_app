@@ -130,6 +130,7 @@ class UserPost {
     this.likedBy = const [],
     this.repostedBy = const [],
     this.commentCount = 0,
+    this.isPrivate = false,
     this.tournamentKey,
     this.tournamentName,
     this.createdAt,
@@ -165,6 +166,12 @@ class UserPost {
   /// Kept by the `follows-commentCount` Cloud Function; nobody writes it
   /// from the app.
   final int commentCount;
+
+  /// Posted from a private profile (`private`): only the author and their
+  /// accepted followers may read it (firestore.rules canSeePost). Stamped
+  /// from the author's profile when posted and kept in step by the
+  /// `follows` Cloud Functions; the author never edits it.
+  final bool isPrivate;
 
   int get likeCount => likedBy.length;
   int get repostCount => repostedBy.length;
@@ -243,6 +250,7 @@ class UserPost {
     likedBy: likedBy,
     repostedBy: repostedBy,
     commentCount: commentCount,
+    isPrivate: isPrivate,
     tournamentKey: tournamentKey == null ? this.tournamentKey : tournamentKey(),
     tournamentName: tournamentName == null
         ? this.tournamentName
@@ -285,6 +293,7 @@ class UserPost {
       final num n when n > 0 => n.toInt(),
       _ => 0,
     },
+    isPrivate: map['private'] == true,
     tournamentKey: map['tournamentKey'] as String?,
     tournamentName: map['tournamentName'] as String?,
     createdAt: parseDate(map['createdAt']),
@@ -318,4 +327,13 @@ class UserPostDraft {
 
   final UserPost post;
   final List<NewAttachment> newImages;
+}
+
+/// A private profile's post the user isn't an accepted follower of (the
+/// rules refuse to read it).
+class PostHiddenException implements Exception {
+  const PostHiddenException();
+
+  @override
+  String toString() => 'Only people they approve see this post.';
 }

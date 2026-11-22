@@ -1,54 +1,288 @@
 /* Hosted tournaments and leagues: lists, the form, the event page, games
-   and results. Uses the site's tokens from app.css. */
+   and results. Uses the site's tokens (site.css): turf for actions and
+   what's selected, scoreboard navy for a live (or today's) event, amber
+   only for what's the viewer's to do, red only while it's live. */
 
 .hosted-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
 .hosted-toolbar input[type="search"] { flex: 1 1 220px; min-width: 0; }
-.hosted-filters, .hosted-divisions, .hosted-tabs { flex-wrap: wrap; }
-.hosted-tabs { overflow-x: auto; }
+.hosted-filters, .hosted-divisions { flex-wrap: wrap; }
 .hosted-official { color: var(--accent); font-weight: 600; font-size: 0.85em; }
-.hosted-status.hosted-registration, .hosted-status.hosted-live, .pill.hosted-live { background: var(--accent-soft); color: var(--accent); }
-.hosted-status.hosted-draft { border: 1px dashed var(--line); }
+.hosted-status.hosted-registration, .pill.hosted-live:not(.hosted-status) { background: var(--accent-soft); color: var(--accent-ink); }
+.hosted-status.hosted-live { background: var(--live-soft); color: var(--live-ink); }
+.hosted-status.hosted-draft { border: 1px dashed var(--line-2); background: var(--field); color: var(--ink-soft); }
+.hosted-status.hosted-seeding, .hosted-status.hosted-scheduled, .hosted-status.hosted-finished { background: var(--field); color: var(--ink-soft); }
 .hosted-actions { margin-top: 10px; }
 .hosted-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 
-.hosted-page h1 { margin: 2px 0 4px; }
-.hosted-head { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: flex-start; }
+/* The event page's header: plain, or the scoreboard on a live day. */
+.hosted-head { display: flex; flex-wrap: wrap; gap: 12px 16px; justify-content: space-between; align-items: flex-end; }
+.hosted-head-main { display: grid; gap: 6px; min-width: 0; flex: 1 1 320px; }
+.hosted-head-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.hosted-head-tags .pill { margin: 0; }
+.hosted-page h1 { margin: 0; font-size: clamp(1.6rem, 3.2vw, 2rem); font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; overflow-wrap: anywhere; }
+.hosted-meta { margin: 0; color: var(--muted); font-size: 0.92rem; }
+.hosted-head-actions { margin: 0; align-items: center; }
+.hosted-eyebrow { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.hosted-eyebrow a { color: inherit; }
+
+.hosted-board {
+  background: var(--board); color: var(--on-board); border-radius: var(--radius);
+  padding: 22px 24px; align-items: flex-start;
+}
+.hosted-board .hosted-meta, .hosted-board .hosted-eyebrow { color: var(--board-muted); }
+.hosted-board .hosted-eyebrow a:hover { color: var(--on-board); }
+.hosted-board .btn { background: var(--board-2); color: var(--on-board); border-color: transparent; }
+.hosted-board .btn:hover { filter: brightness(1.15); }
+.hosted-board .icon-btn { color: var(--on-board); }
+.hosted-board .form-error { color: var(--on-board); }
+.hosted-live-pill, .hosted-today-pill {
+  display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: 999px;
+  font-size: 0.78rem; font-weight: 700; white-space: nowrap;
+}
+.hosted-live-pill { background: var(--live-soft); color: var(--live-ink); }
+.hosted-live-pill i { width: 8px; height: 8px; border-radius: 50%; background: var(--live); }
+.hosted-today-pill { background: var(--board-2); color: var(--on-board); }
+
+/* Section tabs: underlined, turf on the open one. */
+.hosted-tabs {
+  display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none;
+}
+.hosted-tabs::-webkit-scrollbar { display: none; }
+.hosted-tabs button {
+  flex: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: none;
+  color: var(--muted); font: inherit; font-weight: 600; font-size: 0.95rem; padding: 10px 14px; cursor: pointer;
+}
+.hosted-tabs button:hover { color: var(--ink); }
+.hosted-tabs button.on { color: var(--accent); border-bottom-color: var(--accent); font-weight: 700; }
+
+/* Divisions: filter chips (navy when on, like the app's chips). */
+.hosted-page .hosted-divisions { background: none; border: 0; padding: 0; gap: 8px; }
+.hosted-page .hosted-divisions button { border: 1px solid var(--line); background: var(--card); color: var(--ink-soft); }
+.hosted-page .hosted-divisions button.on { background: var(--chip-on); color: var(--on-chip-on); border-color: var(--chip-on); box-shadow: none; }
+
 .hosted-description { white-space: pre-wrap; margin: 0; }
-.hosted-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; margin: 0; }
-.hosted-facts dt { color: var(--muted); }
+.hosted-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 16px; margin: 0; }
+.hosted-facts dt { color: var(--muted); font-size: 0.9rem; }
 .hosted-facts dd { margin: 0; overflow-wrap: anywhere; }
-.hosted-checklist { margin: 0 0 12px; padding-left: 20px; }
-.hosted-checklist li { color: var(--muted); }
-.hosted-checklist li.done { color: var(--ink); }
-.hosted-checklist li.done::marker { content: "✓  "; color: var(--accent); }
+
+/* Next steps: a progress bar, then each step's mark. */
+.hosted-steps { display: grid; gap: 10px; }
+.hosted-steps .card-head { margin: 0; }
+.hosted-steps-bar { height: 6px; border-radius: 3px; background: var(--field); overflow: hidden; }
+.hosted-steps-bar i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.hosted-checklist { list-style: none; margin: 0 -18px; padding: 0; display: grid; }
+.hosted-checklist li {
+  display: flex; align-items: center; gap: 12px; padding: 9px 18px; color: var(--ink-soft);
+  border-top: 1px solid var(--line);
+}
+.hosted-checklist li.done { color: var(--muted); }
+.hosted-checklist li.current { background: var(--disc-soft); color: var(--ink); font-weight: 700; }
+.hosted-step-mark {
+  flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 0.78rem; font-weight: 800; color: var(--muted); border: 1.5px solid var(--line-2);
+}
+.hosted-checklist li.done .hosted-step-mark { background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; }
+.hosted-checklist li.current .hosted-step-mark { background: var(--disc); color: var(--on-disc); border-color: transparent; }
+.hosted-step-action .home-actions { margin: 0; }
+
 .hosted-division-row, .hosted-entry { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; }
 .hosted-entry > form { flex-basis: 100%; }
-.hosted-captains { border: 1px solid var(--line); border-radius: var(--radius, 10px); padding: 8px 12px; display: grid; gap: 4px; }
+.hosted-captains { border: 1px solid var(--line); border-radius: var(--radius-control); padding: 8px 12px; display: grid; gap: 4px; }
 .hosted-seeds { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .hosted-seeds li, .hosted-page .row-card { display: flex; gap: 8px; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+/* app.css makes a row card's spans grids; keep the actions in a row. */
+.hosted-page .row-card > .home-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; }
+.hosted-page .row-card > span:first-child:not(.hosted-seed) { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+/* app.css makes a row card's spans grids; keep the actions in a row. */
+.hosted-page .row-card > .home-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; }
+.hosted-page .row-card > span:first-child:not(.hosted-seed) { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.hosted-seed { display: flex !important; align-items: center; gap: 10px; min-width: 0; font-weight: 600; }
+.hosted-seed > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hosted-seed-n { font-family: var(--font-score); font-size: 1.25rem; min-width: 1.2em; color: var(--ink-soft); }
 .hosted-slot-links { margin: 12px 0 0; padding-left: 20px; display: grid; gap: 4px; }
 
-.hosted-heading { font-size: 1rem; margin: 8px 0 4px; }
-.hosted-day { margin: 12px 0 2px; font-size: 0.95rem; }
+/* Amber: what's the viewer's to do. */
+.hosted-pill-due { background: var(--disc); color: var(--on-disc); margin: 0; }
+.hosted-page .pill.pill-soft { margin: 0; }
+.hosted-due-note { color: var(--disc-ink); font-weight: 700; font-size: 0.82rem; }
+.hosted-page .row-card.hosted-row-due { background: var(--disc-soft); border-color: var(--disc); }
+.btn.hosted-btn-due { background: var(--disc); color: var(--on-disc); border-color: var(--disc); }
+.btn.hosted-btn-due:hover:not(:disabled) { filter: brightness(1.05); }
+
+/* Stat tiles: big Barlow numbers. */
+.hosted-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; }
+.hosted-stat { display: grid; gap: 2px; padding: 10px 14px; border-radius: var(--radius-control); background: var(--field); }
+.hosted-stat b { font-family: var(--font-score); font-weight: 800; font-size: 1.8rem; line-height: 1; color: var(--ink); }
+.hosted-stat b small { font-size: 0.55em; color: var(--muted); }
+.hosted-stat span { font-size: 0.78rem; color: var(--muted); }
+.hosted-stat-due { background: var(--disc-soft); }
+.hosted-stat-due span { color: var(--disc-ink); font-weight: 700; }
+.hosted-publish { display: grid; gap: 10px; }
+.hosted-publish > * { margin: 0; }
+
+.hosted-heading { font-size: 1rem; font-weight: 800; margin: 8px 0 4px; }
+.hosted-day { margin: 14px 0 2px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .hosted-game-row { gap: 6px; }
-.hosted-game { border: 1px solid var(--line); border-radius: var(--radius, 10px); background: var(--card); padding: 10px 12px; display: grid; gap: 6px; }
-.hosted-game-you { border-color: var(--accent); }
+
+/* A game: its teams with marks and scores, winner in ink, loser muted. */
+.hosted-game {
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--card);
+  padding: 12px 14px; display: grid; gap: 8px; overflow: hidden;
+}
 .hosted-game-skipped { opacity: 0.6; }
 .hosted-game-head { display: flex; gap: 8px; justify-content: space-between; align-items: center; flex-wrap: wrap; }
-.hosted-game-teams { display: grid; grid-template-columns: minmax(0, 1fr) 3ch; gap: 2px 8px; }
-.hosted-game-teams b { text-align: right; }
-.hosted-winner { font-weight: 700; }
+.hosted-game-head small { color: var(--muted); font-size: 0.8rem; font-weight: 600; }
+.hosted-game-head .pill { margin: 0; }
+.hosted-game-teams { display: grid; gap: 6px; }
+.hosted-side { display: flex; align-items: center; gap: 10px; min-width: 0; font-weight: 600; }
+.hosted-side-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hosted-score { font-family: var(--font-score); font-weight: 800; font-size: 1.5rem; line-height: 1; min-width: 2ch; text-align: right; }
+.hosted-winner { color: var(--ink); font-weight: 700; }
+.hosted-loser, .hosted-loser .hosted-score { color: var(--muted); }
+.hosted-mark {
+  flex: none; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center;
+  background: var(--field); color: var(--ink-soft); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.02em;
+}
+.hosted-mark-tbd { background: none; border: 1.5px dashed var(--line-2); }
+/* The viewer's game that needs a score: amber edge and head. */
+.hosted-game-you { border: 2px solid var(--disc); padding-top: 0; }
+.hosted-game-due {
+  margin: 0 -14px -8px; padding: 10px 14px 0; background: var(--disc-soft); color: var(--disc-ink);
+  font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+}
+.hosted-game-due {
+  margin: 0 -14px -8px; padding: 10px 14px 0; background: var(--disc-soft); color: var(--disc-ink);
+  font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+}
+.hosted-game-you .hosted-game-head { margin: 0 -14px; padding: 10px 14px; background: var(--disc-soft); }
+.hosted-game-you .hosted-game-head small { color: var(--disc-ink); }
 .hosted-game-actions { margin: 0; }
-.hosted-score-form input { max-width: 7rem; }
+/* The score form: −, the score in the scoreboard face (typed or stepped), +. */
+.score-steps { display: grid; gap: 12px; }
+.score-step { display: grid; gap: 6px; }
+.score-step-name { font-weight: 700; overflow-wrap: anywhere; }
+.score-step-row { display: flex; align-items: center; gap: 8px; }
+.score-step-btn { flex: none; min-width: 48px; height: 48px; padding: 0; justify-content: center; font-size: 1.4rem; }
+.score-step-row input.score-step-input {
+  flex: 1 1 auto; min-width: 0; max-width: 8rem; height: 56px; text-align: center;
+  font-family: var(--font-score); font-weight: 800; font-size: 2.4rem; line-height: 1;
+  -moz-appearance: textfield; appearance: textfield;
+}
+.score-step-input::-webkit-outer-spin-button, .score-step-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
-.hosted-champion { display: grid; gap: 2px; text-align: center; }
-.hosted-champion b { font-size: 1.3rem; }
+/* Results: champion, standings with Barlow numbers, the bracket. */
+.hosted-champion { display: grid; gap: 2px; text-align: center; background: var(--accent-soft); border-color: transparent; }
+.hosted-champion .hosted-eyebrow { color: var(--accent-ink); }
+.hosted-champion b { font-size: 1.4rem; font-weight: 800; }
 .hosted-table-wrap { overflow-x: auto; }
+.hosted-standings th { font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.hosted-standings td { font-weight: 600; }
+.hosted-standings td.narrow { font-family: var(--font-score); font-weight: 800; font-size: 1.1rem; }
+.hosted-standings td.muted { font-family: inherit; font-weight: 500; font-size: 0.85rem; }
+.hosted-standings .hosted-rank { text-align: left; color: var(--ink-soft); }
+.hosted-standings .hosted-plus { color: var(--accent); }
+.hosted-standings tr.hosted-mine td { background: var(--accent-soft); color: var(--accent-ink); }
 .hosted-bracket { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px; }
-.hosted-bracket-col { flex: 0 0 220px; display: grid; gap: 8px; align-content: start; }
+.hosted-bracket-col { flex: 0 0 240px; display: grid; gap: 8px; align-content: start; }
+.hosted-bracket .hosted-heading { font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 
 @media (max-width: 560px) {
+  .hosted-board { padding: 16px; }
   .hosted-facts { grid-template-columns: minmax(0, 1fr); }
   .hosted-facts dt { margin-top: 6px; }
   .hosted-bracket-col { flex-basis: 78vw; }
 }
+
+/* The host's form (TournamentForm): numbered section cards, full-width
+   choices. */
+.hosted-form { counter-reset: hosted-step; }
+.hosted-form > .card > .card-title { display: flex; align-items: center; gap: 10px; font-size: 1.05rem; font-weight: 800; }
+.hosted-form > .card > .card-title::before {
+  counter-increment: hosted-step; content: counter(hosted-step);
+  flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent-ink); font-size: 0.8rem; font-weight: 800;
+}
+.hosted-form .segmented { display: flex; width: 100%; border-radius: var(--radius-control); }
+.hosted-form .segmented button { flex: 1 1 0; border-radius: 9px; padding: 8px 10px; }
+.hosted-form .hosted-chips .pill { margin: 0; }
+
+/* Live running scores (F1): the red LIVE pill on a game while it's played,
+   the navy header's live line, and the Live score stepper. */
+.hosted-game-pills { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.hosted-live-pill.hosted-live-small {
+  height: 20px; padding: 0 8px; gap: 5px; background: var(--live); color: #fff;
+  font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em;
+}
+.hosted-live-pill.hosted-live-small i { width: 6px; height: 6px; background: #fff; }
+.hosted-live-line { display: flex; align-items: center; gap: 8px; margin: 4px 0 0; color: var(--on-board); font-size: 0.95rem; min-width: 0; }
+.hosted-live-line > i { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--live); box-shadow: 0 0 0 3px color-mix(in srgb, var(--live) 30%, transparent); }
+.hosted-live-line > span { min-width: 0; overflow-wrap: anywhere; }
+.hosted-live-score { font-family: var(--font-score); font-weight: 800; font-size: 1.35rem; line-height: 1; padding: 0 2px; }
+.hosted-live-more { color: var(--board-muted); }
+
+dialog.dialog:has(.live-dialog) { width: min(100% - 32px, 480px); }
+.live-dialog { display: grid; gap: 12px; }
+.live-dialog > * { margin: 0; }
+.live-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.live-dialog-head .card-title { margin: 0; font-size: 1.25rem; }
+.live-steps { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.live-step { display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 14px; }
+.live-step + .live-step { border-top: 1px solid var(--line); }
+.live-step-name { flex: 1; min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
+.live-step-btn { flex: none; min-width: 44px; height: 44px; padding: 0; justify-content: center; font-size: 1.2rem; }
+.live-step-plus { min-width: 60px; height: 50px; font-family: var(--font-score); font-weight: 800; font-size: 1.4rem; }
+.live-step-score { flex: none; width: 3ch; text-align: center; font-family: var(--font-score); font-weight: 800; font-size: 2.5rem; line-height: 1; }
+.live-note { text-align: center; }
+.live-stop { justify-self: center; color: var(--muted); }
+.live-dialog .form-actions { justify-content: flex-end; }
+@media (max-width: 420px) {
+  .live-step { gap: 6px; padding-left: 10px; }
+  .live-step .hosted-mark { display: none; }
+  .live-step-score { font-size: 2rem; }
+}
+
+/* Spots left on a tournament card (F10): turf while there is room, neutral when full; never amber. */
+.row-card small.spots-left { color: var(--accent-ink); font-weight: 700; }
+.row-card small.spots-left.spots-full { color: var(--muted); font-weight: 500; }
+
+/* A league's schedule a week at a time: ‹ Week 3 › (turf arrows). */
+.league-week-nav { display: flex; align-items: center; gap: 8px; }
+.league-week-title { flex: 1; display: grid; justify-items: center; text-align: center; gap: 2px; }
+.league-week-title b { font-family: var(--font-score); font-weight: 800; font-size: 1.6rem; line-height: 1.1; }
+.league-week-arrow { flex: none; width: 44px; height: 44px; font-size: 1.8rem; line-height: 1; color: var(--accent); }
+.league-week-arrow:disabled { color: var(--line-2); cursor: default; }
+.league-week-byes { text-align: center; }
+
+/* A card's title with a link beside it (Bracket · Open bracket). */
+.hosted-card-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.hosted-card-head .text-btn { color: var(--accent); font-weight: 600; }
+/* The bracket on its own page. */
+.bracket-page-head { display: grid; gap: 4px; }
+.bracket-page-head h1 { margin: 0; }
+
+/* Entering a team: one of the viewer's teams to pick, turf when picked. */
+.enter-team-option {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line);
+  border-radius: var(--radius-control, 12px); background: var(--card); cursor: pointer;
+}
+.enter-team-option.on { border: 2px solid var(--accent); background: var(--accent-soft); }
+.enter-team-option > span { display: grid; min-width: 0; }
+.enter-team-option input[type="radio"] { accent-color: var(--accent); }
+
+/* The event form a step at a time: "Step 2 of 6 · When & where" over a
+   turf bar of the steps, then Back / Next (Save draft / Publish). */
+.form-steps { display: grid; gap: 8px; }
+.form-steps-title { font-size: 0.85rem; color: var(--ink-soft); }
+.form-steps-bar { display: flex; gap: 4px; }
+.form-steps-bar button {
+  flex: 1; height: 16px; padding: 6px 0; border: 0; background: none; cursor: pointer;
+  background-clip: content-box; background-color: var(--line); border-radius: 999px;
+}
+.form-steps-bar button.on { background-color: var(--accent); }
+.hosted-form-nav { flex-wrap: wrap; }
+.hosted-form-problem { margin: 0; color: var(--disc-ink); font-weight: 600; }
+.form-review { display: grid; gap: 10px; margin: 0; }
+.form-review-row { display: flex; align-items: center; gap: 12px; justify-content: space-between; }
+.form-review-row dt { font-size: 0.8rem; font-weight: 700; color: var(--muted); }
+.form-review-row dd { margin: 0; overflow-wrap: anywhere; }
+.form-review-row .text-btn { color: var(--accent); font-weight: 600; flex: none; }

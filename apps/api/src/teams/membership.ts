@@ -1,6 +1,7 @@
 import { randomInt } from "node:crypto";
 import {
   type CreateTeamInput,
+  cleanMemberGrants,
   cleanMemberRoles,
   communityLinkRequestSchema,
   createCommunityTeamRequestSchema,
@@ -12,10 +13,17 @@ import {
   linkedTeamRolesRequestSchema,
   nameTakenMessage,
   normalizeInviteCode,
+  type PendingInvite,
+  type PendingInvites,
+  pendingInvitesMax,
   roleLimits,
   rolesData,
   saveRolesRequestSchema,
+  setAllowJoinRequestsRequestSchema,
+  setMemberPermissionsRequestSchema,
   setMemberRoleRequestSchema,
+  setPublicPageRequestSchema,
+  setTeamSectionsRequestSchema,
   setStatKeeperRequestSchema,
   type TeamKind,
   type Division,
@@ -26,6 +34,7 @@ import {
 } from "@stall10/shared";
 import { type Caller, callerLabel, type UserLookup } from "../auth.js";
 import { ApiError, parseBody } from "../errors.js";
+import type { DocQueries } from "../queries.js";
 import { AlreadyExists, type Data, type DocStore, serverTime, type Tx } from "../store.js";
 import {
   addMember,
@@ -43,8 +52,13 @@ import {
   nounOf,
   removeMember,
   requirePermission,
+  setAllowJoinRequests,
+  setMemberPermissions,
+  setPublicPage,
+  setSections,
   setStatKeeper,
   strings,
+  takesRequests,
   transferOwnership,
 } from "./access.js";
 import { ClubAgeGate } from "./club_age.js";
@@ -67,6 +81,8 @@ const p = {
 /** No 0/O/1/I, so codes read aloud easily (as the app mints them). */
 const codeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
+const str = (v: unknown) => (typeof v === "string" ? v : "");
+
 const notFound = (what = "team") => new ApiError("not_found", `That ${what} doesn't exist anymore.`);
 
 /**
@@ -88,6 +104,8 @@ export class MembershipService {
       Array.from({ length: n }, () => codeAlphabet[randomInt(codeAlphabet.length)]).join(""),
     /** Club teams' age rule (16 and over); without birth dates, club joins are refused. */
     private readonly clubAges: ClubAgeGate = new ClubAgeGate(undefined, now),
+    /** Lists a team's pending invites (a collection group query on teamInvites). */
+    private readonly queries?: DocQueries,
   ) {}
 
   /** The caller's name as the app shows it, from their Auth record. */
@@ -169,7 +187,7 @@ export class MembershipService {
       if (isMember(team, caller.uid)) return;
       if (!isGroup(team)) throw new ApiError("permission_denied", "Join a team with an invite code or link.");
       if (team.requiresApproval === true) {
-        throw new ApiError("failed_precondition", "This group needs approval. Ask to join instead.");
+        throw new ApiError("failed_precondition", "This community needs approval. Ask to join instead.");
       }
       tx.update(p.team(teamId), addMember(team, caller.uid, name));
     });
@@ -177,7 +195,10 @@ export class MembershipService {
 
   /**
    * joinRequests create: a non-member asks to join a group that needs
-   * approval (flood-controlled, so not while muted).
+   * approval, or a team that allows join requests (F26; API only for
+   * teams). Flood-controlled, so not while muted. A club team's age rule
+   * is checked now too, so someone under 16 (or with no date of birth) is
+   * told straight away; approving checks it again.
    */
   async requestToJoin(caller: Caller, teamId: string): Promise<void> {
     await this.checkNotMuted(caller.uid);
@@ -185,11 +206,12 @@ export class MembershipService {
     await this.store.transact(async (tx) => {
       const team = await this.team(tx, teamId);
       const existing = await tx.get(p.request(teamId, caller.uid));
-      if (!isGroup(team) || team.requiresApproval !== true) {
+      if (!takesRequests(team)) {
         throw new ApiError("failed_precondition", "This doesn't take join requests.");
       }
       if (isMember(team, caller.uid)) throw new ApiError("already_exists", `You're already in this ${nounOf(team)}.`);
       if (existing) return;
+      await this.clubAges.check(team, caller.uid);
       tx.create(p.request(teamId, caller.uid), { name, createdAt: serverTime });
     });
   }
@@ -206,23 +228,28 @@ export class MembershipService {
   }
 
   /**
-   * approveRequest(): a manageMembers admin of a group adds someone who
-   * asked, as a member named as in their request, and clears the request.
+   * approveRequest(): a manageMembers admin of a group, or of a team (F26;
+   * API only for teams), adds someone who asked, as a member named as in
+   * their request, and clears the request. It goes through the same checks
+   * as every other join: not already a member (addMember), and a club
+   * team's age rule (16 and over, date of birth on file). A team only
+   * while it allows requests (turning them off declines those waiting).
    */
   async approveJoinRequest(caller: Caller, teamId: string, uid: string): Promise<void> {
     await this.store.transact(async (tx) => {
       const team = await this.team(tx, teamId);
       const request = await tx.get(p.request(teamId, uid));
-      if (!isGroup(team)) throw new ApiError("failed_precondition", "Only groups take join requests.");
       requirePermission(team, caller.uid, "manageMembers", "You can't answer join requests here.");
+      if (!isGroup(team) && !takesRequests(team)) {
+        throw new ApiError("failed_precondition", "This team doesn't take join requests. Invite them instead.");
+      }
       if (!request) throw new ApiError("not_found", "That request was withdrawn.");
       const name = typeof request.name === "string" && request.name ? request.name : "Member";
       if (isMember(team, uid)) {
         tx.delete(p.request(teamId, uid));
         return;
       }
-      // Only groups take requests, so this never refuses today; it's here
-      // so a club team never gains someone under 16 this way.
+      // Club teams are for players 16 and over, whoever lets them in.
       await this.clubAges.check(team, uid, name);
       tx.update(p.team(teamId), addMember(team, uid, name));
       tx.delete(p.request(teamId, uid));
@@ -243,6 +270,8 @@ export class MembershipService {
       }
       if (isMember(team, uid)) throw new ApiError("already_exists", `They're already in this ${nounOf(team)}.`);
       tx.set(p.invite(uid, teamId), {
+        // Lets the team's admins list who's still invited (pendingInvites).
+        teamId,
         teamName: String(team.name ?? ""),
         kind: kindOf(team),
         invitedBy: caller.uid,
@@ -273,6 +302,57 @@ export class MembershipService {
     });
   }
 
+  /** Whether [uid] may invite people to [team] (canInvite() in the teamInvites rule). */
+  private async canInvite(tx: Tx, team: Data, teamId: string, uid: string): Promise<boolean> {
+    return can(team, uid, "manageMembers") || (await this.communityInvites(tx, team, teamId, uid));
+  }
+
+  /**
+   * Who's invited to the team and hasn't answered yet, for those who may
+   * invite (the roster's "Invites pending"), newest first: each one's
+   * public card, who invited them and when. Invites sent before they
+   * carried `teamId` (API 0.35.0) aren't found.
+   */
+  async pendingInvites(caller: Caller, teamId: string): Promise<PendingInvites> {
+    const team = await this.store.transact(async (tx) => {
+      const team = await this.team(tx, teamId);
+      if (!(await this.canInvite(tx, team, teamId, caller.uid))) {
+        throw new ApiError("permission_denied", `Only those who invite people see who's invited to this ${nounOf(team)}.`);
+      }
+      return team;
+    });
+    if (!this.queries?.group) throw new ApiError("unavailable", "Pending invites can't be listed right now.");
+    const found = await this.queries.group("teamInvites", pendingInvitesMax, { teamId });
+    const invites = found
+      .map(({ path, data }) => ({ uid: path.split("/")[1] ?? "", data }))
+      // Only users/{uid}/teamInvites/{teamId}, and no one who has joined since.
+      .filter(({ uid }) => uid && !isMember(team, uid));
+    const profiles = await this.store.getAll(invites.map(({ uid }) => `profiles/${uid}`));
+    const out: PendingInvite[] = invites.map(({ uid, data }, i) => {
+      const profile = profiles[i] ?? {};
+      const card: PendingInvite = { uid, name: str(profile.name) || "Someone" };
+      if (str(profile.username)) card.username = str(profile.username);
+      if (str(profile.photoUrl)) card.photoUrl = str(profile.photoUrl);
+      if (profile.private === true) card.private = true;
+      if (str(data.invitedByName)) card.invitedByName = str(data.invitedByName);
+      if (data.createdAt instanceof Date) card.invitedAt = data.createdAt.toISOString();
+      return card;
+    });
+    out.sort((a, b) => (b.invitedAt ?? "").localeCompare(a.invitedAt ?? "") || a.name.localeCompare(b.name));
+    return { invites: out };
+  }
+
+  /** teamInvites delete by someone who may invite: takes an invite back. */
+  async withdrawInvite(caller: Caller, teamId: string, uid: string): Promise<void> {
+    await this.store.transact(async (tx) => {
+      const team = await this.team(tx, teamId);
+      if (!(await this.canInvite(tx, team, teamId, caller.uid))) {
+        throw new ApiError("permission_denied", `You can't change who's invited to this ${nounOf(team)}.`);
+      }
+      tx.delete(p.invite(uid, teamId));
+    });
+  }
+
   /** teamInvites delete: the invitee declines. */
   async declineInvite(caller: Caller, teamId: string): Promise<void> {
     await this.store.transact(async (tx) => {
@@ -300,6 +380,19 @@ export class MembershipService {
     });
   }
 
+  /**
+   * The owner's per-person permission switches (setMemberPermissions in
+   * access.ts): the member's own permissions, with memberPerms worked out
+   * again. API only; no rule lets a client write memberGrants.
+   */
+  async setMemberPermissions(caller: Caller, teamId: string, uid: string, body: unknown): Promise<void> {
+    const { perms } = parseBody(setMemberPermissionsRequestSchema, body);
+    await this.store.transact(async (tx) => {
+      const team = await this.team(tx, teamId);
+      tx.update(p.team(teamId), setMemberPermissions(team, caller.uid, uid, perms));
+    });
+  }
+
   /** setStatKeepers(). */
   async setStatKeeper(caller: Caller, teamId: string, uid: string, body: unknown): Promise<void> {
     const { on } = parseBody(setStatKeeperRequestSchema, body);
@@ -323,7 +416,8 @@ export class MembershipService {
    * setRoles(): the owner replaces the custom roles and who has them. Who
    * has which is cleaned to current members and existing roles, and each
    * member's permissions (memberPerms) are worked out here, never taken
-   * from the body. Tiers and community role copies (orgRoles) stay.
+   * from the body; it counts each member's own permissions (memberGrants),
+   * which stay. Tiers and community role copies (orgRoles) stay.
    */
   async saveRoles(caller: Caller, teamId: string, body: unknown): Promise<void> {
     const input = parseBody(saveRolesRequestSchema, body);
@@ -333,7 +427,7 @@ export class MembershipService {
       const ids = new Set(strings(team.memberIds));
       const members = Object.keys(mapOf(team.members)).filter((u) => ids.has(u));
       const memberRoles = cleanMemberRoles(input.memberRoles, input.roles, members);
-      tx.update(p.team(teamId), rolesData(input.roles, memberRoles));
+      tx.update(p.team(teamId), rolesData(input.roles, memberRoles, cleanMemberGrants(team.memberGrants, members)));
     });
   }
 
@@ -359,6 +453,45 @@ export class MembershipService {
       const update = editDetails(team, caller.uid, input);
       tx.update(p.team(teamId), update);
       tx.set(p.listing(teamId), listingFor({ ...team, ...update }));
+    });
+  }
+
+  /** setSections(): the owner switches the team's optional sections. */
+  async setSections(caller: Caller, teamId: string, body: unknown): Promise<void> {
+    const input = parseBody(setTeamSectionsRequestSchema, body);
+    await this.store.transact(async (tx) => {
+      const team = await this.team(tx, teamId);
+      tx.update(p.team(teamId), setSections(team, caller.uid, input));
+    });
+  }
+
+  /** setPublicPage(): an admin switches the team's public page, its listing with it. */
+  async setPublicPage(caller: Caller, teamId: string, body: unknown): Promise<void> {
+    const input = parseBody(setPublicPageRequestSchema, body);
+    await this.store.transact(async (tx) => {
+      const team = await this.team(tx, teamId);
+      const update = setPublicPage(team, caller.uid, input.public);
+      tx.update(p.team(teamId), update);
+      tx.set(p.listing(teamId), listingFor({ ...team, ...update }));
+    });
+  }
+
+  /**
+   * The "Allow join requests" switch (setAllowJoinRequests in access.ts),
+   * with the listing rewritten to match in the same transaction. Turning
+   * it off declines the requests waiting (up to 400 at once), so only teams
+   * that take requests hold any: account deletion and Download your data
+   * look only there.
+   */
+  async setAllowJoinRequests(caller: Caller, teamId: string, body: unknown): Promise<void> {
+    const { on } = parseBody(setAllowJoinRequestsRequestSchema, body);
+    const waiting = on ? [] : await this.store.list(`teams/${teamId}/joinRequests`, 400);
+    await this.store.transact(async (tx) => {
+      const team = await this.team(tx, teamId);
+      const update = setAllowJoinRequests(team, caller.uid, on);
+      tx.update(p.team(teamId), update);
+      tx.set(p.listing(teamId), listingFor({ ...team, ...update }));
+      for (const r of waiting) tx.delete(p.request(teamId, r.id));
     });
   }
 

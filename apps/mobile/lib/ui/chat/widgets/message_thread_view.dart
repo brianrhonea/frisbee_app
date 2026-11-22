@@ -21,13 +21,15 @@ import '../../core/ui/undo_snack_bar.dart';
 import '../../core/ui/user_avatar.dart';
 import '../../videos/widgets/file_video_player.dart';
 import '../view_models/message_thread_viewmodel.dart';
+import 'reaction_bubble.dart';
 import '../../core/ui/skeleton.dart';
 
 /// Messages with a composer below, for a team room or a direct message.
 /// Shows [readOnlyNotice] in place of the composer when the user can't post.
 ///
-/// Long-press (or right-click) a message to react, reply, copy or delete
-/// it; swipe a message's bubble to the right to reply. Drag anywhere to the
+/// Double-tap a message for the reaction bubble; long-press (or right-click)
+/// it to react, reply, copy or delete
+/// it. Swipe a message's bubble to the right to reply. Drag anywhere to the
 /// left to see every message's time.
 class MessageThreadView extends StatefulWidget {
   const MessageThreadView({
@@ -38,6 +40,13 @@ class MessageThreadView extends StatefulWidget {
     this.hintText = 'Message',
     this.footer,
     this.videoPlayer = fileVideoPlayer,
+    this.header,
+    this.eventCard,
+    this.pollCard,
+    this.isPinned,
+    this.onTogglePin,
+    this.onShareEvent,
+    this.onCreatePoll,
   });
 
   final MessageThreadViewModel viewModel;
@@ -52,6 +61,28 @@ class MessageThreadView extends StatefulWidget {
 
   /// Plays video attachments; tests swap in a stand-in.
   final FileVideoPlayerBuilder videoPlayer;
+
+  /// Above the messages, e.g. a team room's pinned strip.
+  final Widget? header;
+
+  /// Draws a message's shared event (team rooms); null shows nothing.
+  final Widget Function(ChatMessage message, ChatEventRef event)? eventCard;
+
+  /// Draws a message's poll (team rooms); null shows nothing.
+  final Widget Function(ChatMessage message, ChatPoll poll)? pollCard;
+
+  /// Whether a message is pinned (team rooms); marks it in the thread.
+  final bool Function(ChatMessage message)? isPinned;
+
+  /// Pins or unpins a message from its long-press sheet; null where the
+  /// user can't pin.
+  final ValueChanged<ChatMessage>? onTogglePin;
+
+  /// "Share an event" in the attach menu; null hides it.
+  final VoidCallback? onShareEvent;
+
+  /// "Poll" in the attach menu; null hides it.
+  final VoidCallback? onCreatePoll;
 
   @override
   State<MessageThreadView> createState() => _MessageThreadViewState();
@@ -171,6 +202,19 @@ class _MessageThreadViewState extends State<MessageThreadView>
 
   void _react(ChatMessage m, String emoji) => vm.react.execute((m, emoji));
 
+  bool _canReact(ChatMessage m) => vm.canReact && m.createdAt != null;
+
+  /// Double-tap: the bubble of reactions over the message (rect on screen).
+  Future<void> _quickReact(ChatMessage m, Rect rect) async {
+    final emoji = await showReactionBubble(
+      context,
+      anchor: rect,
+      mine: m.reactionOf(vm.uid),
+      alignEnd: vm.isMine(m) && vm.style == ThreadStyle.bubbles,
+    );
+    if (mounted && emoji != null) _react(m, emoji);
+  }
+
   /// The author's profile, over the conversation so back returns here.
   void _openProfile(String uid) {
     if (uid.isEmpty || !vm.opensProfiles) return;
@@ -188,17 +232,26 @@ class _MessageThreadViewState extends State<MessageThreadView>
       builder: (_) => _MessageActionsSheet(
         message: m,
         mine: m.reactionOf(vm.uid),
-        canReact: vm.canReact && m.createdAt != null,
+        canReact: _canReact(m),
         canReply: _canReply(m),
         canDelete: vm.canDelete(m),
         canOpenProfile:
             vm.opensProfiles && m.authorId.isNotEmpty && !vm.isMine(m),
+        pinned: widget.onTogglePin != null && m.createdAt != null
+            ? widget.isPinned?.call(m) ?? m.isPinned
+            : null,
       ),
     );
     if (!mounted || action == null) return;
     switch (action) {
       case _React(:final emoji):
         _react(m, emoji);
+      case _MoreReactions():
+        final emoji = await showEmojiPicker(
+          context,
+          mine: m.reactionOf(vm.uid),
+        );
+        if (mounted && emoji != null) _react(m, emoji);
       case _Reply():
         _reply(m);
       case _Copy():
@@ -207,6 +260,8 @@ class _MessageThreadViewState extends State<MessageThreadView>
         _delete(m);
       case _Profile():
         _openProfile(m.authorId);
+      case _Pin():
+        widget.onTogglePin?.call(m);
     }
   }
 
@@ -217,6 +272,7 @@ class _MessageThreadViewState extends State<MessageThreadView>
       maxWidth: 900,
       child: Column(
         children: [
+          ?widget.header,
           Expanded(
             child: ScrollToTop(
               controller: _scroll,
@@ -232,9 +288,15 @@ class _MessageThreadViewState extends State<MessageThreadView>
                     onActions: _actions,
                     onReply: (m) => _canReply(m) ? _reply(m) : null,
                     onReact: vm.canReact ? _react : null,
+                    onQuickReact: (m, rect) {
+                      if (_canReact(m)) _quickReact(m, rect);
+                    },
                     onDelete: _delete,
                     onProfile: _openProfile,
                     reveal: _reveal,
+                    eventCard: widget.eventCard,
+                    pollCard: widget.pollCard,
+                    isPinned: widget.isPinned,
                   ),
                 ),
               ),
@@ -251,6 +313,8 @@ class _MessageThreadViewState extends State<MessageThreadView>
               focusNode: _focus,
               onSend: _send,
               hintText: widget.hintText,
+              onShareEvent: widget.onShareEvent,
+              onCreatePoll: widget.onCreatePoll,
             )
           else
             _ReadOnlyBar(text: widget.readOnlyNotice),
@@ -270,6 +334,11 @@ class _React extends _MessageAction {
   final String emoji;
 }
 
+/// The + in the sheet's reactions: every emoji.
+class _MoreReactions extends _MessageAction {
+  const _MoreReactions();
+}
+
 class _Reply extends _MessageAction {
   const _Reply();
 }
@@ -286,15 +355,23 @@ class _Delete extends _MessageAction {
   const _Delete();
 }
 
+class _Pin extends _MessageAction {
+  const _Pin();
+}
+
 /// What a message row can do, handed down from the view.
 class _RowActions {
   const _RowActions({
     required this.onActions,
     required this.onReply,
     required this.onReact,
+    required this.onQuickReact,
     required this.onDelete,
     required this.onProfile,
     required this.reveal,
+    this.eventCard,
+    this.pollCard,
+    this.isPinned,
   });
 
   /// The long-press sheet.
@@ -305,15 +382,28 @@ class _RowActions {
 
   /// Toggles a reaction; null where reactions aren't offered.
   final void Function(ChatMessage, String)? onReact;
+
+  /// Double-tap: the reaction bubble over the message at that rect.
+  final void Function(ChatMessage, Rect) onQuickReact;
   final ValueChanged<ChatMessage> onDelete;
   final ValueChanged<String> onProfile;
 
   /// Every message's time, shown while the thread is dragged left.
   final _TimeReveal reveal;
+
+  /// A shared event's card (team rooms).
+  final Widget Function(ChatMessage, ChatEventRef)? eventCard;
+
+  /// A poll's card (team rooms).
+  final Widget Function(ChatMessage, ChatPoll)? pollCard;
+
+  /// Whether a message is pinned (team rooms).
+  final bool Function(ChatMessage)? isPinned;
 }
 
-/// Long-press on a message: a row of quick reactions, then Reply, Copy
-/// and Delete.
+/// Long-press on a message: when it was sent, a row of quick reactions,
+/// then Reply, Copy and Delete. The time is here too so it isn't only
+/// behind the drag-left gesture.
 class _MessageActionsSheet extends StatelessWidget {
   const _MessageActionsSheet({
     required this.message,
@@ -322,6 +412,7 @@ class _MessageActionsSheet extends StatelessWidget {
     required this.canReply,
     required this.canDelete,
     required this.canOpenProfile,
+    this.pinned,
   });
 
   final ChatMessage message;
@@ -333,16 +424,29 @@ class _MessageActionsSheet extends StatelessWidget {
   final bool canDelete;
   final bool canOpenProfile;
 
+  /// Whether it's pinned; null where the user can't pin.
+  final bool? pinned;
+
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     void pick(_MessageAction a) => Navigator.pop(context, a);
     final name = message.authorName.isEmpty ? 'Member' : message.authorName;
+    final other = quickReactions.contains(mine) ? null : mine;
     return SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (message.createdAt case final sent?)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                _FeedRow._stamp(sent),
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12.5, color: c.muted),
+              ),
+            ),
           if (canReact)
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
@@ -369,6 +473,27 @@ class _MessageActionsSheet extends StatelessWidget {
                         ),
                       ),
                     ),
+                  // Any other emoji; shows theirs when it's not above.
+                  Semantics(
+                    button: true,
+                    label: 'More emoji',
+                    child: InkResponse(
+                      radius: 26,
+                      onTap: () => pick(const _MoreReactions()),
+                      child: Container(
+                        width: 48,
+                        height: 48,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: other == null ? c.field : c.accentSoft,
+                        ),
+                        child: other == null
+                            ? Icon(Icons.add, color: c.ink2)
+                            : Text(other, style: const TextStyle(fontSize: 26)),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -384,19 +509,24 @@ class _MessageActionsSheet extends StatelessWidget {
               title: const Text('Copy text'),
               onTap: () => pick(const _Copy()),
             ),
+          if (pinned case final p?)
+            ListTile(
+              leading: Icon(p ? Icons.push_pin : Icons.push_pin_outlined),
+              title: Text(p ? 'Unpin message' : 'Pin message'),
+              onTap: () => pick(const _Pin()),
+            ),
           if (canOpenProfile)
             ListTile(
               leading: const Icon(Icons.person_outline),
               title: Text("View $name's profile"),
               onTap: () => pick(const _Profile()),
             ),
+          // Destructive, but neutral: red is kept for live games, and the
+          // confirm dialog says what deleting does.
           if (canDelete)
             ListTile(
-              leading: Icon(Icons.delete_outline, color: Colors.red.shade400),
-              title: Text(
-                'Delete message',
-                style: TextStyle(color: Colors.red.shade400),
-              ),
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Delete message'),
               onTap: () => pick(const _Delete()),
             ),
         ],
@@ -564,14 +694,16 @@ class _MessageList extends StatelessWidget {
                       canSwipeReply: canSwipeReply,
                     ),
             ),
-            if (vm.receiptFor(m) case final receipt?)
+            if (vm.statusFor(m) case final receipt?)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 2, 16, 0),
                 child: Text(
                   receipt,
                   textAlign: TextAlign.end,
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: vm.isFailed(m)
+                        ? Theme.of(context).colorScheme.error
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -961,8 +1093,8 @@ class _ReactionChips extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: 4),
       child: Wrap(
-        spacing: 4,
-        runSpacing: 4,
+        spacing: 6,
+        runSpacing: 6,
         children: [
           for (final r in counts)
             Semantics(
@@ -973,7 +1105,7 @@ class _ReactionChips extends StatelessWidget {
               child: Material(
                 color: r.mine ? c.accentSoft : c.card,
                 shape: StadiumBorder(
-                  side: BorderSide(color: r.mine ? c.accent : c.border),
+                  side: BorderSide(color: r.mine ? c.accent : c.border2),
                 ),
                 child: InkWell(
                   customBorder: const StadiumBorder(),
@@ -982,12 +1114,16 @@ class _ReactionChips extends StatelessWidget {
                       : () => onReact!(message, r.emoji),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 7,
-                      vertical: 2,
+                      horizontal: 9,
+                      vertical: 3,
                     ),
                     child: Text(
                       r.count > 1 ? '${r.emoji} ${r.count}' : r.emoji,
-                      style: TextStyle(fontSize: 13, color: c.ink),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: r.mine ? c.accentInk : c.ink2,
+                      ),
                     ),
                   ),
                 ),
@@ -1033,9 +1169,9 @@ class _Attachments extends StatelessWidget {
   );
 }
 
-/// Long-press (or right-click) handling shared by both row styles: opens
-/// the message's actions.
-class _Pressable extends StatelessWidget {
+/// Long-press (or right-click) and double-tap handling shared by both row
+/// styles: the actions sheet, or the reaction bubble.
+class _Pressable extends StatefulWidget {
   const _Pressable({
     required this.message,
     required this.actions,
@@ -1047,11 +1183,53 @@ class _Pressable extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-    behavior: HitTestBehavior.opaque,
-    onLongPress: () => actions.onActions(message),
-    onSecondaryTap: () => actions.onActions(message),
-    child: child,
+  State<_Pressable> createState() => _PressableState();
+}
+
+/// Double-tap is spotted from raw pointer events rather than a
+/// double-tap recognizer: that one holds every single tap inside the
+/// message (links, cards, poll buttons) until it times out.
+class _PressableState extends State<_Pressable> {
+  Offset? _down;
+  Duration? _lastUp;
+  Offset? _lastUpAt;
+
+  void _onUp(PointerUpEvent e) {
+    final down = _down;
+    _down = null;
+    // A drag or a swipe, not a tap.
+    if (down == null || (e.position - down).distance > kTouchSlop) return;
+    final last = _lastUp;
+    final lastAt = _lastUpAt;
+    if (last != null &&
+        lastAt != null &&
+        e.timeStamp - last <= kDoubleTapTimeout &&
+        (e.position - lastAt).distance <= kDoubleTapSlop) {
+      _lastUp = null;
+      _lastUpAt = null;
+      final box = context.findRenderObject();
+      if (box is! RenderBox || !box.hasSize) return;
+      widget.actions.onQuickReact(
+        widget.message,
+        box.localToGlobal(Offset.zero) & box.size,
+      );
+      return;
+    }
+    _lastUp = e.timeStamp;
+    _lastUpAt = e.position;
+  }
+
+  @override
+  Widget build(BuildContext context) => Listener(
+    onPointerDown: (e) => _down = e.position,
+    onPointerCancel: (_) => _down = null,
+    onPointerUp: _onUp,
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onLongPress: () => widget.actions.onActions(widget.message),
+      onSecondaryTap: () => widget.actions.onActions(widget.message),
+      child: widget.child,
+    ),
   );
 }
 
@@ -1113,7 +1291,7 @@ class _FeedRow extends StatelessWidget {
                     child: Text(
                       name,
                       style: TextStyle(
-                        fontSize: 14.5,
+                        fontSize: 14,
                         fontWeight: FontWeight.w700,
                         color: nameColor ?? c.ink,
                       ),
@@ -1123,12 +1301,19 @@ class _FeedRow extends StatelessWidget {
                 if (vm.usernameOf(m.authorId) case final handle?)
                   Text(
                     '@$handle',
-                    style: TextStyle(fontSize: 12.5, color: c.muted),
+                    style: TextStyle(fontSize: 12, color: c.muted),
                   ),
                 Text(
                   time == null ? 'Sending…' : _stamp(time),
-                  style: TextStyle(fontSize: 11.5, color: c.muted),
+                  style: TextStyle(fontSize: 12, color: c.muted),
                 ),
+                if (actions.isPinned?.call(m) ?? false)
+                  Icon(
+                    Icons.push_pin,
+                    size: 13,
+                    color: c.muted,
+                    semanticLabel: 'Pinned',
+                  ),
               ],
             ),
           ),
@@ -1137,10 +1322,14 @@ class _FeedRow extends StatelessWidget {
             text: m.text,
             style: TextStyle(
               color: time == null ? c.muted : c.ink,
-              fontSize: 14.5,
-              height: 1.375,
+              fontSize: 15,
+              height: 1.4,
             ),
           ),
+        if (m.event case final e?)
+          if (actions.eventCard case final card?) card(m, e),
+        if (m.poll case final p?)
+          if (actions.pollCard case final card?) card(m, p),
         _Attachments(message: m, viewModel: vm, videoPlayer: videoPlayer),
         _ReactionChips(message: m, uid: vm.uid, onReact: actions.onReact),
       ],
@@ -1240,7 +1429,7 @@ class _BubbleRow extends StatelessWidget {
     final fill = mine ? c.accent : c.card;
     final ink = mine ? c.onAccent : c.ink;
     const big = Radius.circular(18);
-    const small = Radius.circular(5);
+    const small = Radius.circular(6);
     // Square the corners on the side the run continues.
     final radius = BorderRadius.only(
       topLeft: !mine && !startsRun ? small : big,
@@ -1275,15 +1464,15 @@ class _BubbleRow extends StatelessWidget {
                       ),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 13,
-                          vertical: 8,
+                          horizontal: 12,
+                          vertical: 10,
                         ),
                         child: _MessageText(
                           text: m.text,
                           style: TextStyle(
                             color: sending ? ink.withValues(alpha: 0.7) : ink,
                             fontSize: 15,
-                            height: 1.3,
+                            height: 1.4,
                           ),
                         ),
                       ),
@@ -1709,7 +1898,7 @@ class _ReadOnlyBar extends StatelessWidget {
   }
 }
 
-enum _AttachKind { camera, video, photo, file }
+enum _AttachKind { camera, video, photo, file, event, poll }
 
 /// The text box's menu: the usual cut, copy, paste and select all, plus
 /// Undo and Redo while there's something to undo or redo.
@@ -1769,9 +1958,12 @@ class _ReplyBar extends StatelessWidget {
     final c = AppColors.of(context);
     final name = message.authorName.isEmpty ? 'Someone' : message.authorName;
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.fromLTRB(10, 4, 2, 4),
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: c.border)),
+        color: c.field,
+        borderRadius: BorderRadius.circular(12),
+        border: Border(left: BorderSide(color: c.accent, width: 3)),
       ),
       child: Row(
         children: [
@@ -1822,6 +2014,8 @@ class _Composer extends StatelessWidget {
     required this.focusNode,
     required this.onSend,
     required this.hintText,
+    this.onShareEvent,
+    this.onCreatePoll,
   });
 
   final MessageThreadViewModel viewModel;
@@ -1830,6 +2024,12 @@ class _Composer extends StatelessWidget {
   final FocusNode focusNode;
   final VoidCallback onSend;
   final String hintText;
+
+  /// "Share an event" in the attach menu (team rooms).
+  final VoidCallback? onShareEvent;
+
+  /// "Poll" in the attach menu (team rooms).
+  final VoidCallback? onCreatePoll;
 
   // Its buttons (send, attach) keep the keyboard open.
   @override
@@ -1850,89 +2050,61 @@ class _Composer extends StatelessWidget {
         final sending = vm.send.running;
         final wide = !ScreenSize.of(context).isMobile;
         final attach = vm.canAttach
-            ? PopupMenuButton<_AttachKind>(
-                tooltip: 'Upload a photo, video or file',
-                enabled:
-                    !sending &&
-                    !vm.pickFiles.running &&
-                    !vm.recordVideo.running,
-                icon: Icon(Icons.add_circle, color: c.muted),
-                onSelected: (k) => switch (k) {
-                  _AttachKind.camera => vm.takePhoto.execute(),
-                  _AttachKind.video => vm.recordVideo.execute(),
-                  _AttachKind.photo => vm.pickFiles.execute(true),
-                  _AttachKind.file => vm.pickFiles.execute(false),
-                },
-                itemBuilder: (_) => [
-                  if (vm.canUseCamera)
-                    const PopupMenuItem(
-                      value: _AttachKind.camera,
-                      child: ListTile(
-                        leading: Icon(Icons.photo_camera_outlined),
-                        title: Text('Take photo'),
-                      ),
-                    ),
-                  if (vm.canUseCamera)
-                    const PopupMenuItem(
-                      value: _AttachKind.video,
-                      child: ListTile(
-                        leading: Icon(Icons.videocam_outlined),
-                        title: Text('Record video'),
-                      ),
-                    ),
-                  const PopupMenuItem(
-                    value: _AttachKind.photo,
-                    child: ListTile(
-                      leading: Icon(Icons.photo_outlined),
-                      title: Text('Photo'),
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: _AttachKind.file,
-                    child: ListTile(
-                      leading: Icon(Icons.insert_drive_file_outlined),
-                      title: Text('File'),
-                    ),
-                  ),
-                ],
+            ? Container(
+                width: 44,
+                height: 44,
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: c.card,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: c.border2),
+                ),
+                child: _attachMenu(context, c, vm, sending),
               )
-            : const SizedBox(width: 12);
-        return Padding(
-          padding: EdgeInsets.fromLTRB(16, 0, 16, wide ? 20 : 10),
-          child: Container(
-            decoration: BoxDecoration(
-              color: c.background,
-              border: Border.all(color: c.border),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (vm.drafts.isNotEmpty)
-                  Container(
-                    height: 88,
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: [
-                        for (final d in vm.drafts)
-                          _DraftChip(
-                            draft: d,
-                            onRemove: sending ? null : () => vm.removeDraft(d),
-                          ),
-                      ],
-                    ),
+            : const SizedBox.shrink();
+        return Container(
+          decoration: BoxDecoration(
+            color: c.card,
+            border: Border(top: BorderSide(color: c.border)),
+          ),
+          padding: EdgeInsets.fromLTRB(12, 8, 12, wide ? 16 : 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (vm.drafts.isNotEmpty)
+                SizedBox(
+                  height: 84,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      for (final d in vm.drafts)
+                        _DraftChip(
+                          draft: d,
+                          onRemove: sending ? null : () => vm.removeDraft(d),
+                        ),
+                    ],
                   ),
-                if (vm.drafts.isNotEmpty) Divider(height: 1, color: c.border),
-                if (vm.replyingTo case final reply?)
-                  _ReplyBar(message: reply, onCancel: vm.cancelReply),
-                if (sending) const LinearProgressIndicator(minHeight: 2),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    attach,
-                    Expanded(
+                ),
+              if (vm.replyingTo case final reply?)
+                _ReplyBar(message: reply, onCancel: vm.cancelReply),
+              if (sending)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 6),
+                  child: LinearProgressIndicator(minHeight: 2),
+                ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  attach,
+                  Expanded(
+                    child: Container(
+                      constraints: const BoxConstraints(minHeight: 44),
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      alignment: Alignment.centerLeft,
+                      decoration: BoxDecoration(
+                        color: c.field,
+                        borderRadius: BorderRadius.circular(22),
+                      ),
                       child: Focus(
                         // Enter sends; Shift+Enter adds a line.
                         onKeyEvent: (_, event) {
@@ -1965,9 +2137,10 @@ class _Composer extends StatelessWidget {
                                 state,
                                 undoController,
                               ),
-                          style: TextStyle(fontSize: 14.5, color: c.ink),
+                          style: TextStyle(fontSize: 15, color: c.ink),
                           decoration: InputDecoration(
                             hintText: hintText,
+                            hintStyle: TextStyle(fontSize: 15, color: c.muted),
                             counterText: '',
                             isDense: true,
                             filled: false,
@@ -1976,36 +2149,112 @@ class _Composer extends StatelessWidget {
                             focusedBorder: InputBorder.none,
                             disabledBorder: InputBorder.none,
                             contentPadding: const EdgeInsets.symmetric(
-                              vertical: 14,
+                              vertical: 12,
                             ),
                           ),
                         ),
                       ),
                     ),
-                    // Always shown: touch screens of any size (tablets
-                    // included) may have no Enter key to send with.
-                    ValueListenableBuilder(
-                      valueListenable: controller,
-                      builder: (context, value, _) {
-                        final empty =
-                            value.text.trim().isEmpty && vm.drafts.isEmpty;
-                        return IconButton(
-                          tooltip: 'Send',
-                          color: c.accent,
-                          icon: const Icon(Icons.send_rounded, size: 22),
-                          onPressed: sending || empty ? null : onSend,
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Always shown: touch screens of any size (tablets
+                  // included) may have no Enter key to send with.
+                  ValueListenableBuilder(
+                    valueListenable: controller,
+                    builder: (context, value, _) {
+                      final empty =
+                          value.text.trim().isEmpty && vm.drafts.isEmpty;
+                      return IconButton.filled(
+                        tooltip: 'Send',
+                        style: IconButton.styleFrom(
+                          fixedSize: const Size(44, 44),
+                          backgroundColor: c.accent,
+                          foregroundColor: c.onAccent,
+                          disabledBackgroundColor: c.field,
+                          disabledForegroundColor: c.muted,
+                        ),
+                        icon: const Icon(Icons.send_rounded, size: 20),
+                        onPressed: sending || empty ? null : onSend,
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
           ),
         );
       },
     );
   }
+
+  /// The attach button's menu: camera (where there is one), photo, file.
+  Widget _attachMenu(
+    BuildContext context,
+    AppColors c,
+    MessageThreadViewModel vm,
+    bool sending,
+  ) => PopupMenuButton<_AttachKind>(
+    tooltip: 'Upload a photo, video or file',
+    enabled: !sending && !vm.pickFiles.running && !vm.recordVideo.running,
+    padding: EdgeInsets.zero,
+    icon: Icon(Icons.add, color: c.ink2),
+    onSelected: (k) => switch (k) {
+      _AttachKind.camera => vm.takePhoto.execute(),
+      _AttachKind.video => vm.recordVideo.execute(),
+      _AttachKind.photo => vm.pickFiles.execute(true),
+      _AttachKind.file => vm.pickFiles.execute(false),
+      _AttachKind.event => onShareEvent?.call(),
+      _AttachKind.poll => onCreatePoll?.call(),
+    },
+    itemBuilder: (_) => [
+      if (vm.canUseCamera)
+        const PopupMenuItem(
+          value: _AttachKind.camera,
+          child: ListTile(
+            leading: Icon(Icons.photo_camera_outlined),
+            title: Text('Take photo'),
+          ),
+        ),
+      if (vm.canUseCamera)
+        const PopupMenuItem(
+          value: _AttachKind.video,
+          child: ListTile(
+            leading: Icon(Icons.videocam_outlined),
+            title: Text('Record video'),
+          ),
+        ),
+      const PopupMenuItem(
+        value: _AttachKind.photo,
+        child: ListTile(
+          leading: Icon(Icons.photo_outlined),
+          title: Text('Photo'),
+        ),
+      ),
+      const PopupMenuItem(
+        value: _AttachKind.file,
+        child: ListTile(
+          leading: Icon(Icons.insert_drive_file_outlined),
+          title: Text('File'),
+        ),
+      ),
+      if (onShareEvent != null)
+        const PopupMenuItem(
+          value: _AttachKind.event,
+          child: ListTile(
+            leading: Icon(Icons.event_outlined),
+            title: Text('Share an event'),
+          ),
+        ),
+      if (onCreatePoll != null)
+        const PopupMenuItem(
+          value: _AttachKind.poll,
+          child: ListTile(
+            leading: Icon(Icons.poll_outlined),
+            title: Text('Poll'),
+          ),
+        ),
+    ],
+  );
 }
 
 class _DraftChip extends StatelessWidget {

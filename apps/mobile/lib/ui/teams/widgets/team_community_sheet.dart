@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
+import '../../../routing/push_team_route.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/view_model_host.dart';
@@ -114,7 +114,7 @@ class _TeamCommunitySheetState extends State<TeamCommunitySheet> {
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
               Navigator.pop(context);
-              context.push(Routes.team(vm.orgId!));
+              pushTeamRoute(context, Routes.team(vm.orgId!));
             },
           ),
           const SizedBox(height: 8),

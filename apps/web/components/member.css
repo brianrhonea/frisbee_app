@@ -1,0 +1,331 @@
+/* ==== Member pages (redesign W2) ==========================================
+   Home, schedule, inbox, notifications, profile, settings, the Teams list
+   and Create. Every rule sits under its page's root class, so the team hub
+   and the public pages keep their own (app.css, W1/W3). Uses site.css's
+   tokens only. */
+
+/* --- Shared bits ---------------------------------------------------------- */
+
+/* The member's answer on a schedule row (RsvpPill): Going in turf, other
+   answers neutral, "Needs RSVP" in amber (theirs to do). */
+.rsvp-pill {
+  display: inline-flex; align-items: center; gap: 4px; flex: none; max-width: 140px;
+  padding: 3px 10px; border-radius: 999px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: var(--field); color: var(--ink-soft); font-size: 12px; font-weight: 700; line-height: 1.4;
+}
+.rsvp-pill.going { background: var(--accent-soft); color: var(--accent-ink); }
+.rsvp-pill.needs { background: var(--disc-soft); color: var(--disc-ink); }
+.sched-row.needs .rsvp-pill.needs, .needs-you .rsvp-pill.needs { background: var(--disc); color: var(--on-disc); }
+
+/* A team's dot on meta lines (the app's TeamDot). */
+.team-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--team); flex: none; }
+
+/* Cards on these pages: the redesign's 16px radius. */
+.huddle .card, .schedule-page .card, .messages .card, .notifications .notice-group, .settings .card,
+.teams-page .card, .create-page .card, .dash .card, .post-page .card { border-radius: var(--radius); }
+
+/* Delete and Leave links: neutral, not red. */
+.schedule-page .text-btn.danger, .messages .text-btn.danger, .offline-banner .text-btn.danger,
+.huddle .menu-list .danger, .post-page .menu-list .danger, .dash .menu-list .danger { color: var(--ink-soft); }
+
+/* --- Posts (PostCard, PostActions, Comments) on member pages --------------- */
+.huddle .post, .post-page .post, .dash .post {
+  border-radius: var(--radius); padding: 18px 20px; box-shadow: none;
+}
+.huddle .post > .post-images, .post-page .post > .post-images, .dash .post > .post-images { margin: 14px 0 0; border-radius: var(--radius-control); }
+.huddle .post-author b, .post-page .post-author b, .dash .post-author b { font-weight: 700; }
+.huddle .post-body, .post-page .post-body, .dash .post-body { line-height: 1.6; }
+.huddle .post-tag, .post-page .post-tag, .dash .post-tag { background: var(--accent-soft); color: var(--accent-ink); }
+.huddle .post-box, .post-page .post-box, .dash .post-box { border-radius: var(--radius-control); background: var(--field); border-color: transparent; }
+.huddle .post-actions, .post-page .post-actions, .dash .post-actions { margin: 8px -8px -8px; justify-content: flex-start; gap: 6px; }
+.huddle .post-action, .post-page .post-action, .dash .post-action { border-radius: var(--radius-control); }
+.huddle .post-action.on, .post-page .post-action.on, .dash .post-action.on { color: var(--accent-ink); }
+.huddle .menu-list, .post-page .menu-list, .dash .menu-list { border-radius: var(--radius-control); box-shadow: 0 10px 30px rgb(0 0 0 / 0.18); }
+.huddle .comment-bubble, .post-page .comment-bubble, .dash .comment-bubble { border-radius: var(--radius-control); }
+.huddle .comment-to, .post-page .comment-to, .dash .comment-to { color: var(--accent-ink); }
+.post-page .back-link { margin: 0 0 14px; }
+.post-page .back-link a { color: var(--ink-soft); font-weight: 600; text-decoration: none; }
+.post-page .back-link a:hover { color: var(--ink); text-decoration: underline; }
+
+/* --- Home (Dashboard): greeting, Needs you, the feed, Coming up ------------ */
+.huddle .huddle-head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 16px; flex-wrap: wrap; }
+.huddle .huddle-greeting { font-size: clamp(1.5rem, 3vw, 1.9rem); letter-spacing: -0.03em; font-weight: 800; }
+.huddle .huddle-date { color: var(--muted); font-size: 0.9rem; font-weight: 600; }
+
+/* The feed's tabs: Your teams / Following / Everyone. */
+.huddle .feed-tabs { margin-top: 2px; border-bottom-color: var(--line); }
+.huddle .feed-tabs button { padding: 10px 14px; color: var(--muted); font-weight: 600; }
+.huddle .feed-tabs button.on { color: var(--ink); font-weight: 700; border-bottom-color: var(--accent); }
+
+/* The composer: a soft field to type in, Post in turf. */
+.huddle .composer-card { padding: 16px 18px; box-shadow: none; }
+.huddle .composer-card .composer-bar { border-top: 0; padding-top: 2px; }
+
+/* Needs you: what's the member's to do, amber. */
+.huddle .needs-you { padding: 0; overflow: hidden; box-shadow: none; }
+.huddle .needs-you .card-title {
+  display: flex; align-items: center; gap: 8px; margin: 0; padding: 14px 18px 12px; border-bottom: 1px solid var(--line);
+}
+.needs-count {
+  display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px;
+  background: var(--disc); color: var(--on-disc); font-size: 12px; font-weight: 800; line-height: 1;
+}
+.huddle .needs-you-list { gap: 0; }
+.huddle .needs-you-list li + li { border-top: 1px solid var(--line); }
+.huddle .needs-you-list a {
+  display: flex; align-items: center; gap: 12px; margin: 0; padding: 12px 18px; border-radius: 0;
+}
+.huddle .needs-you-list a:hover { background: var(--field); }
+.needs-tile {
+  display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 50%;
+  background: var(--field); color: var(--ink-soft); font-size: 12px; font-weight: 800;
+}
+.needs-main { display: grid; flex: 1; min-width: 0; }
+.needs-main b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.huddle .needs-you-list .needs-main small { color: var(--muted); font-weight: 500; }
+.needs-action {
+  flex: none; padding: 7px 14px; border-radius: var(--radius-control);
+  background: var(--disc); color: var(--on-disc); font-size: 13px; font-weight: 700;
+}
+
+/* Invitations (TeamInvites): theirs to answer. */
+.huddle .team-invites, .teams-page .team-invites { border-left: 4px solid var(--disc); box-shadow: none; }
+
+/* Upcoming events in the rail: date tiles, a team dot, the RSVP. */
+.huddle .upcoming-card .date-list .event-date { background: var(--accent-soft); border: 0; color: var(--accent-ink); border-radius: var(--radius-control); }
+.huddle .upcoming-card .date-list .event-date small { color: var(--accent-ink); }
+.huddle .upcoming-card .date-list .event-date b { font-family: var(--font-score); font-weight: 800; font-size: 1.45rem; line-height: 1; }
+.huddle .upcoming-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.huddle .upcoming-title b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.92rem; }
+.huddle .upcoming-title .rsvp-pill { padding: 2px 8px; font-size: 11px; }
+.huddle .upcoming-team { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.huddle .upcoming-team a { color: var(--muted); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.huddle .upcoming-team a:hover { color: var(--ink); text-decoration: underline; }
+.huddle .next-event .rsvp-pill { justify-self: start; margin-top: 4px; }
+
+/* --- Schedule (Schedule.tsx): days, then rows with a time column ---------- */
+.schedule-page .sched-card { padding: 18px 0 6px; box-shadow: none; }
+.schedule-page .sched-card > .card-head, .schedule-page .sched-card > .schedule-filter,
+.schedule-page .sched-card > .event-editor, .schedule-page .sched-card > p { margin-left: 18px; margin-right: 18px; }
+.schedule-page .schedule-filter.segmented { background: none; border: 0; padding: 0; gap: 6px; }
+.schedule-page .schedule-filter.segmented button {
+  border: 1px solid var(--line-2); background: var(--card); color: var(--ink); font-size: 0.86rem; padding: 6px 14px;
+}
+.schedule-page .schedule-filter.segmented button.on { background: var(--chip-on); color: var(--on-chip-on); border-color: var(--chip-on); box-shadow: none; }
+.sched-days { display: grid; }
+.sched-day-head {
+  margin: 0; padding: 14px 18px 6px; border-top: 1px solid var(--line);
+  font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
+}
+.sched-day:first-child .sched-day-head { border-top: 0; }
+.sched-list { list-style: none; margin: 0; padding: 0 8px 6px; display: grid; gap: 2px; }
+.sched-row {
+  display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; gap: 12px; align-items: start;
+  padding: 10px 10px; border-radius: var(--radius-control);
+}
+.sched-row:hover { background: var(--field); }
+.sched-row.needs { background: var(--disc-soft); }
+.sched-time { display: grid; line-height: 1.3; padding-top: 1px; }
+.sched-time b { font-size: 0.86rem; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.sched-time small { font-size: 0.76rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sched-main { display: grid; gap: 2px; min-width: 0; }
+.sched-title { font-size: 0.95rem; line-height: 1.3; overflow-wrap: anywhere; }
+.sched-title a { color: var(--ink); text-decoration: none; }
+.sched-title a:hover { color: var(--accent-ink); text-decoration: underline; }
+.sched-meta { display: block; color: var(--muted); font-size: 0.8rem; overflow-wrap: anywhere; }
+.sched-meta .cal-dot { width: 8px; height: 8px; margin-right: 6px; vertical-align: 0.08em; }
+.sched-notes { white-space: pre-wrap; overflow-wrap: anywhere; }
+.sched-row .event-actions { margin-top: 2px; gap: 12px; }
+.sched-row .event-actions .text-btn { font-size: 0.8rem; text-decoration: none; font-weight: 600; }
+.sched-row .event-actions .text-btn:hover { text-decoration: underline; }
+.sched-row > .rsvp-pill { margin-top: 1px; }
+.schedule-page .schedule-meeting-live { color: var(--live-ink); font-weight: 700; }
+.schedule-page .cal-invites { border-color: var(--line); border-left: 4px solid var(--disc); }
+@media (max-width: 480px) {
+  .sched-row { grid-template-columns: 58px minmax(0, 1fr); gap: 4px 10px; }
+  .sched-row > .rsvp-pill { grid-column: 2; justify-self: start; }
+}
+/* List / Month, and the month grid (F16): dots for team (blue), personal
+   (magenta) and still to answer (amber); today in turf, the picked day
+   outlined. */
+.schedule-page .sched-card > .card-head { flex-wrap: wrap; gap: 8px; }
+.schedule-page .schedule-view.segmented { margin-left: auto; }
+.schedule-page .schedule-view.segmented button { padding: 5px 12px; font-size: 0.84rem; }
+.schedule-page .sched-month-head { display: flex; align-items: center; gap: 6px; margin: 12px 18px 6px; }
+.schedule-page .sched-month-head p { flex: 1; display: grid; justify-items: center; margin: 0; line-height: 1.3; }
+.schedule-page .sched-month-head small { font-size: 0.76rem; }
+.schedule-page .sched-month-head .btn { min-width: 36px; font-size: 1.1rem; line-height: 1; }
+.schedule-page .sched-month {
+  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px;
+  margin: 0 12px 6px; padding: 8px 6px; border: 1px solid var(--line); border-radius: var(--radius);
+}
+.schedule-page .sched-month-dow { text-align: center; font-size: 11px; font-weight: 700; color: var(--muted); padding-bottom: 4px; }
+.schedule-page .sched-month-day {
+  display: grid; justify-items: center; align-content: center; gap: 3px; height: 50px; padding: 0;
+  border: 0; border-radius: 10px; background: none; color: var(--ink); font: inherit; cursor: pointer;
+}
+.schedule-page .sched-month-day:hover { background: var(--field); }
+.schedule-page .sched-month-day b {
+  display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%;
+  font-size: 0.9rem; font-weight: 600; border: 1.5px solid transparent;
+}
+.schedule-page .sched-month-day.out { color: var(--muted); opacity: 0.6; }
+.schedule-page .sched-month-day.on b { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); font-weight: 800; }
+.schedule-page .sched-month-day.today b { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 800; }
+.schedule-page .sched-month-dots { display: flex; gap: 3px; height: 5px; }
+.schedule-page .sched-month-dots i { width: 5px; height: 5px; border-radius: 50%; }
+.schedule-page .sched-month + .sched-day .sched-day-head { border-top: 0; }
+.schedule-page .sched-day > p { margin: 0 18px 10px; }
+
+/* --- Inbox (Messages.tsx) ------------------------------------------------- */
+.messages .messages-tools .btn { border-radius: var(--radius-control); }
+.messages .hub-list > .segmented { justify-self: stretch; display: flex; }
+.messages .hub-list > .segmented a { flex: 1; text-align: center; }
+.messages .hub-list > .search-input { border-radius: var(--radius-control); border-color: transparent; }
+.messages .conv-heading {
+  margin: 16px 10px 4px; font-size: 11px; font-weight: 800; letter-spacing: 0.1em; color: var(--muted);
+}
+/* .hub-items a would make the row a block; keep its avatar / text / time grid. */
+.messages .hub-items a.conv-row { display: grid; padding: 9px 10px; border-radius: var(--radius-control); }
+.messages .conv-row.active { background: var(--accent-soft); }
+.messages .conv-row .avatar { border-radius: 50%; }
+.messages .conv-time { align-self: start; padding-top: 3px; }
+/* Unread: bold, with an amber dot (unread counts are amber). */
+.messages .conv-row .notice-dot { right: 12px; bottom: 12px; width: 10px; height: 10px; margin: 0; background: var(--disc); }
+.messages .thread { border-radius: var(--radius); box-shadow: none; }
+.messages .thread-head { padding: 14px 18px; }
+.messages .thread-body { background: var(--bg); gap: 4px; }
+.messages .thread-foot { background: var(--card); }
+/* Bubbles: others' in a card with a line, your own in turf on the right. */
+.messages .message-text {
+  width: fit-content; max-width: min(520px, 100%); margin: 2px 0; padding: 8px 12px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 4px 14px 14px 14px;
+}
+.messages .message.mine { grid-template-columns: minmax(0, 1fr) 32px; }
+.messages .message.mine > .avatar { grid-column: 2; grid-row: 1; }
+.messages .message.mine .message-main { grid-column: 1; grid-row: 1; display: grid; justify-items: end; text-align: right; }
+.messages .message.mine.grouped .message-main { grid-column: 1; }
+.messages .message.mine .message-time { grid-column: 2; justify-self: start; }
+.messages .message.mine .message-text {
+  background: var(--accent); color: var(--on-accent); border-color: var(--accent); border-radius: 14px 4px 14px 14px; text-align: left;
+}
+.messages .message.mine .message-actions { grid-column: 1; justify-content: flex-end; }
+.messages .message-reactions span { background: var(--card); border: 1px solid var(--line); }
+.messages .message-reactions .mine { color: var(--accent-ink); border-color: var(--accent); }
+.messages .chat-input-row textarea { border-radius: var(--radius-control); background: var(--field); border-color: transparent; }
+.messages .chat-input-row textarea:focus { background: var(--card); border-color: var(--accent); outline: none; }
+
+/* --- Notifications (Notifications.tsx) ------------------------------------ */
+.notifications .toolbar { gap: 8px 10px; }
+.notifications .segmented { background: none; border: 0; padding: 0; gap: 6px; }
+.notifications .segmented button {
+  border: 1px solid var(--line-2); background: var(--card); color: var(--ink); font-size: 0.86rem; padding: 6px 14px;
+}
+.notifications .segmented button.on { background: var(--chip-on); color: var(--on-chip-on); border-color: var(--chip-on); box-shadow: none; }
+.notifications .notice-mark { font-weight: 700; text-decoration: none; }
+.notifications .notice-mark:hover:not(:disabled) { text-decoration: underline; }
+.notice-group {
+  margin-bottom: 14px; padding: 0; overflow: hidden;
+  background: var(--card); border: 1px solid var(--line);
+}
+.notice-group-head {
+  margin: 0; padding: 12px 18px 8px; font-size: 11px; font-weight: 800; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--muted);
+}
+.notice-group.needs .notice-group-head { color: var(--disc-ink); }
+.notifications .notice-list { gap: 0; }
+.notifications .notice { border: 0; border-top: 1px solid var(--line); border-radius: 0; padding: 12px 18px; }
+.notifications .notice:hover { background: var(--field); }
+.notifications .notice.unread { background: transparent; }
+.notifications .notice.unread:hover { background: var(--field); }
+.notifications .notice .notice-dot { order: 9; margin: 0 2px; width: 9px; height: 9px; background: transparent; }
+.notifications .notice.unread .notice-dot { background: var(--accent); }
+.notifications .notice > .avatar { order: -1; }
+.notifications .notice > .icon-btn { order: 10; }
+.notifications .notice .pill { background: var(--field); color: var(--ink-soft); }
+/* Follow requests waiting: the member's to do, in amber. */
+.notifications .notice-requests { margin: 0; }
+.notice-group.needs .notice-requests { background: var(--disc-soft); }
+.notice-group.needs .notice-requests:hover { background: var(--disc-soft); filter: brightness(0.98); }
+.notice-group.needs .notice-requests .notice-dot { background: var(--disc); }
+.notice-group.needs .notice-requests .pill { background: var(--disc); color: var(--on-disc); }
+
+/* --- Settings ------------------------------------------------------------ */
+.settings .settings-nav {
+  padding: 8px; gap: 2px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  top: 88px;
+}
+.settings .settings-nav a { padding: 10px 12px; border-radius: var(--radius-control); font-weight: 600; font-size: 0.94rem; color: var(--ink-soft); }
+.settings .settings-nav a.active { background: var(--accent-soft); color: var(--accent-ink); font-weight: 700; }
+.settings .settings-main .card { padding: 20px; box-shadow: none; }
+.settings .settings-main .card-title { font-size: 1.05rem; font-weight: 800; letter-spacing: -0.01em; }
+/* Uppercase muted sub-headings inside a group. */
+.settings .settings-main .card h3, .settings .settings-form legend {
+  font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
+}
+.settings .switch-row { padding: 14px 0; }
+.settings .switch-row b { font-weight: 700; }
+.settings .switch-row small { font-size: 0.82rem; }
+.settings .settings-form input:not([type="checkbox"]):not([type="radio"]), .settings .settings-form select, .settings .settings-form textarea {
+  border-radius: var(--radius-control); background: var(--card); border-color: var(--line-2);
+}
+.settings .settings-form input:focus, .settings .settings-form select:focus, .settings .settings-form textarea:focus {
+  outline: 2px solid var(--accent); outline-offset: 0; border-color: var(--accent);
+}
+.settings .notify-teams > li { border-top-color: var(--line); }
+.settings .notify-team-head b { font-weight: 700; }
+.notify-custom {
+  justify-self: start; padding: 2px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-ink);
+  font-size: 0.78rem; font-weight: 700;
+}
+/* Delete account: a plain card; its confirm is ink, not red. */
+.settings .danger-zone { border-color: var(--line); }
+/* Light / Dark / System (AppearanceSetting). */
+.theme-choice { display: inline-flex; gap: 2px; padding: 4px; border-radius: var(--radius-control); background: var(--field); flex-wrap: wrap; }
+.theme-choice button {
+  min-width: 84px; padding: 8px 16px; border: 0; border-radius: 9px; background: none; cursor: pointer;
+  color: var(--ink-soft); font: inherit; font-size: 0.9rem; font-weight: 600;
+}
+.theme-choice button:hover { color: var(--ink); }
+.theme-choice button.on { background: var(--card); color: var(--ink); font-weight: 700; box-shadow: 0 1px 3px rgb(0 0 0 / 0.12); }
+.theme-choice button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.settings-group > p { margin: 10px 0 0; }
+
+/* Personal details (PersonalGate's last step, Settings → Personal details). */
+.personal-finish { border-radius: var(--radius); }
+.personal-prompt { border-radius: var(--radius); border-left: 4px solid var(--disc); }
+
+/* --- Teams list (app/teams, MyTeams, TeamInvites) ------------------------- */
+.teams-page .team-list a, .teams-page .community-head { padding: 8px; border-radius: var(--radius-control); }
+.teams-page .team-list b, .teams-page .community-head b { font-weight: 700; }
+.teams-page .home-actions { margin: 0; gap: 8px; }
+.teams-page .team-invite-list li { padding: 4px 0; }
+.teams-page .card-title { font-weight: 800; }
+
+/* --- Create (CreateTeam) ------------------------------------------------- */
+.create-page .back-link { margin: 0 0 10px; font-size: 0.9rem; }
+.create-page .back-link a { color: var(--muted); font-weight: 600; text-decoration: none; }
+.create-page .back-link a:hover { color: var(--ink); text-decoration: underline; }
+.create-kinds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0 0 16px; padding: 0; list-style: none; }
+.create-kind {
+  display: grid; gap: 4px; height: 100%; padding: 14px 16px; border-radius: var(--radius);
+  background: var(--card); border: 1px solid var(--line); color: var(--ink); text-decoration: none;
+}
+.create-kind:hover { border-color: var(--accent); }
+.create-kind[aria-current="page"] { border: 2px solid var(--accent); background: var(--accent-soft); padding: 13px 15px; }
+.create-kind b { font-weight: 800; }
+.create-kind small { color: var(--muted); font-size: 0.82rem; line-height: 1.4; }
+.create-page .settings-form input, .create-page .settings-form select, .create-page .settings-form textarea {
+  border-radius: var(--radius-control); background: var(--card); border-color: var(--line-2);
+}
+@media (max-width: 640px) { .create-kinds { grid-template-columns: 1fr; } }
+
+/* --- Profile (ProfileDashboard) ------------------------------------------- */
+.dash .profile-card { box-shadow: none; }
+.dash .profile-card h1 { font-weight: 800; letter-spacing: -0.03em; }
+.dash .tile { justify-items: start; padding: 12px 14px; border: 0; background: var(--field); border-radius: var(--radius-control); }
+.dash .tile b { font-family: var(--font-score); font-weight: 800; font-size: 1.9rem; line-height: 1; color: var(--ink); }
+.dash .tile small { font-weight: 600; }
+.dash .team-list a { border-radius: var(--radius-control); }
+@media (max-width: 480px) { .dash .tiles { grid-template-columns: repeat(2, 1fr); } }
+/* ==== end Member pages =================================================== */

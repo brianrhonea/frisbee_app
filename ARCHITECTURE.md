@@ -170,24 +170,51 @@ sequenceDiagram
 
 **Endpoints** (all need an ID token; answers are `{}` unless noted)
 - Teams: `POST /v1/teams` → `{id}`; `PATCH /v1/teams/:id` (details +
-  listing); `PUT /v1/teams/:id/listing`; `POST /v1/invite-codes` →
-  `{code, teamId, expiresAt}`.
+  listing); `PUT /v1/teams/:id/listing`; `PUT /v1/teams/:id/sections`
+  (owner switches Playbook, Videos, Stats, Meetings; new teams start with
+  them off); `PUT /v1/teams/:id/public-page` `{public}` (manageTeam
+  admins of a team, not a group: `publicPage: false` on the team doc and
+  its listing, or removed; off, outsiders get the card only, as a
+  private group: `isPrivateHost`, `rosterIsPublic`, `showsPublic` in the
+  rules); `PUT /v1/teams/:id/allow-join-requests` `{on}` (F26:
+  manageTeam admins of a team, not a group or a league's team:
+  `allowJoinRequests: true` on the team doc and its listing, or removed;
+  off also deletes the requests waiting, in the same transaction);
+  `POST /v1/invite-codes` → `{code, teamId, expiresAt}`.
 - Joining: `POST /v1/teams/join` `{code}` → `{teamId}`;
   `POST /v1/teams/:id/members` (open group); `POST|DELETE
-  /v1/teams/:id/join-requests[/:uid]`; `POST
-  /v1/teams/:id/join-requests/:uid/approve`; `POST /v1/teams/:id/invites`
-  (the team's member managers, or its community's for a team it links);
-  `POST /v1/me/team-invites/:teamId/accept`; `DELETE
+  /v1/teams/:id/join-requests[/:uid]` (a group that approves who joins,
+  or a team with `allowJoinRequests`: for teams the API is the only
+  writer, and a club team's request and approval both run the club age
+  rule); `POST /v1/teams/:id/join-requests/:uid/approve` (manageMembers;
+  the same join checks as any join: existing membership, mute, club
+  age); `POST /v1/teams/:id/invites`
+  (the team's member managers, or its community's for a team it links;
+  the invite carries `teamId`); `GET /v1/teams/:id/invites` →
+  `PendingInvites` (the same people: who's invited and hasn't answered,
+  public cards, newest first, by a collection group query on
+  `teamInvites.teamId`, which has its index; invites from before
+  `teamId` aren't listed) and `DELETE /v1/teams/:id/invites/:uid`
+  (withdraw); `POST /v1/me/team-invites/:teamId/accept`; `DELETE
   /v1/me/team-invites/:teamId`.
 - Members: `DELETE /v1/teams/:id/members/:uid` (leave/remove); `PUT
-  /v1/teams/:id/members/:uid/role`; `PUT .../stat-keeper`; `POST
-  /v1/teams/:id/owner`; `PUT /v1/teams/:id/roles`.
+  /v1/teams/:id/members/:uid/role`; `PUT .../stat-keeper`; `PUT
+  /v1/teams/:id/members/:uid/permissions` `{perms}` (F25: the owner sets
+  a member's own permissions, `memberGrants.{uid}`; never the owner's or
+  a legacy coach's/captain's; `memberPerms` = role permissions ∪ grants,
+  recomputed by every writer); `POST /v1/teams/:id/owner`; `PUT
+  /v1/teams/:id/roles`.
 - Roster: `GET /v1/teams/:id/roster` → `TeamRoster` (any signed-in
   caller; a private group's only to its members; a youth team's only to
   its members and the member managers of the school or club community
   that accepted it, as `communityInvites()` in the rules), with a
-  community's linked teams in `teams`. The app reads `roster/*` from
-  Firestore, which the rules already keep to members.
+  community's linked teams in `teams`, and each player's `line`. The
+  app reads `roster/*` from Firestore, which the rules already keep to
+  members. `PUT /v1/teams/:id/roster-lines` `{lines: {spotId: "o" | "d"
+  | "both" | null}}` (a team's manageTeam admins; every spot must
+  exist) sets or clears roster spots' `line`; the rules let clients keep
+  or drop a spot's line, never set it, and saving a spot
+  (`roster-players`) keeps it.
 - Communities: `PUT|DELETE /v1/teams/:id/community`; `POST
   /v1/teams/:org/link-requests/:team/accept`; `DELETE
   /v1/teams/:org/link-requests/:team`; `PUT|DELETE
@@ -199,6 +226,14 @@ sequenceDiagram
 - Profile: `POST /v1/me/username` → `{username}`; `PUT
   /v1/me/profile/details`; `PUT /v1/me/profile/privacy`; `PUT
   /v1/me/profile/visibility`.
+- Download your data: `GET /v1/me/export` → `DataExport`
+  (`packages/shared/src/data_export.ts`) as a JSON attachment
+  (`apps/api/src/export`): the caller's own account, profile, personal
+  details, settings, follows, posts, comments, sent messages, teams with
+  their own role, their answers to events and meetings, personal events
+  and roster spots, each capped and marked `truncated`; others appear
+  only as team names and conversation names. Once per 10 minutes per
+  person (`limits/{uid}.exportedAt`, so every instance agrees).
 - Dashboard: `GET /v1/me/home[?before=]` → `MeHome` (own profile with
   `needsUsername`, teams with the caller's role, upcoming events they may
   see per `sees(e)`, and a paged feed of their posts and the people they
@@ -227,7 +262,10 @@ sequenceDiagram
   `authorName` only for public profiles.
 - Public tournaments (no token; `apps/api/src/tournaments/public_*.ts`):
   `GET /v1/public/tournaments` (upcoming and running published events,
-  as Find tournaments lists them), `/v1/public/tournaments/:id?division=`
+  as Find tournaments lists them; events open for team registration
+  carry `spots`, each division's cap less its seeds, which members'
+  live lists on both platforms read from here too),
+  `/v1/public/tournaments/:id?division=`
   (overview, divisions, accepted teams, team names, one division's
   games) and `/v1/public/group-tournaments/:groupId/:id` (a group
   tournament's public listing). Drafts (the rules' `visible()`) and
@@ -236,6 +274,10 @@ sequenceDiagram
   Same visitor limit as browse, `public, max-age=30`, and cached in
   each instance for 30s (`ttl_cache.ts`: at most 200 events, games by
   the division they resolve to, so `?division=` can't multiply reads).
+  Games carry their running score (`live`: scores and times, never who
+  kept it), and live events' cards in the list carry `liveGames` (the
+  games being played now, with the teams' public names) for Discover's
+  "Live now"; only games updated in the last 3 hours are read.
 - Public rankings (no token; `apps/api/src/rankings/public_*.ts`):
   `GET /v1/public/rankings` → `PublicRankings` (`packages/shared`
   `rankings.ts`): every team ranking by level then division, each with
@@ -464,18 +506,18 @@ the API is deployed and the URL is added. The `use_api_teams` flag in
 | 2 | Teams | join (code, link, open group, request/approve), invites, leave, remove, roles, permissions, transfer, edit details, community links, create team in community | Rule functions ported in `apps/api/src/teams/access.ts`, run in transactions (`MembershipService`); `use_api_membership` flag. `DELETE /v1/teams/:id` (`apps/api/src/teams/deletion.ts`) deletes a team on both platforms: it checks the typed name and refuses while the team hosts a tournament or league that hasn't finished (finished ones stay, read-only). The app's own cascade is the flag-off fallback and doesn't check hosted events. Club teams are for players 16 and over (`apps/api/src/teams/club_age.ts`, reading the date of birth through `PersonalService.birthDate`): joins and starts of club teams are API-only, so `firestore.rules` refuses them directly, the flag-off fallback can't join or start one, and with no personal-details key the API refuses them (503). Still direct: `migrateTiersToRoles` (edits chat rooms, item 10), roster | **Migrated** (fallback kept) |
 | 3 | Users | profile edit, username claim, privacy settings, personal details, message policy, delete account (callable today) | `apps/api/src/profiles`; `use_api_profiles` flag. Personal details are API-only from the start (`apps/api/src/personal`, no direct path). `/v1/me/message-policy` for the website (the app still writes `users/{uid}.messagePolicy` directly). Name, profile picture and header photo (`PUT /v1/me/identity`, `apps/api/src/account`) and notification settings (`/v1/me/notification-settings/*`) for the website; the app still writes them directly. Still direct: `publishSummary`, other `users/{uid}` settings (owner-only, unvalidated); delete account stays a callable | **Migrated** details, privacy, visibility, username (fallback kept) |
 | 4 | Media | upload URLs + server-side compression (§6) | `apps/api/src/media`: sniffing, sharp compression, HEIC via ffmpeg (`ffmpegHeicDecoder`), `transcodeJobs/{id}` + `transcode.ts` for the Cloud Run job; needs `STORAGE_BUCKET`. Not yet: the job's entry point and queue (until it's wired, `POST /v1/uploads` refuses videos for every purpose but chat with failed_precondition), signed URLs verified against real Storage, app callers (posts/chat/avatars still upload directly) | **API built**, app not switched |
-| 5 | Posts | posts, team posts, comments, likes, reposts | `apps/api/src/posts`: likes, reposts, text posts (create/edit/delete, photos from `/v1/uploads`), comments (the website uses them; the app still writes directly). Unit tests with fakes; emulator tests pending. `POST /v1/posts` also takes a typed-in workout (`workoutSchema`, no GPS route). `apps/api/src/hub`: team posts (create/edit/delete, photos from `teamImage` uploads). Event news (`tournamentKey`), tournament tags and event posts (`apps/api/src/posts/shared_event.ts`) too. Not yet: video in posts | **Players' posts, comments and team posts in the API**, app not switched |
+| 5 | Posts | posts, team posts, comments, likes, reposts | `apps/api/src/posts`: likes, reposts, text posts (create/edit/delete, photos from `/v1/uploads`), comments (the website uses them; the app still writes directly). Unit tests with fakes; emulator tests pending. `POST /v1/posts` also takes a typed-in workout (`workoutSchema`, no GPS route). `apps/api/src/hub`: team posts (create/edit/delete, photos from `teamImage` uploads). Event news (`tournamentKey`), tournament tags and event posts (`apps/api/src/posts/shared_event.ts`) too. Pinned team posts and comments on team posts (`PUT|DELETE /v1/teams/:id/posts/:postId/pin`, `POST /v1/teams/:id/posts/:postId/comments`, `DELETE .../comments/:commentId`; `apps/api/src/hub/team_post_extras.ts`; redesign F24) are API-only from the start: the app calls them too (none without `API_BASE_URL`); `firestore.rules` keeps `pinnedAt`, `pinnedBy` and `commentCount` out of a team post's keys and lets members only read comments; the limit is held in the server-only `teams/{id}/feed/pins`, and the `follows` functions keep `commentCount` and clear a deleted post's comments. Not yet: video in posts | **Players' posts, comments and team posts in the API**, app not switched |
 | 6 | Follows | follow, requests, accept | `apps/api/src/follows`, with notification read/clear (the website uses them; the app still writes directly). Unit tests with fakes; emulator tests pending | **In the API**, app not switched |
-| 7 | Events | team/personal events, RSVPs, polls; calendar sharing | `apps/api/src/calendar`: calendars (`calendars/{id}`: members and roles, pending invites; invitee copies in `users/{uid}/calendarInvites`), events on any calendar the caller can edit (`/v1/calendars/:id/events`, `validMine` ported; My calendar's stay in `users/{uid}/events`), and the ICS subscription feed (`/v1/ical/:token.ics`, token stored hashed). API-only: clients read only calendars they're on, never another calendar's events, and viewers get no notes. Unit and emulator tests; rules tests for `calendars`, `calendarInvites` and the feed records. The app still writes My calendar's events directly. Team events with their `publicEvents` copy, RSVPs, reactions and votes: `apps/api/src/hub` (the website uses them; the app still writes directly) | **Calendars, their events, team events and answers in the API**; app not switched |
-| 8 | Leagues & tournaments | hosted tournaments, leagues, signups, drafts | `apps/api/src/tournaments` (hosted events and leagues), with signups and drafts in item 14 and group tournaments in item 16. The website uses them; the app still writes directly and keeps the callables. Not yet: payments | **In the API**, app not switched |
+| 7 | Events | team/personal events, RSVPs, polls; calendar sharing | `apps/api/src/calendar`: calendars (`calendars/{id}`: members and roles, pending invites; invitee copies in `users/{uid}/calendarInvites`), events on any calendar the caller can edit (`/v1/calendars/:id/events`, `validMine` ported; My calendar's stay in `users/{uid}/events`), and the ICS subscription feed (`/v1/ical/:token.ics`, token stored hashed). API-only: clients read only calendars they're on, never another calendar's events, and viewers get no notes. Unit and emulator tests; rules tests for `calendars`, `calendarInvites` and the feed records. The app still writes My calendar's events directly. Team events with their `publicEvents` copy, RSVPs (with their notes, `rsvpNotes`; `note` on `PUT .../rsvp`), reactions and votes: `apps/api/src/hub` (the website uses them; the app still writes directly, notes under the rules' `validRsvpNote`) | **Calendars, their events, team events and answers in the API**; app not switched |
+| 8 | Leagues & tournaments | hosted tournaments, leagues, signups, drafts | `apps/api/src/tournaments` (hosted events and leagues), with signups and drafts in item 14 and group tournaments in item 16. The website uses them; the app still writes directly and keeps the callables. Live running scores (`POST`/`DELETE /v1/tournaments/:id/divisions/:divisionId/games/:gameId/live`, `liveScoreRequestSchema`; F1) are API-only from the start: the app calls them too (no direct path, none without `API_BASE_URL`), and `firestore.rules` keeps clients from setting `games/*.live`. Not yet: payments | **In the API**, app not switched |
 | 9 | Search & browse | `api-search`, `browse-*` callables → API GETs with caching | `apps/api/src/browse`: `/v1/public/*` (feed, posts, players, teams, the team finder, adult rosters, events, search; cached, with revalidation tags) and the members' `/v1/feed`; the website uses them. The app keeps `api-search` (`use_api_search` flag), and the `browse-*` callables only served the removed Flutter website (removable after the next hosting deploy, §9) | **In the API**, app not switched |
-| 10 | Chat & DMs | send, edit, react; rooms and folders | Writes via the API; reads stay Firestore listeners (§11.2). Team rooms: send, react, delete in `apps/api/src/hub`; DMs and groups (open, groups and members, send, react, delete, read, requests, archive, clear) in `apps/api/src/messages`. The website uses both; the app still writes directly. Rooms and folders (create, edit, access, arrange, delete): `apps/api/src/hub/rooms.ts`, and DM typing marks, for the website. Discord template import: `apps/api/src/discord` | **Team room messages and DMs in the API**, app not switched |
-| 12 | Playbook | save and delete plays | `apps/api/src/playbook` (the website uses it; the app still writes `teams/{id}/plays` directly) | **In the API**, app not switched |
-| 13 | Team videos | links, edit, move, remove; folders | `apps/api/src/videos` (the website uses it; the app still writes directly). Uploads from the website wait on the transcode job (item 4) | **In the API**, app not switched; uploads not yet |
+| 10 | Chat & DMs | send, edit, react; rooms and folders | Writes via the API; reads stay Firestore listeners (§11.2). Team rooms: send, react, delete in `apps/api/src/hub`; DMs and groups (open, groups and members, send, react, delete, read, requests, archive, clear) in `apps/api/src/messages`. The website uses both; the app still writes directly. Rooms and folders (create, edit, access, arrange, delete): `apps/api/src/hub/rooms.ts`, and DM typing marks, for the website. Discord template import: `apps/api/src/discord`. Pinned messages and event cards in team rooms (`PUT|DELETE .../messages/:id/pin`, `POST /v1/teams/:id/chats/:room/event-shares`; `apps/api/src/hub/chat_extras.ts`; redesign F2, F3) are API-only from the start: the app calls them too (none without `API_BASE_URL`), and `firestore.rules` already keeps clients from setting `pinnedAt`, `pinnedBy`, `event` or a room's `pins`. Polls in team rooms (redesign F33) too: `POST /v1/teams/:id/chats/:room/polls`, `PUT .../messages/:id/vote` (the caller's whole choice), `POST .../messages/:id/close-poll`; votes live on the message's `poll` (`votes`, `voterIds`), which the rules keep clients from setting | **Team room messages and DMs in the API**, app not switched |
+| 12 | Playbook | save and delete plays (and saved whiteboards: plays with `kind: "whiteboard"`, pen strokes in `drawings`) | `apps/api/src/playbook` (the website uses it; the app still writes `teams/{id}/plays` directly; a save that leaves out `kind`/`drawings` keeps the stored ones) | **In the API**, app not switched |
+| 13 | Team videos | links, edit, move, remove; folders | `apps/api/src/videos` (the website uses it; the app still writes directly). Uploads from the website wait on the transcode job (item 4). Notes, clips and comments on a video and its event tag (`POST .../videos/:id/comments`, `DELETE .../videos/:id/comments/:commentId`, `PUT .../videos/:id/event`; `apps/api/src/videos/extras.ts`; redesign F4–F6) are API-only from the start: the app calls them too (none without `API_BASE_URL`); `firestore.rules` lets members read comments and admins delete them (for the app's own video removal), and keeps `eventId` out of the video's writable keys | **In the API**, app not switched; uploads not yet |
 | 14 | Signups & drafts | player signups, drafted teams, captains' draft, league teams | `apps/api/src/drafts` (ports of the draft callables and `createLeagueTeams`; logic shared in `packages/shared/src/drafts.ts`, mirrored in `firebase/functions/src/tournaments/draft_model.ts` and `league.ts`, so change them together). The website uses it; the app keeps the callables and direct writes | **In the API**, app not switched |
 | 15 | Stats & roster players | stats games (live tracker), stats tournaments, roster spots and claims | `apps/api/src/stats` (own 90-a-minute bucket; tracker logic and `SaveQueue` in `packages/shared/src/stats_tracker.ts`). The website uses it; the app still writes directly | **In the API**, app not switched |
 | 16 | Group tournaments | create, publish, scores, bracket | `apps/api/src/group_tournaments` (model in `packages/shared/src/group_tournaments.ts`; `groupEngine` adapts the shared engine in `tournament_engine.ts`, ported from the app's). The website uses it; the app still writes directly | **In the API**, app not switched |
-| 11 | Meetings & voice | LiveKit tokens (callable today); meetings, requests, watch together, call chat | `apps/api/src/meetings` (token routes port the callables; needs the `LIVEKIT_*` env on Cloud Run, DEPLOY.md). The website uses it; the app keeps the callables and direct writes | **In the API**, app not switched |
+| 11 | Meetings & voice | LiveKit tokens (callable today); meetings, requests, watch together, call chat | `apps/api/src/meetings` (token routes port the callables; needs the `LIVEKIT_*` env on Cloud Run, DEPLOY.md; RSVPs take a `note`, as team events do). The website uses it; the app keeps the callables and direct writes | **In the API**, app not switched |
 | 12 | Payments | Hosts connect Stripe (payouts), payers' Checkout for bid, spot and entry fees, Stripe's webhook | `apps/api/src/payments` (new in the API, no callable or rules to port). Stripe Connect direct charges with Stall 10's fee as the application fee; needs `STRIPE_*` on Cloud Run (DEPLOY.md, "Payments"). Server-only collections `payoutAccounts`, `stripeAccounts`, `charges`, `stripePayments`, `stripeEvents` (no client rules); the webhook writes the existing `tournaments/{id}/payments/{payer}` | **In the API**, both clients use it (off until Stripe keys are set) |
 | — | Stays on device | theme, workout recording, playbook drawing (until saved) | | n/a |
 
@@ -508,6 +550,19 @@ Still open:
    are many endpoints.
 7. **Transcode cost.** ffmpeg on Cloud Run (recommended: CPU minutes only)
    vs. the Transcoder API ($0.015/min); revisit if video volume grows.
+
+Decided (2026-11-16):
+
+8. **Offline queue.** Messages, team chat, new posts, new
+   team posts and comments sent while the server can't be reached are
+   kept on the device and replayed in order (app `OutboxRepository`,
+   website `lib/outbox.ts`; shared rules in `packages/shared/src/outbox.ts`).
+   Each item's id is chosen before the first try and is both the
+   Firestore doc id and the API `id`, so a replay is idempotent
+   (`already_exists` counts as sent). The app sends through the same
+   repository code as a direct send, so it follows whatever path (API or
+   Firestore) that repository uses. Unsent items are stored unencrypted
+   in the app's support folder or the browser's IndexedDB.
 
 ## 12. Known issues
 

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../domain/models/invite_code.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/error_message.dart';
+import '../../core/ui/layout.dart' show Eyebrow;
 import '../view_models/invite_code_viewmodel.dart';
 
 /// The team's invite code for owners, coaches and captains. Hidden until
@@ -31,7 +33,10 @@ class InviteCodeCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Invite code', style: theme.textTheme.labelLarge),
+                      Eyebrow(
+                        'Invite code',
+                        color: AppColors.of(context).accentInk,
+                      ),
                       if (!viewModel.showing) ...[
                         const SizedBox(height: 4),
                         Text(
@@ -61,9 +66,13 @@ class InviteCodeCard extends StatelessWidget {
                       else ...[
                         SelectableText(
                           code,
-                          style: theme.textTheme.headlineMedium?.copyWith(
+                          style: TextStyle(
+                            fontFamily: scoreFont,
+                            fontSize: 36,
+                            height: 1.1,
                             letterSpacing: 4,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.of(context).ink,
                           ),
                         ),
                         const SizedBox(height: 4),

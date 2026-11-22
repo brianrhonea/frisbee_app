@@ -88,8 +88,11 @@ export function nextOwner(team: TeamMembers, uid: string): string | undefined {
   return best;
 }
 
-/** Event response maps holding one entry per member. */
-export const eventResponseFields = ["rsvps", "reactions", "votes"] as const;
+/**
+ * Response maps holding one entry per member: an event's, and a meeting's
+ * (rsvps and rsvpNotes only).
+ */
+export const eventResponseFields = ["rsvps", "rsvpNotes", "reactions", "votes"] as const;
 
 /** The event response maps that have an entry for `uid`. */
 export function eventResponsesOf(event: Data, uid: string): string[] {
@@ -97,6 +100,17 @@ export function eventResponsesOf(event: Data, uid: string): string[] {
     const m = event[f];
     return typeof m === "object" && m !== null && uid in (m as Data);
   });
+}
+
+/**
+ * Whether `uid` voted in a chat message's poll (redesign F33): their entry
+ * in `poll.votes` and `poll.voterIds` comes off when their account goes.
+ */
+export function votedInPoll(message: Data, uid: string): boolean {
+  const poll = message.poll;
+  if (typeof poll !== "object" || poll === null) return false;
+  const { votes, voterIds } = poll as Data;
+  return (Array.isArray(voterIds) && voterIds.includes(uid)) || (typeof votes === "object" && votes !== null && uid in (votes as Data));
 }
 
 interface TournamentTeamDoc extends Data {

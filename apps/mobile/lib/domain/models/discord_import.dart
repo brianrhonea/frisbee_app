@@ -126,6 +126,95 @@ class DiscordImportPlan {
   }
 }
 
+/// A category of a template's text channels, for the channel picker.
+class ChannelGroup {
+  const ChannelGroup({this.folderKey, this.name, required this.rooms});
+
+  /// The folder's key, or null for channels in no category.
+  final String? folderKey;
+
+  /// The category's name, or null for channels in no category.
+  final String? name;
+
+  /// Indexes into [DiscordImportPlan.rooms], in the plan's order.
+  final List<int> rooms;
+
+  /// [plan]'s text channels by category, as Discord lists them: those in
+  /// no category first, then each category in order. A room naming a
+  /// folder the plan doesn't have counts as in no category; categories
+  /// with no channels aren't listed (channelGroups in discord.ts).
+  static List<ChannelGroup> of(DiscordImportPlan plan) {
+    final keys = {for (final f in plan.folders) f.key};
+    final byKey = <String?, List<int>>{
+      null: [],
+      for (final f in plan.folders) f.key: [],
+    };
+    for (var i = 0; i < plan.rooms.length; i++) {
+      final key = plan.rooms[i].folderKey;
+      byKey[keys.contains(key) ? key : null]!.add(i);
+    }
+    return [
+      if (byKey[null]!.isNotEmpty) ChannelGroup(rooms: byKey[null]!),
+      for (final f in plan.folders)
+        if (byKey[f.key]!.isNotEmpty)
+          ChannelGroup(folderKey: f.key, name: f.name, rooms: byKey[f.key]!),
+    ];
+  }
+}
+
+/// A plan cut down to the channels picked, with room indexes mapped across
+/// (pickRooms in discord.ts).
+class PickedPlan {
+  const PickedPlan._(this.plan, this.from, this.overrides);
+
+  final DiscordImportPlan plan;
+
+  /// Picked room index → its index in the whole plan.
+  final List<int> from;
+
+  /// The overrides (by whole-plan index) for the picked rooms, by picked
+  /// index, for [DiscordTeamSplit.of].
+  final Map<int, String?> overrides;
+
+  /// Only the rooms in [picked] (indexes into [DiscordImportPlan.rooms];
+  /// ones out of range are ignored), in the plan's order. A category goes
+  /// too when a picked room is in it, or when it had no channels in the
+  /// template (as importing everything does), so unticking all of a
+  /// category's channels leaves it out. Roles are all kept. [overrides]
+  /// say where rooms go in a community with teams, by whole-plan index.
+  factory PickedPlan.of(
+    DiscordImportPlan plan,
+    Set<int> picked, {
+    Map<int, String?> overrides = const {},
+  }) {
+    final from = [
+      for (var i = 0; i < plan.rooms.length; i++)
+        if (picked.contains(i)) i,
+    ];
+    final rooms = [for (final i in from) plan.rooms[i]];
+    final used = {for (final r in rooms) ?r.folderKey};
+    final hadRooms = {for (final r in plan.rooms) ?r.folderKey};
+    return PickedPlan._(
+      DiscordImportPlan(
+        serverName: plan.serverName,
+        roles: plan.roles,
+        folders: [
+          for (final f in plan.folders)
+            if (used.contains(f.key) || !hadRooms.contains(f.key)) f,
+        ],
+        rooms: rooms,
+        skippedChannels: plan.skippedChannels,
+        skippedRoles: plan.skippedRoles,
+      ),
+      from,
+      {
+        for (final (i, whole) in from.indexed)
+          if (overrides.containsKey(whole)) i: overrides[whole],
+      },
+    );
+  }
+}
+
 /// The plan turned into this team's roles, folders and rooms, with new
 /// ids. Roles and folders whose names the team already has are reused, and
 /// rooms already in their folder by name are left alone, so importing the

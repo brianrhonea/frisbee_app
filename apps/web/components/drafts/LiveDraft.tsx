@@ -188,9 +188,10 @@ function Board(props: { user: User; tournamentId: string; divisionId: string; dr
     if (window.confirm(`Finish the draft? ${message}`)) act(() => draftApi.finish(user, tournamentId, divisionId));
   }
 
+  const clockText = running && left !== null ? `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}` : null;
   const banner: [string, string | null, string] =
     draft.status === "finished"
-      ? ["The draft is finished", "The captains' teams are saved.", "done"]
+      ? ["The draft is finished", "The captains' teams are saved.", "finished"]
       : draft.status === "done"
         ? ["Every player has been picked", manager ? "Finish the draft to make the teams." : null, "done"]
         : draft.status === "paused"
@@ -204,8 +205,15 @@ function Board(props: { user: User; tournamentId: string; divisionId: string; dr
   return (
     <>
       <div className={`draft-banner draft-banner-${banner[2]}`} role="status" aria-live="polite">
-        <b>{banner[0]}</b>
-        {banner[1] && <span>{banner[1]}</span>}
+        <div>
+          <b>{banner[0]}</b>
+          {banner[1] && <span>{banner[1]}</span>}
+        </div>
+        {clockText && (
+          <span className="draft-clock" aria-hidden>
+            {clockText}
+          </span>
+        )}
       </div>
 
       {manager && draft.status !== "finished" && (
@@ -226,7 +234,7 @@ function Board(props: { user: User; tournamentId: string; divisionId: string; dr
             </button>
           )}
           {draft.status === "live" && (
-            <button type="button" className={`btn btn-small${timeUp ? " btn-primary" : ""}`} disabled={busy} onClick={() => control("autopick")}>
+            <button type="button" className={`btn btn-small${timeUp ? " draft-btn-due" : ""}`} disabled={busy} onClick={() => control("autopick")}>
               Auto-pick
             </button>
           )}
@@ -235,7 +243,7 @@ function Board(props: { user: User; tournamentId: string; divisionId: string; dr
               Finish
             </button>
           )}
-          <button type="button" className="text-btn danger" disabled={busy} onClick={cancel}>
+          <button type="button" className="text-btn" disabled={busy} onClick={cancel}>
             Cancel draft
           </button>
         </div>
@@ -252,14 +260,23 @@ function Board(props: { user: User; tournamentId: string; divisionId: string; dr
       <h3 className="draft-subtitle">{draft.status === "finished" ? "Teams" : `Teams (${draft.picks.length} of ${poolSize} picked)`}</h3>
       <div className="draft-board">
         {draft.captains.map((c) => (
-          <section key={c.uid} className={`card draft-team${c.uid === clock && running ? " on-clock" : ""}`}>
-            <h4 className="card-title">Team {c.name}</h4>
-            <ol>
+          <section key={c.uid} className={`card draft-team${c.uid === clock && running ? ` on-clock${myTurn ? " mine" : ""}` : ""}`}>
+            <div className="draft-team-head">
+              <h4 className="card-title">Team {c.name}</h4>
+              <span className="draft-count">{draftTeamOf(draft.picks, c.uid).length}</span>
+            </div>
+            <ol className="draft-picks">
               {draftTeamOf(draft.picks, c.uid).map((id, i) => (
                 <li key={id}>
-                  {i === 0 && <span title="Captain">© </span>}
-                  {nameOf(id)}
-                  {details?.[id] && <span className="muted small"> · {details[id].skill ?? 3}</span>}
+                  <span>
+                    {nameOf(id)}
+                    {i === 0 && (
+                      <abbr className="draft-cap" title="Captain">
+                        C
+                      </abbr>
+                    )}
+                  </span>
+                  {details?.[id] && <span className="draft-skill">{details[id].skill ?? 3}</span>}
                 </li>
               ))}
             </ol>

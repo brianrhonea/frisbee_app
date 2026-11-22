@@ -41,6 +41,7 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
     _endsOn = start.add(const Duration(days: 1));
     _format = EventFormat.usual(_draft);
     save = Command0<String>(_save);
+    publish = Command0<String>(_publish);
     final id = tournamentId;
     if (id == null) {
       _watchHost(hostId!);
@@ -111,7 +112,50 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Saves it (a new event as a draft only the host's managers see).
   late final Command0<String> save;
+
+  /// Saves it and publishes it: a draft opens registration, as the event
+  /// page's "Publish and open registration" does. Only for drafts
+  /// ([isDraft]).
+  late final Command0<String> publish;
+
+  /// The form's steps, in order; the last is Review.
+  static const steps = [
+    'Details',
+    'When & where',
+    'Who can play',
+    'Format & divisions',
+    'Fees',
+    'Review',
+  ];
+
+  int _step = 0;
+
+  /// The step showing (an index into [steps]).
+  int get step => _step;
+  bool get onReview => _step == steps.length - 1;
+
+  void goTo(int step) {
+    final s = step.clamp(0, steps.length - 1);
+    if (s == _step) return;
+    _step = s;
+    notifyListeners();
+  }
+
+  void next() => goTo(_step + 1);
+  void back() => goTo(_step - 1);
+
+  /// Still a draft (or not created yet): the form offers Save draft and
+  /// Publish. A published event has a single Save, so editing it never
+  /// changes where it stands.
+  bool get isDraft =>
+      isNew || (_existing?.status ?? HostedStatus.draft) == HostedStatus.draft;
+
+  /// The new event Publish created but couldn't publish, so the screen
+  /// opens it as a draft instead of creating it again.
+  String? get createdDraftId => _createdDraftId;
+  String? _createdDraftId;
 
   /// The existing event's divisions, once loaded.
   List<TournamentDivision>? _divisions;
@@ -496,6 +540,19 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
     if (changes.isNotEmpty) {
       final r = await _repo.saveDivisions(t, changes);
       if (r case Error(:final error)) return Result.error(error);
+    }
+    return Result.ok(id);
+  }
+
+  Future<Result<String>> _publish() async {
+    if (!isDraft) return Result.error(Exception('It is already published.'));
+    final saved = await _save();
+    if (saved case Error(:final error)) return Result.error(error);
+    final id = (saved as Ok<String>).value;
+    final r = await _repo.setStatus(id, HostedStatus.registration);
+    if (r case Error(:final error)) {
+      if (isNew) _createdDraftId = id;
+      return Result.error(error);
     }
     return Result.ok(id);
   }

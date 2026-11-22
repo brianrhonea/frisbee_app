@@ -1,4 +1,5 @@
 import { type DocumentData, type Firestore, type Query, Timestamp } from "firebase-admin/firestore";
+import { teamPostPinsMax } from "@stall10/shared";
 import { pageSize, eventLimit } from "./model.js";
 import { hostFields } from "./visibility.js";
 import { searchLimit } from "../limits/model.js";
@@ -22,6 +23,7 @@ export interface BrowseRepository {
   listings(teamIds: string[]): Promise<Map<string, Data>>;
   /** Team docs by id, only the fields visibility.ts checks (hostFields); missing ones left out. */
   teams(teamIds: string[]): Promise<Map<string, Data>>;
+  /** The newest public posts and the pinned public ones (F24), each once. */
   publicTeamPosts(teamId: string): Promise<Doc[]>;
   upcomingTeamEvents(teamId: string, now: number): Promise<Doc[]>;
   /** Upcoming public events across all teams, with their team's id. */
@@ -91,13 +93,20 @@ export class FirestoreBrowseRepository implements BrowseRepository {
   }
 
   async publicTeamPosts(teamId: string): Promise<Doc[]> {
-    const snap = await this.db
-      .collection(`teams/${teamId}/posts`)
-      .where("public", "==", true)
-      .orderBy("createdAt", "desc")
-      .limit(pageSize)
-      .get();
-    return snap.docs.map(doc);
+    const posts = this.db.collection(`teams/${teamId}/posts`).where("public", "==", true);
+    // public + pinnedAt has a composite index (firestore.indexes.json).
+    const [recent, pinned] = await Promise.all([
+      posts.orderBy("createdAt", "desc").limit(pageSize).get(),
+      // Without the index (not yet built), the page still shows, unpinned.
+      posts
+        .orderBy("pinnedAt", "desc")
+        .limit(teamPostPinsMax)
+        .get()
+        .catch(() => ({ docs: [] })),
+    ]);
+    const byId = new Map<string, Doc>();
+    for (const d of [...pinned.docs, ...recent.docs]) byId.set(d.id, doc(d));
+    return [...byId.values()];
   }
 
   async upcomingTeamEvents(teamId: string, now: number): Promise<Doc[]> {

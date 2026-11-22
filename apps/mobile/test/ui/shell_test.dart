@@ -20,13 +20,13 @@ void main() {
     ];
 
     expect(labels('/home'), ['Home']);
-    expect(labels('/messages'), ['Messages']);
-    expect(labels('/explore'), ['Explore']);
-    expect(labels('/schedule'), ['Events']);
+    expect(labels('/messages'), ['Inbox']);
+    expect(labels('/explore'), ['Discover']);
+    expect(labels('/schedule'), ['Schedule']);
     expect(links('/explore'), [null], reason: "you're already there");
 
-    // Pages opened from Explore lead back to it.
-    expect(labels('/players/u2'), ['Explore', 'Player']);
+    // Pages opened from Discover lead back to it.
+    expect(labels('/players/u2'), ['Discover', 'Player']);
 
     expect(labels('/teams/t1'), ['Teams', 'Cascades']);
     expect(labels('/teams/t1/roster'), ['Teams', 'Cascades', 'Roster']);
@@ -34,8 +34,20 @@ void main() {
     expect(labels('/teams/t1?section=roster'), ['Teams', 'Cascades', 'Roster']);
     expect(labels('/teams/t9'), ['Teams', 'Team']);
 
-    expect(labels('/rankings?d=club-mixed'), ['Explore', 'Rankings']);
+    expect(labels('/rankings?d=club-mixed'), ['Discover', 'Rankings']);
     expect(links('/rankings'), [Routes.explorePath, null]);
+  });
+
+  test('the tabs are Home, Discover, Schedule, Teams and Inbox', () {
+    // The website's nav uses the same names, in the same order.
+    expect(
+      [for (final s in ShellSection.tabs) s.shortLabel],
+      ['Home', 'Discover', 'Schedule', 'Teams', 'Inbox'],
+    );
+    expect(
+      [for (final s in ShellSection.tabs) s.label],
+      ['Home', 'Discover', 'Schedule', 'Teams', 'Inbox'],
+    );
   });
 
   test('screen sizes follow the phone, tablet and desktop breakpoints', () {

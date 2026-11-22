@@ -1,6 +1,7 @@
 "use client";
-import { type FieldPoint, fieldYards, type PlayArrow, type PlayElement } from "@stall10/shared";
-import { type PointerEvent, useId, useRef } from "react";
+import { type DrawingColor, type FieldPoint, fieldYards, type PlayArrow, type PlayDrawing, type PlayElement } from "@stall10/shared";
+import { type PointerEvent, type RefObject, useEffect, useId, useRef, useState } from "react";
+import { hitDrawing, smoothPath } from "./whiteboard_state";
 
 const L = fieldYards.length;
 const W = fieldYards.width;
@@ -10,33 +11,59 @@ const toSvg = (p: FieldPoint) => ({ x: p.y * L, y: p.x * W });
 const clamp = (v: number) => Math.min(1, Math.max(0, v));
 const toField = (x: number, y: number): FieldPoint => ({ x: clamp(y / W), y: clamp(x / L) });
 
-/** What the pointer touched: a piece, an arrow, or the grass at a point. */
-export type FieldHit = { kind: "element" | "arrow"; id: string; at: FieldPoint } | { kind: "field"; at: FieldPoint };
+/** What the pointer touched: a piece, an arrow, a pen stroke, or the grass at a point. */
+export type FieldHit = { kind: "element" | "arrow" | "drawing"; id: string; at: FieldPoint } | { kind: "field"; at: FieldPoint };
 
 interface FieldHandlers {
   onDown?: (hit: FieldHit) => void;
-  onMove?: (at: FieldPoint) => void;
+  /** While the pointer is down; [drawing] is the pen stroke under it now, if any. */
+  onMove?: (at: FieldPoint, drawing: string | null) => void;
   onUp?: (at: FieldPoint) => void;
+}
+
+/** A pen stroke's width in field units: 1% of the short side, and at least 2.5px (FieldPainter). */
+function useStrokeWidth(svg: RefObject<SVGSVGElement | null>, on: boolean) {
+  const [width, setWidth] = useState(W * 0.01);
+  useEffect(() => {
+    const el = svg.current;
+    if (!on || !el || typeof ResizeObserver === "undefined") return;
+    const measure = () => {
+      const px = el.getBoundingClientRect().width;
+      if (px > 0) setWidth(Math.max(W * 0.01, (2.5 * L) / px));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [svg, on]);
+  return width;
 }
 
 /**
  * A play on a sideways field (the length running left to right, as the
- * app shows it in landscape): end zones, brick marks, arrows, pieces, and
- * in a step the trails each piece takes. With [handlers] it takes the
- * pointer (mouse, pen or touch) for the editor.
+ * app shows it in landscape): end zones, brick marks, pen strokes, arrows,
+ * pieces, and in a step the trails each piece takes. With [handlers] it
+ * takes one pointer at a time (mouse, pen or touch) for the editors.
  */
 export function PlayField({
   elements,
   arrows,
+  drawings,
+  draft,
   positions,
   trails,
   ghost,
   selected,
   label,
   handlers,
+  className,
 }: {
   elements: PlayElement[];
   arrows: PlayArrow[];
+  /** Freehand pen strokes, on the grass under arrows and pieces. */
+  drawings?: PlayDrawing[];
+  /** A pen stroke being drawn. */
+  draft?: { color: DrawingColor; points: FieldPoint[] } | null;
   /** Where each piece is shown, if not its setup position. */
   positions?: Record<string, FieldPoint>;
   /** Paths drawn faintly under the pieces (a step's movement). */
@@ -46,9 +73,18 @@ export function PlayField({
   selected?: string | null;
   label: string;
   handlers?: FieldHandlers;
+  className?: string;
 }) {
   const svg = useRef<SVGSVGElement>(null);
   const marker = useId().replace(/:/g, "");
+  const pointer = useRef<number | null>(null);
+  const strokes = drawings ?? [];
+  const penWidth = useStrokeWidth(svg, strokes.length > 0 || !!draft || !!handlers);
+  // Handlers taken away mid-gesture (playback started) leave no pointer held.
+  const editable = !!handlers;
+  useEffect(() => {
+    if (!editable) pointer.current = null;
+  }, [editable]);
 
   function point(e: PointerEvent): FieldPoint {
     const el = svg.current!;
@@ -57,10 +93,16 @@ export function PlayField({
     const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(m.inverse());
     return toField(p.x, p.y);
   }
-  function hit(at: FieldPoint, target: EventTarget): FieldHit {
-    const t = (target as Element).closest?.("[data-id]");
+  /** Field units (yards) per screen pixel. */
+  function unitsPerPx(): number {
+    const px = svg.current?.getBoundingClientRect().width ?? 0;
+    return px > 0 ? L / px : 0.5;
+  }
+  function hit(at: FieldPoint, target: EventTarget | null): FieldHit {
+    const t = (target as Element | null)?.closest?.("[data-id]");
     const id = t?.getAttribute("data-id");
     const kind = t?.getAttribute("data-kind");
+    // A piece or arrow clicked directly wins.
     if (id && (kind === "element" || kind === "arrow")) return { kind, id, at };
     // Near a piece counts too, so small dots are easy to grab.
     const s = toSvg(at);
@@ -70,28 +112,47 @@ export function PlayField({
       const d = Math.hypot(q.x - s.x, q.y - s.y);
       if (d < 3.2 && (!best || d < best.d)) best = { id: e.id, d };
     }
-    return best ? { kind: "element", id: best.id, at } : { kind: "field", at };
+    if (best) return { kind: "element", id: best.id, at };
+    // Then a pen stroke within reach (14px, as the app's FieldGeometry).
+    const stroke = hitDrawing(strokes, at, Math.max(1.6, 14 * unitsPerPx()));
+    return stroke ? { kind: "drawing", id: stroke, at } : { kind: "field", at };
   }
+  const end = (e: PointerEvent) => {
+    if (pointer.current !== e.pointerId) return;
+    pointer.current = null;
+    handlers?.onUp?.(point(e));
+  };
 
   const line = (pts: FieldPoint[]) => pts.map((p) => `${toSvg(p).x.toFixed(2)},${toSvg(p).y.toFixed(2)}`).join(" ");
   return (
     <svg
       ref={svg}
-      className={`field${handlers ? " field-edit" : ""}`}
+      className={`field${handlers ? " field-edit" : ""}${className ? ` ${className}` : ""}`}
       viewBox={`0 0 ${L} ${W}`}
       role="img"
       aria-label={label}
       onPointerDown={
         handlers &&
         ((e) => {
-          if (e.button !== 0) return;
+          // One pointer at a time: a second finger doesn't start another stroke.
+          if (e.button !== 0 || pointer.current !== null) return;
+          pointer.current = e.pointerId;
           (e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId);
-          const at = point(e);
-          handlers.onDown?.(hit(at, e.target));
+          handlers.onDown?.(hit(point(e), e.target));
         })
       }
-      onPointerMove={handlers && ((e) => e.buttons && handlers.onMove?.(point(e)))}
-      onPointerUp={handlers && ((e) => handlers.onUp?.(point(e)))}
+      onPointerMove={
+        handlers &&
+        ((e) => {
+          if (pointer.current !== e.pointerId || !e.buttons) return;
+          const at = point(e);
+          // Captured moves all target the field itself, so the stroke is found by distance.
+          handlers.onMove?.(at, hitDrawing(strokes, at, Math.max(1.6, 14 * unitsPerPx())));
+        })
+      }
+      onPointerUp={handlers && end}
+      onPointerCancel={handlers && end}
+      onLostPointerCapture={handlers && end}
     >
       <defs>
         <marker id={`a${marker}`} viewBox="0 0 6 6" refX="5" refY="3" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
@@ -107,6 +168,10 @@ export function PlayField({
           <line x1={x} y1={W / 2 - 0.6} x2={x} y2={W / 2 + 0.6} />
         </g>
       ))}
+      {strokes.map((d) => (
+        <path key={d.id} data-id={d.id} data-kind="drawing" d={smoothPath(d.points.map(toSvg))} className={`field-pen ${d.color}`} strokeWidth={penWidth} />
+      ))}
+      {draft && draft.points.length > 1 && <path d={smoothPath(draft.points.map(toSvg))} className={`field-pen ${draft.color}`} strokeWidth={penWidth} />}
       {(trails ?? []).map((t) => (
         <polyline key={`t-${t.id}`} points={line(t.points)} className={t.disc ? "field-trail disc" : "field-trail"} markerEnd={`url(#a${marker})`} />
       ))}

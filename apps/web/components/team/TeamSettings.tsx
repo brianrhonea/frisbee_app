@@ -1,5 +1,16 @@
 "use client";
-import { competitionLevels, type EditTeamRequest } from "@stall10/shared";
+import {
+  allowJoinRequestsDescription,
+  competitionLevels,
+  type EditTeamRequest,
+  optionalTeamSections,
+  publicPageDescription,
+  publicPageOn,
+  sectionOn,
+  type SetAllowJoinRequestsRequest,
+  type SetPublicPageRequest,
+  type SetTeamSectionsRequest,
+} from "@stall10/shared";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { callApi } from "@/lib/client";
@@ -10,9 +21,12 @@ import { InviteButton, useInvite } from "./InviteDialog";
 import { JoinRequests } from "./JoinRequests";
 import { useTeamHub } from "./TeamContext";
 import { TeamRoles } from "./TeamRoles";
+import { MemberPermissions, ownPermissionsLabel } from "./MemberPermissions";
 import { DiscordImport } from "./DiscordImport";
 import { TeamCommunity } from "./CommunityAdmin";
 import { MembersOnlySection } from "./TeamNav";
+import { LEAVE_CONFIRM } from "./TeamContext";
+import { optionalSectionInfo } from "./SectionGate";
 
 /** The team doc's editable details (Team.toEditableMap in the app). */
 interface Details {
@@ -28,7 +42,7 @@ const levelLabels: Record<string, string> = { club: "Club", college: "College", 
 
 /**
  * A team's or group's settings, for its members: details (manageTeam),
- * the invite dialog, join requests and who has which role (manageMembers),
+ * a team's sections (Settings › Sections; the owner switches them), the invite dialog, join requests and who has which role (manageMembers),
  * handing it to someone else (the owner), and leaving.
  */
 export function TeamSettings() {
@@ -39,6 +53,9 @@ export function TeamSettings() {
   return (
     <div className="stack settings-stack">
       {viewer.can("manageTeam") && <DetailsForm />}
+      {/* A league team has only its chat and members (TeamSection.forKind in the app). */}
+      {kind === "team" && !viewer.team.leagueId && <SectionsCard />}
+      {kind === "team" && !viewer.team.leagueId && <PublicPageCard />}
       {viewer.can("manageMembers") && <InviteCard />}
       {invite.hasRequests && <JoinRequests teamId={teamId} requests={invite.requests} />}
       {viewer.can("manageMembers") && <MemberRoles />}
@@ -151,6 +168,111 @@ function DetailsForm() {
 }
 
 /**
+ * Settings › Sections (team_settings_screen.dart): a switch for each of
+ * Playbook, Videos, Stats and Meetings. Everyone on the team sees them;
+ * only the owner can switch (`PUT /v1/teams/:id/sections`). The live team
+ * doc shows the result.
+ */
+function SectionsCard() {
+  const { teamId, viewer } = useTeamHub();
+  const { act, busy, error } = useAct();
+  // The switch in flight, until the live team doc shows it.
+  const [pending, setPending] = useState<{ section: string; on: boolean } | null>(null);
+  if (viewer.state !== "member") return null;
+  const owner = viewer.tier === "owner";
+  return (
+    <section className="card settings-form team-sections" id="sections">
+      <h2 className="card-title">Sections</h2>
+      {optionalTeamSections.map((s) => (
+        <label key={s} className={`switch-row${owner ? "" : " switch-row-locked"}`}>
+          <span>
+            <b>{optionalSectionInfo[s].label}</b>
+            <small className="muted">{optionalSectionInfo[s].description}</small>
+          </span>
+          <input
+            type="checkbox"
+            role="switch"
+            checked={pending?.section === s ? pending.on : sectionOn(viewer.team, s)}
+            disabled={!owner || busy}
+            onChange={(e) => {
+              const body: SetTeamSectionsRequest = { [s]: e.target.checked };
+              setPending({ section: s, on: e.target.checked });
+              void act(`/v1/teams/${encodeURIComponent(teamId)}/sections`, "PUT", body).finally(() => setPending(null));
+            }}
+          />
+        </label>
+      ))}
+      <p className="muted small">
+        {owner
+          ? "Feed, Schedule, Chat and Roster are always on. Turned-off sections are hidden from everyone on the team; turning one back on brings back what it had."
+          : "Only the owner can turn sections on or off."}
+      </p>
+      <Status error={error} ok={null} />
+    </section>
+  );
+}
+
+/**
+ * Settings › Visibility (team_settings_screen.dart): the "Public team
+ * page" switch. Everyone on the team sees it; admins (manageTeam) switch
+ * it (`PUT /v1/teams/:id/public-page`), which rewrites the listing too.
+ * The live team doc shows the result.
+ */
+function PublicPageCard() {
+  const { teamId, viewer } = useTeamHub();
+  const { act, busy, error } = useAct();
+  // The switch in flight, until the live team doc shows it.
+  const [pending, setPending] = useState<boolean | null>(null);
+  const [asking, setAsking] = useState<boolean | null>(null);
+  if (viewer.state !== "member") return null;
+  const admin = viewer.can("manageTeam");
+  // "Allow join requests" (F26): off declines those waiting, so it asks first.
+  function setRequests(on: boolean) {
+    if (!on && !window.confirm("Stop taking join requests? Anyone still waiting is declined. People can still join with an invite.")) return;
+    const body: SetAllowJoinRequestsRequest = { on };
+    setAsking(on);
+    void act(`/v1/teams/${encodeURIComponent(teamId)}/allow-join-requests`, "PUT", body).finally(() => setAsking(null));
+  }
+  return (
+    <section className="card settings-form team-sections team-visibility" id="visibility">
+      <h2 className="card-title">Visibility</h2>
+      <label className={`switch-row${admin ? "" : " switch-row-locked"}`}>
+        <span>
+          <b>Public team page</b>
+          <small className="muted">{publicPageDescription}</small>
+        </span>
+        <input
+          type="checkbox"
+          role="switch"
+          checked={pending ?? publicPageOn(viewer.team)}
+          disabled={!admin || busy}
+          onChange={(e) => {
+            const body: SetPublicPageRequest = { public: e.target.checked };
+            setPending(e.target.checked);
+            void act(`/v1/teams/${encodeURIComponent(teamId)}/public-page`, "PUT", body).finally(() => setPending(null));
+          }}
+        />
+      </label>
+      <label className={`switch-row${admin ? "" : " switch-row-locked"}`}>
+        <span>
+          <b>Allow join requests</b>
+          <small className="muted">{allowJoinRequestsDescription}</small>
+        </span>
+        <input
+          type="checkbox"
+          role="switch"
+          checked={asking ?? viewer.team.allowJoinRequests === true}
+          disabled={!admin || busy}
+          onChange={(e) => setRequests(e.target.checked)}
+        />
+      </label>
+      {!admin && <p className="muted small">Only the team&apos;s admins can change this.</p>}
+      <Status error={error} ok={null} />
+    </section>
+  );
+}
+
+/**
  * Inviting lives in the hub's one invite dialog (a link, people by name,
  * join requests); Settings opens it too.
  */
@@ -174,6 +296,8 @@ function InviteCard() {
 function MemberRoles() {
   const { teamId, kind, viewer } = useTeamHub();
   const { act, busy, error } = useAct();
+  // Whose permission switches are open (F25; the owner's).
+  const [editing, setEditing] = useState<string | null>(null);
   if (viewer.state !== "member") return null;
   const team = viewer.team;
   const me = viewer.uid;
@@ -190,6 +314,7 @@ function MemberRoles() {
               <th>Member</th>
               <th>Role</th>
               {owner && kind === "team" && <th>Keeps stats</th>}
+              {owner && <th>Permissions</th>}
               <th />
             </tr>
           </thead>
@@ -234,11 +359,27 @@ function MemberRoles() {
                       />
                     </td>
                   )}
+                  {owner && (
+                    <td>
+                      {tier === "player" || tier === "stats" ? (
+                        <>
+                          <span className="muted">{ownPermissionsLabel(team, uid, kind !== "team") ?? "None"}</span>{" "}
+                          {tier === "player" && uid !== me && (
+                            <button type="button" className="text-btn" disabled={busy} aria-label={`Permissions for ${team.memberNames?.[uid] ?? "member"}`} onClick={() => setEditing(uid)}>
+                              Edit
+                            </button>
+                          )}
+                        </>
+                      ) : (
+                        <span className="muted">All</span>
+                      )}
+                    </td>
+                  )}
                   <td>
                     {!fixed && (
                       <button
                         type="button"
-                        className="text-btn danger"
+                        className="text-btn"
                         disabled={busy}
                         onClick={() => {
                           if (window.confirm(`Remove ${team.memberNames?.[uid] ?? "this member"}?`)) {
@@ -256,8 +397,13 @@ function MemberRoles() {
           </tbody>
         </table>
       </div>
+      {owner && editing && (team.memberIds ?? []).includes(editing) && (
+        <MemberPermissions key={editing} teamId={teamId} team={team} uid={editing} group={kind !== "team"} onClose={() => setEditing(null)} />
+      )}
       <p className="muted small">
-        {owner ? "Give members custom roles and permissions under Roles below." : "The owner sets custom roles and their permissions."}
+        {owner
+          ? "Give someone a preset or their own permissions with Edit, or custom roles under Roles below."
+          : "The owner sets custom roles and their permissions."}
       </p>
       <Status error={error} ok={null} />
     </section>
@@ -273,7 +419,7 @@ function TransferOwnership() {
   const others = (team.memberIds ?? []).filter((u) => u !== viewer.uid);
   return (
     <section className="card settings-form danger-zone">
-      <h2 className="card-title">Hand over the {kind === "team" ? "team" : "group"}</h2>
+      <h2 className="card-title">Hand over the {kind === "team" ? "team" : "community"}</h2>
       <p className="muted small">The new owner gets full control; you stay on as a coach. Owners can&apos;t leave until they hand it over.</p>
       <div className="form-row">
         <label>
@@ -292,7 +438,7 @@ function TransferOwnership() {
         <Status error={error} ok={ok} />
         <button
           type="button"
-          className="btn btn-danger"
+          className="btn btn-quiet"
           disabled={busy || !to}
           onClick={() => {
             if (window.confirm(`Make ${team.memberNames?.[to] ?? "them"} the owner?`)) {
@@ -315,7 +461,7 @@ function DeleteTeam() {
   // As the rules ask: the owner removes everyone else, or hands it on, first.
   const others = Math.max(0, (viewer.state === "member" ? (viewer.team.memberIds?.length ?? 1) : 1) - 1);
   const { act, busy, error } = useAct();
-  const noun = kind === "team" ? "team" : kind === "organization" ? "community" : "group";
+  const noun = kind === "team" ? "team" : "community";
   const matches = typed.trim().toLowerCase() === name.trim().toLowerCase();
   return (
     <section className="card settings-form danger-zone">
@@ -337,7 +483,7 @@ function DeleteTeam() {
         <Status error={error} ok={null} />
         <button
           type="button"
-          className="btn btn-danger"
+          className="btn btn-quiet"
           disabled={busy || !matches || others > 0}
           onClick={() => {
             if (!window.confirm(`Delete ${name} for everyone? This can't be undone.`)) return;
@@ -364,10 +510,10 @@ function LeaveTeam({ teamId }: { teamId: string }) {
         <Status error={error} ok={null} />
         <button
           type="button"
-          className="btn btn-danger"
+          className="btn btn-quiet"
           disabled={busy || !user}
           onClick={() => {
-            if (!user || !window.confirm("Leave? You'll need a new invite to come back.")) return;
+            if (!user || !window.confirm(LEAVE_CONFIRM)) return;
             void act(`/v1/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(user.uid)}`, "DELETE").then((r) => {
               if (r !== null) router.push("/teams");
             });

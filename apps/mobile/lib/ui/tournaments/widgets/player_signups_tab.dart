@@ -5,22 +5,25 @@ import 'package:intl/intl.dart';
 import '../../../domain/models/hosted_tournament.dart';
 import '../../../domain/models/live_draft.dart';
 import '../../../routing/routes.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
+import '../../core/ui/layout.dart' show PersonAvatar;
 import '../../core/ui/status_views.dart';
+import '../../group_tournaments/widgets/hat_parts.dart'
+    show GenderSplitBar, LegendDot, genderColor;
 import '../../payments/widgets/payment_widgets.dart';
 import '../view_models/hosted_tournament_viewmodel.dart';
 import '../view_models/player_signups_viewmodel.dart';
 import 'tournament_dialogs.dart';
+import 'tournament_parts.dart' show Pill, PillTone, RowsCard, StatTile;
 
-Color _statusColor(BuildContext context, SignupStatus s) {
-  final scheme = Theme.of(context).colorScheme;
-  return switch (s) {
-    SignupStatus.accepted => scheme.primaryContainer,
-    SignupStatus.waitlisted => scheme.tertiaryContainer,
-    SignupStatus.declined || SignupStatus.withdrawn => scheme.errorContainer,
-    SignupStatus.applied => scheme.surfaceContainerHighest,
-  };
-}
+/// Accepted is settled (turf); everything else is a plain fact. A new
+/// signup is the host's to decide, so [hostView] shows it in amber.
+PillTone _statusTone(SignupStatus s, {bool hostView = false}) => switch (s) {
+  SignupStatus.accepted => PillTone.turf,
+  SignupStatus.applied when hostView => PillTone.needsYou,
+  _ => PillTone.neutral,
+};
 
 /// Where the user stands as a player: a Sign up button, or their signup
 /// with its status, fee and Edit/Withdraw. For player-entry tournaments
@@ -59,7 +62,7 @@ class PlayerSignupCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final c = AppColors.of(context);
     final t = viewModel.tournament!;
     final fee = t.entryFee;
     final mine = signups.mine;
@@ -81,9 +84,24 @@ class PlayerSignupCard extends StatelessWidget {
           ? const SizedBox.shrink()
           : Padding(
               padding: const EdgeInsets.only(top: 16),
-              child: Text(note, style: theme.textTheme.bodyMedium),
+              child: Text(
+                note,
+                style: TextStyle(fontSize: 13.5, color: c.ink2),
+              ),
             );
     }
+    final title = TextStyle(
+      fontSize: 15,
+      fontWeight: FontWeight.w800,
+      color: c.ink,
+    );
+    final body = TextStyle(fontSize: 13.5, color: c.ink2, height: 1.35);
+    final paid = mine != null && signups.isPaid(mine.uid);
+    final overdue =
+        fee != null &&
+        mine != null &&
+        !paid &&
+        signups.isOverdue(mine.uid, fee, (now ?? DateTime.now)());
     return Card(
       margin: const EdgeInsets.only(top: 16),
       child: Padding(
@@ -92,7 +110,7 @@ class PlayerSignupCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (!isIn) ...[
-              Text('Play in ${t.name}', style: theme.textTheme.titleSmall),
+              Text('Play in ${t.name}', style: title),
               const SizedBox(height: 4),
               Text(
                 [
@@ -103,9 +121,13 @@ class PlayerSignupCard extends StatelessWidget {
                       : 'Sign up on your own; the host builds balanced teams '
                             'from everyone who signs up.',
                 ].join(' '),
+                style: body,
               ),
               const SizedBox(height: 12),
               FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                ),
                 onPressed: signups.signUp.running
                     ? null
                     : () => _signUp(context),
@@ -115,13 +137,9 @@ class PlayerSignupCard extends StatelessWidget {
             ] else ...[
               Row(
                 children: [
-                  Text('Your signup', style: theme.textTheme.titleSmall),
+                  Text('Your signup', style: title),
                   const SizedBox(width: 8),
-                  Chip(
-                    label: Text(mine!.status.label),
-                    backgroundColor: _statusColor(context, mine.status),
-                    visualDensity: VisualDensity.compact,
-                  ),
+                  Pill(mine!.status.label, tone: _statusTone(mine.status)),
                 ],
               ),
               const SizedBox(height: 4),
@@ -132,12 +150,18 @@ class PlayerSignupCard extends StatelessWidget {
                   'Skill ${mine.skill}',
                   if (mine.gender != null) mine.gender!.label,
                 ].join(' · '),
+                style: body,
               ),
               if (signups.myDraft case final draft?
                   when draft.status != DraftStatus.finished)
                 Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: FilledButton.tonalIcon(
+                  padding: const EdgeInsets.only(top: 10),
+                  // Live: scoreboard navy.
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: c.feature,
+                      foregroundColor: c.onFeature,
+                    ),
                     onPressed: () => context.push(
                       Routes.tournamentLiveDraft(
                         viewModel.tournamentId,
@@ -155,20 +179,30 @@ class PlayerSignupCard extends StatelessWidget {
               if (fee != null &&
                   (mine.status == SignupStatus.accepted ||
                       mine.status == SignupStatus.applied))
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
+                Container(
+                  margin: const EdgeInsets.only(top: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    // Paying is the player's to do; paid is settled.
+                    color: paid ? c.accentSoft : c.highlightSoft,
+                    borderRadius: BorderRadius.circular(controlRadius),
+                  ),
                   child: Text(
-                    signups.isPaid(mine.uid)
+                    paid
                         ? 'Entry fee paid.'
-                        : signups.isOverdue(
-                            mine.uid,
-                            fee,
-                            (now ?? DateTime.now)(),
-                          )
+                        : overdue
                         ? 'Entry fee overdue: ${fee.label}. ${fee.instructions}'
                         : 'Entry fee ${fee.label} to pay. '
                               '${fee.instructions}'
                               '${fee.dueAt == null ? '' : ' Due ${DateFormat.yMMMd().format(fee.dueAt!)}.'}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: paid ? c.accentInk : c.highlightInk,
+                    ),
                   ),
                 ),
               if (fee != null &&
@@ -248,7 +282,7 @@ class _PlayersTabState extends State<PlayersTab> {
       builder: (context, _) {
         final t = vm.tournament!;
         final d = vm.division;
-        final theme = Theme.of(context);
+        final c = AppColors.of(context);
         final published = t.status.index >= HostedStatus.scheduled.index;
         return ConstrainedContent(
           child: ListView(
@@ -278,7 +312,7 @@ class _PlayersTabState extends State<PlayersTab> {
                       ? 'Add a division on the Overview tab so players can '
                             'sign up.'
                       : 'The host is still setting up divisions.',
-                  style: theme.textTheme.bodyMedium,
+                  style: TextStyle(fontSize: 13.5, color: c.ink2),
                 ),
               PlayerSignupCard(
                 viewModel: vm,
@@ -300,13 +334,14 @@ class _PlayersTabState extends State<PlayersTab> {
     TournamentDivision d,
     bool published,
   ) {
-    final theme = Theme.of(context);
+    final c = AppColors.of(context);
+    final note = TextStyle(fontSize: 12.5, color: c.muted);
     return [
       Padding(
         padding: const EdgeInsets.only(top: 20, bottom: 8),
         child: Row(
           children: [
-            Expanded(child: Text('Teams', style: theme.textTheme.titleMedium)),
+            Expanded(child: Text('Teams', style: _heading(c))),
             if (vm.isManager)
               FilledButton.icon(
                 onPressed:
@@ -337,30 +372,46 @@ class _PlayersTabState extends State<PlayersTab> {
           vm.isManager
               ? 'Accept players below, then draft teams from them.'
               : 'Teams are drawn once registration closes.',
-          style: theme.textTheme.bodyMedium,
+          style: TextStyle(fontSize: 13.5, color: c.ink2),
         ),
       if (vm.isManager &&
           vm.tournament!.isLeague &&
           d.teams.isNotEmpty &&
           !d.teamsCreated &&
           !vm.isPublished)
-        Card(
+        // The host's to do before publishing: amber.
+        Container(
           margin: const EdgeInsets.only(bottom: 8),
-          color: theme.colorScheme.secondaryContainer,
+          decoration: BoxDecoration(
+            color: c.highlightSoft,
+            borderRadius: BorderRadius.circular(cardRadius),
+          ),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Make the teams', style: theme.textTheme.titleSmall),
+                Text(
+                  'Make the teams',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: c.ink,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'A league plays as real teams, each with chat, a roster '
                   'and its games on the schedule. Create them from your '
                   'drafted teams before you publish the schedule.',
+                  style: TextStyle(fontSize: 13, color: c.ink2),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: c.highlight,
+                    foregroundColor: c.onHighlight,
+                  ),
                   onPressed: vm.createTeams.running
                       ? null
                       : () async {
@@ -392,7 +443,7 @@ class _PlayersTabState extends State<PlayersTab> {
           child: Text(
             'These are real teams: each captain owns theirs and manages '
             'its roster.',
-            style: theme.textTheme.bodySmall,
+            style: note,
           ),
         ),
       if (vm.isManager && vm.isPublished && !d.teamsCreated)
@@ -401,19 +452,28 @@ class _PlayersTabState extends State<PlayersTab> {
           child: Text(
             'The schedule is published: you can still move players, rename '
             'teams and change captains, but not add or remove teams.',
-            style: theme.textTheme.bodySmall,
+            style: note,
           ),
         ),
       for (final team in d.teams)
         Card(
           margin: const EdgeInsets.only(bottom: 8),
+          color: team.playerIds.contains(vm.uid) ? c.accentSoft : null,
           child: ListTile(
-            title: Text(team.name),
+            title: Text(
+              team.name,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: c.ink,
+              ),
+            ),
             subtitle: Text(
               [
                 for (final id in team.playerIds)
                   '${team.nameOf(id)}${id == team.captainId ? ' (C)' : ''}',
               ].join(', '),
+              style: TextStyle(fontSize: 12.5, color: c.ink2),
             ),
             // Members open their team (others can't read it).
             trailing: d.teamsCreated && team.playerIds.contains(vm.uid)
@@ -432,7 +492,7 @@ class _PlayersTabState extends State<PlayersTab> {
     HostedTournament t,
     TournamentDivision d,
   ) {
-    final theme = Theme.of(context);
+    final c = AppColors.of(context);
     final fee = t.entryFee;
     final all = signups.signupsIn(d.id);
     final shown = [
@@ -446,14 +506,25 @@ class _PlayersTabState extends State<PlayersTab> {
     ];
     int count(SignupStatus s) => all.where((x) => x.status == s).length;
     final now = (widget.now ?? DateTime.now)();
+    // Who is still in: the split and average skill count only them.
+    final active = [
+      for (final s in all)
+        if (s.status != SignupStatus.withdrawn &&
+            s.status != SignupStatus.declined)
+          s,
+    ];
+    final mmp = active.where((s) => s.gender == GenderMatch.mmp).length;
+    final wmp = active.where((s) => s.gender == GenderMatch.wmp).length;
+    final avgSkill = active.isEmpty
+        ? null
+        : active.fold<int>(0, (sum, s) => sum + s.skill) / active.length;
+    final pending = count(SignupStatus.applied);
     return [
       Padding(
         padding: const EdgeInsets.only(top: 20, bottom: 8),
         child: Row(
           children: [
-            Expanded(
-              child: Text('Players', style: theme.textTheme.titleMedium),
-            ),
+            Expanded(child: Text('Players', style: _heading(c))),
             if (fee != null)
               FilterChip(
                 label: Text('Unpaid (${signups.unpaidCount(fee)})'),
@@ -463,76 +534,182 @@ class _PlayersTabState extends State<PlayersTab> {
           ],
         ),
       ),
-      Text(
-        '${all.length} signed up · ${count(SignupStatus.accepted)} accepted'
-        '${count(SignupStatus.waitlisted) > 0 ? ' · ${count(SignupStatus.waitlisted)} waitlisted' : ''}',
-        style: theme.textTheme.bodySmall,
-      ),
-      const SizedBox(height: 8),
-      if (shown.isEmpty)
-        Text(
-          all.isEmpty ? 'No one has signed up yet.' : 'Everyone here has paid.',
-        ),
-      for (final s in shown)
-        Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            title: Text(s.name),
-            subtitle: Text(
-              [
-                'Skill ${s.skill}',
-                if (s.gender != null) s.gender!.label,
-                if (fee != null &&
-                    s.status != SignupStatus.withdrawn &&
-                    s.status != SignupStatus.declined)
-                  signups.isPaid(s.uid)
-                      ? 'Paid'
-                      : signups.isOverdue(s.uid, fee, now)
-                      ? 'Overdue'
-                      : 'Unpaid',
-              ].join(' · '),
-            ),
-            leading: Chip(
-              label: Text(s.status.label),
-              backgroundColor: _statusColor(context, s.status),
-              visualDensity: VisualDensity.compact,
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (fee != null &&
-                    s.status != SignupStatus.withdrawn &&
-                    s.status != SignupStatus.declined)
-                  Switch(
-                    value: signups.isPaid(s.uid),
-                    onChanged: (v) =>
-                        signups.setPaid.execute((uid: s.uid, paid: v)),
-                  ),
-                PopupMenuButton<SignupStatus>(
-                  tooltip: 'Change status',
-                  onSelected: (status) =>
-                      signups.decide.execute((uid: s.uid, status: status)),
-                  itemBuilder: (_) => [
-                    for (final status in const [
-                      SignupStatus.accepted,
-                      SignupStatus.waitlisted,
-                      SignupStatus.declined,
-                    ])
-                      if (status != s.status)
-                        PopupMenuItem(
-                          value: status,
-                          child: Text(switch (status) {
-                            SignupStatus.accepted => 'Accept',
-                            SignupStatus.waitlisted => 'Waitlist',
-                            _ => 'Decline',
-                          }),
-                        ),
+      Card(
+        margin: EdgeInsets.zero,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '${all.length} signed up · ${count(SignupStatus.accepted)} accepted'
+                '${count(SignupStatus.waitlisted) > 0 ? ' · ${count(SignupStatus.waitlisted)} waitlisted' : ''}',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: c.ink,
+                ),
+              ),
+              if (all.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: StatTile(
+                        value: '${count(SignupStatus.accepted)}',
+                        label: 'Accepted',
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      // New signups are the host's to decide.
+                      child: StatTile(
+                        value: '$pending',
+                        label: 'To decide',
+                        highlight: pending > 0,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: StatTile(
+                        value: '${count(SignupStatus.waitlisted)}',
+                        label: 'Waitlist',
+                      ),
+                    ),
                   ],
                 ),
               ],
-            ),
+              if (mmp + wmp > 0) ...[
+                const SizedBox(height: 12),
+                GenderSplitBar(
+                  mmp: mmp,
+                  wmp: wmp,
+                  unknown: active.length - mmp - wmp,
+                  height: 10,
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 14,
+                  runSpacing: 4,
+                  children: [
+                    LegendDot(
+                      color: genderColor(c, mmp: true),
+                      label: '$mmp MMP',
+                    ),
+                    LegendDot(
+                      color: genderColor(c, mmp: false),
+                      label: '$wmp WMP',
+                    ),
+                    if (active.length > mmp + wmp)
+                      LegendDot(
+                        color: genderColor(c, mmp: null),
+                        label: '${active.length - mmp - wmp} not set',
+                      ),
+                    if (avgSkill != null)
+                      Text(
+                        'Avg skill ${avgSkill.toStringAsFixed(1)}',
+                        style: TextStyle(fontSize: 12, color: c.ink2),
+                      ),
+                  ],
+                ),
+              ],
+            ],
           ),
+        ),
+      ),
+      const SizedBox(height: 10),
+      if (shown.isEmpty)
+        Text(
+          all.isEmpty ? 'No one has signed up yet.' : 'Everyone here has paid.',
+          style: TextStyle(fontSize: 13.5, color: c.ink2),
+        ),
+      if (shown.isNotEmpty)
+        RowsCard(
+          children: [
+            for (final s in shown)
+              ListTile(
+                contentPadding: const EdgeInsets.only(left: 14, right: 4),
+                leading: PersonAvatar(name: s.name, radius: 18),
+                title: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        s.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: c.ink,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Pill(
+                      s.status.label,
+                      tone: _statusTone(s.status, hostView: true),
+                    ),
+                  ],
+                ),
+                subtitle: Text(
+                  [
+                    'Skill ${s.skill}',
+                    if (s.gender != null) s.gender!.label,
+                    if (fee != null &&
+                        s.status != SignupStatus.withdrawn &&
+                        s.status != SignupStatus.declined)
+                      signups.isPaid(s.uid)
+                          ? 'Paid'
+                          : signups.isOverdue(s.uid, fee, now)
+                          ? 'Overdue'
+                          : 'Unpaid',
+                  ].join(' · '),
+                  style: TextStyle(fontSize: 12, color: c.muted),
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (fee != null &&
+                        s.status != SignupStatus.withdrawn &&
+                        s.status != SignupStatus.declined)
+                      Switch(
+                        value: signups.isPaid(s.uid),
+                        onChanged: (v) =>
+                            signups.setPaid.execute((uid: s.uid, paid: v)),
+                      ),
+                    PopupMenuButton<SignupStatus>(
+                      tooltip: 'Change status',
+                      onSelected: (status) =>
+                          signups.decide.execute((uid: s.uid, status: status)),
+                      itemBuilder: (_) => [
+                        for (final status in const [
+                          SignupStatus.accepted,
+                          SignupStatus.waitlisted,
+                          SignupStatus.declined,
+                        ])
+                          if (status != s.status)
+                            PopupMenuItem(
+                              value: status,
+                              child: Text(switch (status) {
+                                SignupStatus.accepted => 'Accept',
+                                SignupStatus.waitlisted => 'Waitlist',
+                                _ => 'Decline',
+                              }),
+                            ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+          ],
         ),
     ];
   }
 }
+
+TextStyle _heading(AppColors c) => TextStyle(
+  fontSize: 16,
+  fontWeight: FontWeight.w800,
+  letterSpacing: -0.2,
+  color: c.ink,
+);

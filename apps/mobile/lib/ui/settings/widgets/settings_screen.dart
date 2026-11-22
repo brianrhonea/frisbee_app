@@ -22,6 +22,7 @@ import '../../core/ui/layout.dart' show PersonAvatar;
 import '../../profile/view_models/profile_viewmodel.dart';
 import '../../profile/widgets/delete_account_dialog.dart';
 import 'change_password_dialog.dart';
+import 'download_data_group.dart';
 import 'settings_widgets.dart';
 
 /// Names for the appearance choices.
@@ -48,26 +49,27 @@ class SettingsScreen extends StatelessWidget {
         listenable: Listenable.merge([vm, vm.signOut]),
         builder: (context, _) {
           final user = vm.user;
+          final c = AppColors.of(context);
           return SettingsPage(
             title: 'Settings',
             children: [
-              const SizedBox(height: 8),
+              const SizedBox(height: 16),
               Card(
                 child: ListTile(
                   contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
+                    horizontal: 14,
                     vertical: 8,
                   ),
                   leading: PersonAvatar(
                     name: user?.label ?? '',
                     photoUrl: user?.photoUrl,
-                    radius: 24,
+                    radius: 26,
                   ),
                   title: Text(
                     user?.label ?? '',
                     style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 17,
                     ),
                   ),
                   subtitle: Text(
@@ -75,12 +77,14 @@ class SettingsScreen extends StatelessWidget {
                       if (user?.username case final u?) '@$u',
                       ?user?.email,
                     ].join(' · '),
+                    style: TextStyle(fontSize: 13, color: c.muted),
                   ),
-                  trailing: const Icon(Icons.chevron_right),
+                  trailing: Icon(Icons.chevron_right, color: c.muted),
                   onTap: () => context.push(Routes.settingsAccount),
                 ),
               ),
               SettingsGroup(
+                title: 'App',
                 children: [
                   SettingsTile(
                     icon: Icons.tune,
@@ -96,12 +100,13 @@ class SettingsScreen extends StatelessWidget {
                   SettingsTile(
                     icon: Icons.lock_outline,
                     title: 'Privacy',
+                    value: switch (vm.isPrivate) {
+                      true => 'Private',
+                      false => 'Public',
+                      null => null,
+                    },
                     onTap: () => context.push(Routes.settingsPrivacy),
                   ),
-                ],
-              ),
-              SettingsGroup(
-                children: [
                   SettingsTile(
                     icon: Icons.event_available_outlined,
                     title: 'Calendars',
@@ -113,9 +118,15 @@ class SettingsScreen extends StatelessWidget {
                     title: 'People you follow',
                     onTap: () => context.push(Routes.settingsFollowing),
                   ),
+                ],
+              ),
+              SettingsGroup(
+                title: 'You',
+                children: [
                   SettingsTile(
                     icon: Icons.person_outline,
                     title: 'Account',
+                    subtitle: 'Name, username, email, password',
                     onTap: () => context.push(Routes.settingsAccount),
                   ),
                   SettingsTile(
@@ -124,10 +135,6 @@ class SettingsScreen extends StatelessWidget {
                     subtitle: 'Only you can see these',
                     onTap: () => context.push(Routes.settingsPersonal),
                   ),
-                ],
-              ),
-              SettingsGroup(
-                children: [
                   SettingsTile(
                     icon: Icons.menu_book_outlined,
                     title: 'Learn to play',
@@ -137,7 +144,7 @@ class SettingsScreen extends StatelessWidget {
                 ],
               ),
               SettingsGroup(
-                title: 'Legal & your data',
+                title: 'Legal and your data',
                 children: [
                   SettingsTile(
                     icon: Icons.privacy_tip_outlined,
@@ -145,43 +152,41 @@ class SettingsScreen extends StatelessWidget {
                     onTap: () => _openPage(context, LegalLinks.privacy),
                   ),
                   SettingsTile(
-                    icon: Icons.cookie_outlined,
-                    title: 'Cookie Policy',
-                    onTap: () => _openPage(context, LegalLinks.cookies),
-                  ),
-                  SettingsTile(
                     icon: Icons.gavel_outlined,
                     title: 'Terms of Service',
                     onTap: () => _openPage(context, LegalLinks.terms),
                   ),
                   SettingsTile(
-                    icon: Icons.delete_forever_outlined,
+                    icon: Icons.cookie_outlined,
+                    title: 'Cookie Policy',
+                    onTap: () => _openPage(context, LegalLinks.cookies),
+                  ),
+                  SettingsTile(
+                    icon: Icons.delete_outline,
                     title: 'Delete account & data',
                     subtitle: 'Your profile, posts and messages',
                     onTap: () => context.push(Routes.settingsAccount),
                   ),
                 ],
               ),
-              SettingsGroup(
-                children: [
-                  SettingsTile(
-                    icon: Icons.logout,
-                    title: 'Sign out',
-                    opensPage: false,
-                    onTap: vm.signOut.running
-                        ? null
-                        : () async {
-                            if (await confirmDialog(
-                              context,
-                              title: 'Sign out?',
-                              message: 'Are you sure you want to sign out?',
-                              confirmLabel: 'Sign out',
-                            )) {
-                              vm.signOut.execute();
-                            }
-                          },
-                  ),
-                ],
+              Padding(
+                padding: const EdgeInsets.only(top: 18),
+                child: OutlinedButton.icon(
+                  onPressed: vm.signOut.running
+                      ? null
+                      : () async {
+                          if (await confirmDialog(
+                            context,
+                            title: 'Sign out?',
+                            message: 'Are you sure you want to sign out?',
+                            confirmLabel: 'Sign out',
+                          )) {
+                            vm.signOut.execute();
+                          }
+                        },
+                  icon: const Icon(Icons.logout, size: 18),
+                  label: const Text('Sign out'),
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.only(top: 24),
@@ -218,29 +223,99 @@ class GeneralSettingsScreen extends StatelessWidget {
         builder: (context, _) => SettingsPage(
           title: 'General',
           children: [
-            RadioGroup<ThemeMode>(
-              groupValue: vm.themeMode,
-              onChanged: (m) => vm.setThemeMode.execute(m!),
-              child: SettingsGroup(
-                title: 'Appearance',
-                footer: 'System follows your device’s light or dark mode.',
-                children: [
-                  for (final mode in ThemeMode.values)
-                    RadioListTile<ThemeMode>(
-                      value: mode,
-                      title: Text(themeModeLabel(mode)),
-                      secondary: Icon(switch (mode) {
-                        ThemeMode.system => Icons.brightness_auto_outlined,
-                        ThemeMode.light => Icons.light_mode_outlined,
-                        ThemeMode.dark => Icons.dark_mode_outlined,
-                      }),
-                      controlAffinity: ListTileControlAffinity.trailing,
-                    ),
-                ],
-              ),
+            SettingsGroup(
+              title: 'Appearance',
+              footer: 'System follows your device’s light or dark mode.',
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: _ThemeChoice(
+                    value: vm.themeMode,
+                    onChanged: (m) => vm.setThemeMode.execute(m),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Light, Dark or System, as one segmented control.
+class _ThemeChoice extends StatelessWidget {
+  const _ThemeChoice({required this.value, required this.onChanged});
+
+  final ThemeMode value;
+  final ValueChanged<ThemeMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: c.field,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          for (final mode in const [
+            ThemeMode.light,
+            ThemeMode.dark,
+            ThemeMode.system,
+          ])
+            Expanded(
+              child: Semantics(
+                inMutuallyExclusiveGroup: true,
+                checked: mode == value,
+                button: true,
+                child: Material(
+                  color: mode == value ? c.card : Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(9),
+                    side: mode == value
+                        ? BorderSide(color: c.border)
+                        : BorderSide.none,
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () => onChanged(mode),
+                    child: SizedBox(
+                      height: 40,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            switch (mode) {
+                              ThemeMode.system =>
+                                Icons.brightness_auto_outlined,
+                              ThemeMode.light => Icons.light_mode_outlined,
+                              ThemeMode.dark => Icons.dark_mode_outlined,
+                            },
+                            size: 18,
+                            color: mode == value ? c.accent : c.ink2,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            themeModeLabel(mode),
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: mode == value
+                                  ? FontWeight.w700
+                                  : FontWeight.w600,
+                              color: mode == value ? c.accent : c.ink2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -278,8 +353,13 @@ class PrivacySettingsScreen extends StatelessWidget {
                   'Notifications.',
               children: [
                 SwitchListTile(
-                  secondary: const Icon(Icons.lock_outline),
+                  secondary: const SettingsIcon(Icons.lock_outline),
                   title: const Text('Private profile'),
+                  subtitle: Text(
+                    (vm.isPrivate ?? false)
+                        ? 'On · people ask to follow you'
+                        : 'Off · anyone on Stall 10 can see your profile',
+                  ),
                   value: vm.isPrivate ?? false,
                   onChanged: vm.isPrivate == null || vm.setPrivate.running
                       ? null
@@ -296,10 +376,13 @@ class PrivacySettingsScreen extends StatelessWidget {
                   'accept them.',
               children: [
                 ListTile(
-                  leading: const Icon(Icons.forum_outlined),
+                  leading: const SettingsIcon(Icons.forum_outlined),
                   title: const Text('Who can message you'),
                   subtitle: Text(vm.messagePolicy.label),
-                  trailing: const Icon(Icons.chevron_right),
+                  trailing: Icon(
+                    Icons.chevron_right,
+                    color: AppColors.of(context).muted,
+                  ),
                   onTap: () async {
                     final picked = await showDialog<MessagePolicy>(
                       context: context,
@@ -312,19 +395,12 @@ class PrivacySettingsScreen extends StatelessWidget {
                   },
                 ),
                 SwitchListTile(
-                  secondary: const Icon(Icons.done_all),
+                  secondary: const SettingsIcon(Icons.done_all),
                   title: const Text('Read receipts'),
                   value: vm.readReceipts,
                   onChanged: vm.setReadReceipts.execute,
                 ),
               ],
-            ),
-            ViewModelHost(
-              create: (c) => DeviceAccessViewModel(
-                permissions:
-                    c.read<DevicePermissions?>() ?? const DevicePermissions(),
-              ),
-              builder: (_, access) => DeviceAccessGroup(viewModel: access),
             ),
             SettingsGroup(
               title: 'Show on my profile',
@@ -362,7 +438,7 @@ class PrivacySettingsScreen extends StatelessWidget {
                       ),
                     ])
                   SwitchListTile(
-                    secondary: Icon(icon),
+                    secondary: SettingsIcon(icon),
                     title: Text(label),
                     value: on ?? true,
                     onChanged: switch (vm.visibility) {
@@ -372,6 +448,13 @@ class PrivacySettingsScreen extends StatelessWidget {
                   ),
               ],
             ),
+            ViewModelHost(
+              create: (c) => DeviceAccessViewModel(
+                permissions:
+                    c.read<DevicePermissions?>() ?? const DevicePermissions(),
+              ),
+              builder: (_, access) => DeviceAccessGroup(viewModel: access),
+            ),
           ],
         ),
       ),
@@ -379,11 +462,19 @@ class PrivacySettingsScreen extends StatelessWidget {
   }
 }
 
-/// Account: name, username, email, and deleting the account.
+/// Account: name, username, email, downloading your data, and deleting
+/// the account.
 class AccountSettingsScreen extends StatelessWidget {
-  const AccountSettingsScreen({super.key, required this.viewModel});
+  const AccountSettingsScreen({
+    super.key,
+    required this.viewModel,
+    this.shareFile = shareDataFile,
+  });
 
   final ProfileViewModel viewModel;
+
+  /// Hands "Download your data"'s file to the user (the share sheet).
+  final ShareDataFile shareFile;
 
   Future<void> _editName(BuildContext context) async {
     final controller = TextEditingController(text: viewModel.user?.displayName);
@@ -431,7 +522,7 @@ class AccountSettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final vm = viewModel;
-    final error = Theme.of(context).colorScheme.error;
+    final c = AppColors.of(context);
     return _CommandErrors(
       commands: [vm.updateDisplayName],
       onDone: {vm.updateDisplayName: 'Name updated'},
@@ -443,30 +534,33 @@ class AccountSettingsScreen extends StatelessWidget {
             title: 'Account',
             children: [
               SettingsGroup(
+                title: 'Profile',
                 children: [
-                  SettingsTile(
-                    icon: Icons.badge_outlined,
-                    title: 'Display name',
+                  _ValueTile(
+                    label: 'Display name',
                     value: user?.displayName ?? '',
+                    action: 'Edit',
                     onTap: vm.updateDisplayName.running
                         ? null
                         : () => _editName(context),
                   ),
-                  SettingsTile(
-                    icon: Icons.alternate_email,
-                    title: 'Username',
+                  _ValueTile(
+                    label: 'Username',
                     value: switch (user?.username) {
                       final u? => '@$u',
                       null => 'Not set',
                     },
-                    opensPage: false,
                   ),
+                ],
+              ),
+              SettingsGroup(
+                title: 'Sign-in',
+                children: [
                   if (user?.email case final email?)
-                    SettingsTile(
+                    _ValueTile(
                       icon: Icons.mail_outline,
-                      title: 'Email',
+                      label: 'Email',
                       value: email,
-                      opensPage: false,
                     ),
                   if (vm.hasPassword)
                     SettingsTile(
@@ -487,28 +581,106 @@ class AccountSettingsScreen extends StatelessWidget {
                     ),
                 ],
               ),
-              SettingsGroup(
-                footer:
-                    'Deletes your profile, posts and messages for good. Teams '
-                    'you own pass to another member.',
-                children: [
-                  SettingsTile(
-                    icon: Icons.delete_forever_outlined,
-                    title: 'Delete account',
-                    color: error,
-                    opensPage: false,
-                    onTap: () => showDialog<void>(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (_) => DeleteAccountDialog(viewModel: vm),
-                    ),
+              DownloadDataGroup(viewModel: vm, share: shareFile),
+              const SizedBox(height: 26),
+              const SettingsHeading('Delete account'),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.info_outline, size: 20, color: c.muted),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Deletes your profile, posts and messages for '
+                              'good. Teams you own pass to another member.',
+                              style: TextStyle(
+                                fontSize: 14,
+                                height: 1.4,
+                                color: c.ink2,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton(
+                        onPressed: () => showDialog<void>(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (_) => DeleteAccountDialog(viewModel: vm),
+                        ),
+                        child: const Text('Delete account'),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ],
           );
         },
       ),
+    );
+  }
+}
+
+/// An account row: a small label over its value, and an optional turf
+/// action word (e.g. "Edit") on the right.
+class _ValueTile extends StatelessWidget {
+  const _ValueTile({
+    required this.label,
+    required this.value,
+    this.icon,
+    this.action,
+    this.onTap,
+  });
+
+  final String label;
+  final String value;
+  final IconData? icon;
+  final String? action;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return ListTile(
+      minTileHeight: 60,
+      leading: icon == null ? null : SettingsIcon(icon!),
+      title: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: c.muted,
+        ),
+      ),
+      subtitle: Text(
+        value,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          color: c.ink,
+        ),
+      ),
+      trailing: action == null || onTap == null
+          ? null
+          : Text(
+              action!,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: c.accent,
+              ),
+            ),
+      onTap: onTap,
     );
   }
 }

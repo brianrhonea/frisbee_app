@@ -21,6 +21,8 @@ export interface PublicTournamentRepository {
   entries(id: string): Promise<Doc[]>;
   /** A division's games, in order. */
   games(id: string, divisionId: string): Promise<Doc[]>;
+  /** A division's games whose running score was updated from [since] on (live.updatedAt; single-field index). */
+  liveGames(id: string, divisionId: string, since: Date): Promise<Doc[]>;
   /** teamDirectory listings by team id (missing ones left out). */
   listings(teamIds: string[]): Promise<Map<string, Data>>;
   /** Team docs by id, only the fields visibility.ts checks (hostFields); missing ones left out. */
@@ -30,7 +32,7 @@ export interface PublicTournamentRepository {
 }
 
 /** Most divisions, entries and games read for one page (rules: 12 divisions; 2,100 games a division). */
-export const readCaps = { divisions: 20, entries: 1000, games: 2200 } as const;
+export const readCaps = { divisions: 20, entries: 1000, games: 2200, liveGames: 64 } as const;
 
 const doc = (d: { id: string; data: () => Record<string, unknown> | undefined }): Doc => ({
   id: d.id,
@@ -83,6 +85,15 @@ export class FirestorePublicTournamentRepository implements PublicTournamentRepo
       .collection(`tournaments/${id}/divisions/${divisionId}/games`)
       .orderBy("order")
       .limit(readCaps.games)
+      .get();
+    return snap.docs.map(doc);
+  }
+
+  async liveGames(id: string, divisionId: string, since: Date): Promise<Doc[]> {
+    const snap = await this.db
+      .collection(`tournaments/${id}/divisions/${divisionId}/games`)
+      .where("live.updatedAt", ">=", Timestamp.fromDate(since))
+      .limit(readCaps.liveGames)
       .get();
     return snap.docs.map(doc);
   }

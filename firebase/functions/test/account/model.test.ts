@@ -10,6 +10,7 @@ import {
   signInHandle,
   tournamentWithout,
   userFolder,
+  votedInPoll,
 } from "../../src/account/model";
 
 describe("nextOwner", () => {
@@ -45,11 +46,23 @@ describe("signedInRecently", () => {
   });
 });
 
+describe("votedInPoll", () => {
+  it("finds the user's vote in a chat poll (F33)", () => {
+    const poll = (votes: Record<string, number[]>) => ({ poll: { question: "Q", options: ["a", "b"], votes, voterIds: Object.keys(votes) } });
+    expect(votedInPoll(poll({ me: [0], you: [1] }), "me")).toBe(true);
+    expect(votedInPoll(poll({ you: [1] }), "me")).toBe(false);
+    expect(votedInPoll({ poll: { votes: { me: [0] } } }, "me")).toBe(true);
+    expect(votedInPoll({ text: "hi" }, "me")).toBe(false);
+  });
+});
+
 describe("eventResponsesOf", () => {
   it("lists the response maps with an entry for the user", () => {
     const event = { rsvps: { me: "going", you: "maybe" }, reactions: { you: ["fire"] }, votes: { me: [0] } };
     expect(eventResponsesOf(event, "me")).toEqual(["rsvps", "votes"]);
     expect(eventResponsesOf({ rsvps: {} }, "me")).toEqual([]);
+    // RSVP notes go too, on events and meetings.
+    expect(eventResponsesOf({ rsvps: { me: "attending" }, rsvpNotes: { me: "Late" } }, "me")).toEqual(["rsvps", "rsvpNotes"]);
     expect(eventResponsesOf({}, "me")).toEqual([]);
   });
 });

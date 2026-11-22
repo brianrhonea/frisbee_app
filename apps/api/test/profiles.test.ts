@@ -149,6 +149,24 @@ describe("privacy", () => {
     expect(s.store.doc(P)).toMatchObject({ stats: {}, games: [], teams: [1], tags: ["x"], visibility: { stats: false, teams: true, games: false } });
   });
 
+  it("visibility drops per-team stats when stats or teams are hidden", async () => {
+    const teamStats = { t1: { "2026": { games: 1 } } };
+    s.store.put(P, { name: "Pat", stats: { s: 1 }, teams: [1], teamStats });
+    await s.call("PUT", "/v1/me/profile/visibility", { visibility: { stats: true, teams: true, games: true }, tags: [] });
+    expect(s.store.doc(P)).toMatchObject({ teamStats });
+    await s.call("PUT", "/v1/me/profile/visibility", { visibility: { stats: true, teams: false, games: true }, tags: [] });
+    expect(s.store.doc(P)).not.toHaveProperty("teamStats");
+    expect(s.store.doc(P)).toMatchObject({ stats: { s: 1 } });
+  });
+
+  it("making it private moves per-team stats too", async () => {
+    const teamStats = { t1: { "2026": { games: 1 } } };
+    s.store.put(P, { name: "Pat", username: "pat", stats: { s: 1 }, teamStats, tags: [] });
+    await s.call("PUT", "/v1/me/profile/privacy", { private: true });
+    expect(s.store.doc(H)).toMatchObject({ teamStats });
+    expect(s.store.doc(P)).not.toHaveProperty("teamStats");
+  });
+
   it("visibility of a private profile goes on the private doc", async () => {
     s.store.put(P, { name: "Pat", private: true });
     await s.call("PUT", "/v1/me/profile/visibility", { visibility: { stats: true, teams: false, games: true }, tags: [] });

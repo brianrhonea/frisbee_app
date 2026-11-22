@@ -1,5 +1,6 @@
 "use client";
 import type { InviteCodeResponse, InviteTtl } from "@stall10/shared";
+import QRCode from "qrcode";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { callApi, problem } from "@/lib/client";
 import { formatDateTime } from "@/lib/dates";
@@ -56,8 +57,11 @@ export function useInvite(): InviteHub {
 export function InviteProvider({ children }: { children: ReactNode }) {
   const { teamId, kind, viewer } = useTeamHub();
   const canInvite = viewer.state === "member" && viewer.can("manageMembers");
-  // As Settings had it: a group that approves who joins.
-  const hasRequests = canInvite && kind !== "team" && viewer.state === "member" && viewer.team.requiresApproval === true;
+  // As Settings had it: a group that approves who joins, or a team that allows join requests (F26).
+  const hasRequests =
+    canInvite &&
+    viewer.state === "member" &&
+    (kind !== "team" ? viewer.team.requiresApproval === true : viewer.team.allowJoinRequests === true);
   const requests = useLiveQuery<{ name?: string }>(hasRequests ? `teams/${teamId}/joinRequests` : null, [], teamId);
   const [pane, setPane] = useState<Pane | null>(null);
   const link = useTeamLink(teamId, kind === "team" && canInvite);
@@ -172,6 +176,7 @@ function ShareLink({ link }: { link: TeamLink }) {
   const { teamId, kind, privateGroup } = useTeamHub();
   const team = kind === "team";
   const { ensure, ttl } = link;
+  const [qr, setQr] = useState(false);
   useEffect(() => {
     if (team) void ensure(ttl);
   }, [team, ensure, ttl]);
@@ -189,15 +194,21 @@ function ShareLink({ link }: { link: TeamLink }) {
         {team
           ? "Anyone with the link joins as a player until it expires."
           : privateGroup
-            ? "Anyone with the link can find the group and ask to join."
-            : "Anyone with the link can find and join the group."}
+            ? "Anyone with the link can find the community and ask to join."
+            : "Anyone with the link can find and join the community."}
       </p>
       {url ? (
-        <div className="invite-link-row">
-          <input readOnly value={url} aria-label="Invite link" onFocus={(e) => e.currentTarget.select()} />
-          <CopyButton text={url} />
-          <ShareSheetButton url={url} title={`Join on Stall 10`} />
-        </div>
+        <>
+          <div className="invite-link-row">
+            <input readOnly value={url} aria-label="Invite link" onFocus={(e) => e.currentTarget.select()} />
+            <CopyButton text={url} />
+            <button type="button" className="btn btn-small" aria-expanded={qr} onClick={() => setQr((o) => !o)}>
+              {qr ? "Hide QR" : "QR code"}
+            </button>
+            <ShareSheetButton url={url} title={`Join on Stall 10`} />
+          </div>
+          {qr && <QrCode url={url} />}
+        </>
       ) : link.error ? (
         <ErrorNote onRetry={() => void ensure(ttl)}>{link.error}</ErrorNote>
       ) : (
@@ -221,6 +232,34 @@ function ShareLink({ link }: { link: TeamLink }) {
         </div>
       )}
       {kind !== "community" && <ReadOutCode />}
+    </div>
+  );
+}
+
+/**
+ * [url] as a QR code to scan with a phone's camera (the app's QR button
+ * does the same). Dark on white in both themes, so cameras read it.
+ */
+function QrCode({ url }: { url: string }) {
+  const [svg, setSvg] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    QRCode.toString(url, { type: "svg", margin: 1, color: { dark: "#000000", light: "#ffffff" } })
+      .then((s) => live && setSvg(s))
+      .catch(() => live && setSvg(null));
+    return () => {
+      live = false;
+    };
+  }, [url]);
+  return (
+    <div className="invite-qr">
+      {svg ? (
+        // Made here from our own invite URL, so it's safe to inline.
+        <div className="invite-qr-code" role="img" aria-label="QR code for the invite link" dangerouslySetInnerHTML={{ __html: svg }} />
+      ) : (
+        <Loading label="Making the code…" />
+      )}
+      <small className="muted">Point a phone camera at the code.</small>
     </div>
   );
 }

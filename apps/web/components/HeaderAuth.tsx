@@ -41,7 +41,7 @@ export function HeaderAuth() {
   return (
     <>
       <Link className="link" href="/sign-in">Log in</Link>
-      <Link className="btn btn-primary btn-small" href="/sign-up">Sign up</Link>
+      <Link className="btn btn-primary btn-small" href="/sign-up">Join free</Link>
     </>
   );
 }

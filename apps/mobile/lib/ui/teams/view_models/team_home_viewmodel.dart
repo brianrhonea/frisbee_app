@@ -2,15 +2,24 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../data/repositories/hosted_tournament/hosted_tournament_repository.dart';
+import '../../../data/repositories/hosted_tournament/tournament_days.dart';
 import '../../../data/repositories/auth/auth_repository.dart';
+import '../../../data/repositories/chat/chat_repository.dart';
+import '../../../data/repositories/chat/team_chat_activity.dart';
+import '../../../data/repositories/direct_message/direct_message_repository.dart';
 import '../../../data/repositories/event/event_repository.dart';
+import '../../../data/repositories/team/team_hints_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
 import '../../../data/repositories/team_post/team_post_repository.dart';
 import '../../../data/services/file_picker_service.dart';
 import '../../../domain/models/chat.dart';
+import '../../../domain/models/direct_message.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/team_event.dart';
+import '../../../domain/models/team_page.dart';
 import '../../../domain/models/team_post.dart';
+import 'team_post_comments_viewmodel.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 import '../../../data/repositories/follow/follow_repository.dart';
@@ -18,6 +27,8 @@ import '../../../data/repositories/group_tournament/group_tournament_repository.
 import '../../../data/repositories/notification/notification_repository.dart';
 import '../../../domain/models/follow.dart';
 import '../../../domain/models/group_tournament.dart';
+import '../../../domain/models/hosted_tournament.dart';
+import '../../../domain/tournament_engine/tournament_day.dart';
 import '../../follow/view_models/follow_viewmodel.dart';
 
 /// Whether [typed] confirms deleting a team called [name]: the same name,
@@ -39,13 +50,21 @@ class TeamHomeViewModel extends ChangeNotifier {
     FollowRepository? followRepository,
     NotificationRepository? notificationRepository,
     GroupTournamentRepository? groupTournamentRepository,
+    HostedTournamentRepository? tournamentRepository,
+    TeamHintsRepository? hints,
+    ChatRepository? chatRepository,
+    DirectMessageRepository? directMessageRepository,
     DateTime Function()? clock,
   }) : _teams = teamRepository,
+       _chats = chatRepository,
+       _dms = directMessageRepository,
+       _hints = hints ?? TeamHintsRepositoryMemory(),
        _events = eventRepository,
        _posts = teamPostRepository,
        _auth = authRepository,
        _picker = filePicker,
        _groupTournaments = groupTournamentRepository,
+       _hosted = tournamentRepository,
        _clock = clock ?? DateTime.now {
     _followSlot = FollowSlot(
       followRepository: followRepository,
@@ -57,11 +76,19 @@ class TeamHomeViewModel extends ChangeNotifier {
     deleteTeam = Command1<void, String>(_deleteTeam);
     savePost = Command1<void, PostDraft>(_savePost);
     deletePost = Command1<void, String>((id) => _posts.deletePost(teamId, id));
+    pinPost = Command1<void, ({String postId, String? unpin})>(
+      (a) => _posts.pinPost(teamId, a.postId, unpin: a.unpin),
+    );
+    unpinPost = Command1<void, String>((id) => _posts.unpinPost(teamId, id));
     joinTeam = Command1<String, String>(_joinTeam);
     joinGroup = Command0<void>(_joinGroup);
     cancelJoinRequest = Command0<void>(
       () => _teams.cancelJoinRequest(teamId, uid),
     );
+    setNextRsvp = Command1<void, ({String eventId, RsvpStatus? status})>(
+      (a) => _events.setRsvp(teamId, a.eventId, uid, a.status),
+    );
+    messageOrganizer = Command1<String, CommunityOrganizer>(_message);
 
     _listingSub = _teams
         .watchListing(teamId)
@@ -77,6 +104,25 @@ class TeamHomeViewModel extends ChangeNotifier {
           },
         );
     _watchTeam();
+    _hints.sectionsHintDismissed(teamId).then((d) {
+      if (_disposed) return;
+      _hintDismissed = d;
+      notifyListeners();
+    });
+    final me = authRepository.currentUser?.uid ?? '';
+    if (tournamentRepository != null && me.isNotEmpty) {
+      _days = TournamentDays(
+        repository: tournamentRepository,
+        teams: _teams
+            .watchTeam(teamId)
+            .map(
+              (t) =>
+                  t != null && t.members.containsKey(me) ? [t] : const <Team>[],
+            ),
+        uid: me,
+        clock: clock,
+      )..addListener(notifyListeners);
+    }
   }
 
   /// Upcoming events shown on the home page; the rest are in Team Events.
@@ -92,6 +138,7 @@ class TeamHomeViewModel extends ChangeNotifier {
   final AuthRepository _auth;
   final FilePickerService _picker;
   final GroupTournamentRepository? _groupTournaments;
+  final HostedTournamentRepository? _hosted;
   StreamSubscription<List<TournamentListing>>? _listingsSub;
   List<TournamentListing> _tournamentListings = const [];
 
@@ -99,12 +146,39 @@ class TeamHomeViewModel extends ChangeNotifier {
   /// can open and follow one they aren't playing in.
   List<TournamentListing> get tournamentListings => _tournamentListings;
   final DateTime Function() _clock;
+  final TeamHintsRepository _hints;
+  bool _disposed = false;
+
+  /// Null until read from the device.
+  bool? _hintDismissed;
+
+  /// How long a team counts as brand new, for the sections hint.
+  static const newTeamFor = Duration(days: 30);
+
+  /// The one-time hint for the owner of a brand-new team that still has
+  /// every optional section off: they're in Settings › Sections.
+  bool get showSectionsHint {
+    final t = _team;
+    if (t == null || _hintDismissed != false || !isOwner) return false;
+    if (t.kind != TeamKind.team || t.isLeagueTeam) return false;
+    if (OptionalSection.values.any(t.hasSection)) return false;
+    final made = t.createdAt;
+    return made == null || _clock().difference(made) < newTeamFor;
+  }
+
+  void dismissSectionsHint() {
+    _hintDismissed = true;
+    notifyListeners();
+    _hints.dismissSectionsHint(teamId);
+  }
+
   final _downloads = <String, Future<Result<Uint8List>>>{};
 
   late final StreamSubscription<TeamListing?> _listingSub;
   StreamSubscription<Team?>? _teamSub;
   StreamSubscription<List<TeamEvent>>? _eventsSub;
   StreamSubscription<List<TeamPost>>? _postsSub;
+  StreamSubscription<List<TeamPost>>? _pinnedSub;
 
   /// Whose event and post streams are watched: the public ones, or a
   /// member's (with what a community lets them see); null before either.
@@ -137,12 +211,138 @@ class TeamHomeViewModel extends ChangeNotifier {
   }
 
   void _onChange() {
+    _watchChat();
     _watchListings();
+    _watchEntered();
     _watchContent();
     _watchRequest();
     _watchJoinRequests();
     _publishListing();
     notifyListeners();
+  }
+
+  final ChatRepository? _chats;
+  StreamSubscription<List<ChatRoom>>? _roomsSub;
+  StreamSubscription<Map<String, Map<String, DateTime>>>? _readsSub;
+  String? _roomsKey;
+  List<ChatRoom> _rooms = const [];
+  Map<String, DateTime> _reads = const {};
+
+  /// Watches the team's rooms and the member's read times for the chat
+  /// tile. Both are the shell's shared listeners ([SharedStreams]), so
+  /// this adds no reads. Re-asks when the member's roles change.
+  void _watchChat() {
+    final chats = _chats;
+    final team = _team;
+    if (chats == null) return;
+    if (team == null) {
+      _roomsSub?.cancel();
+      _roomsSub = null;
+      _roomsKey = null;
+      _rooms = const [];
+      return;
+    }
+    _readsSub ??= chats.watchReads(uid).listen((r) {
+      _reads = r[teamId] ?? const {};
+      notifyListeners();
+    }, onError: (Object _) {});
+    final key = [
+      team.roleOf(uid)?.name,
+      ...?team.memberRoles[uid],
+      team.has(uid, TeamPermission.manageChats),
+    ].join(',');
+    if (key == _roomsKey) return;
+    _roomsKey = key;
+    _roomsSub?.cancel();
+    _roomsSub = chats.watchRooms(team, uid).listen((r) {
+      _rooms = r;
+      notifyListeners();
+    }, onError: (Object _) {});
+  }
+
+  /// The chat tile: how many of the team's rooms the member can read have
+  /// messages they haven't read (rooms, not messages; teamChatSummary).
+  int get newInChat {
+    final team = _team;
+    if (team == null) return 0;
+    return TeamChatSummary.fromReadable(team, [
+      for (final r in _rooms)
+        if (r.accessFor(team, uid).canRead) r,
+    ], _reads).unreadRooms.length;
+  }
+
+  /// The next event (the first of [upcomingEvents]) for the "going" tile.
+  TeamEvent? get nextEvent => upcomingEvents.firstOrNull;
+
+  /// How many said Going to [nextEvent] (`goingCount` in packages/shared).
+  int get nextGoing => [
+    for (final a in nextEvent?.rsvps.values ?? const <RsvpStatus>[])
+      if (a == RsvpStatus.going) a,
+  ].length;
+
+  // The community page (redesign F27): the next pickup card, the chat
+  // section and the organizers section.
+
+  /// The viewer's answer to [nextEvent]; null when unanswered.
+  RsvpStatus? get myNextRsvp => nextEvent?.rsvpOf(uid);
+
+  /// Amber "RSVP needed" on the pickup card: a member who hasn't answered
+  /// [nextEvent] (which isn't over: [upcomingEvents] leaves those out).
+  bool get nextNeedsRsvp => isMember && nextEvent != null && myNextRsvp == null;
+
+  /// RSVPs to the next event through the schedule's path
+  /// ([EventRepository.setRsvp]); a null status takes the answer back.
+  late final Command1<void, ({String eventId, RsvpStatus? status})> setNextRsvp;
+
+  /// Picks [status] on [nextEvent]; picking the current answer (or null)
+  /// takes it back, as on the event screen.
+  void answerNext(RsvpStatus? status) {
+    final e = nextEvent;
+    if (e == null || !isMember || setNextRsvp.running) return;
+    setNextRsvp.execute((
+      eventId: e.id,
+      status: status == myNextRsvp ? null : status,
+    ));
+  }
+
+  /// "New event" on the empty pickup card.
+  bool get canAddEvents =>
+      _team?.has(uid, TeamPermission.manageEvents) ?? false;
+
+  /// The chat section: the rooms the member can read, unread ones first
+  /// and marked, up to [chatSectionMax]; `more` are on the chat page.
+  ({List<({ChatRoom room, bool unread})> rooms, int more}) get chatSection {
+    final team = _team;
+    if (team == null) return (rooms: const [], more: 0);
+    final s = TeamChatSummary.fromReadable(team, [
+      for (final r in _rooms)
+        if (r.accessFor(team, uid).canRead) r,
+    ], _reads);
+    return chatSectionRooms(s.rooms, s.unreadRooms);
+  }
+
+  /// The organizers section: the owner and those who run the community.
+  List<CommunityOrganizer> get organizers => switch (_team) {
+    final t? => communityOrganizers(t),
+    null => const [],
+  };
+
+  final DirectMessageRepository? _dms;
+
+  /// Whether the organizers' Message buttons can open a conversation.
+  bool get canMessage => _dms != null;
+
+  /// Opens (or starts) a direct conversation with an organizer, as a
+  /// profile's Message button does; the result is the conversation id.
+  late final Command1<String, CommunityOrganizer> messageOrganizer;
+
+  Future<Result<String>> _message(CommunityOrganizer o) async {
+    final dms = _dms;
+    final me = _auth.currentUser;
+    if (dms == null || me == null) {
+      return Result.error(Exception('Not signed in'));
+    }
+    return dms.openConversation(me, UserProfile(uid: o.uid, name: o.name));
   }
 
   StreamSubscription<List<GroupJoinRequest>>? _joinRequestsSub;
@@ -179,17 +379,36 @@ class TeamHomeViewModel extends ChangeNotifier {
     }, onError: (Object _) {});
   }
 
+  StreamSubscription<List<EnteredTournament>>? _enteredSub;
+  List<EnteredTournament> _entered = const [];
+
+  /// Whether Tournaments is a tab of its own on this team's page: a team
+  /// (not a community) with a tournament ahead; members only, as only
+  /// they can read its entries.
+  bool get tournamentsTab => hasTournamentAhead(_entered, _clock());
+
+  /// Watches the tournaments a team has entered while the user is on it.
+  void _watchEntered() {
+    final repo = _hosted;
+    final want = repo != null && _team?.kind == TeamKind.team;
+    if (want == (_enteredSub != null)) return;
+    _enteredSub?.cancel();
+    _enteredSub = null;
+    _entered = const [];
+    if (!want) return;
+    _enteredSub = repo.watchEnteredBy(teamId).listen((e) {
+      _entered = e;
+      notifyListeners();
+    }, onError: (Object _) {});
+  }
+
   StreamSubscription<bool>? _requestSub;
   bool _requestPending = false;
 
   /// Watches the user's own join request while they're outside a group
-  /// that needs approval.
+  /// that needs approval, or a team that takes requests (F26).
   void _watchRequest() {
-    final want =
-        loaded &&
-        !isMember &&
-        (summary?.isCommunity ?? false) &&
-        (summary?.requiresApproval ?? false);
+    final want = loaded && !isMember && (summary?.takesRequests ?? false);
     if (want == (_requestSub != null)) return;
     _requestSub?.cancel();
     _requestSub = null;
@@ -216,13 +435,16 @@ class TeamHomeViewModel extends ChangeNotifier {
     _watchingAsMember = key;
     _eventsSub?.cancel();
     _postsSub?.cancel();
+    _pinnedSub?.cancel();
     _contentError = null;
     _eventList = const [];
     _postList = const [];
+    _pinnedList = const [];
     // A private group shows outsiders nothing beyond its listing.
     if (isPrivateToMe) {
       _eventsSub = null;
       _postsSub = null;
+      _pinnedSub = null;
       return;
     }
     // Only what's coming up is shown here; Team Events has the history.
@@ -241,6 +463,16 @@ class TeamHomeViewModel extends ChangeNotifier {
           _postList = p;
           notifyListeners();
         }, onError: _onContentError);
+    // Pinned posts can be older than the newest [postLimit] (redesign F24).
+    _pinnedSub = _posts.watchPinnedPosts(teamId, publicOnly: !member).listen(
+      (p) {
+        _pinnedList = p;
+        notifyListeners();
+      },
+      // Pins are extra: without them (say, before the public + pinnedAt
+      // index is built) the feed still shows, newest first.
+      onError: (Object _) {},
+    );
   }
 
   /// Teams from before the directory, or edited elsewhere, get their
@@ -281,8 +513,9 @@ class TeamHomeViewModel extends ChangeNotifier {
   /// A community group rather than a team.
   bool get isGroup => summary?.isCommunity ?? false;
 
-  /// A private group the user isn't in: only its listing is visible.
-  bool get isPrivateToMe => !isMember && (summary?.isPrivateGroup ?? false);
+  /// A private group the user isn't in, or a team whose public page is
+  /// off: only its listing is visible.
+  bool get isPrivateToMe => !isMember && (summary?.hidesPage ?? false);
 
   /// A youth team the user isn't on: its roster is for its members only
   /// (the API refuses anyone else), so the page says so in its place.
@@ -319,6 +552,7 @@ class TeamHomeViewModel extends ChangeNotifier {
 
   List<TeamEvent> _eventList = const [];
   List<TeamPost> _postList = const [];
+  List<TeamPost> _pinnedList = const [];
   Object? _contentError;
 
   /// Events or posts failed to load; the rest of the page still works.
@@ -337,8 +571,39 @@ class TeamHomeViewModel extends ChangeNotifier {
     ];
   }
 
-  /// Newest first. Public posts only for non-members.
-  List<TeamPost> get posts => _postList;
+  /// The feed: [pinnedPosts] first, then the rest newest first. Public
+  /// posts only for non-members.
+  List<TeamPost> get posts => [...pinnedPosts, ...otherPosts];
+
+  ({List<TeamPost> pinned, List<TeamPost> rest}) get _feed =>
+      arrangeTeamFeed(_pinnedList, _postList);
+
+  /// Posts the team's admins pinned, newest pin first (redesign F24).
+  List<TeamPost> get pinnedPosts => _feed.pinned;
+
+  /// The rest of the feed, newest first.
+  List<TeamPost> get otherPosts => _feed.rest;
+
+  /// Admins pin posts and delete anyone's comment (through the API).
+  bool get canPin => canPost && _posts.canUseFeedExtras;
+
+  /// Members read and write comments (through the API to write).
+  bool get canComment => isMember && _posts.canUseFeedExtras;
+
+  /// Pins a post; with [TeamPost.pinsMax] pinned, [unpin] names the one
+  /// to take down (the view asks which).
+  late final Command1<void, ({String postId, String? unpin})> pinPost;
+  late final Command1<void, String> unpinPost;
+
+  /// The comment thread of [post], for its sheet (the sheet disposes it).
+  TeamPostCommentsViewModel commentsFor(TeamPost post) =>
+      TeamPostCommentsViewModel(
+        teamId: teamId,
+        postId: post.id,
+        repository: _posts,
+        uid: uid,
+        canModerate: canPost,
+      );
 
   late final Command1<void, Team> updateTeam;
   late final Command0<void> leaveTeam;
@@ -354,7 +619,8 @@ class TeamHomeViewModel extends ChangeNotifier {
   /// may be another team if the code is for one.
   late final Command1<String, String> joinTeam;
 
-  /// Joins an open group, or asks to join one that needs approval.
+  /// Joins an open group, or asks to join one that needs approval or a
+  /// team that takes join requests (F26).
   late final Command0<void> joinGroup;
 
   /// Withdraws a pending join request.
@@ -364,8 +630,11 @@ class TeamHomeViewModel extends ChangeNotifier {
     final me = _auth.currentUser;
     final listing = summary;
     if (me == null) return Result.error(Exception('Not signed in'));
-    if (listing == null) return Result.error(Exception('Group not found'));
-    if (listing.requiresApproval) return _teams.requestToJoin(teamId, me);
+    if (listing == null) return Result.error(Exception('Community not found'));
+    if (listing.takesRequests) return _teams.requestToJoin(teamId, me);
+    if (!listing.isCommunity) {
+      return Result.error(Exception('Join a team with an invite code.'));
+    }
     final result = await _teams.joinGroup(teamId, me);
     if (result is Ok) _watchTeam();
     return result;
@@ -434,16 +703,30 @@ class TeamHomeViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _listingSub.cancel();
     _listingsSub?.cancel();
     _requestSub?.cancel();
     _joinRequestsSub?.cancel();
+    _enteredSub?.cancel();
     _teamSub?.cancel();
     _eventsSub?.cancel();
     _postsSub?.cancel();
+    _pinnedSub?.cancel();
+    _roomsSub?.cancel();
+    _readsSub?.cancel();
     _followSlot.dispose();
+    _days
+      ?..removeListener(notifyListeners)
+      ..dispose();
     super.dispose();
   }
+
+  TournamentDays? _days;
+
+  /// The team's tournament day (today, or this evening for tomorrow),
+  /// shown in place of its next event; members only.
+  TeamTournamentDay? get tournamentDay => _days?.forTeam(teamId);
 }
 
 /// Picks photos for a post, or takes one with the [camera]; empty when

@@ -1,3 +1,8 @@
+import '../data/repositories/chat/chat_repository.dart';
+import '../data/repositories/team/team_repository.dart';
+import '../data/repositories/profile/profile_repository.dart';
+import '../data/repositories/event/event_repository.dart';
+import '../data/repositories/video/video_repository.dart';
 import '../data/repositories/notification/notification_repository.dart';
 import '../data/repositories/draft/message_draft_repository.dart';
 import '../data/repositories/people/people_repository.dart';
@@ -19,9 +24,11 @@ import '../ui/chat/widgets/chat_room_settings_screen.dart';
 import '../ui/meetings/view_models/meeting_detail_viewmodel.dart';
 import '../ui/meetings/view_models/meeting_editor_viewmodel.dart';
 import '../ui/meetings/view_models/meeting_room_viewmodel.dart';
+import '../ui/meetings/view_models/meetings_list_viewmodel.dart';
 import '../ui/meetings/widgets/meeting_detail_screen.dart';
 import '../ui/meetings/widgets/meeting_editor_screen.dart';
 import '../ui/meetings/widgets/meeting_room_screen.dart';
+import '../ui/meetings/widgets/meetings_list_screen.dart';
 import '../ui/messages/view_models/direct_chat_viewmodel.dart';
 import '../ui/messages/view_models/group_members_viewmodel.dart';
 import '../ui/messages/view_models/inbox_viewmodel.dart';
@@ -33,11 +40,12 @@ import '../ui/core/ui/view_model_host.dart';
 import '../ui/core/ui/slide_over_page.dart';
 import '../ui/notifications/widgets/follow_requests_screen.dart';
 import '../ui/settings/widgets/settings_screen.dart';
-import '../ui/learn/widgets/learn_screen.dart';
 import '../ui/shell/view_models/shell_viewmodel.dart';
 import '../ui/shell/widgets/app_shell.dart';
 import '../ui/playbook/view_models/play_editor_viewmodel.dart';
+import '../ui/playbook/view_models/whiteboard_viewmodel.dart';
 import '../ui/playbook/widgets/play_editor_screen.dart';
+import '../ui/playbook/widgets/whiteboard_screen.dart';
 import '../ui/notifications/view_models/notification_settings_viewmodel.dart';
 import '../ui/notifications/view_models/notifications_viewmodel.dart';
 import '../ui/notifications/widgets/notification_settings_screen.dart';
@@ -140,7 +148,7 @@ GoRouter router(
       redirect: (_, state) => Routes.post(state.pathParameters['postId']!),
     ),
     // A profile opened from a conversation or chat room, over it, so back
-    // returns there (the Explore tab's /players/:uid would switch tabs).
+    // returns there (the Discover tab's /players/:uid would switch tabs).
     GoRoute(
       path: '/people/:uid',
       redirect: (_, state) =>
@@ -177,7 +185,7 @@ GoRouter router(
         builder: (_, vm) => RecordWorkoutScreen(viewModel: vm),
       ),
     ),
-    GoRoute(path: Routes.learn, builder: (_, _) => const LearnScreen()),
+    GoRoute(path: Routes.learn, builder: (_, _) => learnPage()),
     // Settings, from the gear on the user's profile: slides over the page
     // (a panel on wide screens), and its sections slide over it.
     GoRoute(
@@ -337,6 +345,7 @@ GoRouter router(
                 teamRepository: c.read(),
                 authRepository: c.read(),
                 tournamentRepository: c.read(),
+                videoRepository: readOptional<VideoRepository>(c),
               ),
               builder: (_, vm) => EventDetailScreen(viewModel: vm),
             );
@@ -387,6 +396,7 @@ GoRouter router(
                 videoRepository: c.read(),
                 teamRepository: c.read(),
                 authRepository: c.read(),
+                eventRepository: readOptional<EventRepository>(c),
               ),
               builder: (_, vm) => VideoScreen(viewModel: vm),
             );
@@ -453,10 +463,19 @@ GoRouter router(
     // Routes.teamMeetingsPath).
     GoRoute(
       path: '${Routes.teamMeetingsPath}/:teamId',
-      redirect: (_, state) {
+      // The team's Meetings list (F17).
+      builder: (_, state) {
         final teamId = state.pathParameters['teamId']!;
-        final base = '${Routes.teamMeetingsPath}/$teamId';
-        return state.uri.path == base ? Routes.teamEvents(teamId) : null;
+        return ViewModelHost(
+          key: ValueKey('meetings-$teamId'),
+          create: (c) => MeetingsListViewModel(
+            teamId: teamId,
+            meetingRepository: c.read(),
+            teamRepository: c.read(),
+            authRepository: c.read(),
+          ),
+          builder: (_, vm) => MeetingsListScreen(viewModel: vm),
+        );
       },
       routes: [
         GoRoute(
@@ -558,6 +577,7 @@ GoRouter router(
             teamRepository: c.read(),
             authRepository: c.read(),
             calendarRepository: c.read(),
+            profileRepository: readOptional<ProfileRepository>(c),
           ),
           builder: (_, vm) => EventEditorScreen(viewModel: vm),
         );
@@ -584,6 +604,7 @@ GoRouter router(
                 authRepository: c.read(),
                 postRepository: c.read(),
                 calendarRepository: c.read(),
+                profileRepository: readOptional<ProfileRepository>(c),
               ),
               builder: (_, vm) => EventEditorScreen(viewModel: vm),
             );
@@ -633,6 +654,7 @@ GoRouter router(
           teamRepository: c.read(),
           directMessageRepository: c.read(),
           notificationRepository: c.read(),
+          chatRepository: c.read<ChatRepository?>(),
         ),
         builder: (_, vm) => AppShell(
           viewModel: vm,
@@ -645,12 +667,22 @@ GoRouter router(
         StatefulShellBranch(
           routes: [GoRoute(path: Routes.home, builder: (_, _) => homePage())],
         ),
-        // Explore: search and player profiles.
+        // Discover: search, tournaments and leagues to find, rankings and
+        // player profiles.
         StatefulShellBranch(
           routes: [
             GoRoute(
               path: Routes.explorePath,
               builder: (_, state) => explorePage(state),
+            ),
+            GoRoute(
+              path: Routes.discoverPath,
+              redirect: (_, state) => Uri(
+                path: Routes.explorePath,
+                queryParameters: state.uri.queryParameters.isEmpty
+                    ? null
+                    : state.uri.queryParameters,
+              ).toString(),
             ),
             GoRoute(
               path: Routes.rankingsPath,
@@ -667,12 +699,17 @@ GoRouter router(
             ),
           ],
         ),
-        // Events: the user's schedule, and tournaments and leagues to find.
+        // Schedule: the user's own calendar. Events to find are on
+        // Discover now; the old `?view=find` opens it.
         StatefulShellBranch(
           routes: [
             GoRoute(
               path: Routes.schedule,
-              builder: (_, state) => eventsPage(state),
+              redirect: (_, state) =>
+                  state.uri.queryParameters['view'] == 'find'
+                  ? Routes.explore()
+                  : null,
+              builder: (_, _) => schedulePage(),
             ),
           ],
         ),
@@ -708,7 +745,7 @@ GoRouter router(
                 ),
                 GoRoute(
                   path: 'search',
-                  // Finding teams and groups is Explore's job now; old links
+                  // Finding teams and groups is Discover's job now; old links
                   // land there.
                   redirect: (_, _) => Routes.explore(only: ExploreFilter.teams),
                   builder: (_, _) => const SizedBox.shrink(),
@@ -786,6 +823,7 @@ GoRouter router(
                           ViewModelHost(
                             key: ValueKey('chat-$teamId-$roomId'),
                             create: (c) => ChatRoomViewModel(
+                              outbox: c.read(),
                               teamId: teamId,
                               roomId: roomId,
                               teamRepository: c.read(),
@@ -828,6 +866,25 @@ GoRouter router(
                             authRepository: c.read(),
                           ),
                           builder: (_, vm) => PlayEditorScreen(viewModel: vm),
+                        );
+                      },
+                    ),
+                    GoRoute(
+                      path: 'whiteboards/:playId',
+                      parentNavigatorKey: _rootKey,
+                      builder: (_, state) {
+                        final teamId = state.pathParameters['teamId']!;
+                        final playId = state.pathParameters['playId']!;
+                        return ViewModelHost(
+                          key: ValueKey('whiteboard-$teamId-$playId'),
+                          create: (c) => WhiteboardViewModel(
+                            teamId: teamId,
+                            playId: playId == 'new' ? null : playId,
+                            playRepository: c.read(),
+                            teamRepository: c.read(),
+                            authRepository: c.read(),
+                          ),
+                          builder: (_, vm) => WhiteboardScreen(viewModel: vm),
                         );
                       },
                     ),
@@ -893,7 +950,7 @@ GoRouter router(
             ),
           ],
         ),
-        // Messages: private conversations. Team chats are on team pages.
+        // Inbox: private conversations and team chats.
         StatefulShellBranch(
           routes: [
             GoRoute(
@@ -903,6 +960,8 @@ GoRouter router(
                   directMessageRepository: c.read(),
                   authRepository: c.read(),
                   notificationRepository: c.read<NotificationRepository?>(),
+                  teamRepository: c.read<TeamRepository?>(),
+                  chatRepository: c.read<ChatRepository?>(),
                 ),
                 builder: (_, vm) => InboxScreen(viewModel: vm),
               ),
@@ -945,6 +1004,7 @@ GoRouter router(
                       ViewModelHost(
                         key: ValueKey('dm-$id'),
                         create: (c) => DirectChatViewModel(
+                          outbox: c.read(),
                           conversationId: id,
                           directMessageRepository: c.read(),
                           authRepository: c.read(),

@@ -24,8 +24,9 @@ export function TeamEventEditor({
 }) {
   const { user } = useAuth();
   const { teamId, viewer, privateGroup } = useTeamHub();
-  // A new event may be shared on the member's profile, except in a private group (canShare).
-  const canShare = !event && !privateGroup;
+  // A new event may be shared on the member's profile, except in a private
+  // group or a team whose public page is off (canShare).
+  const canShare = !event && !privateGroup && !(viewer.state === "member" && viewer.team.publicPage === false);
   const [share, setShare] = useState<ShareChoice>({ on: false, message: "" });
   const team = viewer.state === "member" ? viewer.team : null;
   const org = team?.kind === "organization";

@@ -25,7 +25,7 @@ function ClubInviteNote({ teamId }: { teamId: string }) {
 }
 
 /** What the app calls each kind in a sentence (TeamKind.noun). */
-const nouns: Record<string, string> = { team: "team", community: "group", organization: "community" };
+const nouns: Record<string, string> = { team: "team", community: "community", organization: "community" };
 
 /**
  * The member's invitations to teams and groups, newest first, with Accept
@@ -76,7 +76,7 @@ export function TeamInvites() {
                 <button type="button" className="btn btn-small" disabled={busy !== null} onClick={() => void answer(i.id, false)}>
                   Decline
                 </button>
-                <button type="button" className="btn btn-primary btn-small" disabled={busy !== null} onClick={() => void answer(i.id, true)}>
+                <button type="button" className="btn btn-amber btn-small" disabled={busy !== null} onClick={() => void answer(i.id, true)}>
                   Accept
                 </button>
               </span>

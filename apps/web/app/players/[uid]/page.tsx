@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { MembersOnly } from "@/components/MembersOnly";
 import { LivePlayer } from "@/components/PlayerPage";
 
@@ -12,7 +13,10 @@ export default async function Player({ params }: Props) {
   const { uid } = await params;
   return (
     <MembersOnly next={`/players/${encodeURIComponent(uid)}`} what="Sign up free or log in to see players' profiles.">
-      <LivePlayer uid={uid} />
+      {/* The Team filter reads ?team=. */}
+      <Suspense>
+        <LivePlayer uid={uid} />
+      </Suspense>
     </MembersOnly>
   );
 }

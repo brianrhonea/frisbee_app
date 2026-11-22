@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../domain/models/personal_details.dart';
 import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
+import '../../../routing/push_team_route.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
+import '../../core/ui/layout.dart' show Tag, TeamBadge;
 import '../../core/ui/status_views.dart';
 import '../view_models/community_teams_viewmodel.dart';
 import 'invite_members_dialog.dart';
@@ -66,7 +68,7 @@ class _CommunityTeamsTabState extends State<CommunityTeamsTab> {
     switch (cmd.result) {
       case Ok<String>(:final value):
         cmd.clearResult();
-        context.push(Routes.team(value));
+        pushTeamRoute(context, Routes.team(value));
       case Error<String>():
         showErrorSnackBar(context, cmd.result);
         cmd.clearResult();
@@ -176,28 +178,47 @@ class _CommunityTeamsTabState extends State<CommunityTeamsTab> {
                           'up here.',
               )
             else ...[
-              Text(
-                '${teams.length} team${teams.length == 1 ? '' : 's'}',
-                style: theme.textTheme.titleSmall,
-              ),
-              const SizedBox(height: 8),
-              for (final t in teams)
-                _TeamTile(
-                  team: t,
-                  on: vm.isOn(t),
-                  joining: vm.isJoining(t),
-                  roleNames: vm.roleNames(t),
-                  onOpen: () => context.push(Routes.team(t.id)),
-                  onInvite: vm.canInvite
-                      ? () => showInviteMembers(
-                          context,
-                          vm.inviteTarget(t),
-                          withLink: false,
-                        )
-                      : null,
-                  onEditAccess: vm.canManage ? () => _editAccess(t) : null,
-                  onUnlink: vm.canManage ? () => _unlink(t) : null,
+              Padding(
+                padding: const EdgeInsets.only(left: 2, bottom: 8),
+                child: Text(
+                  '${teams.length} team${teams.length == 1 ? '' : 's'}',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
+                    color: AppColors.of(context).ink,
+                  ),
                 ),
+              ),
+              Card(
+                margin: EdgeInsets.zero,
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  children: [
+                    for (final (i, t) in teams.indexed) ...[
+                      if (i > 0) const Divider(height: 1),
+                      _TeamTile(
+                        team: t,
+                        on: vm.isOn(t),
+                        joining: vm.isJoining(t),
+                        roleNames: vm.roleNames(t),
+                        onOpen: () => pushTeamRoute(context, Routes.team(t.id)),
+                        onInvite: vm.canInvite
+                            ? () => showInviteMembers(
+                                context,
+                                vm.inviteTarget(t),
+                                withLink: false,
+                              )
+                            : null,
+                        onEditAccess: vm.canManage
+                            ? () => _editAccess(t)
+                            : null,
+                        onUnlink: vm.canManage ? () => _unlink(t) : null,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ],
           ],
         ),
@@ -229,61 +250,57 @@ class _TeamTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final c = AppColors.of(context);
     final who = roleNames.isEmpty
         ? 'No role gets on it yet'
         : 'For ${roleNames.join(', ')}';
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        onTap: onOpen,
-        leading: CircleAvatar(
-          backgroundColor: theme.colorScheme.primaryContainer,
-          child: Icon(
-            Icons.shield_outlined,
-            color: theme.colorScheme.onPrimaryContainer,
-          ),
+    return ListTile(
+      onTap: onOpen,
+      contentPadding: const EdgeInsets.fromLTRB(14, 4, 4, 4),
+      leading: const TeamBadge(size: 38),
+      title: Text(
+        team.name,
+        style: TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: 15,
+          color: c.ink,
         ),
-        title: Text(team.name),
-        subtitle: Text('${team.division.label} · $who'),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (on || joining)
-              Chip(
-                label: Text(on ? "You're on it" : 'Joining…'),
-                visualDensity: VisualDensity.compact,
-                side: BorderSide.none,
-                backgroundColor: theme.colorScheme.secondaryContainer,
-              ),
-            if (onInvite != null || onEditAccess != null)
-              PopupMenuButton<String>(
-                tooltip: 'Team options',
-                onSelected: (v) => switch (v) {
-                  'invite' => onInvite,
-                  'access' => onEditAccess,
-                  _ => onUnlink,
-                }?.call(),
-                itemBuilder: (_) => [
-                  if (onInvite != null)
-                    const PopupMenuItem(
-                      value: 'invite',
-                      child: Text('Invite people'),
-                    ),
-                  if (onEditAccess != null)
-                    const PopupMenuItem(
-                      value: 'access',
-                      child: Text('Who gets on it'),
-                    ),
-                  if (onUnlink != null)
-                    const PopupMenuItem(
-                      value: 'unlink',
-                      child: Text('Remove from community'),
-                    ),
-                ],
-              ),
-          ],
-        ),
+      ),
+      subtitle: Text(
+        '${team.division.label} · $who',
+        style: TextStyle(fontSize: 12.5, color: c.muted),
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (on || joining) Tag(on ? "You're on it" : 'Joining…'),
+          if (onInvite != null || onEditAccess != null)
+            PopupMenuButton<String>(
+              tooltip: 'Team options',
+              onSelected: (v) => switch (v) {
+                'invite' => onInvite,
+                'access' => onEditAccess,
+                _ => onUnlink,
+              }?.call(),
+              itemBuilder: (_) => [
+                if (onInvite != null)
+                  const PopupMenuItem(
+                    value: 'invite',
+                    child: Text('Invite people'),
+                  ),
+                if (onEditAccess != null)
+                  const PopupMenuItem(
+                    value: 'access',
+                    child: Text('Who gets on it'),
+                  ),
+                if (onUnlink != null)
+                  const PopupMenuItem(
+                    value: 'unlink',
+                    child: Text('Remove from community'),
+                  ),
+              ],
+            ),
+        ],
       ),
     );
   }
@@ -302,12 +319,16 @@ class _Requests extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      color: theme.colorScheme.secondaryContainer,
-      margin: EdgeInsets.zero,
+    final c = AppColors.of(context);
+    // Teams asking in wait on the admins: amber, the tab's only "needs you".
+    return Container(
+      decoration: BoxDecoration(
+        color: c.highlightSoft,
+        border: Border.all(color: c.highlight.withValues(alpha: 0.45)),
+        borderRadius: BorderRadius.circular(cardRadius),
+      ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+        padding: const EdgeInsets.fromLTRB(14, 12, 8, 6),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -315,12 +336,20 @@ class _Requests extends StatelessWidget {
               requests.length == 1
                   ? '1 team wants to join'
                   : '${requests.length} teams want to join',
-              style: theme.textTheme.titleSmall,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.4,
+                color: c.highlightInk,
+              ),
             ),
             for (final r in requests)
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                title: Text(r.teamName),
+                title: Text(
+                  r.teamName,
+                  style: TextStyle(fontWeight: FontWeight.w700, color: c.ink),
+                ),
                 subtitle: Text(
                   [
                     r.division.label,
@@ -336,6 +365,10 @@ class _Requests extends StatelessWidget {
                       child: const Text('Decline'),
                     ),
                     FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: c.highlight,
+                        foregroundColor: c.onHighlight,
+                      ),
                       onPressed: () => onAccept(r),
                       child: const Text('Add'),
                     ),

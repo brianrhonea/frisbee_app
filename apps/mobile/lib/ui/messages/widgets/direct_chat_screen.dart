@@ -48,10 +48,11 @@ class DirectChatScreen extends StatelessWidget {
             notificationRepository: c.read<NotificationRepository?>(),
           ),
           builder: (context, inbox) => Scaffold(
-            appBar: AppBar(title: const Text('Messages')),
+            appBar: AppBar(title: const Text('Inbox')),
             body: ChatSplit(
               list: InboxList(
                 viewModel: inbox,
+                flat: true,
                 selectedKey: 'dm:${vm.conversationId}',
                 // Switching conversations replaces this page, so back
                 // still leaves.
@@ -260,7 +261,12 @@ class _DirectChatViewState extends State<DirectChatView> {
             avatar: vm.conversation == null
                 ? null
                 : vm.isGroup
-                ? const CircleAvatar(radius: 18, child: Icon(Icons.groups))
+                ? CircleAvatar(
+                    radius: 18,
+                    backgroundColor: AppColors.of(context).accentSoft,
+                    foregroundColor: AppColors.of(context).accentInk,
+                    child: const Icon(Icons.groups, size: 20),
+                  )
                 : UserAvatar(
                     uid: vm.otherId ?? '',
                     name: vm.otherName,
@@ -495,7 +501,7 @@ class _RequestBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: c.card,
         border: Border.all(color: c.border),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

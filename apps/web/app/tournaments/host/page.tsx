@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { MembersOnly } from "@/components/MembersOnly";
-import { HostEvent } from "@/components/tournaments/TournamentLists";
+import { HostEvent } from "@/components/tournaments/HostEvent";
 
 export const metadata: Metadata = { title: "Host an event" };
 

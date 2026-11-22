@@ -1,0 +1,67 @@
+/* --- Playbook switch and whiteboard (playbook/Playbook.tsx, Whiteboard.tsx).
+   The web playbook's design: cards on the site tokens, turf (--accent)
+   for what's selected, destructive actions neutral. */
+.team-hub .playbook-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.team-hub .playbook-switch button.on { background: var(--accent); color: var(--on-accent); box-shadow: none; }
+
+/* The blank whiteboard card and the saved ones. */
+.team-hub .wb-blank { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 18px; align-items: center; }
+.team-hub .wb-blank .field { border-radius: 12px; }
+.team-hub .wb-blank-text { display: grid; gap: 8px; justify-items: start; }
+.team-hub .wb-blank-text > * { margin: 0; }
+@media (max-width: 640px) { .team-hub .wb-blank { grid-template-columns: minmax(0, 1fr); } }
+.team-hub .wb-card { padding: 0; overflow: hidden; display: grid; align-content: start; }
+.team-hub .wb-card:hover { border-color: var(--accent); }
+.team-hub .wb-card-link { display: grid; color: inherit; text-decoration: none; }
+.team-hub .wb-card-link .field { border-radius: 0; }
+.team-hub .wb-card-delete { justify-self: start; margin: 8px 14px 14px; }
+.team-hub .wb-card .wb-card-link > :last-child { margin-bottom: 0; }
+
+/* The whiteboard page. */
+.team-hub .whiteboard > .text-btn { justify-self: start; }
+.team-hub .wb-main { display: grid; gap: 12px; }
+.team-hub .wb-main .field { border-radius: 12px; }
+.team-hub .wb-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.team-hub .wb-title { display: grid; gap: 2px; min-width: 0; }
+.team-hub .wb-title > * { margin: 0; overflow-wrap: anywhere; }
+.team-hub .wb-actions { display: flex; align-items: center; gap: 8px; }
+.team-hub .wb-save { position: relative; }
+.team-hub .wb-save .menu-list { min-width: 180px; }
+.team-hub .wb-field.tool-move .field-el { cursor: grab; }
+.team-hub .wb-field.tool-pen, .team-hub .wb-field.tool-pen .field-el { cursor: crosshair; }
+.team-hub .wb-note { margin: 0; }
+.team-hub .wb-pens { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.team-hub .wb-colors { display: flex; gap: 8px; }
+.team-hub .wb-dot {
+  width: 28px; height: 28px; border-radius: 50%; padding: 0; cursor: pointer;
+  border: 2px solid var(--line-2); box-shadow: inset 0 0 0 2px var(--card);
+}
+.team-hub .wb-dot.on { border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--card), 0 0 0 2px var(--accent); }
+.team-hub .wb-dot.white { background: var(--play-pen-white); }
+.team-hub .wb-dot.ink { background: var(--play-pen-ink); }
+.team-hub .wb-dot.turf { background: var(--play-pen-turf); }
+.team-hub .wb-dot.amber { background: var(--play-pen-amber); }
+.team-hub .wb-dot:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Tool icons the play editor doesn't have: the pen shows its colour. */
+.team-hub .play-tool-icon.move { background: none; border: 2px solid var(--ink-soft); border-radius: 2px; transform: rotate(45deg); width: 8px; height: 8px; }
+.team-hub .play-tool-icon.pen { border: 1px solid var(--line-2); }
+.team-hub .play-tool-icon.pen.white { background: var(--play-pen-white); }
+.team-hub .play-tool-icon.pen.ink { background: var(--play-pen-ink); }
+.team-hub .play-tool-icon.pen.turf { background: var(--play-pen-turf); }
+.team-hub .play-tool-icon.pen.amber { background: var(--play-pen-amber); }
+
+/* Toast after a save. */
+.team-hub .wb-toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 30;
+  display: flex; align-items: center; gap: 14px; padding: 10px 16px; border-radius: 12px;
+  background: var(--ink); color: var(--bg); box-shadow: 0 10px 30px rgb(0 0 0 / 0.25); font-weight: 600;
+  max-width: calc(100% - 32px);
+}
+.team-hub .wb-toast .text-btn { color: var(--accent-soft); font-weight: 700; }
+
+/* Confirm and save dialogs. */
+.wb-dialog { display: grid; gap: 12px; }
+.wb-dialog > *, .wb-dialog form > * { margin: 0; }
+.wb-dialog form { display: grid; gap: 12px; }
+.wb-dialog label { display: grid; gap: 6px; font-weight: 600; font-size: 0.88rem; color: var(--ink-soft); }

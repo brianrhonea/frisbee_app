@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/auth/auth_repository.dart';
+import '../../../data/repositories/chat/chat_repository.dart';
+import '../../../data/repositories/chat/team_chat_activity.dart';
+import '../../../data/repositories/team/team_repository.dart';
 import '../../../data/repositories/direct_message/direct_message_repository.dart';
 import '../../../data/repositories/notification/notification_repository.dart';
 import '../../../domain/models/direct_message.dart';
@@ -78,16 +81,25 @@ class InboxItem {
   bool get isArchived => conversation.isArchived;
 }
 
-/// The user's private messages, newest first. Team chats live on team
-/// pages, not here.
+/// Every chat of the user's: their teams' and communities' chats above
+/// their private messages, each newest first.
 class InboxViewModel extends ChangeNotifier {
   InboxViewModel({
     required DirectMessageRepository directMessageRepository,
     required AuthRepository authRepository,
     NotificationRepository? notificationRepository,
+    TeamRepository? teamRepository,
+    ChatRepository? chatRepository,
   }) : uid = authRepository.currentUser?.uid ?? '',
        _dms = directMessageRepository,
        _notices = notificationRepository {
+    if (teamRepository != null && chatRepository != null) {
+      _teamChats = TeamChatActivity(
+        teamRepository: teamRepository,
+        chatRepository: chatRepository,
+        uid: uid,
+      )..addListener(notifyListeners);
+    }
     archive = Command1<void, InboxItem>(
       (i) => _dms.setArchived(
         i.conversation.id,
@@ -131,6 +143,25 @@ class InboxViewModel extends ChangeNotifier {
   final String uid;
   final DirectMessageRepository _dms;
   final NotificationRepository? _notices;
+  TeamChatActivity? _teamChats;
+
+  /// The team and community chats to list above the conversations, for
+  /// [filter] and [query]: all of them, or the unread ones; none among
+  /// requests or archived conversations.
+  List<TeamChatSummary> get teamChats {
+    final all = _teamChats?.summaries ?? const <TeamChatSummary>[];
+    final q = _query.trim().toLowerCase();
+    return [
+      for (final s in all)
+        if ((_filter == InboxFilter.all ||
+                (_filter == InboxFilter.unread && s.unread)) &&
+            (q.isEmpty || s.team.name.toLowerCase().contains(q)))
+          s,
+    ];
+  }
+
+  /// Teams whose chat has rooms the user hasn't read.
+  int get unreadTeamChats => _teamChats?.unreadCount ?? 0;
   late final StreamSubscription<List<Conversation>> _sub;
   StreamSubscription<NotificationPreferences>? _prefsSub;
   NotificationPreferences? _prefs;
@@ -228,7 +259,9 @@ class InboxViewModel extends ChangeNotifier {
     ];
   }
 
-  int get unreadCount => allItems.where((i) => i.unread).length;
+  /// Unread conversations and team chats, for the Unread filter.
+  int get unreadCount =>
+      allItems.where((i) => i.unread).length + unreadTeamChats;
 
   String? _selectedKey;
 
@@ -351,6 +384,9 @@ class InboxViewModel extends ChangeNotifier {
     archive.dispose();
     delete.dispose();
     toggleMute.dispose();
+    _teamChats
+      ?..removeListener(notifyListeners)
+      ..dispose();
     _sub.cancel();
     _prefsSub?.cancel();
     for (final s in _typingSubs.values) {

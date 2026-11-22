@@ -19,6 +19,8 @@ export interface MeetingData {
   startedBy?: string;
   endedAt?: string;
   rsvps?: Record<string, MeetingRsvp>;
+  /** uid → a short note on their answer, as on team events. */
+  rsvpNotes?: Record<string, string>;
   createdBy?: string;
 }
 export type Meeting = Doc<MeetingData>;

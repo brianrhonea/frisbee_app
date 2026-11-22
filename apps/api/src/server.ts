@@ -11,6 +11,7 @@ import { photoBuckets } from "./browse/visibility.js";
 import { FirestoreRateLimiter } from "./limits/limiter.js";
 import { FirestoreCalendarRepository } from "./calendar/repository.js";
 import { FirestoreMeRepository } from "./me/repository.js";
+import { FirestoreExportRepository } from "./export/repository.js";
 import { buildApp, trustHops } from "./app.js";
 import { parseCorsOrigins } from "./cors.js";
 import { cloudLoggingOptions } from "./logging.js";
@@ -89,6 +90,7 @@ const app = buildApp({
   },
   teams: new FirestoreTeamRepository(db),
   me: { repo: new FirestoreMeRepository(db), imageUrl },
+  exports: new FirestoreExportRepository(db),
   calendar: new FirestoreCalendarRepository(db),
   publicUrl: process.env.PUBLIC_API_URL || undefined,
   // The website's address: its cached public pages are expired on changes.

@@ -4,19 +4,235 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
-## 0.37.0 — 2026-11-16
+## 0.49.0 — 2026-11-20
 
-Works with API 0.29.0 (online payments; shows nothing until Stripe is set
-up on the API).
+With app 0.0.40.
 
 **Added**
-- Hosts: the host's owner sees "Take payments online" on the event page
-  and connects Stripe (`PayoutsCard`); `/payments/payouts` is where
-  Stripe sends them back, and asks for a fresh link when one expired.
-- Payers: "Pay $400 online" on each of your teams' entries (with whether
-  its fee is paid) and on your own signup when the host takes payments
-  (`PayOnline`); Stripe Checkout opens in the tab and comes back to
-  `/payments/done`.
+- Schedule event editor: "New shared calendar…" in the Calendar list
+  makes a calendar there (name, color, Can view / Can edit, people to
+  invite) and selects it for the event.
+- Add to calendar → Share…: the browser's share sheet with the .ics file
+  (or the text), else copies "Title · when · where".
+
+## 0.48.0 — 2026-11-20
+
+With app 0.0.39. Needs API 0.36.0 for emoji beyond the old eight.
+
+**Added**
+- Chat reactions as the app: double-click a message (or React) for a
+  bubble of quick reactions over it, with + for every emoji by group
+  (`chatQuickReactions`, `chatReactionGroups` in `packages/shared`).
+  The quick ones are now the app's ❤️ 👍 👎 😂 ‼️ ❓.
+
+## 0.47.0 — 2026-11-20
+
+Redesign features, second batch, with app 0.0.38. Needs API 0.35.0.
+Details in `docs/product-spec.md` §8.1 items 35–44.
+
+**Added**
+- Tournaments: bracket page (`/tournaments/:id/bracket`), −/+ score
+  steppers, league week stepper, Enter a team page
+  (`/tournaments/:id/enter`), host form in steps with Save draft /
+  Publish, Share (or copy link).
+- Team videos: notes and clips pinned to moments (YouTube now plays
+  through YouTube's IFrame API so notes can seek), comments, tag to an
+  event; events list their tagged videos.
+- "Add to calendar" menu: Google Calendar, Outlook, Apple / other
+  (.ics).
+- Team page: Going and New in chat tiles; roster Role column, O-line /
+  D-line groups, Edit lines, Invites pending; More rows with
+  descriptions, Manage team and Leave.
+- Chat polls in team rooms.
+- Team feed: Pin / Unpin (up to 3), comments with counts, "Post to the
+  team…".
+- Settings › Roles: per-person permissions with presets. Settings ›
+  Visibility: Allow join requests; Request to join for outsiders.
+- Discord import: Pick channels.
+- Community pages: Next pickup card with RSVP, Chat rooms, Organizers.
+
+**Changed**
+- The Teams tab always opens `/teams` (`useSingleTeam` removed).
+
+## 0.46.0 — 2026-11-20
+
+Redesign features, with app 0.0.37. Needs API 0.34.0. Details in
+`docs/product-spec.md` §8.1 items 26–34.
+
+**Added**
+- Live running scores: "Live score" dialog for captains and hosts;
+  LIVE pill and score on games, the live header, tournament-day card
+  and Discover's "Live now" (`useLiveScores`).
+- Team Settings › Sections (new teams start with Feed, Schedule, Chat,
+  Roster; `SectionGate`, `SectionsHint`) and Settings › Visibility ›
+  Public team page.
+- Playbook whiteboard: `/teams/:id/playbook?view=whiteboard`,
+  `/teams/:id/whiteboards/new` and `/whiteboards/:playId`.
+- Notes on event and meeting RSVPs (`RsvpNote`).
+- Schedule List / Month switch.
+- Meetings tab: Upcoming / Past, Live now, Needs RSVP.
+- Team rooms: pinned messages and shared event cards (`ChatExtras`).
+- Settings › Account › Download your data.
+- Learn progress ("N of 12 read") and "N spots left" on tournament
+  cards (`useTournamentSpots`).
+
+## 0.45.0 — 2026-11-20
+
+Navigation and the "Turf & Disc" redesign, with app 0.0.36. Works with
+API 0.33.0. Plan: `docs/redesign-plan.md`.
+
+**Changed**
+- Navigation as the app: Home, Discover, Schedule, Teams, Inbox. Discover
+  (`/explore`) takes in Find events: `/discover`, `/events` and
+  `/schedule?view=find` redirect; chips All, Tournaments, Leagues,
+  Pickup, Teams, Communities, Players (`?only=`). Header "Join free".
+  Home feed tabs Your teams / Following / Everyone (old `?tab=` values
+  still open), no composer on Everyone. The Teams tab opens your only
+  team (`useSingleTeam`) and the team page links back to All teams.
+- New palette and type (light by default, dark from the system or the
+  toggle): turf green for actions, scoreboard navy for live and today,
+  amber only for what is yours to do, red only for live games; Inter and
+  Barlow Condensed (next/font) for scores, dates and the wordmark. New
+  tokens in `site.css` (old names kept as aliases).
+- Every page restyled: frame and public pages (W1), member pages (W2:
+  home "Needs you", schedule grouped by day with "Needs RSVP", inbox,
+  notifications grouped Today / Earlier, settings with an Appearance
+  Light / Dark / System control, create team), team hub (W3: compact
+  header with initials badge and a Message button, schedule with
+  "Directions", a "Notes" card and counts on each RSVP answer, room
+  access None / Read / Read & write, playbook grids, video rows, navy
+  meeting room), tournaments, drafts and stats (W4: navy live header,
+  live days open on Schedule, "Next steps", host chooser "What are you
+  hosting?" / "Host as" in the order Tournament · League · Hat, Teams
+  tab "Accept applications above", publish card with games as a stat,
+  signups Accepted / To decide / Waitlist with an MMP/WMP bar).
+- Delete, leave and other destructive buttons are solid ink or neutral,
+  not red. The finish-sign-up intro no longer mentions USA Ultimate.
+
+**Removed**
+- `/events` page (now Discover's Coming up).
+
+## 0.44.0 — 2026-11-19
+
+Tournaments tab when one is ahead, with app 0.0.34. Works with API 0.33.0.
+
+**Changed**
+- A team's hub shows **Tournaments** in its tab row, after Chat, while
+  the team has a tournament ahead (members; `hasTournamentAhead` in
+  `@stall10/shared`, the app's rule), and drops it from More then.
+- The team's Tournaments page starts with its tournament-day card when it
+  has one.
+
+## 0.43.0 — 2026-11-19
+
+Tournament-day card, with app 0.0.33. Works with API 0.33.0.
+
+**Added**
+- On a tournament day the member home page (phones: in place of Up next;
+  wider: the side column) and the team page show the team's card: the
+  tournament (Live when it is), the next game (opponent, time, field;
+  "Tomorrow" from 17:00 the evening before), record and pool place, and
+  the last result (`useTournamentDays`, `TournamentDayCard`). One rule
+  with the app: `tournamentDay` in `@stall10/shared`. Between pools and
+  the bracket it says **Next game to be decided**; a next game on another
+  day shows the day. Wide screens show it in the side column, phones
+  above the feed.
+- Captains get **Report score** / **Confirm score** on the card. It opens
+  `/tournaments/{id}?division=…&game=…`: the Schedule tab with the game
+  first under **This game**, its score form open when it's theirs to
+  report. `?tab=schedule|results` picks a tab.
+
+## 0.42.0 — 2026-11-19
+
+Team chats in Messages, with app 0.0.32. Needs API 0.33.0.
+
+**Added**
+- Messages' Inbox lists the member's team and community chats above
+  their conversations (`useTeamChats`): which rooms have new messages, the
+  newest's time, an unread dot. A click opens the team's Chat on the only
+  unread room, else the newest. Search matches team names. One rule with
+  the app: `teamChatSummary` in `@stall10/shared`.
+- A team's room list shows rooms with unread messages bold with a dot;
+  the open room is marked read (`PUT /v1/teams/:id/chats/:room/read`) as
+  messages arrive.
+
+## 0.41.0 — 2026-11-19
+
+Stats per team on profiles, with app 0.0.31. Works with API 0.32.0.
+
+**Added**
+- A player's page has a **Team** menu on its Career table (two or more
+  teams with stats; `profileStatsChoice` in `@stall10/shared`, the app's
+  rule), kept in `?team=`. It narrows the table and the season tiles.
+  The Career table also ends with a Career total row, as the app's does.
+
+**Changed**
+- The sidebar's short label for a pickup community is "Pickup".
+
+## 0.40.0 — 2026-11-19
+
+UI review release 1, with app 0.0.30. Works with API 0.31.1.
+
+**Changed**
+- One name for communities: "Pickup community" (was "Community group")
+  and "community" (was "group") in every page, dialog and placeholder,
+  with the app's words. Explore's chip is **Communities** (`?only=groups`
+  still works). Group messages keep "group".
+- Stats: **Track a tournament** (was New tournament) and **Tournament
+  stats** for the list, as in the app.
+- The static About and account-deletion pages say pickup communities.
+
+**Added**
+- The invite dialog's **QR code** button shows the link as a QR code to
+  scan (the `qrcode` package, rendered to an inline SVG, dark on white in
+  both themes).
+
+## 0.39.1 — 2026-11-17
+
+List caps (security review S4).
+
+**Changed**
+- A post shows its newest 100 comments, oldest first, as the app does
+  (it showed the oldest 300). The database rules now refuse a comments
+  query for more than 100.
+
+## 0.39.0 — 2026-11-17
+
+Private profiles' posts (security review S1). Works with API 0.31.0.
+
+**Changed**
+- A player's page listens for new posts with `private == false` unless
+  it's the member's own page or a private profile they're an accepted
+  follower of, as the database rules now require. What the page shows is
+  unchanged (it comes from the API).
+
+## 0.38.0 — 2026-11-16
+
+Needs API 0.30.0: deploy the API first. The site now sends an `id` with
+every new comment, and older APIs turn that down (400). 0.37.0 is the
+payments branch's.
+
+**Added**
+- Offline queue, as in the app: a message (direct or team chat), post,
+  team post or comment sent while Stall 10 can't be reached waits in this
+  browser (IndexedDB, `lib/outbox.ts`) and sends by itself, in order,
+  once it can. Each keeps the id it got when sent, so nothing is posted
+  twice. Photos and files are uploaded when added, so the queued item is
+  the finished request. One tab sends at a time (a Web Lock); other tabs
+  follow along (BroadcastChannel).
+- Whether Stall 10 can be reached (`lib/online.ts`): the browser's
+  offline event, a send that couldn't get through, then `GET /health`
+  every 15 seconds until it answers.
+- A banner at the top while offline or while anything waits: "You're
+  offline. 2 items will send when you're back." It opens "Waiting to
+  send", with Try again (for one the server turned down) and Discard.
+- Messages still waiting show at the end of their thread, faded, with
+  "Waiting to send", "Sending…" or why it wasn't sent.
+- Composers say "Couldn't reach Stall 10. Your message will send by
+  itself once it can." when they queue instead of send.
+
+Likes, reactions, RSVPs and edits aren't queued; they say they couldn't
+reach Stall 10, as before.
 
 ## 0.36.0 — 2026-11-16
 

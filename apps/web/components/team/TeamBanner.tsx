@@ -1,35 +1,64 @@
 "use client";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useLayoutEffect, useRef, useState } from "react";
 import { Avatar } from "../Avatar";
 import { FollowButton } from "../FollowButton";
 import { roleLabel } from "../ProfileDashboard";
 import { JoinWithCode } from "../CreateTeam";
 import { Dialog } from "../Dialog";
+import { NavIcon } from "../NavIcons";
 import { ShareButton } from "../ShareButton";
 import { InviteButton } from "./InviteDialog";
+import { TeamBadge } from "./TeamBadge";
 import { type TeamDoc, type TeamViewer, useTeamHub } from "./TeamContext";
 import { JoinButton } from "./TeamNav";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 /**
- * The banner's buttons: Invite (member managers), Join (groups'
+ * The header's buttons, as the app's compact team header: Invite (member
+ * managers; turf, with an amber count of join requests), Join (groups'
  * outsiders), Follow (people not on it, as in the app: a member's feed
- * already has every post) and Share. Members' Settings gear is the one
- * beside the tabs (TeamNav).
+ * already has every post), Message (members: the team's chat), Share, and
+ * members' Settings gear.
  */
 export function TeamBannerActions() {
   const { teamId, name, viewer } = useTeamHub();
+  const path = usePathname();
+  const base = `/teams/${teamId}`;
+  const member = viewer.state === "member";
+  const onSettings = path.startsWith(`${base}/settings`);
   return (
     <>
       <InviteButton />
       <JoinButton />
       {showsFollow(viewer.state) && <FollowButton type="team" targetId={teamId} />}
-      <ShareButton url={new URL(`/teams/${encodeURIComponent(teamId)}`, siteUrl).toString()} title={`${name} on Stall 10`} className="btn btn-small" />
+      {member && (
+        <Link className="btn btn-small btn-quiet" href={`${base}/chat`}>
+          Message
+        </Link>
+      )}
+      <ShareButton url={new URL(`/teams/${encodeURIComponent(teamId)}`, siteUrl).toString()} title={`${name} on Stall 10`} className="btn btn-small btn-quiet" />
+      {member && (
+        <Link
+          href={`${base}/settings`}
+          className={`icon-btn team-gear${onSettings ? " on" : ""}`}
+          aria-label="Settings"
+          title="Settings"
+          aria-current={onSettings ? "page" : undefined}
+        >
+          <NavIcon name="settings" size={20} />
+        </Link>
+      )}
     </>
   );
+}
+
+/** The header's initials badge, for the name members see (TeamName). */
+export function TeamHeadBadge() {
+  const { name, kind } = useTeamHub();
+  return <TeamBadge name={name} kind={kind} size={56} />;
 }
 
 /** Whether the banner offers Follow: only once the viewer is known not to be on the team (the app's TeamHomeViewModel.follow). */
@@ -45,28 +74,42 @@ export function membersInOrder(team: TeamDoc): Array<{ uid: string; name: string
 }
 
 /**
- * How many members, with a few faces, linking to the roster, and the
- * viewer's role. Members only, as in the app (its count line): outsiders
- * can't read the team doc, and the public page doesn't say.
+ * The meta line under the name (the app's _metaLine): what the team is and
+ * where ([subtitle]), then for members how many are on it, with a few
+ * faces, linking to the roster, the year it started and the viewer's role.
+ * Members only past the subtitle, as in the app: outsiders can't read the
+ * team doc, and the public page doesn't say.
  */
-export function MemberCount() {
+export function TeamMeta({ subtitle }: { subtitle?: string }) {
   const { teamId, kind, viewer } = useTeamHub();
-  if (viewer.state !== "member") return null;
-  const people = membersInOrder(viewer.team);
+  const member = viewer.state === "member" ? viewer : null;
+  const people = member ? membersInOrder(member.team) : [];
   const n = people.length;
+  const created = member?.team.createdAt ? new Date(member.team.createdAt) : null;
+  const founded = created && !Number.isNaN(created.getTime()) ? created.getFullYear() : null;
+  if (!subtitle && !member) return null;
   return (
-    <p className="member-line">
-      <Link className="member-count" href={`/teams/${teamId}/roster`}>
-        <span className="avatar-stack" aria-hidden="true">
-          {people.slice(0, 4).map((p) => (
-            <Avatar key={p.uid} name={p.name} size={24} />
-          ))}
-        </span>
-        {n} {n === 1 ? "member" : "members"}
-      </Link>
-      <span className="pill">{roleLabel(viewer.tier, kind)}</span>
+    <p className="team-meta member-line">
+      {subtitle && <span>{subtitle}</span>}
+      {member && (
+        <Link className="member-count" href={`/teams/${teamId}/roster`}>
+          <span className="avatar-stack" aria-hidden="true">
+            {people.slice(0, 4).map((p) => (
+              <Avatar key={p.uid} name={p.name} size={20} />
+            ))}
+          </span>
+          {n} {n === 1 ? "member" : "members"}
+        </Link>
+      )}
+      {founded && <span>Est. {founded}</span>}
+      {member && <span className="pill">{roleLabel(member.tier, kind)}</span>}
     </p>
   );
+}
+
+/** How many members and the viewer's role: the meta line without a subtitle. */
+export function MemberCount() {
+  return <TeamMeta />;
 }
 
 /** The description, two lines until "more". */
@@ -103,13 +146,13 @@ export function TeamAbout({ text }: { text: string }) {
  * signed in who isn't on it is told so and can type in a code or link.
  */
 export function InviteOnlyHint() {
-  const { teamId, kind, viewer } = useTeamHub();
+  const { teamId, kind, joinRequests, viewer } = useTeamHub();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   if (kind !== "team" || viewer.state !== "outsider") return null;
   return (
     <div className="invite-only">
-      <span>Invite-only — have a code?</span>
+      <span>{joinRequests ? "Ask to join, or have a code?" : "Invite-only — have a code?"}</span>
       <button type="button" className="btn btn-small" onClick={() => setOpen(true)}>
         Join with a code
       </button>

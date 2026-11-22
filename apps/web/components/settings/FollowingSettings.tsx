@@ -20,7 +20,7 @@ interface Follow {
 
 const tabs = [
   ["user", "Players"],
-  ["team", "Teams and groups"],
+  ["team", "Teams and communities"],
   ["tournament", "Tournaments"],
 ] as const;
 
@@ -33,7 +33,7 @@ function hrefOf(f: Follow): string {
     return `/teams/${encodeURIComponent(f.groupId)}/tournaments/${encodeURIComponent(id)}`;
   }
   if (f.type === "tournament") return `/tournaments/${encodeURIComponent(f.targetId)}`;
-  return "/events";
+  return "/explore#coming-up";
 }
 
 /** Everything the member follows, as a table: filter, find, notifications, unfollow. */

@@ -60,6 +60,14 @@ class FakeTournaments implements PublicTournamentRepository {
     this.gamesAsked.push(`${id}/${divisionId}`);
     return this.gameDocs.get(`${id}/${divisionId}`) ?? [];
   }
+  liveAsked: string[] = [];
+  async liveGames(id: string, divisionId: string, since: Date) {
+    this.liveAsked.push(`${id}/${divisionId}`);
+    return (this.gameDocs.get(`${id}/${divisionId}`) ?? []).filter((g) => {
+      const at = (g.data.live as Data | undefined)?.updatedAt;
+      return typeof at === "string" && Date.parse(at) >= since.getTime();
+    });
+  }
   async listings(ids: string[]) {
     return new Map(ids.flatMap((id) => (this.listingMap.has(id) ? [[id, this.listingMap.get(id)!] as const] : [])));
   }
@@ -258,6 +266,62 @@ describe("visitors' tournament pages", () => {
       });
     });
 
+    it("gives live events' games being played now (Live now), with public names and no uids", async () => {
+      t.repo.tournaments.set("fall", tournament({ status: "live", startsOn: iso(now) }));
+      t.repo.tournaments.set("soon", tournament({ status: "scheduled", startsOn: iso(now + day) }));
+      t.repo.divisionDocs.set("fall", [{ id: "open", data: division() }]);
+      t.repo.entryDocs.set("fall", [entry("haze", "Haze", "accepted"), entry("doublewide", "Doublewide", "accepted")]);
+      const live = (scoreA: number, scoreB: number, at: number) => ({ scoreA, scoreB, startedAt: iso(at - 600_000), updatedAt: iso(at), by: "capUid1" });
+      t.repo.gameDocs.set("fall/open", [
+        gameDoc("g1", { status: "scheduled", scoreA: null, scoreB: null, field: 3, live: live(7, 5, now - 60_000) }),
+        // Stale (not updated for hours), already reported, or not live at all.
+        gameDoc("g2", { status: "scheduled", scoreA: null, scoreB: null, live: live(3, 3, now - 4 * 3600_000) }),
+        gameDoc("g3", { status: "reported", scoreA: null, scoreB: null, report: { scoreA: 15, scoreB: 3, byTeam: "haze" }, live: live(14, 3, now) }),
+        gameDoc("g4"),
+      ]);
+      const cards = (await t.get("/v1/public/tournaments")).json().tournaments;
+      const fall = cards.find((c: { id: string }) => c.id === "fall");
+      expect(fall.liveGames).toEqual([
+        {
+          divisionId: "open",
+          gameId: "g1",
+          label: "Pool A",
+          field: 3,
+          teamA: "haze",
+          teamB: "doublewide",
+          nameA: "Haze",
+          nameB: "Doublewide",
+          scoreA: 7,
+          scoreB: 5,
+          updatedAt: iso(now - 60_000),
+        },
+      ]);
+      expect(JSON.stringify(cards)).not.toContain("capUid1");
+      // Only live events are asked.
+      expect(t.repo.liveAsked).toEqual(["fall/open"]);
+      expect(cards.find((c: { id: string }) => c.id === "soon").liveGames).toBeUndefined();
+    });
+
+    it("gives team spots left while registration is open (caps less accepted teams), and none otherwise", async () => {
+      t.repo.tournaments.set("open", tournament());
+      t.repo.divisionDocs.set("open", [
+        { id: "open", data: division({ maxTeams: 8, seeds: ["haze", "doublewide"] }) },
+        { id: "mixed", data: division({ division: "mixed", maxTeams: 4, seeds: ["a", "b", "c", "d"] }) },
+      ]);
+      t.repo.tournaments.set("full", tournament({ startsOn: iso(now + 7 * day) }));
+      t.repo.divisionDocs.set("full", [{ id: "open", data: division({ maxTeams: 2, seeds: ["haze", "doublewide"] }) }]);
+      // Seeding has started, or players sign up (a hat tournament): no spots.
+      t.repo.tournaments.set("seeding", tournament({ status: "seeding", startsOn: iso(now + 8 * day) }));
+      t.repo.divisionDocs.set("seeding", [{ id: "open", data: division() }]);
+      t.repo.tournaments.set("hat", tournament({ entryType: "players", startsOn: iso(now + 9 * day) }));
+      t.repo.divisionDocs.set("hat", [{ id: "open", data: division() }]);
+      const cards = (await t.get("/v1/public/tournaments")).json().tournaments;
+      const spots = Object.fromEntries(cards.map((c: { id: string; spots?: unknown }) => [c.id, c.spots ?? null]));
+      expect(spots).toEqual({ open: { left: 6, cap: 12 }, full: { left: 0, cap: 2 }, seeding: null, hat: null });
+      // Never who's in.
+      expect(JSON.stringify(cards)).not.toContain("haze");
+    });
+
     it("still lists what's starting when the running query fails", async () => {
       t.repo.endingFails = true;
       t.repo.tournaments.set("ok", tournament());
@@ -288,6 +352,16 @@ describe("visitors' tournament pages", () => {
         gameDoc("g2", { order: 1, teamA: "haze", teamB: null, sourceB: { type: "winner", game: "g1" }, status: "reported", scoreA: null, scoreB: null, report: { scoreA: 15, scoreB: 9, byTeam: "haze" } }),
       ]);
       t.repo.gameDocs.set("fall/mixed", [gameDoc("m1", { teamA: "kids", teamB: null, status: "scheduled", scoreA: null, scoreB: null })]);
+    });
+
+    it("gives a game's running score without who kept it", async () => {
+      t.repo.gameDocs.set("fall/open", [
+        gameDoc("g1", { status: "scheduled", scoreA: null, scoreB: null, live: { scoreA: 7, scoreB: 5, startedAt: iso(now - 600_000), updatedAt: iso(now), by: "capUid1" } }),
+      ]);
+      const page = (await t.get("/v1/public/tournaments/fall")).json();
+      expect(page.games[0]).toMatchObject({ status: "scheduled", scoreA: null, scoreB: null, live: { scoreA: 7, scoreB: 5, startedAt: iso(now - 600_000), updatedAt: iso(now) } });
+      expect(page.games[0].live.by).toBeUndefined();
+      expect(JSON.stringify(page)).not.toContain("capUid1");
     });
 
     it("shows the page without a token: overview, divisions in order, accepted teams, the first division's games", async () => {

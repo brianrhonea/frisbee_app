@@ -1,7 +1,9 @@
 "use client";
-import { chatAttachmentsMax, chatReactionChoices, chatTextMax, formatFileSize } from "@stall10/shared";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { chatAttachmentsMax, chatQuickReactions, chatReactionGroups, chatTextMax, formatFileSize } from "@stall10/shared";
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import type { OutboxKind } from "@stall10/shared";
 import { callApi } from "@/lib/client";
+import { queuedNotice, submitOutbox } from "@/lib/outbox";
 import { loadDraft, saveDraft } from "@/lib/drafts";
 import { chatFileProblem, newId, removeUpload, uploadPhoto } from "@/lib/upload";
 import { useAuth } from "./AuthProvider";
@@ -23,8 +25,13 @@ export function ChatComposer({
   onClearReply,
   onTyping,
   draftKey,
+  outbox,
+  onShareEvent,
+  onCreatePoll,
 }: {
   path: string;
+  /** Where this thread's messages wait while Stall 10 can't be reached (the app's OutboxKind and target). */
+  outbox: { kind: OutboxKind; target: string };
   upload: { targetId: string };
   placeholder: string;
   replyTo?: { id: string; authorName?: string; text?: string } | null;
@@ -33,6 +40,10 @@ export function ChatComposer({
   onTyping?: (typing: boolean) => void;
   /** Where this thread's unsent text is kept (`dm_<id>`, `chat_<team>_<room>`). */
   draftKey?: string;
+  /** "Share an event" beside files in the attach menu (team rooms, F3). */
+  onShareEvent?: () => void;
+  /** "Poll" in the attach menu (team rooms, F33). Without either, there's no menu. */
+  onCreatePoll?: () => void;
 }) {
   const { user } = useAuth();
   const [text, setText] = useState("");
@@ -40,6 +51,8 @@ export function ChatComposer({
   const [files, setFiles] = useState<Pending[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [attachMenu, setAttachMenu] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   /** Files removed while still uploading: deleted once their upload finishes. */
   const dropped = useRef(new Set<string>());
@@ -93,16 +106,24 @@ export function ChatComposer({
     if (!user || !canSend) return;
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
-      await callApi(user, path, {
-        method: "POST",
+      const done = await submitOutbox(user, {
+        kind: outbox.kind,
+        id: messageId,
+        target: outbox.target,
+        label: "Message",
+        path,
         body: {
-          id: messageId,
           text,
           uploadIds: ready.map((f) => f.uploadId!),
           ...(replyTo && { replyTo: replyTo.id }),
         },
+        preview: text.trim(),
+        files: ready.length,
+        replyTo: replyTo ? { authorName: replyTo.authorName, text: replyTo.text } : null,
       });
+      if (done === "queued") setNotice(queuedNotice("Message"));
       edit("");
       onTyping?.(false);
       setFiles([]);
@@ -142,6 +163,11 @@ export function ChatComposer({
           {error}
         </p>
       )}
+      {notice && (
+        <p className="muted small" role="status">
+          {notice}
+        </p>
+      )}
       <div className="chat-input-row">
         <input
           ref={input}
@@ -153,9 +179,63 @@ export function ChatComposer({
             e.target.value = "";
           }}
         />
-        <button type="button" className="icon-btn" aria-label="Attach files" title="Attach photos, videos or files" onClick={() => input.current?.click()}>
-          📎
-        </button>
+        {onShareEvent || onCreatePoll ? (
+          <span className="attach-menu">
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label="Attach"
+              aria-haspopup="menu"
+              aria-expanded={attachMenu}
+              title={onShareEvent ? "Attach files, share an event or ask a poll" : "Attach files or ask a poll"}
+              onClick={() => setAttachMenu(!attachMenu)}
+            >
+              📎
+            </button>
+            {attachMenu && (
+              <span className="attach-menu-list" role="menu">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setAttachMenu(false);
+                    input.current?.click();
+                  }}
+                >
+                  Photo, video or file
+                </button>
+                {onShareEvent && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setAttachMenu(false);
+                      onShareEvent();
+                    }}
+                  >
+                    Share an event
+                  </button>
+                )}
+                {onCreatePoll && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setAttachMenu(false);
+                      onCreatePoll();
+                    }}
+                  >
+                    Poll
+                  </button>
+                )}
+              </span>
+            )}
+          </span>
+        ) : (
+          <button type="button" className="icon-btn" aria-label="Attach files" title="Attach photos, videos or files" onClick={() => input.current?.click()}>
+            📎
+          </button>
+        )}
         <textarea
           aria-label={placeholder}
           placeholder={placeholder}
@@ -187,23 +267,38 @@ export function ChatComposer({
   );
 }
 
-/** Reply, react and delete on one message; [path] is the message's endpoint. */
+/**
+ * Reply, react and delete on one message; [path] is the message's endpoint.
+ * Reacting opens a bubble of quick reactions above the message with a +
+ * for any other emoji (as the app's double-tap); the list opens it on a
+ * double-click too, through [picking] and [onPickingChange].
+ */
 export function MessageActions({
   path,
   mine,
   canDelete,
   onReply,
   onDeleted,
+  extra,
+  picking: pickingProp,
+  onPickingChange,
 }: {
   path: string;
   mine: string | null;
   canDelete: boolean;
   onReply?: () => void;
+  /** More actions before Delete, e.g. a team room's Pin (F2). */
+  extra?: ReactNode;
   /** Told once the message is deleted (older pages aren't live). */
   onDeleted?: () => void;
+  /** Whether the reaction bubble is open, when the list controls it. */
+  picking?: boolean;
+  onPickingChange?: (open: boolean) => void;
 }) {
   const { user } = useAuth();
-  const [picking, setPicking] = useState(false);
+  const [pickingOwn, setPickingOwn] = useState(false);
+  const picking = pickingProp ?? pickingOwn;
+  const setPicking = (open: boolean) => (onPickingChange ? onPickingChange(open) : setPickingOwn(open));
   const [error, setError] = useState<string | null>(null);
 
   async function call(url: string, method: "PUT" | "DELETE", body?: unknown) {
@@ -224,26 +319,20 @@ export function MessageActions({
           Reply
         </button>
       )}
-      <button type="button" className="text-btn" aria-expanded={picking} onClick={() => setPicking(!picking)} aria-label="React">
+      <button type="button" className="text-btn" data-reaction-toggle aria-expanded={picking} onClick={() => setPicking(!picking)} aria-label="React">
         {mine ?? "☺"}
       </button>
       {picking && (
-        <span className="reaction-picker" role="group" aria-label="Pick a reaction">
-          {chatReactionChoices.map((e) => (
-            <button
-              key={e}
-              type="button"
-              className={mine === e ? "on" : ""}
-              onClick={() => {
-                setPicking(false);
-                void call(`${path}/reaction`, "PUT", { emoji: mine === e ? null : e });
-              }}
-            >
-              {e}
-            </button>
-          ))}
-        </span>
+        <ReactionBubble
+          mine={mine}
+          onClose={() => setPicking(false)}
+          onPick={(e) => {
+            setPicking(false);
+            void call(`${path}/reaction`, "PUT", { emoji: mine === e ? null : e });
+          }}
+        />
       )}
+      {extra}
       {canDelete && (
         <button
           type="button"
@@ -256,6 +345,65 @@ export function MessageActions({
         </button>
       )}
       {error && <span className="form-error">{error}</span>}
+    </div>
+  );
+}
+
+/** The quick reactions in a pill over the message, then + for every emoji. Escape or a click outside closes it. */
+function ReactionBubble({ mine, onPick, onClose }: { mine: string | null; onPick: (emoji: string) => void; onClose: () => void }) {
+  const [more, setMore] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const close = useRef(onClose);
+  close.current = onClose;
+  useEffect(() => {
+    ref.current?.querySelector("button")?.focus();
+    const key = (e: KeyboardEvent) => e.key === "Escape" && close.current();
+    const click = (e: MouseEvent) => {
+      const t = e.target as Element;
+      // The React button toggles it itself.
+      if (ref.current && !ref.current.contains(t) && !t.closest?.("[data-reaction-toggle]")) close.current();
+    };
+    document.addEventListener("keydown", key);
+    document.addEventListener("mousedown", click);
+    return () => {
+      document.removeEventListener("keydown", key);
+      document.removeEventListener("mousedown", click);
+    };
+  }, []);
+  const other = mine && !(chatQuickReactions as readonly string[]).includes(mine) ? mine : null;
+  return (
+    <div className="reaction-bubble" ref={ref} role="dialog" aria-label="React to this message">
+      <div className="reaction-quick" role="group" aria-label="Quick reactions">
+        {chatQuickReactions.map((e) => (
+          <button key={e} type="button" className={mine === e ? "on" : ""} aria-pressed={mine === e} aria-label={`React ${e}`} onClick={() => onPick(e)}>
+            {e}
+          </button>
+        ))}
+        {other && (
+          <button type="button" className="on" aria-pressed aria-label={`React ${other}`} onClick={() => onPick(other)}>
+            {other}
+          </button>
+        )}
+        <button type="button" className="reaction-more" aria-expanded={more} aria-label="More emoji" onClick={() => setMore(!more)}>
+          +
+        </button>
+      </div>
+      {more && (
+        <div className="reaction-all">
+          {chatReactionGroups.map((g) => (
+            <section key={g.name} aria-label={g.name}>
+              <h4>{g.name}</h4>
+              <div className="reaction-grid">
+                {g.emoji.map((e) => (
+                  <button key={e} type="button" className={mine === e ? "on" : ""} aria-label={`React ${e}`} onClick={() => onPick(e)}>
+                    {e}
+                  </button>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

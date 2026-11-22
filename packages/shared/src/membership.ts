@@ -75,6 +75,16 @@ export const setMemberRoleRequestSchema = z.strictObject({
   role: z.enum(["owner", "coach", "captain", "player"]),
 });
 
+/**
+ * `PUT /v1/teams/:id/members/:uid/permissions`: the owner sets the
+ * permissions a member has of their own (memberGrants), on top of what
+ * their roles give. The whole set; `[]` takes them all away.
+ */
+export const setMemberPermissionsRequestSchema = z.strictObject({
+  perms: z.array(z.enum(teamPermissions)).max(teamPermissions.length),
+});
+export type SetMemberPermissionsRequest = z.infer<typeof setMemberPermissionsRequestSchema>;
+
 /** `PUT /v1/teams/:id/members/:uid/stat-keeper`. */
 export const setStatKeeperRequestSchema = z.strictObject({ on: z.boolean() });
 
@@ -161,25 +171,61 @@ export function cleanMemberRoles(
   return out;
 }
 
-/** Each member's permissions from their roles (memberPermsFor). */
+/**
+ * [grants] (the team doc's `memberGrants`: permissions members have of
+ * their own, set with per-person switches) cleaned for use: only
+ * [members], only known permissions, in the app's order, no empty entries
+ * (cleanMemberGrants).
+ */
+export function cleanMemberGrants(grants: unknown, members: Iterable<string>): Record<string, TeamPermission[]> {
+  const keep = new Set(members);
+  const out: Record<string, TeamPermission[]> = {};
+  if (!grants || typeof grants !== "object" || Array.isArray(grants)) return out;
+  for (const [uid, list] of Object.entries(grants as Record<string, unknown>)) {
+    if (!keep.has(uid) || !Array.isArray(list)) continue;
+    const perms = teamPermissions.filter((p) => list.includes(p));
+    if (perms.length > 0) out[uid] = perms;
+  }
+  return out;
+}
+
+/**
+ * Each member's permissions (memberPermsFor): what their roles give plus
+ * what they were granted of their own ([grants], already cleaned).
+ */
 export function memberPermsFor(
   memberRoles: Record<string, readonly string[]>,
   roles: Record<string, { perms: readonly string[] }>,
+  grants: Record<string, readonly string[]>,
 ): Record<string, TeamPermission[]> {
-  const out: Record<string, TeamPermission[]> = {};
+  const all = new Map<string, Set<string>>();
+  const add = (uid: string, ps: Iterable<string>) => {
+    const set = all.get(uid) ?? new Set<string>();
+    for (const p of ps) set.add(p);
+    all.set(uid, set);
+  };
   for (const [uid, ids] of Object.entries(memberRoles)) {
-    const perms = new Set<string>();
-    for (const id of ids) {
-      if (Object.hasOwn(roles, id)) for (const p of roles[id].perms) perms.add(p);
-    }
+    for (const id of ids) if (Object.hasOwn(roles, id)) add(uid, roles[id].perms);
+  }
+  for (const [uid, ps] of Object.entries(grants)) add(uid, ps);
+  const out: Record<string, TeamPermission[]> = {};
+  for (const [uid, perms] of all) {
     const ordered = teamPermissions.filter((p) => perms.has(p));
     if (ordered.length > 0) out[uid] = ordered;
   }
   return out;
 }
 
-/** The team doc fields for [roles] and cleaned [memberRoles] (rolesData). */
-export function rolesData(roles: Record<string, CustomRoleInput>, memberRoles: Record<string, readonly string[]>) {
+/**
+ * The team doc fields for [roles] and cleaned [memberRoles] (rolesData).
+ * memberPerms also counts each member's own [grants] (cleaned), which a
+ * role save leaves as they are.
+ */
+export function rolesData(
+  roles: Record<string, CustomRoleInput>,
+  memberRoles: Record<string, readonly string[]>,
+  grants: Record<string, readonly string[]>,
+) {
   const stored: Record<string, { name: string; color: number; position: number; perms: TeamPermission[] }> = {};
   for (const [id, r] of Object.entries(roles)) {
     stored[id] = {
@@ -191,5 +237,61 @@ export function rolesData(roles: Record<string, CustomRoleInput>, memberRoles: R
   }
   const cleaned: Record<string, string[]> = {};
   for (const [uid, ids] of Object.entries(memberRoles)) cleaned[uid] = sorted(ids);
-  return { roles: stored, memberRoles: cleaned, memberPerms: memberPermsFor(cleaned, stored) };
+  return { roles: stored, memberRoles: cleaned, memberPerms: memberPermsFor(cleaned, stored, grants) };
+}
+
+// ---- Role presets (RolePreset in team_role.dart) ---------------------------
+
+/**
+ * A named bundle of permissions an owner gives someone in one tap. Only the
+ * six permissions above exist, so there is no payments preset.
+ */
+export interface RolePreset {
+  id: string;
+  name: string;
+  summary: string;
+  perms: readonly TeamPermission[];
+}
+
+/** A team's presets, from no permissions up to every one. Checked against fixtures/role_presets.json. */
+export const teamRolePresets: readonly RolePreset[] = [
+  { id: "member", name: "Member", summary: "Plays, chats and RSVPs; no admin rights", perms: [] },
+  { id: "statKeeper", name: "Stat keeper", summary: "Tracks games and edits stats", perms: ["keepStats"] },
+  {
+    id: "captain",
+    name: "Captain",
+    summary: "Runs events and chat rooms, moderates and keeps stats",
+    perms: ["manageChats", "manageEvents", "moderate", "keepStats"],
+  },
+  {
+    id: "coach",
+    name: "Coach",
+    summary: "Runs the team, its members, events and stats",
+    perms: ["manageTeam", "manageMembers", "manageEvents", "keepStats"],
+  },
+  { id: "admin", name: "Admin", summary: "Every permission; only the owner can do more", perms: [...teamPermissions] },
+];
+
+/** A group's or community's presets: they don't keep stats. */
+export const groupRolePresets: readonly RolePreset[] = [
+  { id: "member", name: "Member", summary: "Joins in, chats and RSVPs; no admin rights", perms: [] },
+  { id: "moderator", name: "Moderator", summary: "Runs chat rooms and deletes other people's messages", perms: ["manageChats", "moderate"] },
+  { id: "organizer", name: "Organizer", summary: "Runs events and chat rooms and moderates", perms: ["manageChats", "manageEvents", "moderate"] },
+  {
+    id: "admin",
+    name: "Admin",
+    summary: "Every permission; only the owner can do more",
+    perms: teamPermissions.filter((p) => p !== "keepStats"),
+  },
+];
+
+/** The presets for a team ([group] false) or a group or community. */
+export const rolePresetsFor = (group: boolean): readonly RolePreset[] => (group ? groupRolePresets : teamRolePresets);
+
+/** The preset whose permissions are exactly [perms], or null ("Custom"). */
+export function presetMatching(perms: readonly string[], group: boolean): RolePreset | null {
+  const want = new Set(perms);
+  return (
+    rolePresetsFor(group).find((p) => p.perms.length === want.size && p.perms.every((x) => want.has(x))) ?? null
+  );
 }

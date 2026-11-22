@@ -337,6 +337,7 @@ class ProfileSummary {
   const ProfileSummary({
     this.teams = const [],
     this.seasons = const {},
+    this.teamSeasons = const {},
     this.games = const [],
     this.updatedAt,
   });
@@ -348,6 +349,12 @@ class ProfileSummary {
 
   /// Season (the year, e.g. "2026") → totals.
   final Map<String, StatTotals> seasons;
+
+  /// Team id → season → totals: [seasons] split by the team the games
+  /// were for, so a profile can show one team's numbers. Published only
+  /// with both stats and teams shown, since it says which teams they're
+  /// on; the names come from [teams].
+  final Map<String, Map<String, StatTotals>> teamSeasons;
 
   /// Newest first, at most [maxGames].
   final List<ProfileGame> games;
@@ -363,7 +370,57 @@ class ProfileSummary {
   bool sameAs(ProfileSummary o) =>
       _listEquals(teams, o.teams) &&
       _mapEquals(seasons, o.seasons) &&
+      _teamSeasonsEqual(teamSeasons, o.teamSeasons) &&
       _listEquals(games, o.games);
+
+  static bool _teamSeasonsEqual(
+    Map<String, Map<String, StatTotals>> a,
+    Map<String, Map<String, StatTotals>> b,
+  ) {
+    if (a.length != b.length) return false;
+    for (final e in a.entries) {
+      final other = b[e.key];
+      if (other == null || !_mapEquals(e.value, other)) return false;
+    }
+    return true;
+  }
+}
+
+/// Which team's numbers a profile shows (`profileStatsChoice` in
+/// `@stall10/shared`, checked on `fixtures/profile_stats/choice.json`).
+///
+/// The Team filter offers the teams on [ProfileSummary.teams], in that
+/// order, that have stats in [ProfileSummary.teamSeasons]; it shows only
+/// with two or more. A [teamId] it doesn't offer means all teams.
+class ProfileStatsChoice {
+  ProfileStatsChoice._(this.options, this.teamId, this.seasons);
+
+  factory ProfileStatsChoice.of(ProfileSummary summary, String? teamId) {
+    final options = [
+      for (final t in summary.teams)
+        if (summary.teamSeasons[t.id]?.values.any((s) => !s.isEmpty) ?? false)
+          t,
+    ];
+    final shown = options.length >= 2 ? options : const <ProfileTeam>[];
+    final picked = shown.any((t) => t.id == teamId) ? teamId : null;
+    return ProfileStatsChoice._(
+      shown,
+      picked,
+      picked == null ? summary.seasons : summary.teamSeasons[picked]!,
+    );
+  }
+
+  /// The teams to pick from; empty when there's no filter to show.
+  final List<ProfileTeam> options;
+
+  /// The team picked; null for all teams.
+  final String? teamId;
+
+  /// Season → totals for [teamId], or for every team.
+  final Map<String, StatTotals> seasons;
+
+  /// The team picked, if any.
+  ProfileTeam? get team => options.where((t) => t.id == teamId).firstOrNull;
 }
 
 /// A player's profile, from `profiles/{uid}`.
@@ -396,6 +453,7 @@ class PlayerProfile {
     'visibility',
     'teams',
     'stats',
+    'teamStats',
     'games',
     'summaryUpdatedAt',
     'tags',
@@ -432,6 +490,11 @@ class PlayerProfile {
         if (e is Map) Map<String, dynamic>.from(e),
     ];
     final stats = Map<String, dynamic>.from((m['stats'] as Map?) ?? const {});
+    Map<String, StatTotals> seasonsOf(Map raw) => {
+      for (final e in raw.entries)
+        if (e.value is Map)
+          '${e.key}': StatTotals.fromMap(Map<String, dynamic>.from(e.value)),
+    };
     return PlayerProfile(
       uid: uid,
       name: m['name'] as String? ?? '',
@@ -443,10 +506,10 @@ class PlayerProfile {
       details: ProfileDetails.fromMap(m),
       summary: ProfileSummary(
         teams: [for (final t in maps(m['teams'])) ProfileTeam.fromMap(t)],
-        seasons: {
-          for (final e in stats.entries)
-            if (e.value is Map)
-              e.key: StatTotals.fromMap(Map<String, dynamic>.from(e.value)),
+        seasons: seasonsOf(stats),
+        teamSeasons: {
+          for (final e in ((m['teamStats'] as Map?) ?? const {}).entries)
+            if (e.value is Map) '${e.key}': seasonsOf(e.value as Map),
         },
         games: [for (final g in maps(m['games'])) ProfileGame.fromMap(g)],
         updatedAt: parseDate(m['summaryUpdatedAt']),

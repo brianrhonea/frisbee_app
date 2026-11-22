@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../domain/models/person_name.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/password_policy.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/error_message.dart';
 import '../view_models/sign_up_viewmodel.dart';
 import 'auth_layout.dart';
@@ -80,6 +81,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         listenable: vm.signUp,
         builder: (context, _) {
           final busy = vm.signUp.running;
+          final c = AppColors.of(context);
           return Form(
             key: _formKey,
             child: AutofillGroup(
@@ -214,7 +216,24 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   const SizedBox(height: 8),
                   TextButton(
                     onPressed: busy ? null : () => context.go(Routes.signIn),
-                    child: const Text('Already have an account? Sign in'),
+                    child: Text.rich(
+                      TextSpan(
+                        text: 'Already have an account? ',
+                        style: TextStyle(
+                          color: c.muted,
+                          fontWeight: FontWeight.w400,
+                        ),
+                        children: [
+                          TextSpan(
+                            text: 'Sign in',
+                            style: TextStyle(
+                              color: c.accent,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),

@@ -46,4 +46,27 @@ describe("plays", () => {
     expect((await call("POST", "/v1/teams/t1/plays", { ...play, elements: [{ ...play.elements[0], position: { x: -1, y: 0 } }] })).status).toBe(400);
     expect((await call("POST", "/v1/teams/t1/plays", { ...play, name: "" })).status).toBe(400);
   });
+
+  it("save whiteboards and pen strokes, and keep them when a save leaves them out", async () => {
+    const stroke = { id: "k1", color: "amber", points: [{ x: 0.1, y: 0.1 }, { x: 0.4, y: 0.2 }] };
+    const board = { name: "Chalk talk", category: "offense", elements: play.elements, kind: "whiteboard", drawings: [stroke] };
+    expect((await call("POST", "/v1/teams/t1/plays", board, "player")).status).toBe(403);
+    const res = await call("POST", "/v1/teams/t1/plays", board);
+    expect(res.status).toBe(201);
+    const id = res.json().id;
+    expect(store.doc(`teams/t1/plays/${id}`)).toMatchObject({ kind: "whiteboard", drawings: [stroke], steps: [] });
+    // An older client's save (no kind, no drawings) doesn't turn it into a play.
+    expect((await call("PUT", `/v1/teams/t1/plays/${id}`, { name: "Renamed", category: "offense", elements: play.elements })).status).toBe(204);
+    expect(store.doc(`teams/t1/plays/${id}`)).toMatchObject({ name: "Renamed", kind: "whiteboard", drawings: [stroke] });
+    expect((await call("PUT", `/v1/teams/t1/plays/${id}`, { name: "Renamed", category: "offense", elements: play.elements, steps: play.steps })).status).toBe(400);
+    // Saved as a play, with no strokes: both fields go.
+    expect((await call("PUT", `/v1/teams/t1/plays/${id}`, { ...play, kind: "play", drawings: [] })).status).toBe(204);
+    const saved = store.doc(`teams/t1/plays/${id}`);
+    expect(saved?.kind).toBeUndefined();
+    expect(saved?.drawings).toBeUndefined();
+    // A plain play stores neither field.
+    const plain = (await call("POST", "/v1/teams/t1/plays", play)).json().id;
+    expect(Object.keys(store.doc(`teams/t1/plays/${plain}`) ?? {})).not.toContain("kind");
+    expect((await call("POST", "/v1/teams/t1/plays", { ...board, drawings: [{ ...stroke, color: "red" }] })).status).toBe(400);
+  });
 });

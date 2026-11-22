@@ -25,15 +25,17 @@ export function StatSheetTable({ sheet, nameOf }: { sheet: StatSheet; nameOf: (i
     <div className="stack">
       <div className="tiles st-eff">
         <div className="tile">
+          <span className="st-tile-label">O efficiency</span>
           <b>{pct(t.oEfficiency)}</b>
           <small>
-            O efficiency · {t.holds} of {t.oPoints} O points scored
+            {t.holds} of {t.oPoints} O points scored
           </small>
         </div>
         <div className="tile">
+          <span className="st-tile-label">Break rate</span>
           <b>{pct(t.breakRate)}</b>
           <small>
-            Break rate · {t.breaks} of {t.dPoints} D points broken
+            {t.breaks} of {t.dPoints} D points broken
           </small>
         </div>
       </div>

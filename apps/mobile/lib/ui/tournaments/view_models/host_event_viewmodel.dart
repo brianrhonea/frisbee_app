@@ -104,8 +104,8 @@ enum HostSectionKind {
     'Host for everyone in the school or club, across its teams.',
   ),
   groups(
-    'Your community groups',
-    'Pickup and hat events for the group to sign up to.',
+    'Your pickup communities',
+    'Pickup and hat events for the community to sign up to.',
   ),
   teams('Your teams', 'Host as a team, for example your own tournament.');
 

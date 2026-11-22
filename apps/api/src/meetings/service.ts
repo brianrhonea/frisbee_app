@@ -22,6 +22,7 @@ import {
   meetingPlaybackRequestSchema,
   meetingRoomName,
   meetingRsvpRequestSchema,
+  nextRsvpNotes,
   type MeetingDoc,
   type MeetingTeam,
   type MeetingTokenResult,
@@ -190,7 +191,7 @@ export class MeetingService {
   async rsvp(caller: Caller, rawTeam: unknown, rawMeeting: unknown, body: unknown): Promise<void> {
     const teamId = docIdParam(rawTeam);
     const meetingId = docIdParam(rawMeeting);
-    const { answer } = parseBody(meetingRsvpRequestSchema, body);
+    const { answer, note } = parseBody(meetingRsvpRequestSchema, body);
     await this.store.transact(async (tx) => {
       const [team, meeting] = await Promise.all([tx.get(p.team(teamId)), tx.get(p.meeting(teamId, meetingId))]);
       if (!team) throw noTeam();
@@ -201,7 +202,9 @@ export class MeetingService {
       const rsvps: Data = { ...mapOf(meeting.rsvps) };
       if (answer === null) delete rsvps[caller.uid];
       else rsvps[caller.uid] = answer;
-      tx.update(p.meeting(teamId, meetingId), { rsvps });
+      // The note goes with the answer (respond's rsvpNotes conjuncts).
+      const rsvpNotes = nextRsvpNotes(meeting.rsvpNotes, caller.uid, answer !== null, note);
+      tx.update(p.meeting(teamId, meetingId), { rsvps, rsvpNotes });
     });
   }
 

@@ -1,6 +1,7 @@
 // The beginner's guide to ultimate, in our own words, not an official rule
 // book; keep it that way (no copied rule text). Keep it in step with the
-// website's /learn (apps/web/app/learn/page.tsx).
+// website's /learn (apps/web/components/LearnGuide.tsx): the same
+// sections, ids and order as packages/shared's learnLessons.
 
 /// One part of a [LearnSection]: a paragraph, a bulleted list, or terms
 /// and meanings. `**bold**` marks words to emphasize.
@@ -24,7 +25,11 @@ class LearnGlossary extends LearnBlock {
 }
 
 class LearnSection {
-  const LearnSection(this.title, this.blocks);
+  const LearnSection(this.id, this.title, this.blocks);
+
+  /// The lesson's id, the same on the website (its section anchor) and in
+  /// packages/shared's learnLessons; read progress is kept by it.
+  final String id;
   final String title;
   final List<LearnBlock> blocks;
 }
@@ -35,7 +40,7 @@ const learnIntro =
     'zones of both, and players referee their own games.';
 
 const learnSections = <LearnSection>[
-  LearnSection('The basics', [
+  LearnSection('basics', 'The basics', [
     LearnText(
       "Two teams of seven try to score by catching the disc in the end zone "
       "they're attacking. You can't run while holding the disc: you move it "
@@ -50,7 +55,7 @@ const learnSections = <LearnSection>[
       'No referees in most games: players make and settle their own calls.',
     ]),
   ]),
-  LearnSection('The field', [
+  LearnSection('field', 'The field', [
     LearnText(
       'A rectangle about the size of a soccer field, with an end zone at '
       'each end. A typical outdoor field is about 70 yards long and 40 wide '
@@ -59,7 +64,7 @@ const learnSections = <LearnSection>[
       'often smaller.',
     ),
   ]),
-  LearnSection('Starting a point', [
+  LearnSection('pull', 'Starting a point', [
     LearnText(
       'Each point starts with both teams standing on their own end zone '
       'lines. The defending team throws the disc the length of the field to '
@@ -71,7 +76,7 @@ const learnSections = <LearnSection>[
       'scored pulls next.',
     ),
   ]),
-  LearnSection('Moving the disc', [
+  LearnSection('moving', 'Moving the disc', [
     LearnText(
       'Once you catch the disc you have to stop as quickly as you safely '
       'can. You may then **pivot**: keep one foot planted and step around it '
@@ -83,7 +88,7 @@ const learnSections = <LearnSection>[
       'and longer throws to cutters down the field.',
     ),
   ]),
-  LearnSection('The stall count', [
+  LearnSection('stall', 'The stall count', [
     LearnText(
       'The defender guarding the thrower counts out loud: "stalling one, '
       'two, three…" up to ten. If the disc hasn\'t left the thrower\'s hand '
@@ -94,7 +99,7 @@ const learnSections = <LearnSection>[
       'the perfect throw.',
     ),
   ]),
-  LearnSection('Scoring and winning', [
+  LearnSection('scoring', 'Scoring and winning', [
     LearnText(
       "A point is scored when a player catches the disc in the end zone "
       "they're attacking, with both feet (or whatever touches the ground "
@@ -106,7 +111,7 @@ const learnSections = <LearnSection>[
       'ask a team to win by two, up to a cap.',
     ),
   ]),
-  LearnSection('Turnovers', [
+  LearnSection('turnovers', 'Turnovers', [
     LearnText('Possession switches to the other team when:'),
     LearnBullets([
       'a pass hits the ground or is dropped,',
@@ -121,7 +126,7 @@ const learnSections = <LearnSection>[
       "There's no break in play.",
     ),
   ]),
-  LearnSection('Defense', [
+  LearnSection('defense', 'Defense', [
     LearnText(
       'Defenders guard players and try to block or intercept passes. Only '
       'one defender may guard the thrower, and they must leave the thrower '
@@ -134,7 +139,7 @@ const learnSections = <LearnSection>[
       'defenses, where players guard areas of the field instead of people.',
     ),
   ]),
-  LearnSection('Fouls and spirit of the game', [
+  LearnSection('spirit', 'Fouls and spirit of the game', [
     LearnText(
       'Ultimate is non-contact. When contact affects a play, the player '
       'fouled calls "foul" and play stops. The players involved talk it '
@@ -149,7 +154,7 @@ const learnSections = <LearnSection>[
       'settle disputes, but players still make the calls.',
     ),
   ]),
-  LearnSection('Divisions and mixed', [
+  LearnSection('divisions', 'Divisions and mixed', [
     LearnText(
       "Competitive ultimate is usually split into **open**, **women's** and "
       '**mixed** divisions, with club, college, youth, masters and '
@@ -161,7 +166,7 @@ const learnSections = <LearnSection>[
       'team chooses the ratio for each point.',
     ),
   ]),
-  LearnSection("Words you'll hear", [
+  LearnSection('words', "Words you'll hear", [
     LearnGlossary([
       (
         'Handler',
@@ -207,16 +212,16 @@ const learnSections = <LearnSection>[
       ('Line', 'The seven players on the field for a point.'),
     ]),
   ]),
-  LearnSection('Getting started', [
+  LearnSection('start', 'Getting started', [
     LearnBullets([
       '**Gear:** cleats, a light and a dark shirt (teams often split by '
           'color), water, and a regulation 175-gram disc if you want to '
           'practice throwing.',
       '**Learn two throws:** the backhand (the classic frisbee throw) and '
           'the forehand or "flick". You\'ll pick up the rest by playing.',
-      '**Find a game:** pickup and league groups welcome beginners. Search '
-          'Explore for groups and teams near you, or see what\'s coming up '
-          'in Events.',
+      '**Find a game:** pickup communities and leagues welcome beginners. Search '
+          'Discover for communities and teams near you, and see what\'s coming '
+          'up there.',
     ]),
   ]),
 ];

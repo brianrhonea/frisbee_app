@@ -16,7 +16,7 @@ import { ApiError, fromZod } from "../errors.js";
 import { docIdParam, isDocId } from "../ids.js";
 import type { MediaStorage } from "../media/storage.js";
 import { type Data, type DocStore, serverTime } from "../store.js";
-import { authorOf, checkNotMuted } from "./author.js";
+import { authorOf, checkNotMuted, checkSeesPost } from "./author.js";
 import { noPost, people } from "./service.js";
 import { sharedEvent } from "./shared_event.js";
 
@@ -142,6 +142,7 @@ export class PostEditor {
         authorId: caller.uid,
         authorName: me.name,
         authorPhotoUrl: me.photoUrl,
+        private: me.private,
         createdAt: serverTime,
         updatedAt: serverTime,
       });
@@ -250,10 +251,12 @@ export class PostEditor {
     if (!parsed.success) throw fromZod(parsed.error);
     await checkNotMuted(this.store, caller.uid, this.now());
     const me = await authorOf(this.store, this.users, caller);
-    const id = this.store.newId(`posts/${postId}/comments`);
+    const id = parsed.data.id ?? this.store.newId(`posts/${postId}/comments`);
     await this.store.transact(async (tx) => {
+      if (await tx.get(p.comment(postId, id))) throw new ApiError("already_exists", "That comment was already posted.");
       const post = await tx.get(p.post(postId));
       if (!post) throw noPost();
+      await checkSeesPost(tx, caller.uid, post);
       if (post.repostOf) throw new ApiError("failed_precondition", "Comment on the original post.");
       let reply: Data = {};
       if (parsed.data.replyTo) {
@@ -310,10 +313,12 @@ export class PostEditor {
 
   /** `PUT|DELETE /v1/posts/:id/comments/:commentId/like`. */
   async setCommentLiked(caller: Caller, rawPostId: unknown, rawId: unknown, liked: boolean): Promise<LikeResult> {
-    const path = p.comment(docIdParam(rawPostId), docIdParam(rawId));
+    const postId = docIdParam(rawPostId);
+    const path = p.comment(postId, docIdParam(rawId));
     return this.store.transact(async (tx) => {
-      const c = await tx.get(path);
+      const [c, post] = await Promise.all([tx.get(path), tx.get(p.post(postId))]);
       if (!c) throw noComment();
+      if (post) await checkSeesPost(tx, caller.uid, post);
       const before = people(c.likedBy);
       if (before.includes(caller.uid) === liked) return { liked, likeCount: before.length };
       if (liked && before.length >= postReactionMax) {

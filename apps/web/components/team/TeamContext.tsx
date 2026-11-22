@@ -1,5 +1,5 @@
 "use client";
-import type { TeamPermission } from "@stall10/shared";
+import { type OptionalTeamSection, sectionOn, type TeamPermission } from "@stall10/shared";
 import { createContext, type ReactNode, useContext } from "react";
 import { type Doc, useLiveDoc } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
@@ -36,9 +36,32 @@ export interface TeamDoc {
   memberNames?: Record<string, string>;
   memberRoles?: Record<string, string[]>;
   memberPerms?: Record<string, TeamPermission[]>;
+  /** Each member's own permissions (the owner's per-person switches, F25); memberPerms counts them. API-written. */
+  memberGrants?: Record<string, TeamPermission[]>;
   statKeepers?: string[];
   requiresApproval?: boolean;
   location?: { address?: string } | null;
+  /** When the team was made (an ISO time, as live reads give them): the header's "Est. 2019". */
+  createdAt?: string;
+  /**
+   * Its optional sections (Settings › Sections), each on or off; a missing
+   * map or key is on (sectionOn in packages/shared). New teams store all off.
+   */
+  sections?: Partial<Record<OptionalTeamSection, boolean>>;
+  /** The league a league team was started for (Team.isLeagueTeam in the app). */
+  leagueId?: string | null;
+  /** The "Public team page" switch: false when outsiders see its card only (publicPageOn in packages/shared). */
+  publicPage?: boolean;
+  /** "Allow join requests" (F26, teams only): true when signed-in outsiders may ask to join. API-written. */
+  allowJoinRequests?: boolean;
+}
+
+/**
+ * Whether the hub shows [section] to [viewer]: off only for a member of a
+ * team whose owner turned it off. Groups store no sections, so always on.
+ */
+export function viewerSectionOn(viewer: TeamViewer, section: OptionalTeamSection): boolean {
+  return viewer.state !== "member" || sectionOn(viewer.team, section);
 }
 
 /**
@@ -60,6 +83,10 @@ interface TeamHubInfo {
   kind: "team" | "community" | "organization";
   /** A community or organization that approves joins: only members see inside. */
   privateGroup: boolean;
+  /** A team whose "Public team page" is off (its listing's publicPage): only members see inside, as a private group. */
+  privatePage: boolean;
+  /** A team that takes join requests (its listing's allowJoinRequests, F26): signed-in outsiders get "Request to join". */
+  joinRequests?: boolean;
   /** A youth team (isYouthTeam): visitors see its card only, and only members its roster. */
   youth: boolean;
   /** Visitors may see the roster (rosterIsPublic: an adult team's), without links to profiles. */
@@ -97,6 +124,8 @@ export function TeamProvider({
   name,
   kind,
   privateGroup,
+  privatePage,
+  joinRequests = false,
   youth,
   publicRoster,
   children,
@@ -115,7 +144,11 @@ export function TeamProvider({
   // Members see their team as it is: the public page hides a drafted
   // league team's name (its players') from everyone else.
   const shownName = viewer.state === "member" ? viewer.team.name || name : name;
-  return <TeamContext.Provider value={{ teamId, name: shownName, kind, privateGroup, youth, publicRoster, viewer }}>{children}</TeamContext.Provider>;
+  return (
+    <TeamContext.Provider value={{ teamId, name: shownName, kind, privateGroup, privatePage, joinRequests, youth, publicRoster, viewer }}>
+      {children}
+    </TeamContext.Provider>
+  );
 }
 
 export function useTeamHub(): TeamHubInfo {
@@ -123,3 +156,6 @@ export function useTeamHub(): TeamHubInfo {
   if (!info) throw new Error("useTeamHub outside TeamProvider");
   return info;
 }
+
+/** What a member is asked before leaving (Settings › Leave and the team page's More menu). */
+export const LEAVE_CONFIRM = "Leave? You'll need a new invite to come back.";

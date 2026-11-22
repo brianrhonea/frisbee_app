@@ -8,7 +8,7 @@ import '../../../domain/models/calendar.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
-import '../../core/ui/layout.dart' show PersonAvatar;
+import '../../core/ui/layout.dart' show CountPill, PersonAvatar;
 import '../../settings/widgets/settings_widgets.dart';
 import '../view_models/calendars_viewmodel.dart';
 
@@ -98,43 +98,27 @@ class _CalendarsScreenState extends State<CalendarsScreen> {
                     child: Center(child: CircularProgressIndicator()),
                   )
           else ...[
-            if (vm.invites.isNotEmpty)
-              SettingsGroup(
-                title: 'Invites',
-                footer: "Nothing is shared with you until you accept.",
-                children: [
-                  for (final i in vm.invites)
-                    ListTile(
-                      key: ValueKey('invite-${i.calendarId}'),
-                      leading: _Dot(i.color),
-                      title: Text(
-                        '${i.from.name} invited you to '
-                        '${i.calendarName}',
-                      ),
-                      subtitle: Text(
-                        i.role.label,
-                        style: TextStyle(color: c.muted),
-                      ),
-                      trailing: Wrap(
-                        spacing: 4,
-                        children: [
-                          TextButton(
-                            onPressed: vm.busy
-                                ? null
-                                : () => vm.answer(i, accept: false),
-                            child: const Text('Decline'),
-                          ),
-                          FilledButton(
-                            onPressed: vm.busy
-                                ? null
-                                : () => vm.answer(i, accept: true),
-                            child: const Text('Accept'),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
+            if (vm.invites.isNotEmpty) ...[
+              const SizedBox(height: 18),
+              SettingsHeading(
+                'Invites',
+                trailing: CountPill(vm.invites.length),
               ),
+              for (final i in vm.invites)
+                Padding(
+                  key: ValueKey('invite-${i.calendarId}'),
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _InviteCard(
+                    invite: i,
+                    onAnswer: vm.busy
+                        ? null
+                        : (accept) => vm.answer(i, accept: accept),
+                  ),
+                ),
+              const SettingsFooter(
+                'Nothing is shared with you until you accept.',
+              ),
+            ],
             SettingsGroup(
               title: 'Your calendars',
               footer:
@@ -146,17 +130,22 @@ class _CalendarsScreenState extends State<CalendarsScreen> {
                   ListTile(
                     key: ValueKey('cal-${cal.id}'),
                     leading: _Dot(cal.color),
-                    title: Text(cal.name),
+                    minLeadingWidth: 10,
+                    title: Text(cal.name, style: _rowTitle),
                     subtitle: Text(
                       _peopleLine(cal),
-                      style: TextStyle(color: c.muted),
+                      style: TextStyle(color: c.muted, fontSize: 12),
                     ),
-                    trailing: const Icon(Icons.chevron_right),
+                    trailing: Icon(Icons.chevron_right, color: c.muted),
                     onTap: () => _open(cal),
                   ),
                 ListTile(
-                  leading: const Icon(Icons.add),
-                  title: const Text('New calendar'),
+                  leading: Icon(Icons.add, color: c.accent),
+                  minLeadingWidth: 10,
+                  title: Text(
+                    'New calendar',
+                    style: _rowTitle.copyWith(color: c.accent),
+                  ),
                   enabled: !vm.busy,
                   onTap: _newCalendar,
                 ),
@@ -170,12 +159,14 @@ class _CalendarsScreenState extends State<CalendarsScreen> {
                     ListTile(
                       key: ValueKey('shared-${cal.id}'),
                       leading: _Dot(cal.color),
-                      title: Text(cal.name),
+                      minLeadingWidth: 10,
+                      title: Text(cal.name, style: _rowTitle),
                       subtitle: Text(
                         '${cal.owner.name} · ${cal.role.label}',
-                        style: TextStyle(color: c.muted),
+                        style: TextStyle(color: c.muted, fontSize: 12),
                       ),
                       trailing: TextButton(
+                        style: TextButton.styleFrom(foregroundColor: c.muted),
                         onPressed: vm.busy
                             ? null
                             : () async {
@@ -203,6 +194,8 @@ class _CalendarsScreenState extends State<CalendarsScreen> {
     },
   );
 
+  static const _rowTitle = TextStyle(fontSize: 15, fontWeight: FontWeight.w600);
+
   static String _peopleLine(CalendarInfo c) {
     final others = c.members.length - 1;
     final invited = c.pending.length;
@@ -220,8 +213,105 @@ class _Dot extends StatelessWidget {
   final CalendarColor color;
 
   @override
-  Widget build(BuildContext context) =>
-      Icon(Icons.circle, color: color.color, size: 18);
+  Widget build(BuildContext context) => Container(
+    width: 10,
+    height: 10,
+    decoration: BoxDecoration(color: color.color, shape: BoxShape.circle),
+  );
+}
+
+/// An invite to someone's calendar, on amber: it's the user's to answer.
+class _InviteCard extends StatelessWidget {
+  const _InviteCard({required this.invite, required this.onAnswer});
+
+  final CalendarInvite invite;
+  final ValueChanged<bool>? onAnswer;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final i = invite;
+    final answer = onAnswer;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: c.highlightSoft,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      // Side by side on wide screens, buttons underneath on phones.
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final who = Row(
+            children: [
+              PersonAvatar(name: i.from.name, photoUrl: i.from.photoUrl),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: i.from.name,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          const TextSpan(text: ' invited you to '),
+                          TextSpan(
+                            text: i.calendarName,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
+                      style: TextStyle(fontSize: 14, color: c.ink),
+                    ),
+                    Text(
+                      i.role.label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: c.highlightInk,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+          final buttons = Row(
+            children: [
+              Expanded(
+                child: FilledButton(
+                  onPressed: answer == null ? null : () => answer(true),
+                  child: const Text('Accept'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: answer == null ? null : () => answer(false),
+                  child: const Text('Decline'),
+                ),
+              ),
+            ],
+          );
+          if (box.maxWidth >= 520) {
+            return Row(
+              children: [
+                Expanded(child: who),
+                const SizedBox(width: 12),
+                SizedBox(width: 240, child: buttons),
+              ],
+            );
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [who, const SizedBox(height: 12), buttons],
+          );
+        },
+      ),
+    );
+  }
 }
 
 /// The private subscription link: every calendar the user is on, kept in
@@ -237,88 +327,184 @@ class _Subscribe extends StatelessWidget {
     final feed = vm.feed;
     final url = feed.url;
     final webcal = feed.webcal;
-    return SettingsGroup(
-      title: 'Outlook, Apple and Google Calendar',
-      footer:
-          "Subscribe with a private link and every calendar you're on shows "
-          'up there, kept up to date (calendar apps check every hour or so). '
-          'Anyone with the link can see those events; reset it if it gets '
-          'out. Each event also has Add to calendar.',
-      children: [
-        if (url == null || webcal == null)
+    final c = AppColors.of(context);
+    const footer =
+        "Subscribe with a private link and every calendar you're on shows "
+        'up there, kept up to date (calendar apps check every hour or so). '
+        'Anyone with the link can see those events; reset it if it gets '
+        'out. Each event also has Add to calendar.';
+    if (url == null || webcal == null) {
+      return SettingsGroup(
+        title: 'Outlook, Apple and Google Calendar',
+        footer: footer,
+        children: [
           ListTile(
-            leading: const Icon(Icons.link),
+            leading: const SettingsIcon(Icons.link),
             title: const Text('Get a subscription link'),
             enabled: !vm.busy,
             onTap: vm.resetFeed,
-          )
-        else ...[
-          ListTile(
-            leading: const Icon(Icons.event_available_outlined),
-            title: const Text('Subscribe in Apple Calendar or Outlook'),
-            onTap: () => launchUrl(
-              Uri.parse(webcal),
-              mode: LaunchMode.externalApplication,
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.calendar_month_outlined),
-            title: const Text('Add to Google Calendar'),
-            onTap: () => launchUrl(
-              Uri.https('calendar.google.com', '/calendar/r', {'cid': webcal}),
-              mode: LaunchMode.externalApplication,
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.copy),
-            title: const Text('Copy link'),
-            subtitle: Text(url, maxLines: 1, overflow: TextOverflow.ellipsis),
-            onTap: () async {
-              await Clipboard.setData(ClipboardData(text: url));
-              if (context.mounted) showSnackBar(context, 'Link copied');
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.refresh),
-            title: const Text('Reset link'),
-            enabled: !vm.busy,
-            onTap: () async {
-              if (await confirmDialog(
-                context,
-                title: 'Make a new link?',
-                message:
-                    'The old one stops working, so subscribe again with the '
-                    'new one.',
-                confirmLabel: 'Reset',
-              )) {
-                await vm.resetFeed();
-              }
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.link_off),
-            title: const Text('Turn off'),
-            enabled: !vm.busy,
-            onTap: () async {
-              if (await confirmDialog(
-                context,
-                title: 'Turn the link off?',
-                message: 'Calendars subscribed to it stop updating.',
-                confirmLabel: 'Turn off',
-                destructive: true,
-              )) {
-                await vm.stopFeed();
-              }
-            },
           ),
         ],
-      ],
+      );
+    }
+    final small = TextButton.styleFrom(
+      foregroundColor: c.accent,
+      textStyle: const TextStyle(
+        fontFamily: appFont,
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+    );
+    return Padding(
+      padding: const EdgeInsets.only(top: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SettingsHeading('Outlook, Apple and Google Calendar'),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: c.accentSoft,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          Icons.event_available_outlined,
+                          size: 20,
+                          color: c.accentInk,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Subscription link is on',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: c.ink,
+                              ),
+                            ),
+                            Text(
+                              url,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 12, color: c.muted),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    icon: const Icon(Icons.event_available_outlined, size: 18),
+                    label: const Text('Subscribe in Apple Calendar or Outlook'),
+                    onPressed: () => launchUrl(
+                      Uri.parse(webcal),
+                      mode: LaunchMode.externalApplication,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  FilledButton.icon(
+                    icon: const Icon(Icons.calendar_month_outlined, size: 18),
+                    label: const Text('Add to Google Calendar'),
+                    onPressed: () => launchUrl(
+                      Uri.https('calendar.google.com', '/calendar/r', {
+                        'cid': webcal,
+                      }),
+                      mode: LaunchMode.externalApplication,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Divider(),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          style: small,
+                          onPressed: () async {
+                            await Clipboard.setData(ClipboardData(text: url));
+                            if (context.mounted) {
+                              showSnackBar(context, 'Link copied');
+                            }
+                          },
+                          child: const Text('Copy link'),
+                        ),
+                      ),
+                      Expanded(
+                        child: TextButton(
+                          style: small,
+                          onPressed: vm.busy
+                              ? null
+                              : () async {
+                                  if (await confirmDialog(
+                                    context,
+                                    title: 'Make a new link?',
+                                    message:
+                                        'The old one stops working, so '
+                                        'subscribe again with the new one.',
+                                    confirmLabel: 'Reset',
+                                  )) {
+                                    await vm.resetFeed();
+                                  }
+                                },
+                          child: const Text('Reset link'),
+                        ),
+                      ),
+                      Expanded(
+                        child: TextButton(
+                          style: small.copyWith(
+                            foregroundColor: WidgetStatePropertyAll(c.muted),
+                          ),
+                          onPressed: vm.busy
+                              ? null
+                              : () async {
+                                  if (await confirmDialog(
+                                    context,
+                                    title: 'Turn the link off?',
+                                    message:
+                                        'Calendars subscribed to it stop '
+                                        'updating.',
+                                    confirmLabel: 'Turn off',
+                                    destructive: true,
+                                  )) {
+                                    await vm.stopFeed();
+                                  }
+                                },
+                          child: const Text('Turn off'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SettingsFooter(footer),
+        ],
+      ),
     );
   }
 }
 
-class _ColorChoice extends StatelessWidget {
-  const _ColorChoice({required this.value, required this.onChanged});
+class CalendarColorChoice extends StatelessWidget {
+  const CalendarColorChoice({
+    super.key,
+    required this.value,
+    required this.onChanged,
+  });
 
   final CalendarColor value;
   final ValueChanged<CalendarColor>? onChanged;
@@ -395,7 +581,7 @@ class _NewCalendarDialogState extends State<_NewCalendarDialog> {
           onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 8),
-        _ColorChoice(
+        CalendarColorChoice(
           value: _color,
           onChanged: (c) => setState(() => _color = c),
         ),
@@ -526,7 +712,7 @@ class _CalendarDetailScreenState extends State<CalendarDetailScreen> {
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: _ColorChoice(
+                child: CalendarColorChoice(
                   value: cal.color,
                   onChanged: busy ? null : (color) => vm.recolor(cal, color),
                 ),

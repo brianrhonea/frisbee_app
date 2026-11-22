@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/stats.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
 
 /// A saved line: O/D tag, name and players. Tap to edit.
@@ -21,9 +22,21 @@ class LineTile extends StatelessWidget {
   final VoidCallback? onDelete;
 
   @override
-  Widget build(BuildContext context) => Card.outlined(
+  Widget build(BuildContext context) => Card(
+    margin: const EdgeInsets.only(bottom: 8),
     child: ListTile(
-      leading: CircleAvatar(child: Text(line.side?.short ?? 'O/D')),
+      leading: CircleAvatar(
+        backgroundColor: line.side == Side.offense
+            ? AppColors.of(context).accentSoft
+            : AppColors.of(context).field,
+        foregroundColor: line.side == Side.offense
+            ? AppColors.of(context).accentInk
+            : AppColors.of(context).ink2,
+        child: Text(
+          line.side?.short ?? 'O/D',
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+      ),
       title: Text(line.name),
       subtitle: Text([for (final id in line.players) nameOf(id)].join(', ')),
       onTap: onTap,

@@ -11,7 +11,8 @@
   display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 700;
   border: 1px solid var(--line); color: var(--ink-soft); vertical-align: middle;
 }
-.meeting-badge.live { background: var(--danger); border-color: var(--danger); color: #fff; }
+/* Live: the scoreboard navy (red is only for live games). */
+.meeting-badge.live { background: var(--board); border-color: var(--board); color: var(--on-board); }
 .meeting-notes { white-space: pre-wrap; }
 .meeting-group h3 { margin: 12px 0 4px; }
 .meeting-names { margin: 0; }
@@ -35,20 +36,21 @@
   background: var(--field); border: 2px solid transparent;
 }
 .call-tile.speaking { border-color: var(--accent); }
-.call-screen { aspect-ratio: auto; min-height: 240px; background: #000; }
+.call-screen { aspect-ratio: auto; min-height: 240px; background: var(--board); }
 .call-video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .call-video.contain { object-fit: contain; }
 .call-video.mirror { transform: scaleX(-1); }
 .call-tile-face { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
 .call-tile-name {
   position: absolute; left: 8px; bottom: 8px; max-width: calc(100% - 16px);
-  padding: 2px 8px; border-radius: 999px; background: rgb(0 0 0 / 0.6); color: #fff; font-size: 0.8rem;
+  padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--board) 75%, transparent); color: var(--on-board); font-size: 0.8rem;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .call-side { display: grid; gap: 10px; }
 .call-side .segmented { flex-wrap: wrap; }
 .call-controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
-.call-controls .btn.off { border-color: var(--danger); color: var(--danger); }
+/* Muted or off: outlined and neutral, never red. */
+.call-controls .btn.off { background: transparent; border: 1px solid var(--board-muted); color: var(--board-muted); }
 .call-people { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .call-people li { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .call-people .speaking { color: var(--accent); font-weight: 700; }
@@ -66,7 +68,7 @@
 /* Watch together */
 .watch { display: grid; gap: 8px; }
 .watch-head { display: grid; gap: 2px; }
-.watch .video-frame { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 10px; background: #000; }
+.watch .video-frame { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 10px; background: var(--board); }
 .watch-youtube > div, .watch-youtube iframe { width: 100%; height: 100%; }
 .watch-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .watch-controls input[type="range"] { flex: 1; min-width: 120px; }

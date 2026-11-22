@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:provider/provider.dart';
 
 /// Creates a ViewModel once for the lifetime of a route and disposes it
 /// when the route is removed, so router rebuilds don't reset view state.
@@ -24,4 +25,15 @@ class _ViewModelHostState<T extends ChangeNotifier>
 
   @override
   Widget build(BuildContext context) => widget.builder(context, _viewModel);
+}
+
+/// [T] from the providers above [context], or null where there's none
+/// (tests that provide only what a page needs): for a view model's
+/// optional extras.
+T? readOptional<T>(BuildContext context) {
+  try {
+    return Provider.of<T>(context, listen: false);
+  } on ProviderNotFoundException {
+    return null;
+  }
 }

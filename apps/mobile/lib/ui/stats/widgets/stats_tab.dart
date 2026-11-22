@@ -7,14 +7,17 @@ import '../../../domain/models/team_event.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
+import '../../core/ui/scoreboard.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/stats_viewmodel.dart';
 import 'game_screen.dart' show confirmDeleteGame;
 import 'game_to_field.dart';
 import 'stat_sheet.dart';
 import 'stats_glossary.dart';
+import '../../core/ui/time_picker.dart';
 
 class StatsTab extends StatelessWidget {
   const StatsTab({super.key, required this.viewModel});
@@ -32,8 +35,10 @@ class StatsTab extends StatelessWidget {
           children: [
             ListTile(
               leading: const Icon(Icons.create_new_folder_outlined),
-              title: const Text('New tournament'),
-              subtitle: const Text('A folder for its games, roster and lines'),
+              title: const Text('Track a tournament'),
+              subtitle: const Text(
+                'Stats for every game you play at one tournament',
+              ),
               onTap: () => Navigator.pop(context, EventType.tournament),
             ),
             ListTile(
@@ -104,7 +109,10 @@ class StatsTab extends StatelessWidget {
       final vm = viewModel;
       if (!vm.loaded) return const LoadingView();
       if (vm.error != null) return ErrorView(error: vm.error);
-      final theme = Theme.of(context);
+      final empty = TextStyle(
+        fontSize: 13.5,
+        color: AppColors.of(context).muted,
+      );
       final standalone = vm.standaloneGames;
       return Scaffold(
         floatingActionButton: vm.canEdit
@@ -112,7 +120,7 @@ class StatsTab extends StatelessWidget {
                 heroTag: 'new-stats',
                 onPressed: () => _add(context),
                 icon: const Icon(Icons.add),
-                label: const Text('Game / tournament'),
+                label: const Text('Track stats'),
               )
             : null,
         body: Align(
@@ -128,10 +136,9 @@ class StatsTab extends StatelessWidget {
                 ),
                 _SeasonCard(viewModel: vm),
                 const SizedBox(height: 20),
-                Text('Tournaments', style: theme.textTheme.titleMedium),
-                const SizedBox(height: 8),
+                SectionHeader('Tournament stats'),
                 if (vm.tournaments.isEmpty)
-                  const Text('No tournaments yet.')
+                  Text('No tournaments tracked yet.', style: empty)
                 else
                   for (final t in vm.tournaments)
                     _TournamentFolder(
@@ -157,16 +164,16 @@ class StatsTab extends StatelessWidget {
                           : null,
                     ),
                 const SizedBox(height: 20),
-                Text('Games', style: theme.textTheme.titleMedium),
-                const SizedBox(height: 8),
+                SectionHeader('Games'),
                 if (standalone.isEmpty)
-                  const Text('No standalone games yet.')
+                  Text('No standalone games yet.', style: empty)
                 else
-                  Card.outlined(
+                  Card(
                     clipBehavior: Clip.antiAlias,
                     child: Column(
                       children: [
-                        for (final g in standalone)
+                        for (final (i, g) in standalone.indexed) ...[
+                          if (i > 0) const Divider(height: 1),
                           GameRow(
                             game: g,
                             onTap: () =>
@@ -184,6 +191,7 @@ class StatsTab extends StatelessWidget {
                                   }
                                 : null,
                           ),
+                        ],
                       ],
                     ),
                   ),
@@ -201,63 +209,98 @@ class _SeasonCard extends StatelessWidget {
 
   final StatsViewModel viewModel;
 
+  static String _pct(double? v) => v == null ? '–' : '${(v * 100).round()}%';
+
   @override
   Widget build(BuildContext context) {
     final vm = viewModel;
-    final theme = Theme.of(context);
-    final leaders = vm.seasonSheet.ranked.take(3).toList();
-    return Card.filled(
+    final c = AppColors.of(context);
+    final sheet = vm.seasonSheet;
+    final leaders = sheet.ranked.take(3).toList();
+    Widget number(String value, String label, {Color? color}) => Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ScoreText(value, size: 32, color: color),
+          const SizedBox(height: 2),
+          Text(label, style: TextStyle(fontSize: 12, color: c.muted)),
+        ],
+      ),
+    );
+    return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(14, 8, 8, 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Season', style: theme.textTheme.labelLarge),
-                      Text(
-                        '${vm.wins}–${vm.losses}',
-                        style: theme.textTheme.displaySmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    'Season',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.8,
+                      color: c.muted,
+                    ),
                   ),
                 ),
-                FilledButton.tonalIcon(
+                TextButton.icon(
+                  style: TextButton.styleFrom(foregroundColor: c.accent),
                   onPressed: () => context.push(Routes.seasonStats(vm.teamId)),
-                  icon: const Icon(Icons.table_chart_outlined),
+                  icon: const Icon(Icons.table_chart_outlined, size: 18),
                   label: const Text('Season stats'),
                 ),
               ],
             ),
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: Row(
+                children: [
+                  number('${vm.wins}–${vm.losses}', 'Record'),
+                  number(_pct(sheet.team.oEfficiency), 'O efficiency'),
+                  number(_pct(sheet.team.breakRate), 'Break rate'),
+                ],
+              ),
+            ),
             if (leaders.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Text('Top +/-', style: theme.textTheme.labelLarge),
+              const SizedBox(height: 14),
+              Text(
+                'Top +/-',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: c.ink,
+                ),
+              ),
               const SizedBox(height: 4),
               for (final (i, p) in leaders.indexed)
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  padding: const EdgeInsets.fromLTRB(0, 4, 6, 4),
                   child: Row(
                     children: [
-                      SizedBox(width: 24, child: Text('${i + 1}.')),
-                      Expanded(child: Text(vm.nameOf(p.playerId))),
+                      SizedBox(
+                        width: 24,
+                        child: ScoreText('${i + 1}', size: 17, color: c.muted),
+                      ),
+                      Expanded(
+                        child: Text(
+                          vm.nameOf(p.playerId),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: c.ink,
+                          ),
+                        ),
+                      ),
                       Text(
                         '${p.goals}G ${p.assists}A '
                         '${p.handBlocks + p.breakups}D',
-                        style: theme.textTheme.bodySmall,
+                        style: TextStyle(fontSize: 12, color: c.muted),
                       ),
                       const SizedBox(width: 12),
-                      Text(
-                        '+${p.plusMinus}',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
+                      ScoreText('+${p.plusMinus}', size: 20, color: c.accent),
                     ],
                   ),
                 ),
@@ -316,7 +359,7 @@ class _DeleteMenu extends StatelessWidget {
           contentPadding: EdgeInsets.zero,
           leading: Icon(
             Icons.delete_outline,
-            color: Theme.of(context).colorScheme.error,
+            color: AppColors.of(context).ink2,
           ),
           title: Text(label),
         ),
@@ -343,18 +386,37 @@ class _TournamentFolder extends StatelessWidget {
     final t = tournament;
     final wins = games.where((g) => g.won == true).length;
     final losses = games.where((g) => g.won == false).length;
-    return Card.outlined(
+    final c = AppColors.of(context);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
       clipBehavior: Clip.antiAlias,
       child: ListTile(
         onTap: onOpen,
-        leading: Icon(Icons.folder, color: Colors.amber.shade700, size: 32),
-        title: Text(t.name),
+        contentPadding: const EdgeInsets.only(left: 14, right: 4),
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: c.accentSoft,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(Icons.emoji_events_outlined, color: c.accentInk),
+        ),
+        title: Text(
+          t.name,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: c.ink,
+          ),
+        ),
         subtitle: Text(
           [
             DateFormat.MMMd().format(t.startDate),
             '${games.length} game${games.length == 1 ? '' : 's'}',
             if (wins + losses > 0) '$wins–$losses',
           ].join(' · '),
+          style: TextStyle(fontSize: 12.5, color: c.muted),
         ),
         trailing: onDelete == null
             ? const Icon(Icons.chevron_right)
@@ -380,39 +442,55 @@ class GameRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final c = AppColors.of(context);
     final g = game;
-    final (badge, color) = switch (g.won) {
-      true => ('W', Colors.green.shade600),
-      false => ('L', scheme.error),
-      null => (g.finished ? 'T' : 'LIVE', scheme.tertiary),
+    final live = g.won == null && !g.finished;
+    // A win is turf, a loss or tie plain; red only for a game still live.
+    final (badge, bg, fg) = switch (g.won) {
+      true => ('W', c.accentSoft, c.accentInk),
+      false => ('L', c.field, c.ink2),
+      null when g.finished => ('T', c.field, c.ink2),
+      null => ('LIVE', c.liveSoft, c.liveInk),
     };
     return ListTile(
       onTap: onTap,
-      leading: const Icon(Icons.description_outlined),
-      title: Text('vs ${g.opponent}'),
-      subtitle: Text(DateFormat.MMMd().add_jm().format(g.date)),
+      contentPadding: const EdgeInsets.only(left: 14, right: 4),
+      title: Text(
+        'vs ${g.opponent}',
+        style: TextStyle(
+          fontSize: 14.5,
+          fontWeight: FontWeight.w700,
+          color: c.ink,
+        ),
+      ),
+      subtitle: Text(
+        DateFormat.MMMd().add_jm().format(g.date),
+        style: TextStyle(fontSize: 12.5, color: c.muted),
+      ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            '${g.ourScore}–${g.theirScore}',
-            style: theme.textTheme.titleMedium,
-          ),
+          ScoreText('${g.ourScore}–${g.theirScore}', size: 22),
           const SizedBox(width: 8),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            padding: const EdgeInsets.fromLTRB(7, 3, 8, 3),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(6),
+              color: bg,
+              borderRadius: BorderRadius.circular(999),
             ),
-            child: Text(
-              badge,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: color,
-                fontWeight: FontWeight.bold,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (live) ...[const LiveDot(size: 6), const SizedBox(width: 4)],
+                Text(
+                  badge,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: fg,
+                  ),
+                ),
+              ],
             ),
           ),
           if (onDelete != null)
@@ -511,7 +589,7 @@ class _NewDialogState extends State<_NewDialog> {
     final theme = Theme.of(context);
     final lines = widget.linesFor(_event);
     return AlertDialog(
-      title: Text(widget.tournament ? 'New tournament' : 'New game'),
+      title: Text(widget.tournament ? 'Track a tournament' : 'New game'),
       content: SizedBox(
         width: 420,
         child: SingleChildScrollView(
@@ -671,7 +749,7 @@ class _NewEventDialogState extends State<_NewEventDialog> {
   }
 
   Future<void> _pickTime() async {
-    final t = await showTimePicker(context: context, initialTime: _time);
+    final t = await showTypedTimePicker(context: context, initialTime: _time);
     if (t != null) setState(() => _time = t);
   }
 

@@ -23,6 +23,7 @@ import { authorOf } from "../posts/author.js";
 import type { DocQueries } from "../queries.js";
 import { type Data, type DocStore, serverTime } from "../store.js";
 import { can, clip, isMap, isMember } from "../teams/access.js";
+import { clearVideoComments } from "./extras.js";
 
 const p = {
   team: (t: string) => `teams/${t}`,
@@ -147,19 +148,23 @@ export class VideoService {
   /**
    * `DELETE /v1/teams/:teamId/videos/:videoId`. The listing goes first, so a
    * failed file delete never leaves a video pointing at nothing; then its
-   * uploaded file, if it's where uploads live.
+   * notes and comments, and its uploaded file, if it's where uploads live.
    */
   async remove(caller: Caller, rawTeam: unknown, rawVideo: unknown): Promise<void> {
     const teamId = docIdParam(rawTeam);
     const videoId = docIdParam(rawVideo);
-    const path = await this.store.transact(async (tx) => {
+    const gone = await this.store.transact(async (tx) => {
       const [team, video] = await Promise.all([tx.get(p.team(teamId)), tx.get(p.video(teamId, videoId))]);
       this.check(team, caller);
       if (!video) return null;
       tx.delete(p.video(teamId, videoId));
       const file = isMap(video.file) ? video.file : null;
-      return file && filePathOk(file.path, teamId, videoId) ? file.path : null;
+      return { path: file && filePathOk(file.path, teamId, videoId) ? file.path : null };
     });
+    if (!gone) return;
+    const { path } = gone;
+    // Its notes and comments (F4, F5) go with it.
+    await clearVideoComments(this.store, this.queries, teamId, videoId).catch((e: unknown) => console.warn(`video ${teamId}/${videoId}: comments not all deleted`, e));
     // The video is gone either way; a file left behind is only logged.
     if (path && this.media) await this.media.delete(path).catch((e: unknown) => console.warn(`video ${teamId}/${videoId}: file ${path} not deleted`, e));
   }

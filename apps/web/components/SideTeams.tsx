@@ -20,7 +20,7 @@ export function tint(id: string) {
 }
 
 /** Kinds, short enough to sit beside the member count in the sidebar. */
-const shortKinds: Record<string, string> = { team: "Team", community: "Community", organization: "School/club" };
+const shortKinds: Record<string, string> = { team: "Team", community: "Pickup", organization: "School/club" };
 
 /** 128, "1.2k", "12k": short enough to always fit. */
 function compact(n: number) {
@@ -62,7 +62,7 @@ export function SideTeams() {
     <nav className="side-teams" aria-label="Your spaces">
       <div className="side-label-row">
         <h2 className="side-label">Your spaces</h2>
-        <StartOrJoinButton className="side-add" label="Create or join a team or group">
+        <StartOrJoinButton className="side-add" label="Create or join a team or community">
           <NavIcon name="plus" size={16} />
         </StartOrJoinButton>
       </div>

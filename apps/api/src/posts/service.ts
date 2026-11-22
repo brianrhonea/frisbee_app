@@ -12,7 +12,7 @@ import type { Caller, UserLookup } from "../auth.js";
 import { ApiError, fromZod } from "../errors.js";
 import { docIdParam, isDocId } from "../ids.js";
 import { type Data, type DocStore, serverTime, type Tx } from "../store.js";
-import { authorOf, checkNotMuted, nameMax, text } from "./author.js";
+import { authorOf, checkNotMuted, nameMax, text, checkSeesPost } from "./author.js";
 import { clip } from "../teams/access.js";
 
 const p = {
@@ -63,11 +63,21 @@ export class PostService {
     return { id: originalId, data: original };
   }
 
+  /** The caller may see [id] (a repost, maybe) and its target (S1). */
+  private async checkSees(tx: Reader, uid: string, id: string, t: Target) {
+    if (t.id !== id) {
+      const repost = await tx.get(p.post(id));
+      if (repost) await checkSeesPost(tx, uid, repost);
+    }
+    await checkSeesPost(tx, uid, t.data);
+  }
+
   /** Likes the post (its original, for a repost), or takes the like back. */
   async setLiked(caller: Caller, rawId: unknown, liked: boolean): Promise<LikeResult> {
     const id = docIdParam(rawId);
     return this.store.transact(async (tx) => {
       const t = await this.target(tx, id);
+      await this.checkSees(tx, caller.uid, id, t);
       const before = people(t.data.likedBy);
       const had = before.includes(caller.uid);
       if (had === liked) return { liked, likeCount: before.length };
@@ -90,9 +100,14 @@ export class PostService {
     const me = await authorOf(this.store, this.users, caller);
     return this.store.transact(async (tx) => {
       const t = await this.target(tx, id);
+      await this.checkSees(tx, caller.uid, id, t);
       const authorId = t.data.authorId;
       if (typeof authorId !== "string" || !authorId) throw noPost();
       if (authorId === caller.uid) throw new ApiError("permission_denied", "You can't repost your own post.");
+      // It would reach the reposter's followers (validRepost in the rules).
+      if (t.data.private === true) {
+        throw new ApiError("failed_precondition", "Posts from private profiles can't be reposted.");
+      }
       const mine = p.post(repostId(t.id, caller.uid));
       const existing = await tx.get(mine);
       const before = people(t.data.repostedBy);
@@ -117,6 +132,7 @@ export class PostService {
         authorId: caller.uid,
         authorName: me.name,
         authorPhotoUrl: me.photoUrl,
+        private: me.private,
         createdAt: serverTime,
         updatedAt: serverTime,
       });
@@ -177,7 +193,8 @@ export class PostService {
       out[id] = {
         liked: liked.includes(caller.uid),
         reposted: reposted.includes(caller.uid),
-        canRepost: t.data.authorId !== caller.uid,
+        // Not a private profile's post (one reposted before can be taken back).
+        canRepost: t.data.authorId !== caller.uid && (t.data.private !== true || reposted.includes(caller.uid)),
         likeCount: liked.length,
         repostCount: reposted.length,
       } satisfies PostState;

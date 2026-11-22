@@ -35,7 +35,7 @@ class ChatSplit extends StatelessWidget {
       children: [
         SizedBox(
           width: chatListWidth,
-          child: Material(color: c.card, child: list),
+          child: Material(color: c.background, child: list),
         ),
         VerticalDivider(width: 1, color: c.border),
         Expanded(child: detail ?? placeholder),
@@ -97,6 +97,7 @@ class ChatDrawer extends StatelessWidget {
     final c = AppColors.of(context);
     return Drawer(
       width: chatListWidth,
+      backgroundColor: c.background,
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -202,7 +203,7 @@ class ChatHeaderBar extends StatelessWidget implements PreferredSizeWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 15,
+                            fontSize: 16,
                             fontWeight: FontWeight.w700,
                             color: c.ink,
                           ),
@@ -212,7 +213,7 @@ class ChatHeaderBar extends StatelessWidget implements PreferredSizeWidget {
                             subtitle!,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 11.5, color: c.muted),
+                            style: TextStyle(fontSize: 12, color: c.muted),
                           ),
                       ],
                     ),

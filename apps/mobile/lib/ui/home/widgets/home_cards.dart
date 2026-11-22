@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../domain/models/team.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/layout.dart';
+import '../../core/ui/scoreboard.dart';
 import '../view_models/home_viewmodel.dart';
 
 /// The user's teams and groups in a row under the composer, with New /
@@ -163,7 +164,9 @@ class GetStartedCard extends StatelessWidget {
 }
 
 /// "Needs you": people asking to join groups the user approves members
-/// for (the website's card of the same name).
+/// for (the website's card of the same name). Amber, since each is the
+/// user's to do: a header on the page, then a small card per group (side
+/// by side, scrolling, when there are several).
 class NeedsYouCard extends StatelessWidget {
   const NeedsYouCard({super.key, required this.items, required this.onOpen});
 
@@ -173,55 +176,84 @@ class NeedsYouCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    return SectionCard(
-      title: 'Needs you',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (final (:team, :count) in items)
-            InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: () => onOpen(team),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(
+    Widget card(PendingRequests r) => Material(
+      color: c.card,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(cardRadius),
+        side: BorderSide(color: c.border),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(cardRadius),
+        onTap: () => onOpen(r.team),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    TeamBadge(size: 30, community: team.isCommunity),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            team.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
-                              color: c.ink,
-                            ),
+                    Row(
+                      children: [
+                        TeamDot(color: c.highlight),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Eyebrow(
+                            'Join requests',
+                            color: c.highlightInk,
                           ),
-                          Text(
-                            count == 1
-                                ? '1 person is asking to join'
-                                : '$count people are asking to join',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: c.accent,
-                            ),
-                          ),
-                        ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      r.team.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: c.ink,
                       ),
                     ),
-                    Icon(Icons.chevron_right, color: c.muted),
+                    Text(
+                      r.count == 1
+                          ? '1 person is asking to join'
+                          : '${r.count} people are asking to join',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12, color: c.muted),
+                    ),
                   ],
                 ),
               ),
-            ),
-        ],
+              Icon(Icons.chevron_right, color: c.muted),
+            ],
+          ),
+        ),
       ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionHeader(
+          'Needs you',
+          leading: TeamDot(color: c.highlight, size: 9),
+        ),
+        if (items.length == 1)
+          card(items.single)
+        else
+          SizedBox(
+            height: 82,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: items.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              itemBuilder: (_, i) =>
+                  SizedBox(width: 240, child: card(items[i])),
+            ),
+          ),
+      ],
     );
   }
 }

@@ -13,7 +13,19 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
-| 0.0.27  | 2026-11-16 | `feature/payments`                      |                     |
+| 0.0.40  | 2026-11-20 | `feature/redesign`                      |                     |
+| 0.0.39  | 2026-11-20 | `feature/redesign`                      |                     |
+| 0.0.38  | 2026-11-20 | `feature/redesign`                      |                     |
+| 0.0.37  | 2026-11-20 | `feature/redesign`                      |                     |
+| 0.0.36  | 2026-11-20 | `feature/redesign`                      |                     |
+| 0.0.35  | 2026-11-19 | `feature/redesign`                      |                     |
+| 0.0.34  | 2026-11-19 | `feature/team-first`                    |                     |
+| 0.0.33  | 2026-11-19 | `feature/team-first`                    |                     |
+| 0.0.32  | 2026-11-19 | `feature/team-first`                    |                     |
+| 0.0.31  | 2026-11-19 | `feature/profile-team-stats`            |                     |
+| 0.0.30  | 2026-11-19 | `fix/ui-wording`                        |                     |
+| 0.0.29  | 2026-11-17 | `fix/private-posts`                     |                     |
+| 0.0.28  | 2026-11-16 | `feature/offline-queue`                 |                     |
 | 0.0.26  | 2026-11-16 | `feature/web-parity`                    |                     |
 | 0.0.25  | 2026-11-16 | `feature/web-parity`                    |                     |
 | 0.0.24  | 2026-11-16 | `feature/web-parity`                    |                     |
@@ -42,22 +54,420 @@ Plain-language notes for testers are in
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
 
-## 0.0.27 — Pay tournament fees online
+## 0.0.40 — Schedule: typed times, sharing, calendars on the tab
 
-- Online payments for tournament and league fees through the API
-  (api 0.29.0; Stripe Connect). `PaymentRepository` /
-  `PaymentRepositoryApi` (no API client: off), `PayoutsViewModel`,
-  `PayOnlineViewModel`, `ui/payments/widgets/payment_widgets.dart`.
-- The event page shows the host's owner a "Take payments online" card
-  (`PayoutsCard`, hidden for everyone else and while payments are off),
-  and each of your teams that still owes its bid or spot fee gets a card
-  with the host's instructions and "Pay $400 online"
-  (`PayOnlineButton`). A signed-up player's card gets the same button
-  for their entry fee.
-- Stripe's pages open in the browser (`LaunchMode.externalApplication`);
-  coming back to the app reloads the card and button. The payment record
-  the host marks by hand is the one Stripe marks, so the paid state
-  updates live as before.
+With web 0.49.0 (product-spec §8.1 items 47–50). No API change.
+
+- Time pickers open in input mode with the hour focused
+  (`core/ui/time_picker.dart`, `showTypedTimePicker`; Flutter only
+  autofocuses after a mode switch); the clock icon switches to the dial.
+  Every picker in the app uses it.
+- Event editor: "New shared calendar" in Add to (new events) makes a
+  calendar on the spot (name, color, Can view / Can edit, people to
+  invite) and puts the event on it (`EventEditorViewModel.createCalendar`,
+  `new_shared_calendar_sheet.dart`).
+- Share beside Add to calendar on every event: the share sheet with the
+  .ics and "Title · when · where" (`shareCalendarEvent`).
+- Schedule tab: Calendars button in the header and a Calendars card under
+  the days (each calendar, Manage, Share a calendar, Outlook/Apple/Google),
+  as the website's.
+- Creating a club team without the API (a build with no `API_BASE_URL`)
+  now says club teams need the server (it checks ages) instead of "You
+  don't have permission": firestore.rules refuses club teams from
+  clients. There is no one-team-per-level limit.
+
+## 0.0.39 — Double-tap reactions; RSVP buttons fixed
+
+With web 0.48.0 and API 0.36.0 (product-spec §8.1 item 45).
+
+- Chat: double-tap a message (pointer events in `_Pressable`, not a
+  double-tap recognizer, so taps inside messages aren't delayed) for a
+  bubble of quick reactions above it (`reaction_bubble.dart`) with a +
+  that opens every emoji by group; the long-press sheet has the + too.
+  `quickReactions`, `reactionGroups` and `isChatReaction` in
+  `domain/models/chat.dart`; shared vectors in
+  `packages/shared/fixtures/chat_reactions/choices.json`. The website's
+  quick reactions are now the app's (it offered a different set, and the
+  API refused three of the app's).
+- RSVP: Going / Maybe / Can't go switched off while a save ran and
+  nothing redrew them after, so a second answer needed the event
+  reopened. The event, meeting and community cards now rebuild on the
+  command. The choices are separate outlined buttons (filled when
+  chosen) instead of a segmented track.
+
+## 0.0.38 — Redesign features, second batch (redesign 4)
+
+With web 0.47.0 and API 0.35.0. Details and tests per feature in
+`docs/product-spec.md` §8.1 items 35–44; open questions in
+`docs/redesign-plan.md` ("Waiting for you" 12–37). Needs the dev deploy
+of Firestore rules + indexes (done), the API, and functions groups
+`notifications`, `follows`, `communities`, `account`, `browse`.
+
+- Tournament extras (F30): standalone bracket page
+  (`/tournaments/:id/bracket/:divisionId`), −/+ score steppers, league
+  week stepper (`league_weeks.dart`, shared `league_weeks.ts`),
+  full-screen Enter a team, host form in steps with Save draft /
+  Publish, Share on tournament pages.
+- Team videos (F4–F6): notes pinned to a moment and clips, a comment
+  thread (push to the video's author), tag a video to a team event
+  (`teams/{t}/videos/{v}/comments`, `eventId`; API-only writes).
+- Teams tab always opens the list, even with one team (F34; reverses
+  the 0.0.36 shortcut, `TeamsTabTap` removed).
+- Add to calendar opens the phone's own new-event screen
+  (`add_2_calendar` 3.0.1, `DeviceCalendarService`); .ics share only as a
+  fallback. Info.plist: `NSCalendarsUsageDescription`,
+  `NSContactsUsageDescription`; Android `<queries>` for INSERT (F35).
+- Team page: "N going" / "N new in chat" tiles (F18); roster roles,
+  O-line / D-line groups and Edit lines (roster spot `line`, API-only),
+  Invites pending with Withdraw (F23); More rows with subtitles, Manage
+  team and Leave (F28).
+- Chat polls in team rooms (F33): question, 2–6 options, multiple
+  answers, closing time; vote, see votes, close (`poll` on the message,
+  API-only).
+- Team feed (F24): pin up to 3 posts, comments on team posts with
+  counts (`teams/{t}/posts/{p}/comments`, `commentCount` kept by the
+  `follows` group), "Post to the team…" box replaces New post. F8
+  audience picker verified (Everyone or a team you manage).
+- Roles (F25): presets (Member, Stat keeper, Captain, Coach, Admin;
+  groups Moderator, Organizer) and per-person permission switches
+  (`memberGrants`, owner only, API-only; `memberPerms` includes them).
+- Team join requests (F26): "Allow join requests" (off by default),
+  Request to join, approve/decline in Members, club age rule checked at
+  request and approval, push "You're in".
+- Discord import: pick which text channels to bring (F15).
+- Community page (F27): Next pickup card with RSVP, Chat rooms with
+  unread dots, Organizers with Message.
+
+## 0.0.37 — Redesign features, first batch (redesign 4)
+
+With web 0.46.0 and API 0.34.0. Details and tests per feature in
+`docs/product-spec.md` §8.1 items 26–34. Needs the dev deploy of
+Firestore + Storage rules, the API, and functions groups
+`notifications`, `browse`, `tournaments`, `account`.
+
+- Live running scores (F1): captains and event managers keep a game's
+  running score ("Live score" sheet: Start game, +1, undo, Report/Set
+  final, Stop live score). LIVE pill and score on games, the navy
+  header, the tournament-day card and Discover's "Live now". Data
+  `games/{id}.live`, API-only.
+- New teams start simple (F21): Playbook, Videos, Stats and Meetings
+  start off (`sections` on the team; missing reads as on); Settings ›
+  Sections; a hint for a new team's owner.
+- Playbook whiteboard (F31): Plays | Whiteboard switch; sketch with pen,
+  players, disc and cones; save as a play or a whiteboard
+  (`kind: "whiteboard"`, `drawings`). Plays keep pen strokes.
+- Note on an RSVP (F7): up to 140 characters on event and meeting
+  answers (`rsvpNotes`), shown in Responses / Invited; rules
+  `validRsvpNote`; account deletion removes them.
+- Schedule month view (F16): Week / Month switch with day dots.
+- Meetings list (F17): Upcoming / Past, Live now, Needs RSVP;
+  `/team-meetings/:teamId` now opens it.
+- Team rooms (F2, F3): pinned messages (up to 10 a room, "Pinned"
+  strip) and event cards shared into chat with RSVP buttons. API-only.
+- Public team page switch (F12): Settings › Visibility; off, outsiders
+  see only the team's card. Team Settings now open to admins (Sections
+  stay the owner's).
+- Download your data (F14): Settings › Account › Your data
+  (`GET /v1/me/export`, once per 10 minutes), via the share sheet.
+- Learn progress (F9): "N of 12 read", kept on the device.
+- Spots left (F10): "N spots left" / "Full · waitlist" on tournament
+  and league cards while registration is open.
+- Discover lists public team events and pickup games (F29), as the
+  website does.
+
+## 0.0.36 — Navigation and every screen restyled (redesign 2–3)
+
+Web navigation changes land in the web 0.45.0 commit that follows. No
+API, rules or data changes.
+
+- Navigation (redesign 2): tabs Home, Discover, Schedule, Teams, Inbox.
+  Discover merges Explore and Find events (`/discover`,
+  `/schedule?view=find` redirect to `/explore`; chips All, Tournaments,
+  Leagues, Pickup, Teams, Communities, Players). The Teams tab opens
+  your team straight away when you have exactly one and no invite. Feed
+  tabs Your teams / Following / Everyone. `events_tabs.dart` removed.
+- Every area restyled in the Turf & Disc look (redesign 3a–3i):
+  tournaments and leagues (navy live header, live days open on
+  Schedule, amber "your game needs a score", "Next steps"), teams and
+  communities (compact team header, initials badges, Teams list rows,
+  invitations in amber), schedule, events and meetings (RSVP segmented
+  control with counts, "Needs RSVP", summary cards), Inbox and chat
+  (Team chats above Direct messages, turf own bubbles, room access
+  segmented control), Home, Discover, profiles, posts and notifications,
+  sign-in and settings (grouped settings cards, Light/Dark/System
+  control), playbook and videos (category grids, tool tiles, step
+  timeline, video rows), hat tournaments, drafts and stats.
+- Colour rules applied: no red Delete/Leave (destructive confirms are
+  solid ink), red only for live games, amber only for what's yours to
+  do. Event-type colours are turf (field time) or neutral. Play
+  diagrams: defence navy instead of red.
+- Shared: `TeamBadge(name:)` draws initials; `TeamInitials`; switch
+  theme; new area parts (`tournament_parts.dart`, `hat_parts.dart`,
+  `rsvp_widgets.dart`, `settings_widgets.dart` additions).
+- Fixes: the sign-up details intro no longer mentions USA Ultimate;
+  leaving Record workout no longer notifies the recorder mid-teardown;
+  text styles with no font in the profile dropdowns and "Follow back".
+- Temporary screenshot tests in `test/screenshots/` (skipped unless
+  `--dart-define=SCREENSHOTS=<dir>`).
+
+## 0.0.35 — "Turf & Disc" redesign foundation (redesign 1)
+
+App only; no API, rules or data changes. Plan: `docs/redesign-plan.md`.
+
+- New palette in `AppColors` (light and dark): turf green actions,
+  scoreboard navy for live/today, disc amber only for what is yours to
+  do, red only for live games. Existing token names kept; new tokens
+  `border2`, `ink2`, `accentInk`, `highlightSoft`, `highlightInk`, `live`,
+  `liveSoft`, `liveInk`, `chipOn`, `onChipOn`, `badge`.
+- Barlow Condensed (OFL) bundled for scores, big numbers, date badges
+  and the italic "STALL 10" wordmark (`scoreFont`).
+- Radii 16 (cards) / 12 (controls); outlined filter chips, navy when
+  selected; turf tab underline; amber unread badges; turf "See all".
+- New shared widgets in `ui/core/ui/scoreboard.dart`: `ScoreText`,
+  `LiveDot`, `LivePill`, `NeedsYouPill`, `TeamDot`, `SectionHeader`,
+  `ScoreLine`, `BoardLabel`.
+- Sign-in artwork recoloured; screenshot harness takes
+  `--dart-define=SHOT_THEME=dark`.
+
+## 0.0.34 — Tournaments tab when one is ahead (team-first 3)
+
+Web 0.44.0. No API or rules changes.
+
+- A team's page shows **Tournaments** as a tab of its own, after Chat,
+  while the team has a tournament ahead; More no longer lists it then.
+  Otherwise it stays under More. Members only (they're the ones who read
+  `teams/{id}/tournamentEntries`); communities are unchanged.
+- One rule: `hasTournamentAhead` (`domain/tournament_engine/tournament_day.dart`),
+  ported to `@stall10/shared`, vectors `fixtures/tournament_day/ahead.json`:
+  an entry still in play (accepted, invited, applied, waitlisted) whose
+  last day is no earlier than yesterday.
+- `TeamTab.tournaments`; `TeamHomeViewModel.tournamentsTab` watches the
+  team's entered tournaments.
+- The team's Tournaments section starts with its tournament-day card when
+  it has one.
+
+## 0.0.33 — Tournament-day card (team-first 2)
+
+Web 0.43.0. No API, rules or function changes: hosted divisions, entries
+and games are already readable by signed-in users once the event isn't a
+draft, and `teams/{id}/tournamentEntries` by the team's members.
+
+- On a tournament day, Home and the team page show a card in place of
+  the next event: the tournament (Live when it is), the team's next game
+  (opponent, time, field; "Tomorrow" from 17:00 the evening before), its
+  record and pool place, and its last result. Home shows one per team;
+  the team page its own.
+- Captains get **Report score** (or **Confirm score**) on the card for
+  the earliest of the team's games that has started without a score, or
+  that the other captain reported. It opens the tournament page on
+  Schedule with that game's sheet up, so the existing score dialog and
+  its checks do the rest. **Schedule & standings** opens the Schedule tab.
+- One rule: `TournamentDay.of` (`domain/tournament_engine/tournament_day.dart`),
+  ported as `tournamentDay` in `@stall10/shared`, vectors
+  `fixtures/tournament_day/day.json`. Pool place shows once the team has
+  a pool result (before that it's only the seed). Between pool play and
+  the bracket the card says **Next game to be decided** while an empty
+  bracket slot comes from the team (`awaiting`: its pool rank, or the
+  winner/loser of a game it played), and **All games played** once it's
+  out. A next game on another day shows the day ("Tomorrow 9:00 AM",
+  "Sun 9:00 AM").
+- `TournamentDays` (`data/repositories/hosted_tournament`) gathers the
+  data: each team's (not communities') accepted entries from two days
+  before the event to the day after it ends (event dates are the host's
+  local midnight, which can be a day off elsewhere; the games' own times
+  decide), then the tournament, entries, divisions and the team's
+  division's games, re-checked each minute while something is on. Used
+  by `HomeViewModel` and `TeamHomeViewModel` (optional
+  `tournamentRepository`).
+- `Routes.tournament(id, division:, game:, tab:)`: `?game=` opens the
+  game's sheet once its division's games load; `?tab=schedule|results`
+  picks the tab.
+- Rules test "an entered team's players read an invite-only event's
+  games": a private group's invite-only event is readable by the
+  players of a team it accepted (reads only need the event published).
+- Tests: `test/ui/tournament_day_test.dart`,
+  `test/shared_fixtures/tournament_day_fixtures_test.dart`;
+  `seedLiveTournament` in `test/testing/hosted_tournament_fakes.dart`
+  (also used by the screenshot harness).
+
+## 0.0.32 — Team chats in Messages (team-first 1)
+
+Web 0.42.0, api 0.33.0. Rules change (deploy to dev; done).
+
+- Messages lists every team and community chat above direct messages
+  (`TeamChatActivity` in `data/repositories/chat`, used by
+  `InboxViewModel` and `ShellViewModel`), unread first: which rooms have
+  new messages ("New in #general"), when the newest was sent, and an
+  unread dot. A tap opens the only unread room, else the newest. The
+  Unread filter and search include them; the Messages badge counts teams
+  with unread chat. This reverses the spec's "team chats live on team
+  pages" (§8.1 item 3).
+- `ChatRoom.lastAt`: when the room's last message was sent, stamped by
+  the sender in the same batch as the message (`_send`; the API's
+  `sendMessage` in its transaction). Only a time, never the text: chat
+  managers read rooms' docs even when they can't read the messages.
+  Rooms only get it from their next message.
+- Read times are private, `users/{uid}/chatReads/{teamId}`
+  (`rooms.{roomId}`): `watchReads` / `markRead`. A sender's own message
+  counts as read; an open room is marked read as messages arrive
+  (`ChatRoomViewModel`). The team's room list shows unread rooms bold
+  with a dot. Account deletion already removes `users/{uid}`.
+- One rule for the inbox row: `TeamChatSummary.fromReadable`, ported as
+  `teamChatSummary` in `@stall10/shared`, vectors
+  `fixtures/team_chats/summary.json`.
+- Rules: anyone who can post in a room may set only `lastAt`, and only to
+  `request.time`; `chatReads` docs are their owner's, `rooms` a map of at
+  most 300.
+- Fix: Home's "Complete your details" card no longer notifies after it's
+  disposed (leaving Home before its preference loaded threw).
+- `test/screenshots/screens_test.dart`: phone screenshots of the main
+  screens on fake data, skipped unless
+  `--dart-define=SCREENSHOTS=<dir>` is passed.
+- Tests: `data/chat_reads_test`, `ui/messages_test` (team chats),
+  `ui/chat_test` (marking read, room dots),
+  `shared_fixtures/team_chats_fixtures_test`; rules "stamps its lastAt",
+  "chat read times"; API `hub` (stamp, `PUT .../read`).
+
+## 0.0.31 — Stats per team on profiles
+
+Web 0.41.0, api 0.32.0. Rules change (deploy to dev).
+
+- `ProfileSummary.teamSeasons` (team id → season → totals), built in
+  `PlayerProfileViewModel._recompute` beside `seasons` and published as
+  `teamStats` (in `_summaryFields` and `PlayerProfile.privateFields`, so
+  it moves with a private profile). It says which teams someone plays
+  on, so it's published only with both stats and teams shown;
+  `saveVisibility` deletes it when either is hidden (deleted rather than
+  `{}`, since a merge keeps an old map's entries). `sameAs` compares it,
+  so existing profiles republish with it.
+- `ProfileStatsChoice`: the profile's **Team** filter beside the season
+  menu, offering the published teams that have stats (two or more);
+  it narrows By the numbers, the season list and Season by season.
+  Recent games stay unfiltered. Ported as `profileStatsChoice` in
+  `@stall10/shared` and checked on `fixtures/profile_stats/choice.json`.
+- Rules: `profiles/{uid}` and `private/details` accept `teamStats`, a
+  map of at most 50 teams.
+- `firebase/functions/src/browse/model.ts` gets the API's `profileView`
+  change (the copies are checked to match); the old browse callables
+  aren't redeployed for it.
+- The profile's team tag for a pickup community says **Pickup** (was
+  Group), as does the website's sidebar.
+- Tests: `player_profile_test` (filter, publish, round trip, hiding
+  teams), `profile_api_test` (writes, hide, private move),
+  `shared_fixtures/profile_stats_fixtures_test`; rules "per-team stats";
+  API `profiles` and `browse.model`.
+
+## 0.0.30 — Wording, QR invites, message times (UI review release 1)
+
+The first of the UI review's releases (web 0.40.0, api 0.31.1). No data,
+rules or function changes.
+
+- One name for communities in every user-facing string: `TeamKind.community`
+  is labelled **Pickup community** (was "Community group") and its noun
+  is "community" (was "group"), so a pickup community and a school or club
+  both read as "community" in sentences. Group messages (group DMs) keep
+  "group". Explore's filter chip is **Communities** (the `groups` filter
+  and `?only=groups` keep their names). The shared `teamKindLabels`
+  (name-taken message) and the website's `kindLabels` match.
+- Stats wording: **Track a tournament** (was New tournament), **Track
+  stats** on the Stats tab's button (was Game / tournament), the list is
+  **Tournament stats**. The data is still `statsTournaments`; only labels
+  changed, so "tournament" in Stats no longer reads like a hosted one.
+- Invite dialog: a **QR code** button beside Copy opens
+  `InviteQrDialog` (`qr_flutter`), the invite link dark on white for a
+  phone camera. The website has the same button (`qrcode`).
+- A message's long-press sheet shows when it was sent, so times aren't
+  only behind the drag-left gesture.
+- `docs/user-guide.md` rewritten for the five tabs, the team hub, the
+  community names, QR invites and stats wording.
+- Tests: `invites_test` (QR code), `messages_test` (time in the sheet),
+  and the renamed strings in `stats_*`, `explore`, `groups`,
+  `host_event` and `group_tournaments` tests.
+
+## 0.0.29 — Private profiles' posts stay private (S1)
+
+Security review S1: the database rules let anyone signed in read a
+private profile's posts, comments and photos; only the app hid them.
+
+- Every person's post carries `private` (`UserPost.isPrivate`), its
+  author's profile's privacy when posted: the app reads the profile and
+  writes it on new posts and reposts (`UserPostRepositoryFirebase`), the
+  API does the same, and the `follows` functions stamp posts that come
+  without it (`postPrivacy`) and update every post when a profile turns
+  private or public (`profilePrivacy`). `firebase/scripts/
+  backfill-post-privacy.mjs` stamps existing posts.
+- Rules (`canSeePost`): a private post, its comments, and liking or
+  commenting on it are for the author and their accepted followers
+  (`users/{me}/follows/user_{author}`); the author can't change the flag.
+  Storage: a private profile's post photos likewise. A missing post can
+  still be asked about (the offline queue checks).
+- Queries: the rules can't check a follow per post in a query over
+  several authors, so those ask for `private == false`, and the user and
+  private profiles they follow (`Follow.approved`, at most 30, the latest
+  followed) are asked for one author at a time
+  (`watchPostsByAuthors`/`fetchPostsBefore` `includePrivate`). Tournament,
+  team-event and community-feed posts are public ones only. A profile
+  page asks for every post on the user's own or an accepted private
+  profile, else public ones. When a profile turns private, its existing
+  followers' follows are marked `approved` by `profilePrivacy`.
+- Push: a private profile's post tagged with a tournament no longer
+  notifies that tournament's followers, only the author's.
+- The community feed watches each post on its own (`watchPostsByIds`):
+  the rules check a query by id post by post, so one that turned private
+  would fail them all; a post the user may not read just drops out. A
+  private author whose follow was taken away shows no posts instead of
+  failing the feed. A single post the user may not read errors with
+  `PostHiddenException` ("Only people they approve see this post.").
+- A private profile's post can't be reposted (`PostActions.canRepost`;
+  the rules and API refuse it too).
+- Phase A only: the rules still let any post query through (`allow
+  list: if signedIn()`), so this build and 0.0.28 both work, and a
+  query for one private author's posts is still answered to anyone.
+  Phase B switches it to `canListPost` (strict `private == false`, since
+  `get('private', false)` let unfiltered queries through in tests) once
+  this build is on testers' phones;
+  `firebase/functions/test/rules/posts_phase_b.rules.test.ts` runs every
+  query this build makes against that rule.
+
+## 0.0.28 — Offline queue, one Photos + button
+
+(0.0.27 is the payments branch's.)
+
+- Offline queue (`OutboxRepository`, `lib/data/repositories/outbox/`):
+  direct and group messages, team chat, posts, team posts and comments
+  sent while Stall 10 can't be reached wait on the device
+  (`FileOutboxStore`: the app support folder, `outbox/jobs.json` and
+  each item's photos and files) and send by themselves, in order per
+  thread, once it can, including after the app is closed and opened
+  again. Each item's id is picked when the user sends it and kept, so a
+  retry never posts twice: before resending, the queue checks the server
+  (`existsOnServer`), and `already_exists` counts as sent. Connection or
+  server errors (`unavailable`, 5xx, rate limits, timeouts) wait and try
+  again with backoff (5 s up to 5 min); anything else is "Not sent",
+  with Try again and Discard, and doesn't hold up the rest. Items belong
+  to the account that sent them and only go out while it's signed in.
+  The rules are shared with the website (`packages/shared/src/outbox.ts`,
+  fixtures in `packages/shared/fixtures/outbox`). New posts only; likes,
+  reactions, RSVPs and edits aren't queued.
+- `ConnectivityService`: no network (connectivity_plus) is offline at
+  once; a failed send also marks it offline; then the API's `/health`
+  every 15 seconds until it answers. Firestore writes wait instead of
+  failing offline, so a send that hangs 15 s (2 min with attachments) is
+  queued. Storage uploads give up after a minute
+  (`setMaxUploadRetryTime`) instead of ten. An expired sign-in token that
+  can't refresh offline is a connection error (`ApiClient`).
+- `OfflineBanner` at the top of the app while offline or while anything
+  waits; tap for "Waiting to send" (`OutboxSheet`). Queued messages show
+  in their thread (`MessageThreadViewModel.statusFor`): "Waiting to
+  send", "Sending…" or "Not sent". A snackbar says when something was
+  queued instead of sent.
+- Post composers (Home's box, the full composer, team posts): one
+  "Photos +" button (`AddPhotosButton`) asks Take photo or Upload photos
+  (straight to the library without a camera), instead of separate camera
+  and photo buttons. Still up to 4 photos; extra picks are left out with
+  a note.
+- New packages: `connectivity_plus` 7.3.1 (7.3.2 needs a newer `dbus`
+  than geolocator allows), `path_provider`.
 
 ## 0.0.26 — Clearer workout boxes, scroll while showing times, push back
 

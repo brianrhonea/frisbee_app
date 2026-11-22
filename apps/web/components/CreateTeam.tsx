@@ -1,17 +1,21 @@
 "use client";
 import { competitionLevels, type CreateTeamRequest, type CreateTeamResponse, divisions, type JoinByCodeResponse } from "@stall10/shared";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { callApi } from "@/lib/client";
 import { useAuth } from "./AuthProvider";
 import { ClubAgeNote } from "./ClubAge";
+import "./member.css";
 
 const kindCopy = {
   team: { title: "Create a team", name: "Team name", hint: "A club, college or league team with a roster, schedule and playbook." },
-  community: { title: "Start a group", name: "Group name", hint: "A pickup group or league anyone can find and join." },
+  community: { title: "Start a pickup community", name: "Community name", hint: "A pickup game or league anyone can find and join." },
   organization: { title: "Start a school or club community", name: "Community name", hint: "A school or club with teams of its own." },
 } as const;
 type Kind = keyof typeof kindCopy;
+/** The chooser's names for each kind. */
+const kindLabels: Record<Kind, string> = { team: "Team", community: "Pickup community", organization: "School or club" };
 const divisionLabels: Record<string, string> = { mixed: "Mixed", open: "Open", women: "Women's", masters: "Masters" };
 const levelLabels: Record<string, string> = { club: "Club", college: "College", youth: "Youth", league: "League", pickup: "Pickup" };
 
@@ -54,6 +58,25 @@ export function CreateTeam() {
   }
 
   return (
+    <>
+    {/* What they're starting: the same three ?kind= pages the Teams tab links to. */}
+    <nav aria-label="What are you starting?">
+      <ul className="create-kinds">
+        {(Object.keys(kindCopy) as Kind[]).map((k) => (
+          <li key={k}>
+            <Link
+              className="create-kind"
+              href={k === "team" ? "/teams/new" : `/teams/new?kind=${k}`}
+              replace
+              aria-current={k === kind ? "page" : undefined}
+            >
+              <b>{kindLabels[k]}</b>
+              <small>{kindCopy[k].hint}</small>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
     <form className="card settings-form" onSubmit={(e) => void create(e)}>
       <h2 className="card-title">{copy.title}</h2>
       <p className="muted small">{copy.hint}</p>
@@ -110,6 +133,7 @@ export function CreateTeam() {
         </button>
       </div>
     </form>
+    </>
   );
 }
 

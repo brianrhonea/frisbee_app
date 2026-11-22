@@ -27,12 +27,12 @@ abstract final class HomeRefresh {
 
 enum ShellSection {
   community('Home', 'Home', Icons.home_outlined, Icons.home_rounded),
-  explore('Explore', 'Explore', Icons.explore_outlined, Icons.explore),
-  events('Events', 'Events', Icons.event_outlined, Icons.event),
+  explore('Discover', 'Discover', Icons.explore_outlined, Icons.explore),
+  events('Schedule', 'Schedule', Icons.event_outlined, Icons.event),
   team('Teams', 'Teams', Icons.groups_outlined, Icons.groups_rounded),
   messages(
-    'Messages',
-    'Messages',
+    'Inbox',
+    'Inbox',
     Icons.chat_bubble_outline_rounded,
     Icons.chat_bubble_rounded,
   ),
@@ -199,7 +199,7 @@ class AppShell extends StatelessWidget {
 typedef Crumb = ({String label, String? path});
 
 /// The breadcrumb trail for [path], starting from its section so the way
-/// back is one tap, e.g. Explore › Events › Event. Every step but the last
+/// back is one tap, e.g. Discover › Player. Every step but the last
 /// links to its page. [teamName] names the user's teams by id.
 List<Crumb> breadcrumbs(String path, String? Function(String id) teamName) {
   final uri = Uri.parse(path);
@@ -210,17 +210,17 @@ List<Crumb> breadcrumbs(String path, String? Function(String id) teamName) {
       ?uri.queryParameters['section'],
   ];
   const community = (label: 'Home', path: Routes.home);
-  final explore = (label: 'Explore', path: Routes.explorePath);
+  final explore = (label: 'Discover', path: Routes.explorePath);
   const myTeams = (label: 'Teams', path: Routes.teams);
   Crumb here(String label) => (label: label, path: null);
 
   final trail = switch (parts.firstOrNull) {
     null || 'home' => [community],
-    'schedule' => [(label: 'Events', path: Routes.schedule)],
+    'schedule' => [(label: 'Schedule', path: Routes.schedule)],
     'explore' => [explore],
     'players' => [explore, here('Player')],
     'rankings' => [explore, here('Rankings')],
-    'messages' => [(label: 'Messages', path: Routes.messages)],
+    'messages' => [(label: 'Inbox', path: Routes.messages)],
     'profile' => [
       (label: 'My profile', path: Routes.profile),
       if (parts.length > 1) here(_capitalize(parts[1])),
@@ -725,12 +725,12 @@ class _Breadcrumbs extends StatelessWidget {
   }
 }
 
-/// The top bar's search: opens Explore, the app-wide search, with the
+/// The top bar's search: opens Discover, the app-wide search, with the
 /// query.
 class SearchField extends StatelessWidget {
   const SearchField({super.key});
 
-  /// The app-wide search: players, teams, groups and events. Explore's
+  /// The app-wide search: players, teams, groups and events. Discover's
   /// own box says the same.
   static const hint = 'Search Stall 10';
 
@@ -764,7 +764,7 @@ class NotificationsButton extends StatelessWidget {
 }
 
 /// The phone's top bar on top-level pages: "Stall 10" (no logo) on the bar, with
-/// search (Explore) and notifications.
+/// search (Discover) and notifications.
 class MobileTopBar extends StatelessWidget implements PreferredSizeWidget {
   const MobileTopBar({super.key, this.search = true});
 
@@ -793,7 +793,7 @@ class MobileTopBar extends StatelessWidget implements PreferredSizeWidget {
       actions: [
         if (search)
           IconButton(
-            tooltip: 'Explore',
+            tooltip: 'Discover',
             onPressed: () => context.go(Routes.explore()),
             icon: Icon(Icons.search, color: c.onSidebar),
           ),

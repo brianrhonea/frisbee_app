@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/themes/theme.dart';
 import '../../core/ui/balanced_text.dart';
 import 'disc_throw_hero.dart';
 
@@ -115,19 +116,23 @@ class _AuthLayoutState extends State<AuthLayout>
   );
 
   Widget _formBody(BuildContext context) {
-    final theme = Theme.of(context);
+    final c = AppColors.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        BalancedText(widget.title, style: theme.textTheme.headlineSmall),
+        BalancedText(
+          widget.title,
+          style: TextStyle(
+            fontSize: 26,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.5,
+            height: 1.15,
+            color: c.ink,
+          ),
+        ),
         if (widget.subtitle case final s?) ...[
           const SizedBox(height: 4),
-          Text(
-            s,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
+          Text(s, style: TextStyle(fontSize: 14, color: c.muted)),
         ],
         const SizedBox(height: 20),
         widget.child,

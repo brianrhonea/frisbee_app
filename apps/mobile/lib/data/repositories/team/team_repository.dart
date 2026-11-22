@@ -1,5 +1,6 @@
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/invite_code.dart';
+import '../../../domain/models/pending_invite.dart';
 import '../../../domain/models/roster_player.dart';
 import '../../../domain/models/team.dart';
 import '../../../utils/result.dart';
@@ -7,6 +8,14 @@ import '../../../utils/result.dart';
 /// How far deleting a team has got: [done] of [total] steps, now on
 /// [step] ("Deleting chat").
 typedef DeleteProgress = ({int done, int total, String step});
+
+/// Why a club team can't be made without the API: only the API checks
+/// the owner is 16 or over (firestore.rules refuses club teams otherwise).
+const clubTeamNeedsServerMessage =
+    "Club teams need a connection to Stall 10's server, which checks "
+    "everyone on them is 16 or over, and this version of the app doesn't "
+    'have one. Update the app, or pick another level (college, youth, '
+    'league or pickup).';
 
 abstract class TeamRepository {
   /// Teams the user is a member of, sorted by name.
@@ -63,6 +72,22 @@ abstract class TeamRepository {
   /// Saves the team's details and its public directory listing.
   Future<Result<void>> updateTeam(Team team);
 
+  /// Owner only: switches [changes]' optional sections on (true) or off
+  /// (false); the others keep what they have.
+  Future<Result<void>> setSections(
+    String teamId,
+    Map<OptionalSection, bool> changes,
+  );
+
+  /// Admins (manageTeam) only: turns the team's public page on or off
+  /// ([Team.publicPage]), its listing with it. Through the API only.
+  Future<Result<void>> setPublicPage(String teamId, bool on);
+
+  /// Admins (manageTeam) turn a team's "Allow join requests" on or off
+  /// ([Team.allowJoinRequests]), its listing with it; off declines the
+  /// requests waiting. Through the API only.
+  Future<Result<void>> setAllowJoinRequests(String teamId, bool on);
+
   /// Teams in the public directory whose name or city words start with the
   /// words of [query].
   Future<Result<List<TeamListing>>> searchTeams(String query);
@@ -88,6 +113,15 @@ abstract class TeamRepository {
   );
 
   Future<Result<void>> setMemberRole(String teamId, String uid, TeamRole role);
+
+  /// Owner only: the permissions [uid] has of their own (the per-person
+  /// switches; a [RolePreset] is a set of them), on top of their roles.
+  /// Through the API only (`PUT /v1/teams/:id/members/:uid/permissions`).
+  Future<Result<void>> setMemberPermissions(
+    String teamId,
+    String uid,
+    Set<TeamPermission> permissions,
+  );
 
   /// Gives a player stats access, or takes it away.
   Future<Result<void>> setStatKeeper(
@@ -188,6 +222,21 @@ abstract class TeamRepository {
   Future<Result<void>> savePlayer(String teamId, RosterPlayer player);
 
   Future<Result<void>> deletePlayer(String teamId, String playerId);
+
+  /// Admins (manageTeam) only: puts each roster spot in [lines] (by id) on
+  /// the O-line, D-line or both, or takes its line away (null). Through
+  /// the API only (`PUT /v1/teams/:id/roster-lines`).
+  Future<Result<void>> setRosterLines(
+    String teamId,
+    Map<String, RosterLine?> lines,
+  );
+
+  /// Who's invited to the team and hasn't answered, newest first, for
+  /// those who may invite people. Through the API only.
+  Future<Result<List<PendingInvite>>> pendingInvites(String teamId);
+
+  /// Takes back the invite to [uid] (someone who may invite people).
+  Future<Result<void>> withdrawInvite(String teamId, String uid);
 
   /// Links roster player [playerId] to the account [uid], or unlinks it
   /// when null, so their stats show on that player's profile. Members may

@@ -195,6 +195,7 @@ class ChatRoom with ChatAccessLists {
     this.position = 0,
     this.createdBy = '',
     this.createdAt,
+    this.lastAt,
   });
 
   /// A room every member can read and write; each team gets one.
@@ -285,8 +286,21 @@ class ChatRoom with ChatAccessLists {
   final String createdBy;
   final DateTime? createdAt;
 
+  /// When its last message was sent, stamped by the sender; null for a
+  /// room with no message since unread dots began. Only a time, never the
+  /// text: chat managers read rooms they can't read the messages of.
+  final DateTime? lastAt;
+
   bool get isNew => id.isEmpty;
   bool get isGeneral => id == generalId;
+
+  /// Whether it has a message newer than [readAt], the user's last read of
+  /// it (null: never read). Voice channels have no messages to read.
+  bool unreadSince(DateTime? readAt) {
+    final last = lastAt;
+    if (isVoice || last == null) return false;
+    return readAt == null || last.isAfter(readAt);
+  }
 
   ChatRoom withRoleAccess(String roleId, ChatAccess access) => _copy(
     readRoles: _apply(readRoles, roleId, access.canRead),
@@ -354,6 +368,7 @@ class ChatRoom with ChatAccessLists {
     position: position ?? this.position,
     createdBy: createdBy,
     createdAt: createdAt,
+    lastAt: lastAt,
   );
 
   factory ChatRoom.fromMap(String id, Map<String, dynamic> map) => ChatRoom(
@@ -368,9 +383,10 @@ class ChatRoom with ChatAccessLists {
     position: (map['position'] as num?)?.toInt() ?? 0,
     createdBy: map['createdBy'] as String? ?? '',
     createdAt: parseDate(map['createdAt']),
+    lastAt: parseDate(map['lastAt']),
   );
 
-  /// Name, place and access lists.
+  /// Name, place and access lists (never [lastAt], which senders stamp).
   Map<String, dynamic> toMap() => {
     'name': name.trim(),
     ...accessMap(),
@@ -583,8 +599,365 @@ class MessageReply {
   };
 }
 
+/// The team event a message shares (redesign F3): its id, and its title
+/// as it was when shared, for pushes, previews and quotes. The card reads
+/// the live event and says "Event no longer available" when it's gone.
+/// Only the API writes it (POST .../event-shares).
+class ChatEventRef {
+  const ChatEventRef({required this.id, this.title = ''});
+
+  final String id;
+  final String title;
+
+  static ChatEventRef? fromMap(Object? map) {
+    if (map is! Map) return null;
+    final id = map['id'];
+    if (id is! String || id.isEmpty) return null;
+    return ChatEventRef(id: id, title: map['title'] as String? ?? '');
+  }
+}
+
+/// Most pinned messages in one team room (chatPinsMax in packages/shared).
+const chatPinsMax = 10;
+
+/// Chat poll limits (packages/shared chat_extras.ts).
+const chatPollQuestionMax = 200;
+const chatPollOptionMax = 80;
+const chatPollOptionsMin = 2;
+const chatPollOptionsMax = 6;
+
+/// A poll as asked in the composer, before the API stores it.
+typedef NewChatPoll = ({
+  String question,
+  List<String> options,
+  bool multiple,
+  DateTime? closesAt,
+});
+
+/// A poll posted into a team room (redesign F33). Options are voted on by
+/// index; [votes] maps each voter to the options they picked. Votes are on
+/// the message, so everyone who reads the room sees them (not anonymous).
+/// Only the API writes it (POST .../polls, PUT .../vote, POST .../close-poll).
+class ChatPoll {
+  const ChatPoll({
+    required this.question,
+    required this.options,
+    this.multiple = false,
+    this.closesAt,
+    this.closedAt,
+    this.closedBy,
+    this.votes = const {},
+  });
+
+  final String question;
+  final List<String> options;
+
+  /// Whether a voter may pick more than one option.
+  final bool multiple;
+
+  /// When voting stops by itself; null: open until closed.
+  final DateTime? closesAt;
+
+  /// When its author or a chat manager closed it early, and who.
+  final DateTime? closedAt;
+  final String? closedBy;
+
+  /// uid → the option indexes they picked.
+  final Map<String, List<int>> votes;
+
+  /// Whether it takes no more votes at [now].
+  bool isClosed(DateTime now) =>
+      closedAt != null || (closesAt != null && !closesAt!.isAfter(now));
+
+  /// [uid]'s picks; empty when they haven't voted.
+  List<int> picksOf(String uid) => votes[uid] ?? const [];
+
+  /// How many people voted.
+  int get voterCount => votes.values.where((v) => v.isNotEmpty).length;
+
+  /// Votes for each option (chatPollTally in packages/shared).
+  List<int> get counts {
+    final counts = List.filled(options.length, 0);
+    for (final picks in votes.values) {
+      for (final i in picks.toSet()) {
+        if (i >= 0 && i < counts.length) counts[i]++;
+      }
+    }
+    return counts;
+  }
+
+  /// Who picked option [i].
+  List<String> votersFor(int i) => [
+    for (final e in votes.entries)
+      if (e.value.contains(i)) e.key,
+  ];
+
+  /// The choice after tapping option [i] with [mine] chosen: tapping a
+  /// chosen option takes it back; on a single-choice poll another replaces
+  /// it (chatPollToggle in packages/shared).
+  List<int> toggle(List<int> mine, int i) {
+    if (mine.contains(i)) return [...mine.where((x) => x != i)];
+    return multiple ? ([...mine, i]..sort()) : [i];
+  }
+
+  static ChatPoll? fromMap(Object? map) {
+    if (map is! Map) return null;
+    final question = map['question'];
+    final options = map['options'];
+    if (question is! String || options is! List) return null;
+    return ChatPoll(
+      question: question,
+      options: [for (final o in options) '$o'],
+      multiple: map['multiple'] == true,
+      closesAt: parseDate(map['closesAt']),
+      closedAt: parseDate(map['closedAt']),
+      closedBy: map['closedBy'] as String?,
+      votes: {
+        for (final e in ((map['votes'] as Map?) ?? const {}).entries)
+          if (e.value is List)
+            '${e.key}': [
+              for (final i in e.value as List)
+                if (i is num) i.toInt(),
+            ],
+      },
+    );
+  }
+}
+
 /// The quick reactions offered on a message, as iMessage's tapbacks.
+/// The website offers the same (chatQuickReactions in packages/shared).
 const quickReactions = ['❤️', '👍', '👎', '😂', '‼️', '❓'];
+
+/// Behind the bubble's +: more emoji, by group. Single emoji only (no
+/// skin tones or joined sequences) so they look the same everywhere. The
+/// website offers the same (chatReactionGroups in packages/shared).
+const reactionGroups = <(String, List<String>)>[
+  (
+    'Smileys',
+    [
+      '😀',
+      '😃',
+      '😄',
+      '😁',
+      '😆',
+      '😅',
+      '🤣',
+      '😂',
+      '🙂',
+      '😉',
+      '😊',
+      '😇',
+      '🥰',
+      '😍',
+      '🤩',
+      '😘',
+      '😋',
+      '😛',
+      '😜',
+      '🤪',
+      '😎',
+      '🤓',
+      '🧐',
+      '🤔',
+      '🤨',
+      '😐',
+      '😑',
+      '😶',
+      '🙄',
+      '😏',
+      '😬',
+      '😮',
+      '😯',
+      '😲',
+      '😳',
+      '🥺',
+      '😢',
+      '😭',
+      '😤',
+      '😠',
+      '😡',
+      '🤯',
+      '😱',
+      '😨',
+      '😰',
+      '😴',
+      '🤤',
+      '🤢',
+      '🤮',
+      '🥵',
+      '🥶',
+      '🥴',
+      '😵',
+      '🤠',
+      '🥳',
+      '🤗',
+      '🤫',
+      '🤭',
+      '🫡',
+      '💀',
+    ],
+  ),
+  (
+    'Hands',
+    [
+      '👍',
+      '👎',
+      '👏',
+      '🙌',
+      '👐',
+      '🤲',
+      '🙏',
+      '🤝',
+      '✌️',
+      '🤞',
+      '🤟',
+      '🤘',
+      '👌',
+      '🤌',
+      '👈',
+      '👉',
+      '👆',
+      '👇',
+      '☝️',
+      '✋',
+      '🤚',
+      '🖐️',
+      '👋',
+      '💪',
+      '🫶',
+      '👀',
+      '🧠',
+    ],
+  ),
+  (
+    'Hearts',
+    [
+      '❤️',
+      '🧡',
+      '💛',
+      '💚',
+      '💙',
+      '💜',
+      '🖤',
+      '🤍',
+      '🤎',
+      '💔',
+      '💕',
+      '💞',
+      '💓',
+      '💗',
+      '💖',
+      '💘',
+      '💝',
+      '❣️',
+    ],
+  ),
+  (
+    'Game day',
+    [
+      '🥏',
+      '🏃',
+      '🏆',
+      '🥇',
+      '🥈',
+      '🥉',
+      '🏅',
+      '🎯',
+      '⚡',
+      '🔥',
+      '💨',
+      '💦',
+      '☀️',
+      '🌧️',
+      '⛈️',
+      '🌈',
+      '❄️',
+      '🏟️',
+      '🧢',
+      '👟',
+      '⏱️',
+      '📣',
+      '🎉',
+      '🎊',
+    ],
+  ),
+  (
+    'Animals and food',
+    [
+      '🐐',
+      '🦅',
+      '🐝',
+      '🦈',
+      '🐻',
+      '🐶',
+      '🐱',
+      '🦁',
+      '🐯',
+      '🐺',
+      '🦊',
+      '🐸',
+      '🐢',
+      '🦆',
+      '🐔',
+      '🍕',
+      '🍔',
+      '🌮',
+      '🍩',
+      '🍪',
+      '🍉',
+      '🍌',
+      '🍺',
+      '☕',
+      '🧃',
+      '💧',
+    ],
+  ),
+  (
+    'Symbols',
+    [
+      '‼️',
+      '❓',
+      '❗',
+      '⁉️',
+      '💯',
+      '✅',
+      '❌',
+      '⭕',
+      '🚫',
+      '⚠️',
+      '💤',
+      '💬',
+      '👑',
+      '💎',
+      '🚀',
+      '⭐',
+      '🌟',
+      '✨',
+      '💥',
+      '🎶',
+      '📅',
+      '📍',
+    ],
+  ),
+];
+
+final _emojiOnly = RegExp(
+  r'^(?:\p{Extended_Pictographic}|\p{Emoji_Component}|‍|️)+$',
+  unicode: true,
+);
+final _pictograph = RegExp(
+  r'\p{Extended_Pictographic}|[\u{1F1E6}-\u{1F1FF}]',
+  unicode: true,
+);
+
+/// Whether [s] can be a reaction: one emoji (or the few pieces one emoji
+/// is made of, like a flag or a skin tone), nothing else. The API checks
+/// the same (isChatReaction in packages/shared).
+bool isChatReaction(String s) =>
+    s.isNotEmpty &&
+    s.length <= ChatMessage.maxReaction &&
+    _emojiOnly.hasMatch(s) &&
+    _pictograph.hasMatch(s);
 
 /// How many people reacted to a message with [emoji], and whether the
 /// user is one of them.
@@ -600,6 +973,10 @@ class ChatMessage {
     this.createdAt,
     this.replyTo,
     this.reactions = const {},
+    this.event,
+    this.poll,
+    this.pinnedAt,
+    this.pinnedBy,
   });
 
   /// Longest reaction stored: one emoji, possibly several code units.
@@ -621,6 +998,19 @@ class ChatMessage {
   /// again replaces it.
   final Map<String, String> reactions;
 
+  /// The team event it shares, shown as a card (team rooms only).
+  final ChatEventRef? event;
+
+  /// The poll it asks, shown as a card (team rooms only, F33).
+  final ChatPoll? poll;
+
+  /// When it was pinned to its room, and by whom; null when it isn't.
+  /// Only the API writes them (PUT .../pin).
+  final DateTime? pinnedAt;
+  final String? pinnedBy;
+
+  bool get isPinned => pinnedAt != null;
+
   /// Its text, else what's attached: for quotes and previews.
   String get preview {
     final images =
@@ -629,6 +1019,12 @@ class ChatMessage {
         attachments.isNotEmpty && attachments.every((a) => a.isVideo);
     final t = text.trim().replaceAll(RegExp(r'\s+'), ' ');
     if (t.isNotEmpty) return t.length > 120 ? '${t.substring(0, 117)}…' : t;
+    if (event case final e?) {
+      return '📅 ${e.title.isEmpty ? 'Event' : e.title}';
+    }
+    if (poll case final p?) {
+      return '📊 ${p.question.isEmpty ? 'Poll' : p.question}';
+    }
     if (attachments.isEmpty) return '';
     if (images) return attachments.length == 1 ? '📷 Photo' : '📷 Photos';
     if (videos) return attachments.length == 1 ? '🎬 Video' : '🎬 Videos';
@@ -674,6 +1070,10 @@ class ChatMessage {
         if (e.key != uid) e.key: e.value,
       uid: ?emoji,
     },
+    event: event,
+    poll: poll,
+    pinnedAt: pinnedAt,
+    pinnedBy: pinnedBy,
   );
 
   factory ChatMessage.fromMap(String id, Map<String, dynamic> map) =>
@@ -693,6 +1093,10 @@ class ChatMessage {
             if (e.value is String && (e.value as String).isNotEmpty)
               '${e.key}': e.value as String,
         },
+        event: ChatEventRef.fromMap(map['event']),
+        poll: ChatPoll.fromMap(map['poll']),
+        pinnedAt: parseDate(map['pinnedAt']),
+        pinnedBy: map['pinnedBy'] as String?,
       );
 }
 

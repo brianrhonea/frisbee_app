@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../domain/models/team_video.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/back_or.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
@@ -203,23 +204,20 @@ class _VideoFormState extends State<_VideoForm> {
         onChanged: _onLinkChanged,
         onSubmitted: vm.checkLink,
       ),
-      const SizedBox(height: 8),
-      _LinkStatus(check: vm.linkCheck, channel: vm.channel),
-      if (id != null) ...[
-        const SizedBox(height: 12),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: AspectRatio(
-            aspectRatio: 16 / 9,
-            child: VideoThumbnail(youtubeId: id),
-          ),
+      const SizedBox(height: 10),
+      if (id == null)
+        _LinkStatus(check: vm.linkCheck, channel: vm.channel)
+      else
+        _FoundCard(
+          youtubeId: id,
+          status: _LinkStatus(check: vm.linkCheck, channel: vm.channel),
         ),
-      ],
     ];
   }
 
   List<Widget> _uploadFields(BuildContext context) {
     final theme = Theme.of(context);
+    final c = AppColors.of(context);
     final file = vm.pickedFile;
     final problem = vm.fileProblem;
     final progress = vm.uploadProgress;
@@ -228,9 +226,7 @@ class _VideoFormState extends State<_VideoForm> {
         'MP4, MOV, MKV and other video files, up to ${TeamVideo.formatBytes(TeamVideo.maxFileBytes)}. The '
         'team has ${TeamVideo.formatBytes(vm.usedBytes)} of '
         '${TeamVideo.formatBytes(TeamVideo.teamQuotaBytes)} used.',
-        style: theme.textTheme.bodySmall?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
+        style: TextStyle(fontSize: 12, height: 1.4, color: c.muted),
       ),
       const SizedBox(height: 12),
       OutlinedButton.icon(
@@ -253,7 +249,7 @@ class _VideoFormState extends State<_VideoForm> {
         Text(
           problem,
           style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.error,
+            color: c.highlightInk,
           ),
         ),
       if (progress != null) ...[
@@ -262,7 +258,7 @@ class _VideoFormState extends State<_VideoForm> {
         const SizedBox(height: 4),
         Text(
           'Uploading ${(progress * 100).floor()}%… keep this page open.',
-          style: theme.textTheme.bodySmall,
+          style: theme.textTheme.bodySmall?.copyWith(color: c.muted),
         ),
       ],
     ];
@@ -273,7 +269,8 @@ class _VideoFormState extends State<_VideoForm> {
     listenable: Listenable.merge([vm, vm.save]),
     builder: (context, _) {
       final editingFile = !vm.isNew && !vm.initial.isYouTube;
-      return ListView(
+      final c = AppColors.of(context);
+      final fields = ListView(
         padding: const EdgeInsets.all(16),
         children: [
           if (vm.isNew) ...[
@@ -291,6 +288,8 @@ class _VideoFormState extends State<_VideoForm> {
                 ),
               ],
               selected: {vm.source},
+              showSelectedIcon: false,
+              style: _segmentStyle(AppColors.of(context)),
               onSelectionChanged: vm.uploadProgress != null
                   ? null
                   : (s) => vm.source = s.single,
@@ -351,21 +350,93 @@ class _VideoFormState extends State<_VideoForm> {
                   : (v) => setState(() => _folderId = v ?? ''),
             ),
           ],
-          const SizedBox(height: 16),
-          FilledButton(
-            onPressed: _canSubmit ? _submit : null,
-            child: Text(
-              !vm.isNew
-                  ? 'Save'
-                  : vm.source == VideoSource.upload
-                  ? 'Upload video'
-                  : 'Add video',
+        ],
+      );
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(child: fields),
+          // The action stays in reach above the keyboard and the fold.
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: c.card,
+              border: Border(top: BorderSide(color: c.border)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                child: FilledButton(
+                  onPressed: _canSubmit ? _submit : null,
+                  child: Text(
+                    !vm.isNew
+                        ? 'Save'
+                        : vm.source == VideoSource.upload
+                        ? 'Upload video'
+                        : 'Add video',
+                  ),
+                ),
+              ),
             ),
           ),
         ],
       );
     },
   );
+}
+
+/// The source picker as a two-way switch: the chosen side is a raised
+/// card on the field fill.
+ButtonStyle _segmentStyle(AppColors c) => ButtonStyle(
+  backgroundColor: WidgetStateProperty.resolveWith(
+    (s) => s.contains(WidgetState.selected) ? c.card : c.field,
+  ),
+  foregroundColor: WidgetStateProperty.resolveWith(
+    (s) => s.contains(WidgetState.selected) ? c.accent : c.muted,
+  ),
+  iconColor: WidgetStateProperty.resolveWith(
+    (s) => s.contains(WidgetState.selected) ? c.accent : c.muted,
+  ),
+  side: WidgetStatePropertyAll(BorderSide(color: c.border2)),
+  textStyle: const WidgetStatePropertyAll(
+    TextStyle(fontFamily: appFont, fontSize: 14, fontWeight: FontWeight.w700),
+  ),
+  minimumSize: const WidgetStatePropertyAll(Size(0, 44)),
+);
+
+/// The linked video's thumbnail beside what the check found.
+class _FoundCard extends StatelessWidget {
+  const _FoundCard({required this.youtubeId, required this.status});
+
+  final String youtubeId;
+  final Widget status;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: c.card,
+        border: Border.all(color: c.border),
+        borderRadius: BorderRadius.circular(cardRadius),
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: SizedBox(
+              width: 112,
+              height: 63,
+              child: VideoThumbnail(youtubeId: youtubeId),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: status),
+        ],
+      ),
+    );
+  }
 }
 
 class _LinkStatus extends StatelessWidget {
@@ -376,39 +447,39 @@ class _LinkStatus extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final c = AppColors.of(context);
     final (IconData? icon, Color color, String text) = switch (check) {
       LinkCheck.empty => (
         null,
-        scheme.onSurfaceVariant,
+        c.muted,
         'Upload to YouTube as Unlisted (or Public), then paste the link.',
       ),
       LinkCheck.invalid => (
         Icons.error_outline,
-        scheme.error,
+        c.highlightInk,
         "That isn't a YouTube video link.",
       ),
       LinkCheck.checking => (
         Icons.hourglass_empty,
-        scheme.onSurfaceVariant,
+        c.muted,
         'Checking with YouTube…',
       ),
       LinkCheck.embeddable => (
         Icons.check_circle_outline,
-        Colors.green.shade700,
+        c.accent,
         channel == null || channel!.isEmpty
             ? 'Ready to play in the app.'
             : 'Ready to play in the app · $channel',
       ),
       LinkCheck.notEmbeddable => (
         Icons.warning_amber_outlined,
-        scheme.error,
+        c.highlightInk,
         "YouTube won't play this one here. Make sure it's Unlisted or "
             'Public (not Private) and that "Allow embedding" is on.',
       ),
       LinkCheck.unknown => (
         Icons.cloud_off_outlined,
-        scheme.onSurfaceVariant,
+        c.muted,
         "Couldn't reach YouTube to check this link. You can still add it.",
       ),
     };

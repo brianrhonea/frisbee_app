@@ -7,6 +7,7 @@ import '../data/repositories/discord/discord_import_repository.dart';
 import '../data/repositories/discord/discord_import_repository_firebase.dart';
 import '../data/repositories/voice/voice_repository.dart';
 import '../data/repositories/voice/voice_repository_livekit.dart';
+import '../data/services/device_calendar_service.dart';
 import '../data/services/device_permissions.dart';
 import '../data/services/callable_client.dart';
 import '../data/repositories/auth/auth_repository.dart';
@@ -32,6 +33,10 @@ import '../data/repositories/ranking/ranking_repository_firebase.dart';
 import '../data/repositories/meeting/meeting_repository.dart';
 import '../data/repositories/meeting/meeting_repository_firebase.dart';
 import '../data/repositories/meeting/meeting_settings_repository.dart';
+import '../data/repositories/schedule/schedule_settings_repository.dart';
+import '../data/repositories/team/team_hints_repository.dart';
+import '../data/repositories/discover/discover_repository.dart';
+import '../data/repositories/learn/learn_progress_repository.dart';
 import '../data/repositories/notification/notification_repository.dart';
 import '../data/repositories/notification/notification_repository_firebase.dart';
 import '../data/repositories/draft/message_draft_repository.dart';
@@ -56,7 +61,10 @@ import '../data/repositories/user_post/user_post_repository.dart';
 import '../data/repositories/user_post/user_post_repository_firebase.dart';
 import '../data/services/attachment_storage.dart';
 import '../data/services/auth_service.dart';
+import '../data/repositories/outbox/outbox_repository.dart';
 import '../data/services/api_client.dart';
+import '../data/services/connectivity_service.dart';
+import '../data/services/outbox_store.dart';
 import '../data/services/api_search.dart';
 import '../data/services/feature_flags.dart';
 import '../data/services/file_picker_service.dart';
@@ -102,6 +110,18 @@ List<SingleChildWidget> get firebaseProviders => [
       flags: context.read<FeatureFlags>(),
     ),
   ),
+  // Whether Stall 10 can be reached, and what waits to go out until it can.
+  ChangeNotifierProvider<ConnectivityService>(
+    create: (context) => ConnectivityService.device(context.read<ApiClient?>()),
+  ),
+  ChangeNotifierProvider<OutboxRepository>(
+    lazy: false,
+    create: (context) => OutboxRepository(
+      store: FileOutboxStore(),
+      connectivity: context.read<ConnectivityService>(),
+      auth: context.read<AuthRepository>(),
+    ),
+  ),
   Provider<CalendarRepository>(
     create: (context) => CalendarRepositoryApi(api: context.read<ApiClient?>()),
   ),
@@ -134,18 +154,27 @@ List<SingleChildWidget> get firebaseProviders => [
   ),
   Provider<EventRepository>(create: (_) => EventRepositoryFirebase()),
   Provider<TeamPostRepository>(
+    // Made at start (as are the other four the offline queue sends
+    // through), so queued items go out without opening their screens.
+    lazy: false,
     create: (context) => TeamPostRepositoryFirebase(
       attachments: context.read<AttachmentStorage>(),
-    ),
-  ),
-  Provider<UserPostRepository>(
-    create: (context) => UserPostRepositoryFirebase(
-      attachments: context.read<AttachmentStorage>(),
+      outbox: context.read<OutboxRepository>(),
       api: context.read<ApiClient?>(),
     ),
   ),
+  Provider<UserPostRepository>(
+    lazy: false,
+    create: (context) => UserPostRepositoryFirebase(
+      attachments: context.read<AttachmentStorage>(),
+      api: context.read<ApiClient?>(),
+      outbox: context.read<OutboxRepository>(),
+    ),
+  ),
   Provider<PostCommentRepository>(
-    create: (_) => PostCommentRepositoryFirebase(),
+    lazy: false,
+    create: (context) =>
+        PostCommentRepositoryFirebase(outbox: context.read<OutboxRepository>()),
   ),
   // Drafts belong to whoever is signed in, and go when they sign out.
   // Made at start (not lazily on the first chat), so it sees every sign-out.
@@ -163,8 +192,12 @@ List<SingleChildWidget> get firebaseProviders => [
     create: (_) => PeopleRepositoryFirebase(),
   ),
   Provider(create: (_) => const DevicePermissions()),
+  Provider(create: (_) => const DeviceCalendarService()),
   Provider<FollowRepository>(create: (_) => FollowRepositoryFirebase()),
-  Provider<VideoRepository>(create: (_) => VideoRepositoryFirebase()),
+  Provider<VideoRepository>(
+    create: (context) =>
+        VideoRepositoryFirebase(api: context.read<ApiClient?>()),
+  ),
   Provider<YouTubeInfoService>(create: (_) => YouTubeInfoService()),
   Provider<GeocodingService>(create: (_) => GeocodingService()),
   Provider<LocationService>(create: (_) => GeolocatorLocationService()),
@@ -179,17 +212,24 @@ List<SingleChildWidget> get firebaseProviders => [
   Provider<HostedTournamentRepository>(
     create: (context) => HostedTournamentRepositoryFirebase(
       functions: context.read<CallableClient>(),
+      api: context.read<ApiClient?>(),
     ),
   ),
   Provider<RankingRepository>(create: (_) => RankingRepositoryFirebase()),
   Provider<ChatRepository>(
-    create: (context) =>
-        ChatRepositoryFirebase(attachments: context.read<AttachmentStorage>()),
+    lazy: false,
+    create: (context) => ChatRepositoryFirebase(
+      attachments: context.read<AttachmentStorage>(),
+      outbox: context.read<OutboxRepository>(),
+      api: context.read<ApiClient?>(),
+    ),
   ),
   Provider<DirectMessageRepository>(
+    lazy: false,
     create: (context) => DirectMessageRepositoryFirebase(
       attachments: context.read<AttachmentStorage>(),
       search: context.read<ApiSearch>(),
+      outbox: context.read<OutboxRepository>(),
     ),
   ),
   Provider(
@@ -211,6 +251,16 @@ List<SingleChildWidget> get firebaseProviders => [
   ),
   Provider<MeetingMediaService>(create: (_) => LiveKitMediaService()),
   Provider(create: (_) => MeetingPresence()),
+  Provider<TeamHintsRepository>(create: (_) => TeamHintsRepositoryPrefs()),
+  Provider<LearnProgressRepository>(
+    create: (_) => LearnProgressRepositoryPrefs(),
+  ),
+  Provider<DiscoverRepository>(
+    create: (context) => DiscoverRepositoryApi(api: context.read<ApiClient?>()),
+  ),
+  Provider<ScheduleSettingsRepository>(
+    create: (_) => ScheduleSettingsRepositoryPrefs(),
+  ),
   Provider<MeetingSettingsRepository>(
     create: (_) => MeetingSettingsRepositoryPrefs(SharedPreferencesService()),
   ),

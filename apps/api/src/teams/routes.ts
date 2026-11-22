@@ -22,4 +22,9 @@ export function rosterRoutes(app: FastifyInstance, roster: RosterService, limite
   app.get("/v1/teams/:teamId/roster", async (req) =>
     roster.roster(caller(req, "roster"), (req.params as { teamId?: unknown }).teamId),
   );
+  /** Edit lines: O-line, D-line or both for each spot named (admins). */
+  app.put("/v1/teams/:teamId/roster-lines", async (req, reply) => {
+    await roster.setLines(requireCaller(req), (req.params as { teamId?: unknown }).teamId, req.body);
+    return reply.code(204).send();
+  });
 }

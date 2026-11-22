@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/personal_details.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/error_message.dart';
+import '../../settings/widgets/settings_widgets.dart';
 import '../view_models/personal_details_viewmodel.dart';
 
 /// Countries offered first (as on the website); others by their ISO code.
@@ -57,16 +59,10 @@ class PersonalDetailsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final vm = viewModel;
     return Scaffold(
-      appBar: AppBar(
+      appBar: settingsAppBar(
+        context,
         title: Text(vm.finishing ? 'Finish signing up' : 'Personal details'),
         automaticallyImplyLeading: !vm.finishing,
-        actions: [
-          if (vm.finishing)
-            TextButton(
-              onPressed: () => vm.signOut.execute(),
-              child: const Text('Sign out'),
-            ),
-        ],
       ),
       body: ListenableBuilder(
         listenable: Listenable.merge([vm, vm.load]),
@@ -283,60 +279,109 @@ class _PersonalFormState extends State<_PersonalForm> {
   );
 
   Widget _heading(String text) => Padding(
-    padding: const EdgeInsets.only(top: 12, bottom: 8),
-    child: Text(text, style: Theme.of(context).textTheme.titleSmall),
+    padding: const EdgeInsets.fromLTRB(4, 12, 4, 10),
+    child: Semantics(
+      header: true,
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.3,
+          color: AppColors.of(context).muted,
+        ),
+      ),
+    ),
+  );
+
+  /// Boxes side by side, e.g. first and last name.
+  Widget _row(List<Widget> boxes) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      for (final (i, box) in boxes.indexed) ...[
+        if (i > 0) const SizedBox(width: 10),
+        Expanded(child: box),
+      ],
+    ],
   );
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final c = AppColors.of(context);
     final busy = vm.save.running;
     final birthProblem = _birth == null
         ? null
         : birthDateProblem(_birth, _today);
-    return Form(
+    final form = Form(
       key: _formKey,
       child: AutofillGroup(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           children: [
             if (vm.finishing)
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Text(
-                  'Like a USA Ultimate membership, Stall 10 needs a few '
-                  'details about you. Your profile shows only your name and '
-                  'username.',
-                  style: theme.textTheme.bodyMedium,
+                  'A few details for club age checks and tournament '
+                  'signups. Your profile shows only your name and username.',
+                  style: TextStyle(fontSize: 14, height: 1.4, color: c.muted),
                 ),
               ),
-            Card(
-              margin: EdgeInsets.zero,
-              color: theme.colorScheme.surfaceContainerHighest,
-              child: const ListTile(
-                leading: Icon(Icons.lock_outline),
-                title: Text('Only you can see these'),
-                subtitle: Text(
-                  'We keep them encrypted and never show them on your '
-                  'profile or to teams.',
-                ),
+            Container(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              decoration: BoxDecoration(
+                color: c.accentSoft,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.lock_outline, size: 18, color: c.accentInk),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Only you can see these',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: c.accentInk,
+                          ),
+                        ),
+                        Text(
+                          'We keep them encrypted and never show them on '
+                          'your profile or to teams.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            height: 1.4,
+                            color: c.accentInk,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
             _heading('Legal name'),
-            _text(
-              _first,
-              'First name',
-              validator: _required('your legal first name'),
-              maxLength: PersonalLimits.name,
-              autofill: const [AutofillHints.givenName],
-            ),
-            _text(
-              _last,
-              'Last name',
-              validator: _required('your legal last name'),
-              maxLength: PersonalLimits.name,
-              autofill: const [AutofillHints.familyName],
-            ),
+            _row([
+              _text(
+                _first,
+                'First name',
+                validator: _required('your legal first name'),
+                maxLength: PersonalLimits.name,
+                autofill: const [AutofillHints.givenName],
+              ),
+              _text(
+                _last,
+                'Last name',
+                validator: _required('your legal last name'),
+                maxLength: PersonalLimits.name,
+                autofill: const [AutofillHints.familyName],
+              ),
+            ]),
             _heading('About you'),
             FormField<DateTime>(
               initialValue: _birth,
@@ -382,10 +427,15 @@ class _PersonalFormState extends State<_PersonalForm> {
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: InputDecorator(
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Email',
                   helperText: "Your account's email.",
                   enabled: false,
+                  suffixIcon: Icon(
+                    Icons.lock_outline,
+                    size: 18,
+                    color: c.muted,
+                  ),
                 ),
                 child: Text(vm.email ?? ''),
               ),
@@ -447,29 +497,31 @@ class _PersonalFormState extends State<_PersonalForm> {
               maxLength: PersonalLimits.city,
               autofill: const [AutofillHints.addressCity],
             ),
-            _text(
-              _region,
-              _us ? 'State' : 'State / province',
-              validator: _required(_us ? 'a state' : 'a state or region'),
-              maxLength: PersonalLimits.region,
-              autofill: const [AutofillHints.addressState],
-            ),
-            _text(
-              _postal,
-              _us ? 'ZIP code' : 'Postal code',
-              validator: _required(_us ? 'a ZIP code' : 'a postal code'),
-              maxLength: PersonalLimits.postalCode,
-              keyboard: _us ? TextInputType.number : TextInputType.text,
-              autofill: const [AutofillHints.postalCode],
-              caps: TextCapitalization.characters,
-            ),
+            _row([
+              _text(
+                _region,
+                _us ? 'State' : 'State / province',
+                validator: _required(_us ? 'a state' : 'a state or region'),
+                maxLength: PersonalLimits.region,
+                autofill: const [AutofillHints.addressState],
+              ),
+              _text(
+                _postal,
+                _us ? 'ZIP code' : 'Postal code',
+                validator: _required(_us ? 'a ZIP code' : 'a postal code'),
+                maxLength: PersonalLimits.postalCode,
+                keyboard: _us ? TextInputType.number : TextInputType.text,
+                autofill: const [AutofillHints.postalCode],
+                caps: TextCapitalization.characters,
+              ),
+            ]),
             if (_minor) ...[
               _heading('Parent or guardian'),
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Text(
                   "Players under $adultAge need a parent or guardian's details.",
-                  style: theme.textTheme.bodySmall,
+                  style: TextStyle(fontSize: 12, color: c.muted),
                 ),
               ),
               _text(
@@ -499,19 +551,49 @@ class _PersonalFormState extends State<_PersonalForm> {
                 keyboard: TextInputType.phone,
               ),
             ],
-            const SizedBox(height: 8),
-            FilledButton(
-              onPressed: busy ? null : _submit,
-              child: busy
-                  ? const SizedBox.square(
-                      dimension: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(vm.finishing ? 'Continue' : 'Save'),
-            ),
           ],
         ),
       ),
+    );
+    return Column(
+      children: [
+        Expanded(child: form),
+        // Continue (or Save) stays in reach under the form.
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: c.card,
+            border: Border(top: BorderSide(color: c.border)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  FilledButton(
+                    onPressed: busy ? null : _submit,
+                    child: busy
+                        ? const SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(vm.finishing ? 'Continue' : 'Save'),
+                  ),
+                  if (vm.finishing) ...[
+                    const SizedBox(height: 4),
+                    TextButton(
+                      style: TextButton.styleFrom(foregroundColor: c.muted),
+                      onPressed: () => vm.signOut.execute(),
+                      child: const Text('Sign out'),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

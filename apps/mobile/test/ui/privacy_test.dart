@@ -4,6 +4,7 @@ import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/follow.dart';
 import 'package:frisbee_app/domain/models/player_profile.dart';
 import 'package:frisbee_app/domain/models/team.dart';
+import 'package:frisbee_app/domain/models/user_post.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/profile/view_models/player_profile_viewmodel.dart';
 import 'package:frisbee_app/ui/profile/view_models/profile_viewmodel.dart';
@@ -175,6 +176,53 @@ void main() {
       expect(follows.follows['u3'], isNull);
       expect(follows.requests[testUser.uid], isEmpty);
       expect(find.text('No requests right now'), findsOne);
+    });
+
+    test("its posts: the owner's and accepted followers' only (S1)", () async {
+      final posts = FakeUserPostRepository()
+        ..posts.addAll([
+          const UserPost(
+            id: 'a',
+            authorId: 'p2',
+            body: 'Followers only',
+            isPrivate: true,
+          ),
+          const UserPost(id: 'b', authorId: 'p2', body: 'Old public one'),
+        ]);
+      profiles.put(
+        const PlayerProfile(uid: 'p2', name: 'Pat', isPrivate: true),
+      );
+      PlayerProfileViewModel open(String uid) {
+        final vm = PlayerProfileViewModel(
+          uid: uid,
+          profileRepository: profiles,
+          authRepository: auth,
+          teamRepository: FakeTeamRepository(),
+          statsRepository: FakeStatsRepository(),
+          directMessageRepository: FakeDirectMessageRepository(),
+          followRepository: follows,
+          notificationRepository: FakeNotificationRepository(),
+          userPostRepository: posts,
+        );
+        addTearDown(vm.dispose);
+        return vm;
+      }
+
+      // Not accepted: nothing shown, and only public posts asked for
+      // (the rules refuse more).
+      final locked = open('p2');
+      await pumpEventQueue();
+      expect(locked.locked, isTrue);
+      expect(locked.posts, isEmpty);
+      expect(posts.includePrivateAsked.last, isEmpty);
+
+      // Accepted: every post (the rules check the follow).
+      profiles.allowed.add('p2');
+      final open2 = open('p2');
+      await pumpEventQueue();
+      expect(open2.locked, isFalse);
+      expect(open2.posts.map((p) => p.id).toSet(), {'a', 'b'});
+      expect(posts.includePrivateAsked.last, {'p2'});
     });
 
     testWidgets('others see only the header until they are accepted', (

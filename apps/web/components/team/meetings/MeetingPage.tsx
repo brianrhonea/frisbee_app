@@ -8,6 +8,7 @@ import { useLiveDoc } from "@/lib/live";
 import { useAuth } from "../../AuthProvider";
 import { type TeamDoc, useTeamHub } from "../TeamContext";
 import { MembersOnlySection } from "../TeamNav";
+import { NoteQuote, RsvpNoteField } from "../../RsvpNote";
 import { audienceLine, canSee, inviteTier, isEditorTier, type MeetingData, meetingApi, meetingHref, meetingsHref, needsApproval, roomHref, whenLine } from "./model";
 import "./meetings.css";
 
@@ -52,9 +53,15 @@ export function MeetingPage({ meetingId }: { meetingId: string }) {
   const ended = m.status === "ended";
   const invited = invitees(member.team, m);
   const name = (uid: string) => member.team.memberNames?.[uid] || "Member";
-  const groups: Array<[string, string[]]> = [
-    ...meetingRsvps.map((a) => [meetingRsvpLabels[a], invited.filter((u) => m.rsvps?.[u] === a).map(name)] as [string, string[]]),
-    ["No reply", invited.filter((u) => !m.rsvps?.[u]).map(name)],
+  // Each person by name, with the note on their answer (the app's responders).
+  type Person = { uid: string; name: string; note: string };
+  const people = (uids: string[]): Person[] =>
+    uids
+      .map((u) => ({ uid: u, name: name(u), note: m.rsvps?.[u] ? (m.rsvpNotes?.[u] ?? "") : "" }))
+      .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+  const groups: Array<[string, Person[]]> = [
+    ...meetingRsvps.map((a) => [meetingRsvpLabels[a], people(invited.filter((u) => m.rsvps?.[u] === a))] as [string, Person[]]),
+    ["No reply", people(invited.filter((u) => !m.rsvps?.[u]))],
   ];
 
   async function run(fn: () => Promise<unknown>) {
@@ -83,7 +90,10 @@ export function MeetingPage({ meetingId }: { meetingId: string }) {
   return (
     <div className="stack meeting-page">
       {back}
-      <section className="card">
+      <section className="card meeting-summary">
+        <p className="meeting-kind">
+          <span className="meeting-badge">Video meeting</span>
+        </p>
         <div className="card-head">
           <h2 className="card-title">
             {m.title || "Meeting"}{" "}
@@ -92,16 +102,16 @@ export function MeetingPage({ meetingId }: { meetingId: string }) {
           </h2>
           {admin && (
             <span className="post-admin">
-              <Link className="text-btn" href={`${meetingHref(teamId, meetingId)}/edit`}>
+              <Link className="btn btn-small btn-quiet" href={`${meetingHref(teamId, meetingId)}/edit`}>
                 Edit
               </Link>{" "}
-              <button type="button" className="text-btn" disabled={busy} onClick={remove}>
+              <button type="button" className="btn btn-small btn-quiet" disabled={busy} onClick={remove}>
                 Delete
               </button>
             </span>
           )}
         </div>
-        <p>{whenLine(m)}</p>
+        <p className="meeting-when">{whenLine(m)}</p>
         <p className="muted small">
           {audienceLine(m)} ·{" "}
           {m.requireApproval
@@ -110,7 +120,6 @@ export function MeetingPage({ meetingId }: { meetingId: string }) {
               : "Invitees wait for an admin to let them in."
             : "Invitees can join once it starts."}
         </p>
-        {m.notes && <p className="meeting-notes">{m.notes}</p>}
         {!ended && (
           <div className="home-actions">
             <Link className="btn btn-primary" href={roomHref(teamId, meetingId)}>
@@ -119,16 +128,30 @@ export function MeetingPage({ meetingId }: { meetingId: string }) {
           </div>
         )}
       </section>
+      {m.notes && (
+        <section className="card meeting-agenda">
+          <h2 className="card-title">Agenda</h2>
+          <p className="meeting-notes">{m.notes}</p>
+        </section>
+      )}
       {!ended && (
-        <section className="card">
+        <section className={`card meeting-rsvp${mine ? "" : " needs"}`}>
           <h2 className="card-title">Will you attend?</h2>
-          <div className="segmented" role="group" aria-label="Your answer">
+          <div className="segmented rsvp-buttons" role="group" aria-label="Your answer">
             {meetingRsvps.map((a) => (
               <button key={a} type="button" className={mine === a ? "on" : ""} aria-pressed={mine === a} disabled={busy} onClick={() => void answer(mine === a ? null : a)}>
                 {meetingRsvpLabels[a]}
               </button>
             ))}
           </div>
+          {/* A note goes with an answer, and goes when it's taken back. */}
+          {mine && (
+            <RsvpNoteField
+              note={m.rsvpNotes?.[member.uid] ?? ""}
+              disabled={busy}
+              onSave={(note) => run(() => callApi(user!, `${meetingApi(teamId, meetingId)}/rsvp`, { method: "PUT", body: { answer: mine, note } }))}
+            />
+          )}
           <p className="muted small">{mine === "attending" ? "We'll notify you when it starts." : "Attending? You get a notification when it starts."}</p>
         </section>
       )}
@@ -139,12 +162,24 @@ export function MeetingPage({ meetingId }: { meetingId: string }) {
       )}
       <section className="card">
         <h2 className="card-title">Invited ({invited.length})</h2>
-        {groups.map(([label, names]) => (
+        {groups.map(([label, who]) => (
           <div key={label} className="meeting-group">
             <h3 className="small">
-              {label} ({names.length})
+              {label} ({who.length})
             </h3>
-            {names.length === 0 ? <p className="muted small">Nobody yet.</p> : <p className="meeting-names">{names.sort().join(", ")}</p>}
+            {who.length === 0 ? (
+              <p className="muted small">Nobody yet.</p>
+            ) : (
+              <p className="meeting-names">
+                {who.map((p, i) => (
+                  <span key={p.uid}>
+                    {i > 0 && ", "}
+                    {p.name}
+                    <NoteQuote note={p.note} />
+                  </span>
+                ))}
+              </p>
+            )}
           </div>
         ))}
       </section>

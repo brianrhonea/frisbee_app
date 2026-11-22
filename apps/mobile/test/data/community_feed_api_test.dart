@@ -85,4 +85,46 @@ void main() {
     final posts = await repo().watchPostsByIds(['a', 'b', 'gone']).first;
     expect(posts.map((p) => p.id), ['b', 'a']);
   });
+
+  test("asks for private profiles' posts one author at a time (S1)", () async {
+    for (final (id, author, private, day) in [
+      ('mine', 'me', true, 1),
+      ('pat', 'pat', true, 2),
+      ('sam', 'sam', false, 3),
+      ('zed', 'zed', true, 4),
+    ]) {
+      await db.doc('posts/$id').set({
+        'authorId': author,
+        'body': 'Post $id',
+        'private': private,
+        'createdAt': DateTime(2026, 11, day),
+      });
+    }
+    final authors = ['me', 'pat', 'sam', 'zed'];
+    final live = await repo()
+        .watchPostsByAuthors(authors, includePrivate: {'me', 'pat'})
+        .first;
+    expect(live.map((p) => p.id), ['sam', 'pat', 'mine']);
+    final older = await repo().fetchPostsBefore(
+      UserPostFilter.authors,
+      authors,
+      before: DateTime(2026, 12),
+      includePrivate: {'me', 'pat'},
+    );
+    expect(
+      switch (older) {
+        Ok(:final value) => value.map((p) => p.id).toList(),
+        Error() => null,
+      },
+      ['sam', 'pat', 'mine'],
+    );
+    // Someone else's profile, not followed: public posts only.
+    expect((await repo().watchPostsBy('zed').first), isEmpty);
+    expect(
+      (await repo().watchPostsBy('zed', includePrivate: true).first).map(
+        (p) => p.id,
+      ),
+      ['zed'],
+    );
+  });
 }

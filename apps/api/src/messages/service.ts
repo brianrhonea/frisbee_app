@@ -4,7 +4,7 @@ import {
   answerRequestSchema,
   archiveRequestSchema,
   typingRequestSchema,
-  chatReactionChoices,
+  isChatReaction,
   chatReactionRequestSchema,
   createGroupRequestSchema,
   directConversationId,
@@ -288,8 +288,8 @@ export class ConversationService {
   /** reactsOnlyAsMe(): anyone in the conversation sets or clears their own emoji. */
   async react(caller: Caller, rawId: unknown, rawMessage: unknown, body: unknown): Promise<void> {
     const { emoji } = parseBody(chatReactionRequestSchema, body);
-    if (emoji !== null && !(chatReactionChoices as readonly string[]).includes(emoji)) {
-      throw new ApiError("invalid_argument", "Pick one of the reactions.");
+    if (emoji !== null && !isChatReaction(emoji)) {
+      throw new ApiError("invalid_argument", "Pick one emoji.");
     }
     const messageId = docIdParam(rawMessage);
     const { id } = await this.mine(caller, rawId);

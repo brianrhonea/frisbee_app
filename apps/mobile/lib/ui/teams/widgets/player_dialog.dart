@@ -55,6 +55,7 @@ class _PlayerDialogState extends State<PlayerDialog> {
         position: _position,
         userId: _userId,
         paid: _paid,
+        line: widget.initial?.line,
       ),
     );
   }

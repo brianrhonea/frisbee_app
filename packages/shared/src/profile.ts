@@ -162,6 +162,7 @@ export const privateProfileFields = [
   "visibility",
   "teams",
   "stats",
+  "teamStats",
   "games",
   "summaryUpdatedAt",
   "tags",

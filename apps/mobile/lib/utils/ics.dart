@@ -44,6 +44,11 @@ abstract final class Ics {
     return out.join('\r\n ');
   }
 
+  /// When [event] ends in a calendar: its end, or an hour after it starts
+  /// (the same rule as the website's calendar links and .ics files).
+  static DateTime endOf(TeamEvent event) =>
+      event.endsAt ?? event.startsAt.add(const Duration(hours: 1));
+
   /// [event] as a calendar file. [uid] stays the same each time it's
   /// exported, so adding it again updates it instead of duplicating it.
   static String event(
@@ -52,7 +57,7 @@ abstract final class Ics {
     String? description,
     DateTime? now,
   }) {
-    final end = event.endsAt ?? event.startsAt.add(const Duration(hours: 1));
+    final end = endOf(event);
     final notes = description ?? event.notes;
     final lines = [
       'BEGIN:VCALENDAR',

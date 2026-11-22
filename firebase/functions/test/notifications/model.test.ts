@@ -10,10 +10,14 @@ import {
   eventChangeNotice,
   formatWhen,
   messagePreview,
+  joinApprovedNotice,
   joinRequestNotice,
+  joinRequestRecipients,
   teamInviteNotice,
   calendarInviteNotice,
   playNotice,
+  videoCommentNotice,
+  videoCommentRecipients,
   reminderNotice,
   reminderRecipients,
   roomReaders,
@@ -139,6 +143,28 @@ describe("notices", () => {
     expect(n.text({}, 3).body).toBe("Sam: Bring lights");
   });
 
+  it("says who shared an event, and which", () => {
+    const n = chatNotice({
+      teamId: "t1",
+      roomId: "general",
+      teamName: "Hawks",
+      roomName: "General",
+      message: { authorName: "Riley", text: "", attachments: [], event: { id: "e1", title: "Practice: zone O" } },
+    });
+    expect(n.text({}, 1)).toEqual({ title: "General · Hawks", body: "Riley shared an event: Practice: zone O" });
+  });
+
+  it("says who posted a poll, and its question", () => {
+    const n = chatNotice({
+      teamId: "t1",
+      roomId: "general",
+      teamName: "Hawks",
+      roomName: "General",
+      message: { authorName: "Riley", text: "", attachments: [], poll: { question: "Which day?", options: ["Sat", "Sun"] } },
+    });
+    expect(n.text({}, 1)).toEqual({ title: "General · Hawks", body: "Riley posted a poll: Which day?" });
+  });
+
   it("titles direct messages with the sender", () => {
     const n = directMessageNotice({ conversationId: "a_b", message: { authorName: "Sam", text: "yo" }, messageId: "m9" });
     expect(n.text({}, 1)).toEqual({ title: "Sam", body: "yo" });
@@ -214,6 +240,30 @@ describe("notices", () => {
     const n = playNotice({ created: true, teamId: "t1", playId: "p1", teamName: "Hawks", play: { name: "Ho stack" } });
     expect(n.text({}, 1)).toEqual({ title: "Hawks: new play", body: "Ho stack" });
     expect(n.route).toBe("/teams/t1/plays/p1");
+    const board = playNotice({ created: false, teamId: "t1", playId: "w1", teamName: "Hawks", play: { name: "Zone talk", kind: "whiteboard" } });
+    expect(board.text({}, 1)).toEqual({ title: "Hawks: whiteboard updated", body: "Zone talk" });
+    expect(board.route).toBe("/teams/t1/whiteboards/w1");
+  });
+});
+
+describe("video comments (F5)", () => {
+  const team = { name: "Hawks", memberIds: ["coach", "pat"] };
+  const video = { title: "Regionals film", authorId: "coach" };
+
+  it("go to the video's author while they're on the team, never for their own or for notes", () => {
+    expect(videoCommentRecipients(team, video, { authorId: "pat", body: "Nice" })).toEqual(["coach"]);
+    expect(videoCommentRecipients(team, video, { authorId: "coach", body: "Mine" })).toEqual([]);
+    expect(videoCommentRecipients(team, video, { authorId: "pat", body: "Mark", atMs: 0 })).toEqual([]);
+    expect(videoCommentRecipients({ ...team, memberIds: ["pat"] }, video, { authorId: "pat", body: "x" })).toEqual([]);
+    expect(videoCommentRecipients(team, undefined, { authorId: "pat", body: "x" })).toEqual([]);
+  });
+
+  it("names who commented and on what, and opens the video", () => {
+    const n = videoCommentNotice({ teamId: "t1", videoId: "v1", teamName: "Hawks", video, comment: { authorName: "Pat", body: " Great\n  D " }, commentId: "c1" });
+    expect(n.text({}, 1)).toEqual({ title: "Hawks: Pat commented on your video", body: "Regionals film: Great D" });
+    expect(n.route).toBe("/team-videos/t1/v1");
+    expect(n.collapseId).toBe("videoComments_t1_v1");
+    expect(n.check?.path).toBe("teams/t1/videos/v1/comments/c1");
   });
 });
 
@@ -224,6 +274,29 @@ describe("joinRequestNotice", () => {
     expect(n.text({}, 3).body).toBe("3 people want to join · Sam");
     expect(n.route).toBe("/teams/g1/members");
     expect(n.category).toBe("teamActivity");
+  });
+});
+
+describe("join requests (F26)", () => {
+  it("reach the owner and everyone who answers them, never the asker", () => {
+    const team = {
+      ownerId: "o",
+      members: { o: "owner", c: "coach", m: "player", p: "player", x: "player" },
+      memberIds: ["o", "c", "m", "p", "x"],
+      memberPerms: { m: ["manageMembers"], p: ["manageEvents"] },
+    };
+    expect(joinRequestRecipients(team, "new").sort()).toEqual(["c", "m", "o"]);
+    expect(joinRequestRecipients(team, "m").sort()).toEqual(["c", "o"]);
+    // A left member's perms don't count.
+    expect(joinRequestRecipients({ ...team, memberPerms: { gone: ["manageMembers"] } }, "new").sort()).toEqual(["c", "o"]);
+  });
+
+  it("tell the asker they're in, opening the team", () => {
+    const n = joinApprovedNotice({ teamId: "t1", teamName: "The Haze", group: false });
+    expect(n.text({}, 1)).toEqual({ title: "You're in: The Haze", body: "Your request to join the team was approved." });
+    expect(n.route).toBe("/teams/t1");
+    expect(n.category).toBe("teamActivity");
+    expect(joinApprovedNotice({ teamId: "g1", teamName: "Pickup", group: true }).text({}, 1).body).toBe("Your request to join was approved.");
   });
 });
 

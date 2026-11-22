@@ -86,6 +86,42 @@ final _plays = <Play>[
   ),
 ];
 
+final _docs = <Play>[
+  _plays.first,
+  Play(
+    id: 'sketched',
+    name: 'Play with pen strokes',
+    category: PlayCategory.endzone,
+    elements: [_e('o1', ElementKind.offense, 0.4, 0.2)],
+    drawings: [
+      PlayDrawing(
+        id: 'k1',
+        color: DrawingColor.turf,
+        points: [_p(0.1, 0.1), _p(0.2, 0.25), _p(0.4, 0.3)],
+      ),
+    ],
+  ),
+  Play(
+    id: 'board',
+    name: 'Zone talk',
+    kind: PlayKind.whiteboard,
+    elements: [
+      _e('o1', ElementKind.offense, 0.3, 0.5),
+      _e('d1', ElementKind.defense, 0.35, 0.52),
+      _e('disc', ElementKind.disc, 0.3, 0.5),
+      _e('cone', ElementKind.cone, 0.9, 0.1),
+    ],
+    drawings: [
+      for (final (i, c) in DrawingColor.values.indexed)
+        PlayDrawing(
+          id: 'k$i',
+          color: c,
+          points: [_p(0.1 * i, 0.6), _p(0.1 * i + 0.05, 0.9)],
+        ),
+    ],
+  ),
+];
+
 final _paths = <List<FieldPoint>>[
   [_p(0.2, 0.2)],
   [_p(0, 0), _p(1, 1)],
@@ -145,6 +181,18 @@ void main() {
                 {'t': t, 'positions': _positions(play.positionsAt(t))},
             ],
           },
+      ],
+    );
+  });
+
+  test('stored plays and whiteboards (playbook/play_docs.json)', () {
+    checkFixture(
+      'playbook/play_docs.json',
+      'Play.toMap for a plain play, a play with pen strokes and a saved '
+          'whiteboard: kind and drawings only when set. Each must pass '
+          'savePlayRequestSchema unchanged.',
+      [
+        for (final play in _docs) {'id': play.id, 'doc': play.toMap()},
       ],
     );
   });

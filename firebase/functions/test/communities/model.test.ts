@@ -90,6 +90,10 @@ describe("communities", () => {
       orgMembers: [],
     });
     expect(membershipUpdate(team(), [], ["c"], {})).toBeNull();
+    // Their own permissions go with them too.
+    expect(membershipUpdate({ ...t, memberGrants: { a: ["moderate"], c: ["keepStats"] } }, [], ["a"], {})).toMatchObject({
+      memberGrants: { c: ["keepStats"] },
+    });
   });
 });
 
@@ -156,6 +160,21 @@ describe("copies of community roles", () => {
     });
     expect(mirrorUpdate(t, org())).toBeNull();
     expect(mirrorUpdate(team(), org())).toBeNull();
+  });
+
+  it("keep members' own permissions (memberGrants) in memberPerms", () => {
+    const t = team({
+      members: { o: "owner", a: "player", c: "player" },
+      memberIds: ["o", "a", "c"],
+      roles,
+      orgRoles: { cap: "officer" },
+      memberGrants: { a: ["keepStats"], c: ["moderate"] },
+      memberPerms: { a: ["keepStats"], c: ["moderate"] },
+    });
+    expect(mirrorUpdate(t, org())).toEqual({
+      memberRoles: { c: ["cap"] },
+      memberPerms: { a: ["keepStats"], c: ["manageEvents", "moderate"] },
+    });
   });
 
   it("follow people the community adds to the team", () => {

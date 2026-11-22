@@ -3,10 +3,13 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/auth/auth_repository.dart';
+import '../../../data/repositories/discover/discover_repository.dart';
 import '../../../data/repositories/hosted_tournament/hosted_tournament_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
+import '../../../domain/models/discover.dart';
 import '../../../domain/models/hosted_tournament.dart';
 import '../../../domain/models/team.dart';
+import '../../../utils/result.dart';
 
 /// A list of hosted tournaments: one host's (its Tournaments section,
 /// drafts included for its managers) or, with no [hostId], every
@@ -17,8 +20,10 @@ class HostedTournamentsViewModel extends ChangeNotifier {
     required HostedTournamentRepository tournamentRepository,
     TeamRepository? teamRepository,
     required AuthRepository authRepository,
+    DiscoverRepository? discoverRepository,
   }) : _repo = tournamentRepository,
        _uid = authRepository.currentUser?.uid ?? '' {
+    if (discoverRepository != null) _loadSpots(discoverRepository);
     final id = hostId;
     if (id == null) {
       _listen(_repo.watchUpcoming());
@@ -39,6 +44,22 @@ class HostedTournamentsViewModel extends ChangeNotifier {
   StreamSubscription<List<HostedTournament>>? _sub;
   StreamSubscription<List<EnteredTournament>>? _enteredSub;
   List<EnteredTournament> _entered = const [];
+  Map<String, TournamentSpots> _spots = const {};
+  bool _disposed = false;
+
+  /// Team spots left in [tournamentId] while registration is open (from
+  /// the API's public list, as the website shows them); null when it
+  /// shows none, or without the API.
+  TournamentSpots? spotsOf(String tournamentId) => _spots[tournamentId];
+
+  Future<void> _loadSpots(DiscoverRepository repo) async {
+    // No spots is fine: the cards just don't say.
+    if (await repo.tournamentSpots() case Ok(:final value)) {
+      if (_disposed || value.isEmpty) return;
+      _spots = value;
+      notifyListeners();
+    }
+  }
 
   /// Tournaments this team plays in (or has applied to, or been invited
   /// to), for its members. Empty for groups, and for everyone else.
@@ -72,6 +93,7 @@ class HostedTournamentsViewModel extends ChangeNotifier {
   String _query = '';
   HostedStatus? _status;
   HostedType? _type;
+  Set<HostedType>? _kinds;
 
   bool get loaded => _loaded || _error != null;
   Object? get error => _error;
@@ -81,16 +103,22 @@ class HostedTournamentsViewModel extends ChangeNotifier {
   /// The kind of event [tournaments] is narrowed to; null for all.
   HostedType? get typeFilter => _type;
 
+  /// The kinds of event Discover's filter keeps (Tournaments: tournaments
+  /// and hat tournaments; Leagues: leagues); null for every kind.
+  Set<HostedType>? get kindsFilter => _kinds;
+
+  void setKindsFilter(Set<HostedType>? kinds) {
+    _kinds = kinds;
+    notifyListeners();
+  }
+
   /// How many events of each kind there are, only for kinds some are.
   Map<HostedType, int> get typeCounts {
     final counts = <HostedType, int>{};
     for (final t in _list) {
       counts[t.type] = (counts[t.type] ?? 0) + 1;
     }
-    return {
-      for (final e in HostedType.values)
-        e: ?counts[e],
-    };
+    return {for (final e in HostedType.values) e: ?counts[e]};
   }
 
   /// Whether there's more than one kind to filter by.
@@ -111,10 +139,7 @@ class HostedTournamentsViewModel extends ChangeNotifier {
     for (final t in _matching) {
       counts[t.status] = (counts[t.status] ?? 0) + 1;
     }
-    return {
-      for (final s in HostedStatus.values)
-        s: ?counts[s],
-    };
+    return {for (final s in HostedStatus.values) s: ?counts[s]};
   }
 
   /// Whether there's more than one status to filter by.
@@ -131,6 +156,10 @@ class HostedTournamentsViewModel extends ChangeNotifier {
     ];
   }
 
+  /// Matching [query] (and the kinds filter), whatever their status:
+  /// Discover's search results.
+  List<HostedTournament> get matches => _matching;
+
   /// Matching [query] only.
   List<HostedTournament> get _matching {
     final q = _query.trim().toLowerCase();
@@ -138,6 +167,7 @@ class HostedTournamentsViewModel extends ChangeNotifier {
     return [
       for (final t in _list)
         if ((type == null || t.type == type) &&
+            (_kinds?.contains(t.type) ?? true) &&
             (q.isEmpty ||
                 '${t.name} ${t.hostName} ${t.location} ${t.type.label}'
                     .toLowerCase()
@@ -191,6 +221,7 @@ class HostedTournamentsViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _hostSub?.cancel();
     _sub?.cancel();
     _enteredSub?.cancel();

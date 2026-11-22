@@ -16,16 +16,18 @@ extension EventTypeStyle on EventType {
     EventType.meeting => Icons.videocam_outlined,
   };
 
+  /// Turf for time on the field, neutral for everything else. Amber is
+  /// kept for what the user has to do, red for live games.
   Color color(ColorScheme scheme) => switch (this) {
-    EventType.practice => scheme.primary,
-    EventType.game => scheme.tertiary,
-    EventType.tournament => Colors.amber.shade700,
-    EventType.scrimmage => Colors.teal.shade500,
-    EventType.workout => Colors.deepPurple.shade300,
-    EventType.social => Colors.pink.shade400,
-    EventType.other => scheme.outline,
-    EventType.pickup => Colors.lightGreen.shade700,
-    EventType.meeting => Colors.indigo.shade400,
+    EventType.practice ||
+    EventType.game ||
+    EventType.tournament ||
+    EventType.scrimmage ||
+    EventType.pickup => scheme.primary,
+    EventType.workout ||
+    EventType.social ||
+    EventType.meeting ||
+    EventType.other => scheme.onSurfaceVariant,
   };
 }
 
@@ -36,10 +38,12 @@ extension RsvpStyle on RsvpStatus {
     RsvpStatus.notGoing => Icons.cancel,
   };
 
+  /// Turf for going, neutral otherwise: red is only for live games and
+  /// amber only for what the user still has to do.
   Color color(ColorScheme scheme) => switch (this) {
-    RsvpStatus.going => Colors.green.shade600,
-    RsvpStatus.maybe => Colors.amber.shade700,
-    RsvpStatus.notGoing => scheme.error,
+    RsvpStatus.going => scheme.primary,
+    RsvpStatus.maybe => scheme.onSurfaceVariant,
+    RsvpStatus.notGoing => scheme.outline,
   };
 }
 

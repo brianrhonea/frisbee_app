@@ -124,7 +124,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining("You don't run"), findsOneWidget);
     expect(find.text('Start a school or club'), findsOneWidget);
-    expect(find.text('Start a community group'), findsOneWidget);
+    expect(find.text('Start a pickup community'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
     vm.dispose();
   });
@@ -340,6 +340,14 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      // A step at a time (F30): Who can play, then Format & divisions.
+      await tester.tap(find.byKey(const Key('form-next')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('form-next')));
+      await tester.pumpAndSettle();
+      expect(find.text('Teams can also reserve a spot'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('form-next')));
+      await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
         find.text('League Women'),
         300,
@@ -350,7 +358,6 @@ void main() {
             )
             .first,
       );
-      expect(find.text('Teams can also reserve a spot'), findsOneWidget);
       expect(find.text('League Mixed'), findsOneWidget);
       await tester.tap(find.text('Timed'));
       await tester.pumpAndSettle();

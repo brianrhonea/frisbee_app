@@ -5,7 +5,8 @@ import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/group_tournament.dart';
 import 'package:frisbee_app/domain/models/hosted_tournament.dart';
 import 'package:frisbee_app/domain/models/live_draft.dart';
-import 'package:frisbee_app/domain/models/team.dart' show Division;
+import 'package:frisbee_app/domain/models/team.dart'
+    show CompetitionLevel, Division;
 import 'package:frisbee_app/domain/tournament_engine/progress.dart';
 import 'package:frisbee_app/utils/result.dart';
 
@@ -659,6 +660,81 @@ class FakeHostedTournamentRepository implements HostedTournamentRepository {
     return const Result.ok(null);
   }
 
+  /// Whether this build can keep running scores (an API is configured).
+  bool liveScores = true;
+
+  /// The clock live scores are stamped with.
+  DateTime Function() liveClock = DateTime.now;
+
+  /// When set, live score writes wait for it (to test taps while one is
+  /// in flight).
+  Completer<void>? liveHold;
+
+  /// Fails the next live score write with this.
+  Object? liveError;
+
+  @override
+  bool get canKeepLiveScores => liveScores;
+
+  @override
+  Future<Result<void>> setLiveScore(
+    String tournamentId,
+    String divisionId,
+    String gameId, {
+    required int scoreA,
+    required int scoreB,
+  }) async {
+    log.add('live $gameId $scoreA-$scoreB');
+    await liveHold?.future;
+    if (liveError case final e?) {
+      liveError = null;
+      return Result.error(e is Exception ? e : Exception('$e'));
+    }
+    final now = liveClock();
+    _update(
+      _key(tournamentId, divisionId),
+      (g) => g.id != gameId
+          ? g
+          : g.copyWith(
+              live: () => LiveScore(
+                scoreA: scoreA,
+                scoreB: scoreB,
+                startedAt: g.live?.startedAt ?? now,
+                updatedAt: now,
+              ),
+            ),
+    );
+    _changed();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> clearLiveScore(
+    String tournamentId,
+    String divisionId,
+    String gameId,
+  ) async {
+    log.add('live off $gameId');
+    _update(
+      _key(tournamentId, divisionId),
+      (g) => g.id != gameId ? g : g.copyWith(live: () => null),
+    );
+    _changed();
+    return const Result.ok(null);
+  }
+
+  @override
+  Stream<List<GroupGame>> watchLiveGames(
+    String tournamentId,
+    String divisionId,
+  ) => _watch(
+    () => [
+      for (final g in [...?games[_key(tournamentId, divisionId)]])
+        if (g.live?.updatedAt case final at?)
+          if (liveClock().difference(at) <= LiveScore.staleAfter) g,
+    ],
+  );
+
   @override
   Future<Result<void>> applyFills(
     String tournamentId,
@@ -688,4 +764,127 @@ class FakeHostedTournamentRepository implements HostedTournamentRepository {
 /// Thrown inside a draft change to delete the draft (cancel).
 class _Cancel implements Exception {
   const _Cancel();
+}
+
+/// Seeds [repo] with tournament [id], live today at [now]: [teamId]
+/// ([teamName]) is entered (accepted) in division `d1`, pool A, with
+/// Front Range, Boulder Gold and Mesa. It beat Front Range 13–8 two hours
+/// ago; its game against Boulder Gold started ten minutes ago with no
+/// score; Mesa is next, in two hours. [captains] captain [teamId].
+void seedLiveTournament(
+  FakeHostedTournamentRepository repo, {
+  required DateTime now,
+  String id = 'x9',
+  String name = 'Mile High Open',
+  String teamId = 't1',
+  String teamName = 'Northside Flyers',
+  List<String> captains = const [],
+  HostedStatus status = HostedStatus.live,
+}) {
+  final today = DateTime(now.year, now.month, now.day);
+  repo.tournaments[id] = HostedTournament(
+    id: id,
+    hostId: 'host',
+    hostName: 'Front Range Ultimate',
+    name: name,
+    startsOn: today,
+    endsOn: today,
+    location: 'Aurora Sports Park',
+    status: status,
+  );
+  repo.entered[teamId] = [
+    EnteredTournament(
+      tournamentId: id,
+      name: name,
+      status: EntryStatus.accepted,
+      startsOn: today,
+      endsOn: today,
+    ),
+  ];
+  repo.entries[id] = {
+    for (final (team, label) in [
+      (teamId, teamName),
+      ('fr', 'Front Range'),
+      ('bg', 'Boulder Gold'),
+      ('me', 'Mesa'),
+    ])
+      team: TournamentEntry(
+        teamId: team,
+        teamName: label,
+        divisionId: 'd1',
+        status: EntryStatus.accepted,
+      ),
+  };
+  repo.divisions[id] = {
+    'd1': TournamentDivision(
+      id: 'd1',
+      division: Division.mixed,
+      level: CompetitionLevel.club,
+      settings: TournamentSettings(startsAt: today, fields: 4),
+      seeds: [teamId, 'fr', 'bg', 'me'],
+      captains: {teamId: captains},
+    ),
+  };
+  GroupGame game(
+    String gid,
+    int order,
+    String a,
+    String b,
+    DateTime at, {
+    int field = 1,
+    int? sa,
+    int? sb,
+  }) => GroupGame(
+    id: gid,
+    order: order,
+    stage: GameStage.pool,
+    round: order + 1,
+    label: 'Pool A',
+    poolId: 'A',
+    field: field,
+    startsAt: at,
+    teamA: a,
+    teamB: b,
+    status: sa == null ? GameStatus.scheduled : GameStatus.done,
+    scoreA: sa,
+    scoreB: sb,
+  );
+  repo.games['$id/d1'] = [
+    game(
+      'g1',
+      0,
+      teamId,
+      'fr',
+      now.subtract(const Duration(hours: 2)),
+      sa: 13,
+      sb: 8,
+    ),
+    game(
+      'g2',
+      1,
+      'bg',
+      'me',
+      now.subtract(const Duration(hours: 2)),
+      field: 2,
+      sa: 13,
+      sb: 11,
+    ),
+    game(
+      'g3',
+      2,
+      'bg',
+      teamId,
+      now.subtract(const Duration(minutes: 10)),
+      field: 3,
+    ),
+    game(
+      'g4',
+      3,
+      'fr',
+      'me',
+      now.subtract(const Duration(minutes: 10)),
+      field: 4,
+    ),
+    game('g5', 4, teamId, 'me', now.add(const Duration(hours: 2)), field: 2),
+  ];
 }

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { callApi } from "@/lib/client";
+import { PendingMessages } from "./PendingMessages";
 import { type Doc, useLiveDoc, useLivePaged, useLiveQuery } from "@/lib/live";
 import { usePagedMessages, useThreadScroll } from "@/lib/messages";
 import { useAuth } from "./AuthProvider";
@@ -18,6 +19,8 @@ import { LoadMore } from "./LoadMore";
 import { loadAtTop, OlderMessages } from "./OlderMessages";
 import { type PickedPerson, PersonPicker } from "./PersonPicker";
 import { isTyping, validId } from "@/lib/text";
+import { useTeamChats } from "./useTeamChats";
+import "./member.css";
 
 /** conversations/{id} (Conversation in the app). */
 interface Conversation {
@@ -86,7 +89,9 @@ function describe(c: Doc<Conversation>, mine: Mine | undefined, me: string) {
 
 /**
  * Messages, like a desktop mail client: the inbox (or requests, or
- * archived) down the left, the open conversation (?c=) beside it. Read
+ * archived) down the left, the open conversation (?c=) beside it. The
+ * inbox lists the member's team and community chats first; each opens
+ * on its team's Chat page. Read
  * live from Firestore as the app does; every write goes through the API.
  */
 export function Messages() {
@@ -124,6 +129,10 @@ export function Messages() {
   );
   const requests = all.filter(({ d }) => d.inRequests).length;
   const open = all.find(({ c }) => c.id === openId);
+  const teamChats = useTeamChats(user?.uid);
+  const shownTeams =
+    view === "inbox" ? (teamChats.chats ?? []).filter((c) => !q || (c.team.name ?? "").toLowerCase().includes(q)) : [];
+  const headed = shownTeams.length > 0 && shown.length > 0;
 
   const go = (q: Record<string, string | null>) => {
     const next = new URLSearchParams(params);
@@ -210,11 +219,37 @@ export function Messages() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+        {shownTeams.length > 0 && (
+          <>
+            {headed && <h3 className="conv-heading">Team chats</h3>}
+            <ul className="hub-items conv-list" aria-label="Team chats">
+              {shownTeams.map((c) => (
+                <li key={c.team.id}>
+                  <Link
+                    href={`/teams/${encodeURIComponent(c.team.id)}/chat${c.open ? `?room=${encodeURIComponent(c.open.id)}` : ""}`}
+                    className={`conv-row${c.unread.length > 0 ? " unread" : ""}`}
+                  >
+                    <Avatar name={c.team.name ?? "Team"} size={36} />
+                    <span className="conv-main">
+                      <b>{c.team.name ?? "Team"}</b>
+                      <small>{c.subtitle}</small>
+                    </span>
+                    <small className="conv-time">
+                      <LocalTime iso={c.lastAt ?? undefined} style="relative" />
+                    </small>
+                    {c.unread.length > 0 && <span className="notice-dot" aria-label="Unread" />}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            {headed && <h3 className="conv-heading">Direct messages</h3>}
+          </>
+        )}
         {!convs.data ? (
           <p className="muted" aria-busy="true">
             Loading…
           </p>
-        ) : shown.length === 0 ? (
+        ) : shown.length === 0 && shownTeams.length > 0 && !q ? null : shown.length === 0 ? (
           <p className="empty">
             {q
               ? "No conversations match your search."
@@ -446,6 +481,8 @@ function ConversationView({
   const hiddenBefore = ms(mine?.clearedAt);
   const messages = usePagedMessages<Message>(`conversations/${conv.id}/messages`, pageSize, hiddenBefore);
   const [replyTo, setReplyTo] = useState<Doc<Message> | null>(null);
+  // The message whose reaction bubble is open (double-click, as the app's double-tap).
+  const [reacting, setReacting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [managing, setManaging] = useState(false);
   const typing = useTyping(conv.id, me, conv.names);
@@ -524,7 +561,7 @@ function ConversationView({
               Object.values(m.reactions ?? {}).reduce<Record<string, number>>((acc, e) => ({ ...acc, [e]: (acc[e] ?? 0) + 1 }), {}),
             );
             return (
-              <div key={m.id} className={`message${grouped ? " grouped" : ""}${m.authorId === me ? " mine" : ""}`}>
+              <div key={m.id} className={`message${grouped ? " grouped" : ""}${m.authorId === me ? " mine" : ""}`} onDoubleClick={m.createdAt ? () => setReacting(m.id) : undefined}>
                 {grouped && (
                   <span className="message-time">
                     <LocalTime iso={m.createdAt} style="time" />
@@ -562,11 +599,14 @@ function ConversationView({
                   canDelete={m.authorId === me}
                   onReply={info.requestForMe ? undefined : () => setReplyTo(m)}
                   onDeleted={() => messages.removed(m.id)}
+                  picking={reacting === m.id}
+                  onPickingChange={(open) => setReacting(open ? m.id : null)}
                 />
               </div>
             );
           })
         )}
+        <PendingMessages kind="directMessage" target={conv.id} shown={list} />
         {info.seen && <p className="muted small conv-seen">Seen</p>}
         {typing.others.length > 0 && (
           <p className="muted small conv-typing" aria-live="polite">
@@ -599,6 +639,7 @@ function ConversationView({
             onClearReply={() => setReplyTo(null)}
             onTyping={typing.report}
             draftKey={`dm_${conv.id}`}
+            outbox={{ kind: "directMessage", target: conv.id }}
           />
         </>
       )}

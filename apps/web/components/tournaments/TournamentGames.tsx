@@ -31,8 +31,14 @@ import {
   divisionLabel,
   leagueTeamPrefix,
   pointDiff,
+  currentWeekIndex,
+  leagueNights,
+  leagueWeekLabel,
+  leagueWeeks,
 } from "@stall10/shared";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { Dialog } from "@/components/Dialog";
 import { dayKey, useRenderZone } from "@/lib/renderZone";
 import { type TournamentState, divisionPath, useAction } from "./useTournament";
 
@@ -76,6 +82,21 @@ function slotLabel(s: TournamentState, g: EngineGame, a: boolean): string {
   return `${src.type === "winner" ? "Winner" : "Loser"} of game ${number(src.game)}`;
 }
 
+/** A team's initials in a small square (the app's team mark). */
+export function TeamMark({ name }: { name: string }) {
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
+  return (
+    <span className="hosted-mark" aria-hidden>
+      {initials || "?"}
+    </span>
+  );
+}
+
 type Action = "report" | "confirm" | "awaiting" | null;
 function actionFor(s: TournamentState, g: EngineGame): Action {
   if (!hasTeams(g) || isDone(g)) return null;
@@ -87,9 +108,46 @@ function actionFor(s: TournamentState, g: EngineGame): Action {
 }
 const badge: Record<Exclude<Action, null>, string> = { report: "Report score", confirm: "Confirm score", awaiting: "Waiting for the other captain" };
 
-function ScoreForm({ s, g, mode, onDone }: { s: TournamentState; g: EngineGame; mode: "report" | "final"; onDone: () => void }) {
-  const [a, setA] = useState(String(g.scoreA ?? g.report?.scoreA ?? ""));
-  const [b, setB] = useState(String(g.scoreB ?? g.report?.scoreB ?? ""));
+/**
+ * One team's score in the score form: its name, then −, the score in the
+ * scoreboard face (still typed straight in) and + (ScoreStepper in the
+ * app). An untouched score stays empty, so "Enter both scores." still
+ * shows; + starts it at 1, and the steppers keep it from 0 to 99.
+ */
+export function ScoreStepper({ name, value, onChange }: { name: string; value: string; onChange: (v: string) => void }) {
+  const n = value.trim() === "" ? null : Number(value);
+  const step = (by: number) => onChange(String(Math.min(99, Math.max(0, (n != null && Number.isFinite(n) ? n : 0) + by))));
+  return (
+    <div className="score-step">
+      <span className="score-step-name">{name}</span>
+      <div className="score-step-row">
+        <button type="button" className="btn score-step-btn" aria-label={`One less for ${name}`} title={`One less for ${name}`} disabled={n == null || !(n > 0)} onClick={() => step(-1)}>
+          −
+        </button>
+        <input
+          type="number"
+          className="score-step-input"
+          min={0}
+          max={99}
+          inputMode="numeric"
+          placeholder="–"
+          aria-label={`Score for ${name}`}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        <button type="button" className="btn btn-primary score-step-btn" aria-label={`One more for ${name}`} title={`One more for ${name}`} disabled={n != null && n >= 99} onClick={() => step(1)}>
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** [g]'s score form; it starts from the game's score, its report, else its running score. [onSent] (else [onDone]) once it's sent. */
+function ScoreForm({ s, g, mode, onDone, onSent }: { s: TournamentState; g: EngineGame; mode: "report" | "final"; onDone: () => void; onSent?: () => void }) {
+  const running = s.liveOf(g);
+  const [a, setA] = useState(String(g.scoreA ?? g.report?.scoreA ?? running?.scoreA ?? ""));
+  const [b, setB] = useState(String(g.scoreB ?? g.report?.scoreB ?? running?.scoreB ?? ""));
   const { busy, error, setError, run } = useAction();
   const url = `${divisionPath(s.id, s.divisionId ?? "")}/games/${encodeURIComponent(g.id)}`;
   async function submit(e: FormEvent) {
@@ -99,24 +157,18 @@ function ScoreForm({ s, g, mode, onDone }: { s: TournamentState; g: EngineGame; 
     const why = scoreError(scoreA, scoreB);
     if (why) return setError(why);
     const r = mode === "report" ? await run(`${url}/report`, "POST", { scoreA, scoreB }) : await run(`${url}/score`, "PUT", { scoreA, scoreB });
-    if (r.ok) onDone();
+    if (r.ok) (onSent ?? onDone)();
   }
   return (
     <form className="settings-form hosted-score-form" onSubmit={submit}>
-      <div className="form-grid">
-        <label>
-          {slotLabel(s, g, true)}
-          <input type="number" min={0} max={99} inputMode="numeric" value={a} onChange={(e) => setA(e.target.value)} />
-        </label>
-        <label>
-          {slotLabel(s, g, false)}
-          <input type="number" min={0} max={99} inputMode="numeric" value={b} onChange={(e) => setB(e.target.value)} />
-        </label>
+      <div className="score-steps">
+        <ScoreStepper name={slotLabel(s, g, true)} value={a} onChange={setA} />
+        <ScoreStepper name={slotLabel(s, g, false)} value={b} onChange={setB} />
       </div>
       <small className="muted">{mode === "report" ? "The other captain confirms it before it counts." : "As the host, this is final right away."}</small>
       {error && <p className="form-error">{error}</p>}
       <div className="home-actions">
-        <button className="btn btn-primary btn-small" disabled={busy}>
+        <button className={`btn btn-small ${mode === "report" ? "hosted-btn-due" : "btn-primary"}`} disabled={busy}>
           {mode === "report" ? "Report score" : isDone(g) ? "Correct the score" : "Set final score"}
         </button>
         <button type="button" className="text-btn" onClick={onDone}>
@@ -127,32 +179,62 @@ function ScoreForm({ s, g, mode, onDone }: { s: TournamentState; g: EngineGame; 
   );
 }
 
-/** One game: its teams and score, and what the viewer can do with it. */
-export function GameCard({ s, g }: { s: TournamentState; g: EngineGame }) {
+/**
+ * One game: its teams and score, and what the viewer can do with it.
+ * [focus] (from a tournament-day card's Report score) scrolls to it and
+ * opens the score form when it's the viewer's to report.
+ */
+export function GameCard({ s, g, focus = false }: { s: TournamentState; g: EngineGame; focus?: boolean }) {
   const zone = useRenderZone();
   const [open, setOpen] = useState<"report" | "final" | null>(null);
+  const [keeping, setKeeping] = useState(false);
   const { busy, error, run } = useAction();
   const action = actionFor(s, g);
+  const live = s.liveOf(g);
+  const canKeep = action !== "confirm" && s.canKeepLive(g);
+  const ref = useRef<HTMLDivElement>(null);
+  const focused = useRef(false);
+  useEffect(() => {
+    if (!focus || focused.current || !action) return;
+    focused.current = true;
+    if (action === "report") setOpen("report");
+    ref.current?.scrollIntoView({ block: "center" });
+  }, [focus, action]);
   const skipped = skippedGame(g, s.games);
   const canSet = s.manager && hasTeams(g) && !laterGamesPlayed(g, s.games);
   const winner = isDone(g) ? ((g.scoreA ?? 0) > (g.scoreB ?? 0) ? "a" : "b") : null;
+  const due = action === "report" || action === "confirm";
+  const side = (a: boolean) => {
+    const won = winner === (a ? "a" : "b");
+    const name = slotLabel(s, g, a);
+    return (
+      <div className={`hosted-side${winner ? (won ? " hosted-winner" : " hosted-loser") : ""}`}>
+        {(a ? g.teamA : g.teamB) ? <TeamMark name={name} /> : <span className="hosted-mark hosted-mark-tbd" aria-hidden />}
+        <span className="hosted-side-name">{name}</span>
+        <b className="hosted-score">{isDone(g) ? (a ? g.scoreA : g.scoreB) : live ? (a ? live.scoreA : live.scoreB) : ""}</b>
+      </div>
+    );
+  };
   const r = g.report;
   const url = `${divisionPath(s.id, s.divisionId ?? "")}/games/${encodeURIComponent(g.id)}`;
   return (
-    <div className={`hosted-game${action === "report" || action === "confirm" ? " hosted-game-you" : ""}${skipped ? " hosted-game-skipped" : ""}`}>
+    <div ref={ref} id={`game-${g.id}`} className={`hosted-game${due ? " hosted-game-you" : ""}${skipped ? " hosted-game-skipped" : ""}`}>
+      {due && <b className="hosted-game-due">{action === "confirm" ? "Your game · confirm the score" : "Your game · needs a score"}</b>}
       <div className="hosted-game-head">
-        <small className="muted">
+        <small>
           Game {g.order + 1} · {g.label}
           {g.startsAt ? ` · ${timeLabel(g.startsAt, zone)}` : ""} · Field {g.field}
         </small>
-        {action && <span className="pill">{badge[action]}</span>}
+        <span className="hosted-game-pills">
+          {live && <LivePill />}
+          {action ? <span className={`pill ${due ? "hosted-pill-due" : "pill-soft"}`}>{badge[action]}</span> : isDone(g) && <span className="pill pill-soft">Final</span>}
+        </span>
       </div>
       <div className="hosted-game-teams">
-        <span className={winner === "a" ? "hosted-winner" : ""}>{slotLabel(s, g, true)}</span>
-        <b>{isDone(g) ? g.scoreA : ""}</b>
-        <span className={winner === "b" ? "hosted-winner" : ""}>{slotLabel(s, g, false)}</span>
-        <b>{isDone(g) ? g.scoreB : ""}</b>
+        {side(true)}
+        {side(false)}
       </div>
+      {live && <small className="muted">Live score. It isn&apos;t final until it&apos;s reported.</small>}
       {skipped && <small className="muted">Not needed: the winners&apos; bracket champion won the final.</small>}
       {r && !isDone(g) && (
         <small className="muted">
@@ -162,16 +244,21 @@ export function GameCard({ s, g }: { s: TournamentState; g: EngineGame }) {
       {open ? (
         <ScoreForm s={s} g={g} mode={open} onDone={() => setOpen(null)} />
       ) : (
-        (action || canSet) && (
+        (action || canSet || canKeep) && (
           <div className="home-actions hosted-game-actions">
+            {canKeep && (
+              <button type="button" className="btn btn-small btn-primary" onClick={() => setKeeping(true)}>
+                {live ? "Update live score" : "Start game"}
+              </button>
+            )}
             {action === "report" && (
-              <button type="button" className="btn btn-primary btn-small" onClick={() => setOpen("report")}>
+              <button type="button" className="btn btn-small hosted-btn-due" onClick={() => setOpen("report")}>
                 Report score
               </button>
             )}
             {action === "confirm" && r && (
               <>
-                <button type="button" className="btn btn-primary btn-small" disabled={busy} onClick={() => void run(`${url}/confirm`, "POST", { scoreA: r.scoreA, scoreB: r.scoreB })}>
+                <button type="button" className="btn btn-small hosted-btn-due" disabled={busy} onClick={() => void run(`${url}/confirm`, "POST", { scoreA: r.scoreA, scoreB: r.scoreB })}>
                   Confirm {r.scoreA}–{r.scoreB}
                 </button>
                 <button type="button" className="btn btn-small" onClick={() => setOpen("report")}>
@@ -188,7 +275,114 @@ export function GameCard({ s, g }: { s: TournamentState; g: EngineGame }) {
         )
       )}
       {error && <p className="form-error">{error}</p>}
+      {keeping && <LiveScoreDialog s={s} g={g} onClose={() => setKeeping(false)} />}
     </div>
+  );
+}
+
+/** The red LIVE pill, only while a game is being played. */
+export function LivePill() {
+  return (
+    <span className="hosted-live-pill hosted-live-small">
+      <i aria-hidden />
+      LIVE
+    </span>
+  );
+}
+
+/**
+ * A game's running score while it's played (LiveScoreSheet in the app),
+ * kept by its teams' captains or the host: Start game, then +1 for
+ * whoever scores and − to undo. Everyone following sees it. It isn't
+ * the final: Report final score (a captain) or Set final score (the host)
+ * opens the score form, filled in from it.
+ */
+function LiveScoreDialog({ s, g: initial, onClose }: { s: TournamentState; g: EngineGame; onClose: () => void }) {
+  // The game as the page has it now (its listener keeps it current).
+  const g = s.games.find((x) => x.id === initial.id) ?? initial;
+  const [finalMode, setFinalMode] = useState<"report" | "final" | null>(null);
+  const live = s.liveOf(g);
+  const canKeep = s.canKeepLive(g);
+  const action = actionFor(s, g);
+  const captain = action === "report";
+  const host = !captain && s.manager && hasTeams(g) && !laterGamesPlayed(g, s.games);
+  const { error, stopping, setLive, stopLive, setError } = s.live;
+  const nameA = slotLabel(s, g, true);
+  const nameB = slotLabel(s, g, false);
+  // Closing it clears a send's error.
+  useEffect(() => () => setError(null), [setError]);
+  const bump = (teamA: boolean, by: number) => {
+    const a = live?.scoreA ?? 0;
+    const b = live?.scoreB ?? 0;
+    setLive(g.id, teamA ? a + by : a, teamA ? b : b + by);
+  };
+  async function stop() {
+    if (!window.confirm("Stop the live score?\n\nThe running score comes off for everyone. Start again any time.")) return;
+    await stopLive(g.id);
+  }
+  const whyNot = !hasTeams(g)
+    ? "Teams are decided by earlier games."
+    : s.t?.status === "finished"
+      ? "This event is over."
+      : "Live scores are kept on the day the game is played.";
+  const stepper = (a: boolean) => {
+    const name = a ? nameA : nameB;
+    const score = live ? (a ? live.scoreA : live.scoreB) : null;
+    const on = canKeep && !!live;
+    return (
+      <div className="live-step">
+        <TeamMark name={name} />
+        <span className="live-step-name">{name}</span>
+        <button type="button" className="btn live-step-btn" aria-label={`Undo a point for ${name}`} title={`Undo a point for ${name}`} disabled={!on || (score ?? 0) <= 0} onClick={() => bump(a, -1)}>
+          −
+        </button>
+        <b className="live-step-score">{score ?? "–"}</b>
+        <button type="button" className="btn btn-primary live-step-btn live-step-plus" aria-label={`Point for ${name}`} disabled={!on || (score ?? 0) >= 99} onClick={() => bump(a, 1)}>
+          +1
+        </button>
+      </div>
+    );
+  };
+  return (
+    <Dialog label="Live score" onClose={onClose} className="card live-dialog" dismissOnBackdrop>
+      <div className="live-dialog-head">
+        <h2 className="card-title">Live score</h2>
+        {live && <LivePill />}
+      </div>
+      <small className="muted">{[`Game ${g.order + 1}`, g.label, `Field ${g.field}`, s.division ? scoreLabel(s.division.settings) : null].filter(Boolean).join(" · ")}</small>
+      {finalMode ? (
+        <ScoreForm s={s} g={g} mode={finalMode} onDone={() => setFinalMode(null)} onSent={onClose} />
+      ) : (
+        <>
+          <div className="live-steps" aria-live="polite">
+            {stepper(true)}
+            {stepper(false)}
+          </div>
+          {!live && (
+            <button type="button" className="btn btn-primary" disabled={!canKeep || stopping} onClick={() => setLive(g.id, 0, 0)}>
+              Start game
+            </button>
+          )}
+          <p className="muted small live-note">{!canKeep && !live ? whyNot : "Everyone following sees this score. It isn't final until the score is reported and confirmed."}</p>
+          {error && <p className="form-error">{error}</p>}
+          {(captain || host) && (
+            <button type="button" className="btn hosted-btn-due" disabled={stopping} onClick={() => setFinalMode(captain ? "report" : "final")}>
+              {captain ? "Report final score" : "Set final score"}
+            </button>
+          )}
+          {live && canKeep && (
+            <button type="button" className="text-btn live-stop" disabled={stopping} onClick={() => void stop()}>
+              Stop live score
+            </button>
+          )}
+          <div className="form-actions">
+            <button type="button" className="btn btn-small" onClick={onClose}>
+              Done
+            </button>
+          </div>
+        </>
+      )}
+    </Dialog>
   );
 }
 
@@ -222,18 +416,37 @@ function PublishCard({ s }: { s: TournamentState }) {
       })),
     });
   }
+  const pools = (d.settings.format === "poolsSingleElim" || d.settings.format === "poolsPlacement") && t.kind !== "league";
+  const lastEnd = plan?.days.length ? plan.days[plan.days.length - 1].endsAt : null;
   return (
-    <section className="card">
-      <h2 className="card-title">{s.published ? "Schedule published" : "Schedule"}</h2>
+    <section className="card hosted-publish">
+      <h2 className="card-title">{s.published ? "Schedule published" : plan ? "Schedule is ready to publish" : "Schedule"}</h2>
       {plan ? (
-        <p>
-          {d.seeds.length} teams · {plan.games.length} games
-          {d.settings.format !== "roundRobin" && (d.settings.format === "poolsSingleElim" || d.settings.format === "poolsPlacement") && t.kind !== "league" ? ` · ${d.settings.poolCount} pools` : ""}
-          <br />
-          <small className="muted">
-            {plan.days.map((day) => `${day.startsAt.toLocaleDateString("en-US", { weekday: "short" })} ${timeLabel(day.startsAt)}–${timeLabel(day.endsAt)}`).join(" · ")}
-          </small>
-        </p>
+        <>
+          <p>
+            {d.seeds.length} teams{pools ? ` · ${d.settings.poolCount} pools` : ""}
+            <br />
+            <small className="muted">
+              {plan.days.map((day) => `${day.startsAt.toLocaleDateString("en-US", { weekday: "short" })} ${timeLabel(day.startsAt)}–${timeLabel(day.endsAt)}`).join(" · ")}
+            </small>
+          </p>
+          <div className="hosted-stats">
+            <div className="hosted-stat">
+              <b>{plan.games.length}</b>
+              <span>Games</span>
+            </div>
+            <div className="hosted-stat">
+              <b>{d.settings.fields}</b>
+              <span>{d.settings.fields === 1 ? "Field" : "Fields"}</span>
+            </div>
+            {lastEnd && (
+              <div className="hosted-stat">
+                <b>{lastEnd.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).replace(/\s?[AP]M$/, "")}</b>
+                <span>Last finish</span>
+              </div>
+            )}
+          </div>
+        </>
       ) : (
         <p className="muted">{problem ?? (t.entryType === "players" ? "Draft and save at least two teams first." : "Accept at least two teams first.")}</p>
       )}
@@ -244,7 +457,7 @@ function PublishCard({ s }: { s: TournamentState }) {
       )}
       {error && <p className="form-error">{error}</p>}
       <div className="home-actions">
-        <button type="button" className={`btn btn-small ${s.published && played ? "btn-danger" : "btn-primary"}`} disabled={!plan || busy} onClick={() => void publish()}>
+        <button type="button" className={`btn btn-small ${s.published ? "" : "hosted-btn-due"}`} disabled={!plan || busy} onClick={() => void publish()}>
           {s.published ? "Regenerate schedule" : "Publish schedule"}
         </button>
       </div>
@@ -269,13 +482,16 @@ export function NoDivisions({ s }: { s: TournamentState }) {
   return <p className="empty">{s.manager ? "No divisions yet. Open one under Edit details." : "The host is still setting up divisions."}</p>;
 }
 
-export function ScheduleTab({ s }: { s: TournamentState }) {
+/** [focusGame]: a game to open first (?game=, from Report score). */
+export function ScheduleTab({ s, focusGame }: { s: TournamentState; focusGame?: string }) {
   const d = s.division;
   const zone = useRenderZone();
   const { busy, error, run } = useAction();
   if (!d || !s.t) return <NoDivisions s={s} />;
   const league = s.t.kind === "league";
   const canSeed = s.manager && bracketSeeds(s.games).length > 0;
+  const focused = focusGame ? (s.games.find((g) => g.id === focusGame) ?? null) : null;
+  const upcoming = s.myUpcoming.filter((g) => g.id !== focused?.id).slice(0, 3);
   let lastDay = "";
   return (
     <div className="stack">
@@ -292,33 +508,99 @@ export function ScheduleTab({ s }: { s: TournamentState }) {
         </div>
       )}
       {error && <p className="form-error">{error}</p>}
-      {s.myUpcoming.length > 0 && (
+      {focused && (
+        <section className="stack">
+          <h3 className="hosted-heading">This game</h3>
+          <GameCard s={s} g={focused} focus />
+        </section>
+      )}
+      {upcoming.length > 0 && (
         <section className="stack">
           <h3 className="hosted-heading">Your next games</h3>
-          {s.myUpcoming.slice(0, 3).map((g) => (
+          {upcoming.map((g) => (
             <GameCard key={g.id} s={s} g={g} />
           ))}
         </section>
       )}
       {s.games.length === 0 && !s.manager && <p className="empty">The schedule appears here once the host publishes it.</p>}
       {s.games.length > 0 && <h3 className="hosted-heading">All games</h3>}
-      {s.games.map((g) => {
+      {/* A league's season, a night at a time. */}
+      {league && s.games.length > 0 && <LeagueWeeks key={d.id} s={s} />}
+      {!league && s.games.map((g) => {
         const day = g.startsAt ? dayKey(g.startsAt, zone) : "";
         const head = day && day !== lastDay;
         lastDay = day || lastDay;
-        const byes = league && g.stage === "pool" && head ? byesIn(d.seeds, s.games, g.round) : [];
         return (
           <div key={g.id} className="stack hosted-game-row">
-            {head && g.startsAt && (
-              <div>
-                <h4 className="hosted-day">{league ? `${g.stage === "pool" ? `Week ${g.round}` : "Playoffs"} · ${dayLabel(g.startsAt, zone)}` : dayLabel(g.startsAt, zone)}</h4>
-                {byes.length > 0 && <small className="muted">Bye: {byes.map(s.teamName).join(", ")}</small>}
-              </div>
-            )}
+            {head && g.startsAt && <h4 className="hosted-day">{dayLabel(g.startsAt, zone)}</h4>}
             <GameCard s={s} g={g} />
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * A league's games a night at a time (the app's _LeagueWeeks): "‹ Week 3 ›"
+ * with the night's date and byes, then its games. Opens on tonight's
+ * night, else the next one (the last once the season is over). Keyed by
+ * division, so another division starts on its own current week.
+ */
+function LeagueWeeks({ s }: { s: TournamentState }) {
+  const zone = useRenderZone();
+  const [picked, setPicked] = useState<number | null>(null);
+  const d = s.division;
+  const weeks = leagueWeeks(s.games, (x) => dayKey(x, zone));
+  if (!d || weeks.length === 0) return null;
+  const i = Math.min(Math.max(picked ?? currentWeekIndex(weeks, dayKey(new Date(), zone)), 0), weeks.length - 1);
+  const week = weeks[i];
+  const rounds = new Set(week.games.filter((g) => g.stage === "pool").map((g) => g.round));
+  const byes = [...new Set([...rounds].flatMap((r) => byesIn(d.seeds, s.games, r)))];
+  const first = week.games[0]?.startsAt;
+  return (
+    <section className="stack league-weeks" aria-label="Schedule by week">
+      <div className="league-week-nav">
+        <button type="button" className="icon-btn league-week-arrow" aria-label="Previous week" title="Previous week" disabled={i === 0} onClick={() => setPicked(i - 1)}>
+          ‹
+        </button>
+        <div className="league-week-title" aria-live="polite">
+          <b>{leagueWeekLabel(week, leagueNights(weeks))}</b>
+          {first && <small className="muted">{dayLabel(first, zone)}</small>}
+        </div>
+        <button type="button" className="icon-btn league-week-arrow" aria-label="Next week" title="Next week" disabled={i === weeks.length - 1} onClick={() => setPicked(i + 1)}>
+          ›
+        </button>
+      </div>
+      {byes.length > 0 && <small className="muted league-week-byes">Bye: {byes.map(s.teamName).join(", ")}</small>}
+      {week.games.map((g) => (
+        <GameCard key={g.id} s={s} g={g} />
+      ))}
+    </section>
+  );
+}
+
+/** A division's bracket on its own page (the app's HostedBracketScreen). */
+export const bracketHref = (tournamentId: string, divisionId: string) =>
+  `/tournaments/${encodeURIComponent(tournamentId)}/bracket?division=${encodeURIComponent(divisionId)}`;
+
+/** The selected division's bracket: a column per round, each game's card with what the viewer can do. On Results and the bracket's own page. */
+export function BracketView({ s }: { s: TournamentState }) {
+  const columns = new Map<string, EngineGame[]>();
+  for (const g of s.games.filter((x) => isBracketStage(x.stage))) {
+    const key = `${g.stage}:${g.round}`;
+    columns.set(key, [...(columns.get(key) ?? []), g]);
+  }
+  return (
+    <div className="hosted-bracket">
+      {[...columns.values()].map((games) => (
+        <div key={`${games[0].stage}${games[0].round}`} className="hosted-bracket-col">
+          <h3 className="hosted-heading">{new Set(games.map((g) => g.label)).size === 1 ? games[0].label : `Round ${games[0].round}`}</h3>
+          {games.map((g) => (
+            <GameCard key={g.id} s={s} g={g} />
+          ))}
+        </div>
+      ))}
     </div>
   );
 }
@@ -329,11 +611,7 @@ export function ResultsTab({ s }: { s: TournamentState }) {
   const league = s.t.kind === "league";
   const places = d.placements.length > 0 ? d.placements : placementsOf(formatOf(s.t, d), d.seeds, s.games);
   const pools = poolTeams(s.games);
-  const columns = new Map<string, EngineGame[]>();
-  for (const g of s.games.filter((x) => isBracketStage(x.stage))) {
-    const key = `${g.stage}:${g.round}`;
-    columns.set(key, [...(columns.get(key) ?? []), g]);
-  }
+  const hasBracket = s.games.some((x) => isBracketStage(x.stage));
   return (
     <div className="stack">
       <DivisionPicker s={s} />
@@ -341,16 +619,17 @@ export function ResultsTab({ s }: { s: TournamentState }) {
       {places.length > 0 && (
         <>
           <section className="card hosted-champion">
+            <small className="hosted-eyebrow">Champion</small>
             <b>{s.teamName(places[0])}</b>
             <span className="muted">{divisionLabel(d)} champion</span>
           </section>
           <section className="card">
             <h2 className="card-title">Final standings</h2>
-            <table className="data-table">
+            <table className="data-table hosted-standings">
               <tbody>
                 {places.map((id, i) => (
-                  <tr key={id}>
-                    <td className="narrow">{ordinal(i + 1)}</td>
+                  <tr key={id} className={s.captainOf.has(id) ? "hosted-mine" : undefined}>
+                    <td className="narrow hosted-rank">{ordinal(i + 1)}</td>
                     <td>{s.teamName(id)}</td>
                     <td className="narrow muted">{d.seeds.includes(id) ? `Seed ${d.seeds.indexOf(id) + 1}` : ""}</td>
                   </tr>
@@ -366,9 +645,10 @@ export function ResultsTab({ s }: { s: TournamentState }) {
           {[...pools.entries()].map(([pool, teams]) => (
             <div key={pool} className="hosted-table-wrap">
               {pools.size > 1 && <h3 className="hosted-heading">Pool {pool}</h3>}
-              <table className="data-table">
+              <table className="data-table hosted-standings">
                 <thead>
                   <tr>
+                    <th className="narrow">#</th>
                     <th>Team</th>
                     <th className="narrow">W</th>
                     <th className="narrow">L</th>
@@ -377,12 +657,13 @@ export function ResultsTab({ s }: { s: TournamentState }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {standings(teams, s.games.filter((g) => g.pool === pool)).map((row) => (
-                    <tr key={row.teamId}>
+                  {standings(teams, s.games.filter((g) => g.pool === pool)).map((row, i) => (
+                    <tr key={row.teamId} className={s.captainOf.has(row.teamId) ? "hosted-mine" : undefined}>
+                      <td className="narrow hosted-rank">{i + 1}</td>
                       <td>{s.teamName(row.teamId)}</td>
                       <td className="narrow">{row.wins}</td>
                       <td className="narrow">{row.losses}</td>
-                      <td className="narrow">{pointDiff(row) > 0 ? `+${pointDiff(row)}` : pointDiff(row)}</td>
+                      <td className={`narrow${pointDiff(row) > 0 ? " hosted-plus" : ""}`}>{pointDiff(row) > 0 ? `+${pointDiff(row)}` : pointDiff(row)}</td>
                       <td className="narrow">{row.pointsFor}</td>
                     </tr>
                   ))}
@@ -393,19 +674,15 @@ export function ResultsTab({ s }: { s: TournamentState }) {
           {awaitingSeeds(s.games) && <p className="muted small">The bracket fills from these once every pool game is in.</p>}
         </section>
       )}
-      {columns.size > 0 && (
+      {hasBracket && (
         <section className="card">
-          <h2 className="card-title">Bracket</h2>
-          <div className="hosted-bracket">
-            {[...columns.values()].map((games) => (
-              <div key={`${games[0].stage}${games[0].round}`} className="hosted-bracket-col">
-                <h3 className="hosted-heading">{new Set(games.map((g) => g.label)).size === 1 ? games[0].label : `Round ${games[0].round}`}</h3>
-                {games.map((g) => (
-                  <GameCard key={g.id} s={s} g={g} />
-                ))}
-              </div>
-            ))}
+          <div className="hosted-card-head">
+            <h2 className="card-title">Bracket</h2>
+            <Link className="text-btn" href={bracketHref(s.id, d.id)}>
+              Open bracket
+            </Link>
           </div>
+          <BracketView s={s} />
         </section>
       )}
     </div>

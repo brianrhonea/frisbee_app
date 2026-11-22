@@ -49,6 +49,12 @@ const accessOf = (d: ManagedRoom | ManagedFolder | undefined): Access => ({
   writeUsers: d?.writeUsers ?? [],
 });
 
+const levels: Array<[Level, string]> = [
+  ["none", "None"],
+  ["read", "Read"],
+  ["write", "Read & write"],
+];
+
 /** Who reads and writes: Everyone, roles (and legacy tiers already set), and single members. */
 function AccessEditor({ value, onChange }: { value: Access; onChange: (a: Access) => void }) {
   const { viewer } = useTeamHub();
@@ -61,34 +67,26 @@ function AccessEditor({ value, onChange }: { value: Access; onChange: (a: Access
   const people = (team.memberIds ?? []).filter((u) => !value.readUsers.includes(u));
   const name = (u: string) => team.memberNames?.[u] || "Member";
 
-  const roleSelect = (id: string, label: string) => (
-    <select
-      aria-label={`${label} access`}
-      value={levelOf(value.readRoles, value.writeRoles, id)}
-      onChange={(e) => {
-        const [readRoles, writeRoles] = withLevel(value.readRoles, value.writeRoles, id, e.target.value as Level);
-        onChange({ ...value, readRoles, writeRoles });
-      }}
-    >
-      <option value="none">Can&apos;t see</option>
-      <option value="read">Read only</option>
-      <option value="write">Read and write</option>
-    </select>
+  // None / Read / Read & write as a segmented control (the app's room access picker).
+  const picker = (label: string, level: Level, set: (l: Level) => void) => (
+    <span className="segmented access-picker" role="radiogroup" aria-label={`${label} access`}>
+      {levels.map(([l, text]) => (
+        <button key={l} type="button" role="radio" aria-checked={level === l} className={level === l ? "on" : ""} onClick={() => set(l)}>
+          {text}
+        </button>
+      ))}
+    </span>
   );
-  const userSelect = (uid: string) => (
-    <select
-      aria-label={`${name(uid)} access`}
-      value={levelOf(value.readUsers, value.writeUsers, uid)}
-      onChange={(e) => {
-        const [readUsers, writeUsers] = withLevel(value.readUsers, value.writeUsers, uid, e.target.value as Level);
-        onChange({ ...value, readUsers, writeUsers });
-      }}
-    >
-      <option value="none">Remove</option>
-      <option value="read">Read only</option>
-      <option value="write">Read and write</option>
-    </select>
-  );
+  const roleSelect = (id: string, label: string) =>
+    picker(label, levelOf(value.readRoles, value.writeRoles, id), (l) => {
+      const [readRoles, writeRoles] = withLevel(value.readRoles, value.writeRoles, id, l);
+      onChange({ ...value, readRoles, writeRoles });
+    });
+  const userSelect = (uid: string) =>
+    picker(name(uid), levelOf(value.readUsers, value.writeUsers, uid), (l) => {
+      const [readUsers, writeUsers] = withLevel(value.readUsers, value.writeUsers, uid, l);
+      onChange({ ...value, readUsers, writeUsers });
+    });
   return (
     <div className="access-table">
       {rows.map(([id, label]) => (
@@ -240,7 +238,7 @@ export function ChatManager({
           {r.id !== "general" && (
             <button
               type="button"
-              className="text-btn danger"
+              className="text-btn"
               disabled={busy}
               onClick={() => {
                 if (window.confirm(`Delete #${r.name}? Its messages and files go too.`)) void run(`${base}/chat-rooms/${encodeURIComponent(r.id)}`, "DELETE");
@@ -330,7 +328,7 @@ export function ChatManager({
                 </button>
                 <button
                   type="button"
-                  className="text-btn danger"
+                  className="text-btn"
                   disabled={busy}
                   onClick={() => {
                     if (window.confirm(`Delete the ${f.name} folder? Its rooms stay, outside any folder.`)) void run(`${base}/chat-folders/${encodeURIComponent(f.id)}`, "DELETE");

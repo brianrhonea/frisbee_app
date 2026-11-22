@@ -103,13 +103,13 @@ enum TeamRole {
 /// join by holding the roles each team asks for.
 enum TeamKind {
   team('Team', 'team'),
-  community('Community group', 'group'),
+  community('Pickup community', 'community'),
   organization('School or club', 'community');
 
   const TeamKind(this.label, this.noun);
   final String label;
 
-  /// What the app calls one in a sentence: "team", "group", "community".
+  /// What the app calls one in a sentence: "team" or "community".
   final String noun;
 
   /// Joined like a group (openly or with approval) and has a description
@@ -174,6 +174,42 @@ Map<String, dynamic> communityFields({
       }
     : {};
 
+/// A team's sections its owner switches on or off (`sections` on the team
+/// doc; optionalTeamSections in packages/shared/src/team.ts). Feed,
+/// Schedule, Chat and Roster are always there. Teams made before the
+/// switches store nothing, which reads as on; new teams start with every
+/// one off ([newTeamSections]). Communities store none.
+enum OptionalSection {
+  playbook('Playbook', 'Plays drawn on a field for the team to study'),
+  videos('Videos', 'Game film and highlights, in folders'),
+  stats('Stats', 'Keep stats point by point, with season totals'),
+  meetings('Meetings', 'Video calls for the team, or some of it');
+
+  const OptionalSection(this.label, this.description);
+  final String label;
+
+  /// One line for the switch in Settings › Sections.
+  final String description;
+
+  /// "Playbook, Videos, Stats or Meetings".
+  static String get listed {
+    final names = [for (final s in values) s.label];
+    return '${names.sublist(0, names.length - 1).join(', ')} or ${names.last}';
+  }
+}
+
+/// What a new team (not a community) stores: every optional section off.
+Map<String, bool> newTeamSections() => {
+  for (final s in OptionalSection.values) s.name: false,
+};
+
+/// The sections stored as off in a team doc's `sections` map.
+Set<OptionalSection> sectionsOffIn(Object? raw) => {
+  if (raw is Map)
+    for (final s in OptionalSection.values)
+      if (raw[s.name] == false) s,
+};
+
 enum Division {
   mixed('Mixed'),
   open('Open'),
@@ -214,6 +250,7 @@ class Team {
     this.roles = const {},
     this.memberRoles = const {},
     this.memberPerms = const {},
+    this.memberGrants = const {},
     this.linkedTeams = const {},
     this.orgId,
     this.orgName = '',
@@ -222,7 +259,29 @@ class Team {
     this.orgRoles = const {},
     this.official = false,
     this.leagueId,
+    this.sectionsOff = const {},
+    this.publicPage = true,
+    this.allowJoinRequests = false,
   });
+
+  /// The "Allow join requests" switch (`allowJoinRequests`, teams only):
+  /// off unless stored as true, so a team takes members by invite only
+  /// until its admins (manageTeam) turn it on through the API. Groups use
+  /// [requiresApproval] instead.
+  final bool allowJoinRequests;
+
+  /// The "Public team page" switch (`publicPage`, publicPageOn in
+  /// packages/shared): on unless stored as false. Off, people outside the
+  /// team see only its card (name, division, level and city), as a private
+  /// group's. Admins (manageTeam) switch it through the API.
+  final bool publicPage;
+
+  /// Optional sections the owner has turned off. Empty for teams made
+  /// before the switches (everything on) and for communities.
+  final Set<OptionalSection> sectionsOff;
+
+  /// Whether the team shows [section] ([OptionalSection]).
+  bool hasSection(OptionalSection section) => !sectionsOff.contains(section);
 
   /// The league (a hosted event's id) this team was made for: drafted by
   /// the league, or started to reserve a spot in it. A league team is just
@@ -301,6 +360,11 @@ class Team {
   /// without reading every role.
   final Map<String, Set<TeamPermission>> memberPerms;
 
+  /// uid → the permissions the owner gave them of their own (the
+  /// per-person switches, starting from a [RolePreset]), on top of their
+  /// roles. Only the API writes it; [memberPerms] counts it.
+  final Map<String, Set<TeamPermission>> memberGrants;
+
   /// What the group is about, on its home page. Groups only.
   final String description;
 
@@ -356,6 +420,19 @@ class Team {
     _ =>
       (permission == TeamPermission.keepStats && statKeepers.contains(uid)) ||
           (memberPerms[uid]?.contains(permission) ?? false),
+  };
+
+  /// The permissions [uid]'s custom roles give them.
+  Set<TeamPermission> rolePermissionsOf(String uid) => {
+    for (final id in memberRoles[uid] ?? const <String>{})
+      ...?roles[id]?.permissions,
+  };
+
+  /// [uid]'s own permissions (the owner's per-person switches): their
+  /// [memberGrants], with stats access counted as Keep stats.
+  Set<TeamPermission> ownPermissionsOf(String uid) => {
+    ...?memberGrants[uid],
+    if (statKeepers.contains(uid)) TeamPermission.keepStats,
   };
 
   /// Team details, roster, playbook, posts and videos.
@@ -492,6 +569,7 @@ class Team {
       roles: parseCustomRoles(map['roles']),
       memberRoles: parseMemberLists(map['memberRoles'], (s) => s),
       memberPerms: parseMemberLists(map['memberPerms'], permissionByName),
+      memberGrants: parseMemberLists(map['memberGrants'], permissionByName),
       linkedTeams: LinkedTeam.parse(map['linkedTeams']),
       orgId: map['orgId'] as String?,
       orgName: map['orgName'] as String? ?? '',
@@ -505,6 +583,9 @@ class Team {
       },
       official: map['official'] == true,
       leagueId: map['leagueId'] as String?,
+      sectionsOff: sectionsOffIn(map['sections']),
+      publicPage: map['publicPage'] != false,
+      allowJoinRequests: map['allowJoinRequests'] == true,
     );
   }
 
@@ -538,12 +619,16 @@ class Team {
     Map<String, CustomRole>? roles,
     Map<String, Set<String>>? memberRoles,
     Map<String, Set<TeamPermission>>? memberPerms,
+    Map<String, Set<TeamPermission>>? memberGrants,
     Map<String, LinkedTeam>? linkedTeams,
     String? Function()? orgId,
     String? orgName,
     bool? orgLinked,
     Set<String>? orgMembers,
     Map<String, String>? orgRoles,
+    Set<OptionalSection>? sectionsOff,
+    bool? publicPage,
+    bool? allowJoinRequests,
   }) => Team(
     id: id,
     name: name ?? this.name,
@@ -562,6 +647,7 @@ class Team {
     roles: roles ?? this.roles,
     memberRoles: memberRoles ?? this.memberRoles,
     memberPerms: memberPerms ?? this.memberPerms,
+    memberGrants: memberGrants ?? this.memberGrants,
     linkedTeams: linkedTeams ?? this.linkedTeams,
     orgId: orgId != null ? orgId() : this.orgId,
     orgName: orgName ?? this.orgName,
@@ -570,6 +656,9 @@ class Team {
     orgRoles: orgRoles ?? this.orgRoles,
     official: official,
     leagueId: leagueId,
+    sectionsOff: sectionsOff ?? this.sectionsOff,
+    publicPage: publicPage ?? this.publicPage,
+    allowJoinRequests: allowJoinRequests ?? this.allowJoinRequests,
   );
 }
 
@@ -756,6 +845,8 @@ class TeamListing {
     this.requiresApproval = false,
     this.location,
     this.official = false,
+    this.publicPage = true,
+    this.allowJoinRequests = false,
   });
 
   factory TeamListing.of(Team team) => TeamListing(
@@ -769,7 +860,23 @@ class TeamListing {
     requiresApproval: team.requiresApproval,
     location: team.location,
     official: team.official,
+    publicPage: team.publicPage,
+    allowJoinRequests:
+        team.kind == TeamKind.team &&
+        team.allowJoinRequests &&
+        !team.isLeagueTeam,
   );
+
+  /// Copied from [Team.publicPage]: false when outsiders see only this.
+  final bool publicPage;
+
+  /// Copied from [Team.allowJoinRequests] (teams only): signed-in outsiders
+  /// may ask to join from the team's page.
+  final bool allowJoinRequests;
+
+  /// Whether outsiders may ask to join: a group that approves who joins,
+  /// or a team that allows requests (takesJoinRequests in packages/shared).
+  bool get takesRequests => isCommunity ? requiresApproval : allowJoinRequests;
 
   final String id;
   final String name;
@@ -817,6 +924,8 @@ class TeamListing {
       description == team.description &&
       requiresApproval == team.requiresApproval &&
       official == team.official &&
+      publicPage == team.publicPage &&
+      allowJoinRequests == TeamListing.of(team).allowJoinRequests &&
       location == (team.isPrivateGroup ? null : team.location);
 
   factory TeamListing.fromMap(String id, Map<String, dynamic> map) =>
@@ -835,6 +944,8 @@ class TeamListing {
         requiresApproval: map['requiresApproval'] as bool? ?? false,
         location: GroupLocation.fromMap(map['location']),
         official: map['official'] == true,
+        publicPage: map['publicPage'] != false,
+        allowJoinRequests: map['allowJoinRequests'] == true,
       );
 
   Map<String, dynamic> toMap() => {
@@ -850,8 +961,17 @@ class TeamListing {
       location: isPrivateGroup ? null : location,
     ),
     if (official) 'official': true,
+    // Only when off, as the API's listingFor writes it.
+    if (!publicPage && kind == TeamKind.team) 'publicPage': false,
+    // Only when on, as the API's listingFor writes it.
+    if (allowJoinRequests && kind == TeamKind.team) 'allowJoinRequests': true,
     'keywords': searchKeywords('$name $city'),
   };
+
+  /// Outsiders see only this card: a private group, or a team whose
+  /// public page is off. Its location, events, posts and roster are for
+  /// members.
+  bool get hidesPage => isPrivateGroup || !publicPage;
 }
 
 /// Someone asking to join a group that requires approval

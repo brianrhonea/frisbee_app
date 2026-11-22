@@ -9,7 +9,7 @@ import { FakeStore, FakeTeamRepository, FakeUsers, FakeVerifier } from "./fakes.
 const now = Date.parse("2026-11-11T12:00:00Z");
 const iso = (ms: number) => new Date(ms).toISOString();
 
-const pickHost = (d: Data): Data => Object.fromEntries(["kind", "requiresApproval", "level"].filter((k) => d[k] !== undefined).map((k) => [k, d[k]]));
+const pickHost = (d: Data): Data => Object.fromEntries(["kind", "requiresApproval", "level", "publicPage"].filter((k) => d[k] !== undefined).map((k) => [k, d[k]]));
 
 class FakeBrowse implements BrowseRepository {
   postsList: Doc[] = [];
@@ -225,6 +225,28 @@ describe("public reads", () => {
     expect(events).toEqual({ events: [], tournaments: [] });
   });
 
+  it("shows a team whose public page is off as its card only, by either document", async () => {
+    t.repo.listed("off", { name: "Off", level: "club", publicPage: false, keywords: ["off"] });
+    // The listing is stale: the team doc says off.
+    t.repo.listed("stale", { name: "Stale", level: "club", keywords: ["off"] }, { level: "club", publicPage: false });
+    for (const id of ["off", "stale"]) {
+      t.repo.teamPosts.set(id, [{ id: "tp", data: { title: "hi", public: true } }]);
+      t.repo.teamEvents.set(id, [{ id: "e", data: { title: "practice" } }]);
+      const body = (await t.get(`/v1/public/teams/${id}`)).json();
+      expect(body.posts, id).toEqual([]);
+      expect(body.events, id).toEqual([]);
+      expect(body.team, id).toMatchObject({ id, level: "club", publicPage: false });
+    }
+    t.repo.events = ["off", "stale"].map((id) => ({ id: `e_${id}`, teamId: id, data: { title: "x" } }));
+    expect((await t.get("/v1/public/events")).json().events).toEqual([]);
+    // Still found by name, as its card.
+    const found = (await t.get("/v1/public/teams?q=off")).json().teams;
+    expect(found.map((x: Data) => [x.id, x.publicPage])).toEqual([
+      ["off", false],
+      ["stale", false],
+    ]);
+  });
+
   it("shows visitors a youth team's card only: no posts, events or location", async () => {
     const location = { address: "1 Field Rd", lat: 1, lng: 2 };
     t.repo.listed("y", { name: "Juniors", division: "mixed", level: "youth", city: "Austin", description: "U17", location, keywords: ["juniors"] });
@@ -297,6 +319,19 @@ describe("public reads", () => {
     const body = (await t.get("/v1/public/teams/t")).json();
     expect(body.posts).toEqual([{ id: "a", title: "Win!" }]);
     expect(body.events).toEqual([{ id: "e", title: "Game", startsAt: iso(now + 1000) }]);
+  });
+
+  it("puts a team's pinned public posts first, without who pinned them (F24)", async () => {
+    t.repo.listed("t", { name: "Haze", level: "club" });
+    t.repo.teamPosts.set("t", [
+      { id: "new", data: { title: "New", public: true, createdAt: iso(now) } },
+      { id: "old", data: { title: "Old", public: true, createdAt: iso(now - 9000), pinnedAt: iso(now - 10), pinnedBy: "coach" } },
+      { id: "mid", data: { title: "Mid", public: true, createdAt: iso(now - 5000) } },
+    ]);
+    const res = await t.get("/v1/public/teams/t");
+    expect(res.json().posts.map((x: Data) => x.id)).toEqual(["old", "new", "mid"]);
+    expect(res.json().posts[0].pinnedAt).toBe(iso(now - 10));
+    expect(res.body).not.toContain("pinnedBy");
   });
 
   it("lists events and tournaments, without private groups'", async () => {
@@ -598,6 +633,13 @@ describe("visitor access to events, the team finder and rosters", () => {
       expect(res.statusCode, id).toBe(404);
       expect(res.body).not.toContain("Pat Public");
     }
+  });
+
+  it("refuses a team whose public page is off, by its doc or its listing", async () => {
+    seedTeam("off", { name: "Off", level: "club", publicPage: false });
+    seedTeam("doc", { name: "Doc", level: "club", publicPage: false }, { name: "Doc", level: "club" });
+    seedTeam("listing", { name: "Listing", level: "club" }, { name: "Listing", level: "club", publicPage: false });
+    for (const id of ["off", "doc", "listing"]) expect((await t.get(`/v1/public/teams/${id}/roster`)).statusCode, id).toBe(404);
   });
 
   it("refuses when the team doc and its listing disagree", async () => {

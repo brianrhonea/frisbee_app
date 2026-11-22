@@ -92,6 +92,12 @@ abstract class AuthRepository extends ChangeNotifier {
   /// Needs a recent [reauthenticate]. Sets [signedOutNotice].
   Future<Result<void>> deleteAccount();
 
+  /// "Download your data": everything Stall 10 keeps about the user, as
+  /// the API's JSON file (`GET /v1/me/export`, DataExport in
+  /// packages/shared), pretty-printed. The API allows one every 10
+  /// minutes and says so when it's too soon.
+  Future<Result<String>> exportData();
+
   /// A message for the sign-in page about why the user was signed out,
   /// e.g. after deleting their account. Shown once.
   String? get signedOutNotice;

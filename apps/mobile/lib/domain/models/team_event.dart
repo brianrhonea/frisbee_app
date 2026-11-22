@@ -47,6 +47,39 @@ enum RsvpStatus {
   };
 }
 
+/// The longest note on an RSVP ("Late 15 min"), after [cleanRsvpNote];
+/// `rsvpNoteMax` in packages/shared and firestore.rules.
+const rsvpNoteMax = 140;
+
+final _noteBreaks = RegExp(r'[\t\n\r\p{Zl}\p{Zp}]+', unicode: true);
+final _noteControls = RegExp(r'[\u0000-\u001f\u007f-\u009f]');
+final _noteSpaces = RegExp(r' {2,}');
+
+/// An RSVP note as stored: one line without control characters, spaces
+/// squeezed and trimmed; empty means no note. Matches `cleanRsvpNote` in
+/// packages/shared (the API's).
+String cleanRsvpNote(String raw) => raw
+    .replaceAll(_noteBreaks, ' ')
+    .replaceAll(_noteControls, '')
+    .replaceAll(_noteSpaces, ' ')
+    .trim();
+
+/// Someone who answered, by name, with their note (empty when none).
+typedef Responder = ({String name, String note});
+
+/// [people] sorted by name, case-insensitively.
+List<Responder> sortedResponders(Iterable<Responder> people) =>
+    people.toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
+/// uid → note, keeping only string values (a doc's `rsvpNotes`).
+Map<String, String> rsvpNotesFrom(Object? raw) => {
+  if (raw is Map)
+    for (final e in raw.entries)
+      if (e.value is String && (e.value as String).isNotEmpty)
+        '${e.key}': e.value as String,
+};
+
 /// Fixed reaction palette. Stored by name so security rules can validate it.
 enum Reaction {
   thumbsUp('👍'),
@@ -118,6 +151,7 @@ class TeamEvent {
     this.notes = '',
     this.poll,
     this.rsvps = const {},
+    this.rsvpNotes = const {},
     this.reactions = const {},
     this.votes = const {},
     this.createdBy,
@@ -146,6 +180,10 @@ class TeamEvent {
   final String notes;
   final EventPoll? poll;
   final Map<String, RsvpStatus> rsvps;
+
+  /// uid -> a short note on their answer ("Late 15 min"); only while they
+  /// have one in [rsvps]. Seen by whoever sees the responses.
+  final Map<String, String> rsvpNotes;
   final Map<String, Set<Reaction>> reactions;
 
   /// uid → chosen [PollOption.id]s.
@@ -159,6 +197,10 @@ class TeamEvent {
   bool get isNew => id.isEmpty;
 
   RsvpStatus? rsvpOf(String uid) => rsvps[uid];
+
+  /// [uid]'s note on their answer; empty when none.
+  String noteOf(String uid) =>
+      rsvps.containsKey(uid) ? rsvpNotes[uid] ?? '' : '';
 
   /// uids with [status].
   List<String> responders(RsvpStatus status) => [
@@ -209,6 +251,7 @@ class TeamEvent {
     notes: notes ?? this.notes,
     poll: poll != null ? poll() : this.poll,
     rsvps: rsvps,
+    rsvpNotes: rsvpNotes,
     reactions: reactions,
     votes: votes,
     createdBy: createdBy,
@@ -239,6 +282,7 @@ class TeamEvent {
               RsvpStatus.maybe,
             ),
       },
+      rsvpNotes: rsvpNotesFrom(map['rsvpNotes']),
       reactions: {
         for (final e in ((map['reactions'] as Map?) ?? const {}).entries)
           e.key as String: {

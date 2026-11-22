@@ -5,11 +5,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/chat.dart';
+import '../../../domain/models/model_utils.dart';
+import '../../../domain/models/outbox.dart';
 import '../../../domain/models/team.dart';
 import '../../../utils/result.dart';
+import '../../services/api_client.dart';
 import '../../services/attachment_storage.dart';
 import '../../services/firestore_utils.dart';
 import '../../services/shared_streams.dart';
+import '../outbox/outbox_repository.dart';
 import 'chat_repository.dart';
 
 /// Rooms live at `teams/{teamId}/chats/{roomId}` with messages beneath, and
@@ -22,9 +26,40 @@ class ChatRepositoryFirebase implements ChatRepository {
     required AttachmentStorage attachments,
     FirebaseFirestore? firestore,
     SharedStreams? sharedStreams,
-  }) : _files = attachments,
+    OutboxRepository? outbox,
+    ApiClient? api,
+  }) : _api = api,
+       _files = attachments,
        _db = firestore ?? FirebaseFirestore.instance,
-       _shared = sharedStreams ?? SharedStreams.instance;
+       _shared = sharedStreams ?? SharedStreams.instance,
+       _outbox = outbox {
+    outbox?.register(
+      OutboxKind.teamChat,
+      OutboxHandler(
+        send: (job, files, author) => _send(
+          job.payload['teamId'] as String? ?? '',
+          job.payload['roomId'] as String? ?? '',
+          job.id,
+          author: author,
+          text: job.payload['text'] as String? ?? '',
+          attachments: files,
+          replyTo: MessageReply.fromMap(job.payload['replyTo']),
+        ),
+        sent: (job) => existsOnServer(
+          _messages(
+            job.payload['teamId'] as String? ?? '',
+            job.payload['roomId'] as String? ?? '',
+          ).doc(job.id),
+        ),
+      ),
+    );
+  }
+
+  /// Holds messages sent offline until they can go out.
+  final OutboxRepository? _outbox;
+
+  /// Pins and event cards; null in builds without `API_BASE_URL`.
+  final ApiClient? _api;
 
   final AttachmentStorage _files;
   final FirebaseFirestore _db;
@@ -42,6 +77,36 @@ class ChatRepositoryFirebase implements ChatRepository {
     String teamId,
     String roomId,
   ) => _rooms(teamId).doc(roomId).collection('messages');
+
+  /// users/{uid}/chatReads/{teamId}: rooms.{roomId} → when [uid] last
+  /// read it.
+  CollectionReference<Map<String, dynamic>> _reads(String uid) =>
+      _db.collection('users').doc(uid).collection('chatReads');
+
+  @override
+  Stream<Map<String, Map<String, DateTime>>> watchReads(
+    String uid,
+  ) => _shared.get(
+    'chatReads/$uid',
+    () => _reads(uid).snapshots().map(
+      (snap) => {
+        for (final d in snap.docs)
+          d.id: {
+            for (final e
+                in ((plainData(d.data())['rooms'] as Map?) ?? const {}).entries)
+              '${e.key}': ?parseDate(e.value),
+          },
+      },
+    ),
+  );
+
+  @override
+  Future<Result<void>> markRead(String teamId, String roomId, String uid) =>
+      guard(
+        () => _reads(uid).doc(teamId).set({
+          'rooms': {roomId: FieldValue.serverTimestamp()},
+        }, SetOptions(merge: true)),
+      );
 
   @override
   Stream<List<ChatRoom>> watchRooms(Team team, String uid) {
@@ -262,6 +327,44 @@ class ChatRepositoryFirebase implements ChatRepository {
     required String text,
     List<NewAttachment> attachments = const [],
     MessageReply? replyTo,
+  }) {
+    // The id is picked now and kept, so a retry can't post it twice.
+    final messageId = _messages(teamId, roomId).doc().id;
+    Future<Result<void>> now() => _send(
+      teamId,
+      roomId,
+      messageId,
+      author: author,
+      text: text,
+      attachments: attachments,
+      replyTo: replyTo,
+    );
+    final outbox = _outbox;
+    if (outbox == null || attachments.any((a) => a.tooLarge)) return now();
+    return outbox.submit(
+      kind: OutboxKind.teamChat,
+      id: messageId,
+      target: teamChatTarget(teamId, roomId),
+      label: 'Team chat message',
+      payload: {
+        'teamId': teamId,
+        'roomId': roomId,
+        'text': text,
+        'replyTo': replyTo?.toMap(),
+      },
+      files: attachments,
+      sendNow: now,
+    );
+  }
+
+  Future<Result<void>> _send(
+    String teamId,
+    String roomId,
+    String messageId, {
+    required AppUser author,
+    required String text,
+    List<NewAttachment> attachments = const [],
+    MessageReply? replyTo,
   }) => guard(
     () => muteAware(_db, author.uid, () async {
       for (final a in attachments) {
@@ -272,20 +375,30 @@ class ChatRepositoryFirebase implements ChatRepository {
           );
         }
       }
-      final ref = _messages(teamId, roomId).doc();
+      final ref = _messages(teamId, roomId).doc(messageId);
       final uploaded = await _files.upload(
         'teams/$teamId/chats/$roomId/${author.uid}/${ref.id}',
         attachments,
       );
       try {
-        await ref.set({
-          'authorId': author.uid,
-          'authorName': author.label,
-          'text': text.trim(),
-          'attachments': [for (final a in uploaded) a.toMap()],
-          'createdAt': FieldValue.serverTimestamp(),
-          'replyTo': ?replyTo?.toMap(),
-        });
+        // One batch: the message, the room's lastAt (a time, never the
+        // text) for everyone's unread dots, and the author's own read.
+        await (_db.batch()
+              ..set(ref, {
+                'authorId': author.uid,
+                'authorName': author.label,
+                'text': text.trim(),
+                'attachments': [for (final a in uploaded) a.toMap()],
+                'createdAt': FieldValue.serverTimestamp(),
+                'replyTo': ?replyTo?.toMap(),
+              })
+              ..update(_rooms(teamId).doc(roomId), {
+                'lastAt': FieldValue.serverTimestamp(),
+              })
+              ..set(_reads(author.uid).doc(teamId), {
+                'rooms': {roomId: FieldValue.serverTimestamp()},
+              }, SetOptions(merge: true)))
+            .commit();
       } catch (_) {
         // Don't leave files behind for a message that was never posted.
         await _files.delete(uploaded.map((a) => a.path));
@@ -317,6 +430,133 @@ class ChatRepositoryFirebase implements ChatRepository {
     await _files.delete(message.attachments.map((a) => a.path));
     await _messages(teamId, roomId).doc(message.id).delete();
   });
+
+  static const _noApi =
+      'Pins, event cards and polls need a connection to Stall 10.';
+
+  ApiClient get _client =>
+      _api ?? (throw const ApiException('unavailable', _noApi));
+
+  static String _roomPath(String teamId, String roomId) =>
+      '/v1/teams/${Uri.encodeComponent(teamId)}/chats/'
+      '${Uri.encodeComponent(roomId)}';
+
+  static String _pinPath(String teamId, String roomId, String messageId) =>
+      '${_roomPath(teamId, roomId)}/messages/'
+      '${Uri.encodeComponent(messageId)}/pin';
+
+  @override
+  bool get canUseChatExtras => _api != null;
+
+  @override
+  Stream<List<ChatMessage>> watchPins(String teamId, String roomId) =>
+      _shared.get(
+        'pins/$teamId/$roomId',
+        () =>
+            countedSnapshots(
+              _messages(
+                teamId,
+                roomId,
+              ).orderBy('pinnedAt', descending: true).limit(chatPinsMax),
+              'chatPins',
+            ).map(
+              (snap) => [
+                // Firestore leaves out messages without pinnedAt; checked
+                // here too.
+                for (final d in snap.docs)
+                  if (ChatMessage.fromMap(d.id, plainData(d.data()))
+                      case final m when m.isPinned)
+                    m,
+              ],
+            ),
+      );
+
+  @override
+  Future<Result<void>> pinMessage(
+    String teamId,
+    String roomId,
+    String messageId, {
+    String? unpin,
+  }) => guard(
+    () => _client.put(_pinPath(teamId, roomId, messageId), {'unpin': ?unpin}),
+  );
+
+  @override
+  Future<Result<void>> unpinMessage(
+    String teamId,
+    String roomId,
+    String messageId,
+  ) => guard(() => _client.delete(_pinPath(teamId, roomId, messageId)));
+
+  @override
+  Future<Result<void>> shareEvent(
+    String teamId,
+    String roomId,
+    String eventId,
+  ) => guard(
+    () => _client.post('${_roomPath(teamId, roomId)}/event-shares', {
+      'eventId': eventId,
+    }),
+  );
+
+  static String _messagePath(String teamId, String roomId, String id) =>
+      '${_roomPath(teamId, roomId)}/messages/${Uri.encodeComponent(id)}';
+
+  @override
+  Future<Result<void>> createPoll(
+    String teamId,
+    String roomId,
+    NewChatPoll poll,
+  ) => guard(
+    () => _client.post('${_roomPath(teamId, roomId)}/polls', {
+      'question': poll.question,
+      'options': poll.options,
+      'multiple': poll.multiple,
+      if (poll.closesAt case final at?)
+        'closesAt': at.toUtc().toIso8601String(),
+    }),
+  );
+
+  @override
+  Future<Result<void>> votePoll(
+    String teamId,
+    String roomId,
+    String messageId,
+    List<int> options,
+  ) => guard(
+    () => _client.put('${_messagePath(teamId, roomId, messageId)}/vote', {
+      'options': options,
+    }),
+  );
+
+  @override
+  Future<Result<void>> closePoll(
+    String teamId,
+    String roomId,
+    String messageId,
+  ) => guard(
+    () => _client.post(
+      '${_messagePath(teamId, roomId, messageId)}/close-poll',
+      const {},
+    ),
+  );
+
+  @override
+  Stream<ChatMessage?> watchMessage(
+    String teamId,
+    String roomId,
+    String messageId,
+  ) => _shared.get(
+    'message/$teamId/$roomId/$messageId',
+    () =>
+        countedDocSnapshots(
+          _messages(teamId, roomId).doc(messageId),
+          'chatPoll',
+        ).map(
+          (d) =>
+              d.exists ? ChatMessage.fromMap(d.id, plainData(d.data())) : null,
+        ),
+  );
 
   @override
   Future<Result<Uint8List>> downloadAttachment(ChatAttachment attachment) =>

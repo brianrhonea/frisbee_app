@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/roster_player.dart';
+import '../../core/themes/theme.dart';
 
 enum PlayerSort { name, position }
 
@@ -31,6 +32,8 @@ class JerseyNumber extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => CircleAvatar(
+    backgroundColor: AppColors.of(context).accentSoft,
+    foregroundColor: AppColors.of(context).accentInk,
     child: Padding(
       padding: const EdgeInsets.all(4),
       child: FittedBox(

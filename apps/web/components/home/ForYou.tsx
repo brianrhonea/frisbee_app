@@ -1,9 +1,11 @@
 "use client";
-// Home's "For you" and "Your teams" feeds (the app's HomeScreen _Tab.forYou
-// and _Tab.teams), and the new-member checklist For you shows while empty.
+// Home's "Following" (once For you) and "Your teams" feeds (the app's
+// HomeScreen tabs), and the new-member checklist they show while empty.
+import { limit } from "firebase/firestore";
 import Link from "next/link";
 import { PostCard } from "@/components/PostCard";
 import { TeamPostCard } from "@/components/team/TeamPostCard";
+import { useLiveQuery } from "@/lib/live";
 import { useMyTeams } from "../useMyTeams";
 import { StartOrJoinButton } from "./StartOrJoin";
 import { FeedPager } from "./useInfiniteFeed";
@@ -74,7 +76,7 @@ export function ForYouFeed({
       <p className="muted small">
         No posts yet. News you follow shows up here.{" "}
         <button type="button" className="link-button" onClick={onCommunity}>
-          See the community
+          See everyone&apos;s posts
         </button>{" "}
         or <Link href="/explore">find people and teams to follow</Link>.
       </p>
@@ -82,17 +84,28 @@ export function ForYouFeed({
   );
 }
 
-/** Every post of the member's teams and groups, newest first (the app's "Your teams" tab). */
-export function TeamsFeed({ uid }: { uid: string }) {
+/**
+ * Every post of the member's teams and groups, newest first (the app's
+ * "Your teams" tab, Home's first). Without a team yet, the new-member
+ * checklist, as this is the tab a new member lands on.
+ */
+export function TeamsFeed({ uid, needsUsername }: { uid: string; needsUsername: boolean }) {
   const teams = useMyTeams(uid);
   const feed = useForYou(uid, teams.data ?? (teams.error ? [] : undefined), noUserPages, { teamsOnly: true });
+  const noTeam = teams.data?.length === 0;
+  // Whether they follow anything yet, for the checklist (one document is enough).
+  const follows = useLiveQuery(noTeam ? `users/${uid}/follows` : null, [limit(1)], `${uid}:any`);
 
   if (feed.items.length > 0) return <FeedList feed={feed} busy={false} error={false} />;
   if (!feed.loaded) return loading;
-  if ((teams.data ?? []).length === 0) return <JoinCard />;
+  if (noTeam) {
+    if (follows.data === undefined && !follows.error) return loading;
+    const steps = onboardingSteps({ needsUsername, onTeam: false, followsAnything: (follows.data ?? []).length > 0 });
+    return <GetStarted steps={steps} />;
+  }
   return (
     <div className="card">
-      <p className="muted small">No team posts yet. News your teams and groups post shows up here.</p>
+      <p className="muted small">No team posts yet. News your teams and communities post shows up here.</p>
     </div>
   );
 }
@@ -103,9 +116,9 @@ function JoinCard() {
     <div className="card promo-card join-card">
       <small>No team yet</small>
       <b>Join your team.</b>
-      <p>Get the schedule, playbook and stats your team shares. Ask a coach for the invite code, find a pickup group, or start your own.</p>
+      <p>Get the schedule, playbook and stats your team shares. Ask a coach for the invite code, find a pickup community, or start your own.</p>
       <div className="join-card-actions">
-        <StartOrJoinButton className="btn btn-amber btn-small" join>
+        <StartOrJoinButton className="btn btn-primary btn-small" join>
           Join with code
         </StartOrJoinButton>
         <Link className="btn btn-small" href="/explore?only=groups">
@@ -135,7 +148,7 @@ export function onboardingSteps({ needsUsername, onTeam, followsAnything }: { ne
   return [
     { id: "username", label: "Pick a username", done: !needsUsername },
     { id: "join", label: "Join or create a team", done: onTeam },
-    { id: "find", label: "Find a team or group near you", done: onTeam },
+    { id: "find", label: "Find a team or community near you", done: onTeam },
     { id: "follow", label: "Follow people", done: followsAnything },
   ];
 }

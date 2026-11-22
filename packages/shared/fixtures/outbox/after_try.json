@@ -1,0 +1,59 @@
+{
+  "about": "afterTry(job attempts 2, failure, now)",
+  "cases": [
+    {
+      "now": "2026-11-16T12:00:00.000Z",
+      "attempts": 2,
+      "failure": null,
+      "message": "Removed from the team.",
+      "result": {
+        "done": true
+      }
+    },
+    {
+      "now": "2026-11-16T12:00:00.000Z",
+      "attempts": 2,
+      "failure": "network",
+      "message": "Removed from the team.",
+      "result": {
+        "state": "waiting",
+        "attempts": 2,
+        "nextTryAt": null,
+        "error": null
+      }
+    },
+    {
+      "now": "2026-11-16T12:00:00.000Z",
+      "attempts": 2,
+      "failure": "retry",
+      "message": "Removed from the team.",
+      "result": {
+        "state": "waiting",
+        "attempts": 3,
+        "nextTryAt": "2026-11-16T12:00:30.000Z",
+        "error": null
+      }
+    },
+    {
+      "now": "2026-11-16T12:00:00.000Z",
+      "attempts": 2,
+      "failure": "permanent",
+      "message": "Removed from the team.",
+      "result": {
+        "state": "failed",
+        "attempts": 3,
+        "nextTryAt": null,
+        "error": "Removed from the team."
+      }
+    },
+    {
+      "now": "2026-11-16T12:00:00.000Z",
+      "attempts": 2,
+      "failure": "sent",
+      "message": "Removed from the team.",
+      "result": {
+        "done": true
+      }
+    }
+  ]
+}

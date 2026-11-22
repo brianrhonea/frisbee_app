@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { createVideoRequestSchema, editVideoRequestSchema, formatVideoBytes, saveVideoFolderRequestSchema, videoFileFormat, youtubeIdFrom } from "../src/videos.js";
+import {
+  createVideoRequestSchema,
+  editVideoRequestSchema,
+  formatVideoBytes,
+  formatVideoTime,
+  isVideoNote,
+  saveVideoFolderRequestSchema,
+  splitVideoComments,
+  tagVideoEventRequestSchema,
+  videoCommentRequestSchema,
+  videoFileFormat,
+  videoNoteTime,
+  youtubeIdFrom,
+} from "../src/videos.js";
 
 const id = "dQw4w9WgXcQ";
 
@@ -58,5 +71,51 @@ describe("video requests", () => {
     expect(formatVideoBytes(1.25 * 1024 * 1024 * 1024)).toBe("1.3 GB");
     expect(videoFileFormat("game.mkv")).toBe("MKV");
     expect(videoFileFormat("game")).toBe("Video");
+  });
+});
+
+describe("notes, clips and comments (F4, F5)", () => {
+  it("takes a comment, a note at a time, or a clip with an end after its start", () => {
+    expect(videoCommentRequestSchema.parse({ body: "  Nice huck " })).toEqual({ body: "Nice huck" });
+    expect(videoCommentRequestSchema.parse({ body: "Mark", atMs: 83_000 })).toEqual({ body: "Mark", atMs: 83_000 });
+    expect(videoCommentRequestSchema.parse({ body: "Zone", atMs: 1000, endMs: 9000 }).endMs).toBe(9000);
+    expect(videoCommentRequestSchema.safeParse({ body: "   " }).success).toBe(false);
+    expect(videoCommentRequestSchema.safeParse({ body: "x".repeat(1001) }).success).toBe(false);
+    expect(videoCommentRequestSchema.safeParse({ body: "x", atMs: -1 }).success).toBe(false);
+    expect(videoCommentRequestSchema.safeParse({ body: "x", atMs: 1.5 }).success).toBe(false);
+    expect(videoCommentRequestSchema.safeParse({ body: "x", atMs: 24 * 3600 * 1000 + 1 }).success).toBe(false);
+    expect(videoCommentRequestSchema.safeParse({ body: "x", endMs: 5 }).success).toBe(false);
+    expect(videoCommentRequestSchema.safeParse({ body: "x", atMs: 5, endMs: 5 }).success).toBe(false);
+    expect(videoCommentRequestSchema.safeParse({ body: "x", authorId: "me" }).success).toBe(false);
+  });
+
+  it("tags an event, or untags with null", () => {
+    expect(tagVideoEventRequestSchema.parse({ eventId: "e1" })).toEqual({ eventId: "e1" });
+    expect(tagVideoEventRequestSchema.parse({ eventId: null })).toEqual({ eventId: null });
+    expect(tagVideoEventRequestSchema.safeParse({ eventId: "" }).success).toBe(false);
+    expect(tagVideoEventRequestSchema.safeParse({}).success).toBe(false);
+  });
+
+  it("formats times as the app does", () => {
+    expect(formatVideoTime(0)).toBe("0:00");
+    expect(formatVideoTime(7_900)).toBe("0:07");
+    expect(formatVideoTime(83_000)).toBe("1:23");
+    expect(formatVideoTime(3_723_000)).toBe("1:02:03");
+    expect(videoNoteTime({ atMs: 83_000 })).toBe("1:23");
+    expect(videoNoteTime({ atMs: 83_000, endMs: 100_000 })).toBe("1:23–1:40");
+  });
+
+  it("lists notes by time and comments oldest first", () => {
+    const all = [
+      { id: "c2", body: "b", createdAt: "2026-11-02T00:00:00Z" },
+      { id: "n2", body: "late", atMs: 9000, createdAt: "2026-11-01T00:00:00Z" },
+      { id: "c1", body: "a", createdAt: "2026-11-01T00:00:00Z" },
+      { id: "n1", body: "early", atMs: 1000, createdAt: "2026-11-03T00:00:00Z" },
+      { id: "c3", body: "unsaved" },
+    ];
+    const { notes, comments } = splitVideoComments(all);
+    expect(notes.map((c) => c.id)).toEqual(["n1", "n2"]);
+    expect(comments.map((c) => c.id)).toEqual(["c1", "c2", "c3"]);
+    expect(isVideoNote({ atMs: 0 })).toBe(true);
   });
 });

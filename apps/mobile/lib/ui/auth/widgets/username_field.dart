@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/username.dart';
+import '../../core/themes/theme.dart';
 import '../view_models/username_checker.dart';
 
 /// The username box: an "@" in front, and whether it's free as you type.
@@ -27,6 +28,7 @@ class UsernameField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final c = AppColors.of(context);
     return ListenableBuilder(
       listenable: checker,
       builder: (context, _) {
@@ -51,7 +53,9 @@ class UsernameField extends StatelessWidget {
                 : status == UsernameStatus.empty
                 ? hint
                 : null,
-            helperStyle: ok ? TextStyle(color: colors.primary) : null,
+            helperStyle: ok
+                ? TextStyle(color: c.accent, fontWeight: FontWeight.w600)
+                : null,
             errorText: switch (status) {
               UsernameStatus.invalid ||
               UsernameStatus.taken ||
@@ -68,7 +72,7 @@ class UsernameField extends StatelessWidget {
               ),
               UsernameStatus.available => Icon(
                 Icons.check_circle,
-                color: colors.primary,
+                color: c.accent,
               ),
               UsernameStatus.taken || UsernameStatus.invalid => Icon(
                 Icons.error_outline,

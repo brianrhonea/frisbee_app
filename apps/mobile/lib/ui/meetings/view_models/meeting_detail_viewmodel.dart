@@ -7,7 +7,9 @@ import '../../../data/repositories/meeting/meeting_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
 import '../../../domain/models/meeting.dart';
 import '../../../domain/models/team.dart';
+import '../../../domain/models/team_event.dart';
 import '../../../utils/command.dart';
+import '../../../utils/result.dart';
 
 /// Backs the meeting page: details, who's invited and RSVPs.
 class MeetingDetailViewModel extends ChangeNotifier {
@@ -22,6 +24,7 @@ class MeetingDetailViewModel extends ChangeNotifier {
     setRsvp = Command1<void, MeetingRsvp?>(
       (a) => _meetings.setRsvp(teamId, meetingId, uid, a),
     );
+    saveNote = Command1<void, String>(_saveNote);
     deleteMeeting = Command0<void>(
       () => _meetings.deleteMeeting(teamId, meetingId),
     );
@@ -45,6 +48,9 @@ class MeetingDetailViewModel extends ChangeNotifier {
   late final List<StreamSubscription<Object?>> _subs;
 
   late final Command1<void, MeetingRsvp?> setRsvp;
+
+  /// Saves the user's note on their answer (empty removes it).
+  late final Command1<void, String> saveNote;
   late final Command0<void> deleteMeeting;
 
   TeamMeeting? _meeting;
@@ -64,6 +70,33 @@ class MeetingDetailViewModel extends ChangeNotifier {
   bool get canEdit => _team?.has(uid, TeamPermission.manageEvents) ?? false;
 
   MeetingRsvp? get myRsvp => _meeting?.rsvpOf(uid);
+
+  /// The user's note on their answer; empty when none.
+  String get myNote => _meeting?.noteOf(uid) ?? '';
+
+  Future<Result<void>> _saveNote(String raw) async {
+    if (myRsvp == null) {
+      return Result.error(Exception('Answer first, then add a note.'));
+    }
+    final note = cleanRsvpNote(raw);
+    if (note.length > rsvpNoteMax) {
+      return Result.error(
+        Exception('Keep the note under $rsvpNoteMax characters.'),
+      );
+    }
+    if (note == myNote) return const Result.ok(null);
+    return _meetings.setRsvpNote(teamId, meetingId, uid, note);
+  }
+
+  /// The team's name, for the meeting's header.
+  String? get teamName => _team?.name;
+
+  /// The user hasn't answered and the meeting hasn't happened yet.
+  bool get needsRsvp {
+    final m = _meeting;
+    if (m == null || m.isEnded || myRsvp != null) return false;
+    return (m.endsAt ?? m.startsAt).isAfter(DateTime.now());
+  }
 
   /// Whether the user waits for an admin before joining.
   bool get needsApproval => switch ((_meeting, _team)) {
@@ -85,6 +118,19 @@ class MeetingDetailViewModel extends ChangeNotifier {
         a: _names(
           (_meeting?.responders(a) ?? const []).where(invited.contains),
         ),
+    };
+  }
+
+  /// Invitees who gave each answer, with their notes, by name.
+  Map<MeetingRsvp, List<Responder>> get responders {
+    final m = _meeting;
+    final invited = _invited;
+    return {
+      for (final a in MeetingRsvp.values)
+        a: sortedResponders([
+          for (final u in m?.responders(a) ?? const <String>[])
+            if (invited.contains(u)) (name: nameOf(u), note: m!.noteOf(u)),
+        ]),
     };
   }
 
@@ -112,6 +158,7 @@ class MeetingDetailViewModel extends ChangeNotifier {
       s.cancel();
     }
     setRsvp.dispose();
+    saveNote.dispose();
     deleteMeeting.dispose();
     super.dispose();
   }

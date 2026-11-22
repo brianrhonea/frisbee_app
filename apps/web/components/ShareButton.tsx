@@ -7,6 +7,9 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 /** A post's address on this site, for sharing outside Stall 10. */
 export const postUrl = (id: string) => new URL(`/posts/${encodeURIComponent(id)}`, siteUrl).toString();
 
+/** A hosted tournament or league's public page, for sharing (the app shares the same link). */
+export const tournamentUrl = (id: string) => new URL(`/tournaments/${encodeURIComponent(id)}`, siteUrl).toString();
+
 /**
  * Shares [url] with the device's share sheet where there is one (phones,
  * some desktops), otherwise copies it.

@@ -161,9 +161,11 @@ function RosterPlayers() {
             </thead>
             <tbody>
               {shown.map((p) => (
-                <tr key={p.id}>
-                  <td className="num">{p.number ?? "–"}</td>
-                  <td>{p.name}</td>
+                <tr key={p.id} className={p.userId === access.uid ? "st-you" : undefined}>
+                  <td className="num st-jersey">{p.number ?? "–"}</td>
+                  <td>
+                    <b>{p.name}</b>
+                  </td>
                   <td>{positionLabel[p.position]}</td>
                   <td className="small">
                     {p.userId === access.uid ? "You" : p.userId ? memberName(p.userId) : <span className="muted">None</span>}

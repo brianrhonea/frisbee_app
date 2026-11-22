@@ -257,6 +257,23 @@ void main() {
       voiceRepository: voice,
     );
 
+    test('rooms with messages the user has not read are unread until '
+        'read', () async {
+      joinAs(TeamRole.player);
+      chats.stampRoom('general', DateTime(2026, 11, 1));
+      final vm = load();
+      await pumpEventQueue();
+      final general = vm.rooms.firstWhere((r) => r.id == 'general');
+      expect(vm.isUnread(general), isTrue);
+      await chats.markRead('t1', 'general', 'u1');
+      await pumpEventQueue();
+      expect(
+        vm.isUnread(vm.rooms.firstWhere((r) => r.id == 'general')),
+        isFalse,
+      );
+      vm.dispose();
+    });
+
     test('players see only rooms they can read', () async {
       joinAs(TeamRole.player);
       final vm = load();
@@ -376,6 +393,37 @@ void main() {
       authRepository: auth,
       filePicker: picker,
     );
+
+    test('marks the room read when it opens and as messages arrive, '
+        'not before it has any', () async {
+      joinAs(TeamRole.player);
+      final vm = load('general');
+      await pumpEventQueue();
+      expect(chats.marked, isEmpty, reason: 'no message yet');
+      chats
+        ..stampRoom('general', DateTime(2026, 11, 1))
+        ..emit();
+      await pumpEventQueue();
+      expect(chats.marked, [('t1', 'general')]);
+      chats.emit();
+      await pumpEventQueue();
+      expect(chats.marked, hasLength(1), reason: 'nothing new');
+      chats
+        ..stampRoom('general', DateTime(2026, 11, 2))
+        ..emit();
+      await pumpEventQueue();
+      expect(chats.marked, hasLength(2));
+      vm.dispose();
+    });
+
+    test("never marks a room the user can't read", () async {
+      joinAs(TeamRole.player);
+      chats.stampRoom('caps', DateTime(2026, 11, 1));
+      final vm = load('caps');
+      await pumpEventQueue();
+      expect(chats.marked, isEmpty);
+      vm.dispose();
+    });
 
     test("mutes and unmutes the room's notifications", () async {
       joinAs(TeamRole.player);

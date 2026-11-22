@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../utils/password_policy.dart';
+import '../../core/themes/theme.dart';
 
 /// Under a new password: a strength bar and the requirements, ticked as
 /// they're met.
@@ -13,17 +14,12 @@ class PasswordStrengthMeter extends StatelessWidget {
   Widget build(BuildContext context) => ValueListenableBuilder(
     valueListenable: controller,
     builder: (context, value, _) {
-      final theme = Theme.of(context);
-      final colors = theme.colorScheme;
+      final c = AppColors.of(context);
       final password = value.text;
-      final strength = PasswordPolicy.strength(password);
-      final color = switch (strength) {
-        PasswordStrength.weak => colors.error,
-        PasswordStrength.fair => Colors.orange,
-        PasswordStrength.good => Colors.lightGreen.shade700,
-        PasswordStrength.strong => Colors.green.shade700,
-      };
-      final small = theme.textTheme.bodySmall;
+      final strength = PasswordStrength.values.indexOf(
+        PasswordPolicy.strength(password),
+      );
+      final small = TextStyle(fontSize: 12, color: c.muted);
       return Padding(
         padding: const EdgeInsets.fromLTRB(4, 6, 4, 0),
         child: Column(
@@ -32,22 +28,24 @@ class PasswordStrengthMeter extends StatelessWidget {
             if (password.isNotEmpty)
               Row(
                 children: [
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(2),
-                      child: LinearProgressIndicator(
-                        value: (strength.index + 1) / 4,
-                        minHeight: 4,
-                        color: color,
-                        backgroundColor: colors.surfaceContainerHighest,
+                  // Four segments, filled up to the strength.
+                  for (var i = 0; i < PasswordStrength.values.length; i++) ...[
+                    if (i > 0) const SizedBox(width: 4),
+                    Expanded(
+                      child: Container(
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: i <= strength ? c.accent : c.border2,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                   const SizedBox(width: 10),
                   Text(
-                    strength.label,
-                    style: small?.copyWith(
-                      color: color,
+                    PasswordStrength.values[strength].label,
+                    style: small.copyWith(
+                      color: strength >= 2 ? c.accentInk : c.ink2,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -64,7 +62,7 @@ class PasswordStrengthMeter extends StatelessWidget {
                       Icon(
                         r.met ? Icons.check_circle : Icons.circle_outlined,
                         size: 14,
-                        color: r.met ? Colors.green.shade700 : colors.outline,
+                        color: r.met ? c.accent : c.muted,
                       ),
                       const SizedBox(width: 4),
                       Text(r.label, style: small),

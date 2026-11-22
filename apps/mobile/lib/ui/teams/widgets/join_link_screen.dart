@@ -114,6 +114,14 @@ class _JoinLinkScreenState extends State<JoinLinkScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
+                      // An invitation waiting on the user: amber, the
+                      // design's "yours to do" colour.
+                      style: vm.alreadyMember
+                          ? null
+                          : FilledButton.styleFrom(
+                              backgroundColor: c.highlight,
+                              foregroundColor: c.onHighlight,
+                            ),
                       onPressed: vm.join.running ? null : vm.join.execute,
                       child: Text(
                         vm.alreadyMember

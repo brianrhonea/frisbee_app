@@ -7,9 +7,11 @@ import '../../../data/repositories/calendar/calendar_repository.dart';
 import '../../../domain/models/calendar.dart';
 import '../../../data/repositories/event/event_repository.dart';
 import '../../../data/repositories/meeting/meeting_repository.dart';
+import '../../../data/repositories/schedule/schedule_settings_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
 import '../../../domain/models/schedule_entry.dart';
 import '../../../domain/models/team.dart';
+import '../../../domain/models/team_event.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 import 'my_schedule.dart';
@@ -24,8 +26,45 @@ enum ScheduleFilter {
   final String label;
 }
 
+/// How the Schedule tab shows its days: a week strip with every day
+/// listed, or a month grid with the picked day's events below.
+enum ScheduleView {
+  week('Week'),
+  month('Month');
+
+  const ScheduleView(this.label);
+  final String label;
+}
+
+/// What a day in the month grid marks: team events (blue), personal ones
+/// (magenta), and one still to answer (amber).
+typedef DayMarks = ({bool team, bool personal, bool needsRsvp});
+
+/// The days of [month]'s grid, Monday first: from the Monday on or before
+/// the 1st to the Sunday on or after the last day (`monthGrid` in
+/// packages/shared, which the website uses).
+List<DateTime> monthGrid(DateTime month) {
+  final first = DateTime(month.year, month.month);
+  final last = DateTime(month.year, month.month + 1, 0);
+  final start = DateTime(
+    first.year,
+    first.month,
+    first.day - (first.weekday - 1),
+  );
+  final end = DateTime(last.year, last.month, last.day + (7 - last.weekday));
+  return [
+    for (
+      var d = start;
+      !d.isAfter(end);
+      d = DateTime(d.year, d.month, d.day + 1)
+    )
+      d,
+  ];
+}
+
 /// Schedule tab: the user's personal and team events a week at a time,
-/// the full-size version of Home's weekly view.
+/// the full-size version of Home's weekly view, or a month at a time
+/// ([ScheduleView]; the choice is kept on the device).
 class ScheduleViewModel extends ChangeNotifier {
   ScheduleViewModel({
     required AuthRepository authRepository,
@@ -33,10 +72,12 @@ class ScheduleViewModel extends ChangeNotifier {
     required EventRepository eventRepository,
     MeetingRepository? meetingRepository,
     CalendarRepository? calendarRepository,
+    ScheduleSettingsRepository? settingsRepository,
     DateTime Function()? clock,
   }) : _clock = clock ?? DateTime.now,
        _events = eventRepository,
        _calendarRepo = calendarRepository,
+       _settings = settingsRepository ?? ScheduleSettingsRepositoryMemory(),
        _uid = authRepository.currentUser?.uid {
     deleteEvent = Command1<void, ScheduleEntry>(_delete);
     _feed = MySchedule(
@@ -49,7 +90,94 @@ class ScheduleViewModel extends ChangeNotifier {
     )..addListener(notifyListeners);
     _weekStart = today;
     _selectedDay = today;
+    _monthStart = DateTime(today.year, today.month);
     _loadCalendars();
+    _restoreView();
+  }
+
+  final ScheduleSettingsRepository _settings;
+
+  ScheduleView _view = ScheduleView.week;
+  ScheduleView get view => _view;
+
+  /// Switches between the week and the month, keeping the picked day in
+  /// view, and remembers the choice on this device.
+  void setView(ScheduleView view) {
+    if (view == _view) return;
+    _view = view;
+    _showDay(_selectedDay);
+    notifyListeners();
+    _settings.saveView(view.name);
+  }
+
+  Future<void> _restoreView() async {
+    final saved = await _settings.view();
+    if (_disposed || saved == null) return;
+    final view = ScheduleView.values.where((v) => v.name == saved).firstOrNull;
+    if (view == null || view == _view) return;
+    _view = view;
+    _showDay(_selectedDay);
+    notifyListeners();
+  }
+
+  /// Brings [day]'s week or month into view, for the current [view].
+  void _showDay(DateTime day) {
+    if (_view == ScheduleView.month) {
+      _monthStart = DateTime(day.year, day.month);
+    } else if (day.isBefore(_weekStart) ||
+        !day.isBefore(_weekStart.add(const Duration(days: 7)))) {
+      _weekStart = day;
+    }
+    _loadCalendars();
+  }
+
+  late DateTime _monthStart;
+
+  /// The first of the month shown in the month view.
+  DateTime get monthStart => _monthStart;
+
+  /// The month's grid, Monday first ([monthGrid]).
+  List<DateTime> get monthDays => monthGrid(_monthStart);
+
+  bool get isCurrentMonth =>
+      _monthStart.year == today.year && _monthStart.month == today.month;
+
+  void nextMonth() => _moveMonth(1);
+
+  void previousMonth() => _moveMonth(-1);
+
+  void _moveMonth(int by) {
+    _monthStart = DateTime(_monthStart.year, _monthStart.month + by);
+    // Today when it's in the month, otherwise the 1st.
+    _selectedDay = isCurrentMonth ? today : _monthStart;
+    _loadCalendars();
+    notifyListeners();
+  }
+
+  /// Whether today is already in view (the week starting today, or this
+  /// month with today picked), so the Today button has nothing to do.
+  bool get showsToday => switch (_view) {
+    ScheduleView.week => isCurrentWeek,
+    ScheduleView.month => isCurrentMonth && _selectedDay == today,
+  };
+
+  /// Number of events in the month shown that pass the filter.
+  int get monthCount {
+    var n = 0;
+    for (final d in monthDays) {
+      if (d.month == _monthStart.month) n += eventsOn(d).length;
+    }
+    return n;
+  }
+
+  /// The dots on [day] in the month grid.
+  DayMarks marksOn(DateTime day) {
+    final events = eventsOn(day);
+    return (
+      team: events.any((e) => e.team != null),
+      personal: events.any((e) => e.team == null),
+      needsRsvp: events.any(needsRsvp),
+    );
   }
 
   final DateTime Function() _clock;
@@ -149,6 +277,12 @@ class ScheduleViewModel extends ChangeNotifier {
 
   void selectDay(DateTime day) {
     _selectedDay = DateTime(day.year, day.month, day.day);
+    // A day from the next or previous month in the grid opens that month.
+    if (_view == ScheduleView.month &&
+        (day.year != _monthStart.year || day.month != _monthStart.month)) {
+      _monthStart = DateTime(day.year, day.month);
+      _loadCalendars();
+    }
     notifyListeners();
   }
 
@@ -156,10 +290,12 @@ class ScheduleViewModel extends ChangeNotifier {
 
   void previousWeek() => _moveWeek(-7);
 
-  /// Back to the week starting today.
+  /// Back to the week starting today, or this month with today picked.
   void goToToday() {
     _weekStart = today;
     _selectedDay = today;
+    _monthStart = DateTime(today.year, today.month);
+    _loadCalendars();
     notifyListeners();
   }
 
@@ -174,19 +310,40 @@ class ScheduleViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// The user's other calendars' events, around the week shown.
-  void _loadCalendars() => _feed.loadCalendars(
-    _weekStart.subtract(MySchedule.lookBack),
-    _weekStart.add(MySchedule.calendarSpan),
-  );
+  /// Where the other calendars' events are read from: around the week
+  /// shown, or the month's whole grid.
+  (DateTime, DateTime) get _calendarRange {
+    if (_view == ScheduleView.month) {
+      final grid = monthDays;
+      final last = grid.last;
+      return (grid.first, DateTime(last.year, last.month, last.day + 1));
+    }
+    return (
+      _weekStart.subtract(MySchedule.lookBack),
+      _weekStart.add(MySchedule.calendarSpan),
+    );
+  }
+
+  /// The user's other calendars' events, around the week or month shown.
+  void _loadCalendars() {
+    final (from, to) = _calendarRange;
+    _feed.loadCalendars(from, to);
+  }
 
   /// Reloads calendars, their events and invites (pull to refresh, and
   /// after an event on one is added, changed or deleted).
-  Future<void> refreshCalendars() => _feed.loadCalendars(
-    _weekStart.subtract(MySchedule.lookBack),
-    _weekStart.add(MySchedule.calendarSpan),
-    force: true,
-  );
+  Future<void> refreshCalendars() {
+    final (from, to) = _calendarRange;
+    return _feed.loadCalendars(from, to, force: true);
+  }
+
+  /// Whether calendars are on (they need the API): the Calendars card
+  /// and button show only then.
+  bool get hasCalendars => _calendarRepo != null;
+
+  /// The calendars the user is on (their own and shared ones), for the
+  /// Calendars card.
+  List<CalendarInfo> get calendars => _feed.calendars;
 
   /// Calendar invites waiting for the user.
   List<CalendarInvite> get invites => _feed.invites;
@@ -227,6 +384,21 @@ class ScheduleViewModel extends ChangeNotifier {
 
   /// Number of events this week that pass the filter.
   int get weekCount => days.fold(0, (n, d) => n + eventsOn(d).length);
+
+  /// The user's answer to a team event or meeting; null for personal and
+  /// calendar events, which have no RSVPs.
+  RsvpStatus? myRsvp(ScheduleEntry e) {
+    final uid = _uid;
+    if (e.team == null || uid == null) return null;
+    return e.event.rsvpOf(uid);
+  }
+
+  /// A team event or meeting the user hasn't answered that is still ahead.
+  bool needsRsvp(ScheduleEntry e) {
+    if (e.team == null || _uid == null || myRsvp(e) != null) return false;
+    final end = e.event.endsAt ?? e.event.startsAt;
+    return end.isAfter(_clock());
+  }
 
   @override
   void dispose() {

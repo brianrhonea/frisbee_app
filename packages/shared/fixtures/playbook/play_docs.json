@@ -1,0 +1,174 @@
+{
+  "about": "Play.toMap for a plain play, a play with pen strokes and a saved whiteboard: kind and drawings only when set. Each must pass savePlayRequestSchema unchanged.",
+  "cases": [
+    {
+      "id": "static",
+      "doc": {
+        "name": "Static diagram",
+        "category": "offense",
+        "notes": "",
+        "elements": [
+          {
+            "id": "o1",
+            "kind": "offense",
+            "position": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "label": ""
+          }
+        ],
+        "arrows": [],
+        "steps": []
+      }
+    },
+    {
+      "id": "sketched",
+      "doc": {
+        "name": "Play with pen strokes",
+        "category": "endzone",
+        "notes": "",
+        "elements": [
+          {
+            "id": "o1",
+            "kind": "offense",
+            "position": {
+              "x": 0.4,
+              "y": 0.2
+            },
+            "label": "o1"
+          }
+        ],
+        "arrows": [],
+        "steps": [],
+        "drawings": [
+          {
+            "id": "k1",
+            "color": "turf",
+            "points": [
+              {
+                "x": 0.1,
+                "y": 0.1
+              },
+              {
+                "x": 0.2,
+                "y": 0.25
+              },
+              {
+                "x": 0.4,
+                "y": 0.3
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "board",
+      "doc": {
+        "name": "Zone talk",
+        "category": "offense",
+        "notes": "",
+        "elements": [
+          {
+            "id": "o1",
+            "kind": "offense",
+            "position": {
+              "x": 0.3,
+              "y": 0.5
+            },
+            "label": "o1"
+          },
+          {
+            "id": "d1",
+            "kind": "defense",
+            "position": {
+              "x": 0.35,
+              "y": 0.52
+            },
+            "label": "d1"
+          },
+          {
+            "id": "disc",
+            "kind": "disc",
+            "position": {
+              "x": 0.3,
+              "y": 0.5
+            },
+            "label": "disc"
+          },
+          {
+            "id": "cone",
+            "kind": "cone",
+            "position": {
+              "x": 0.9,
+              "y": 0.1
+            },
+            "label": "cone"
+          }
+        ],
+        "arrows": [],
+        "steps": [],
+        "kind": "whiteboard",
+        "drawings": [
+          {
+            "id": "k0",
+            "color": "ink",
+            "points": [
+              {
+                "x": 0,
+                "y": 0.6
+              },
+              {
+                "x": 0.05,
+                "y": 0.9
+              }
+            ]
+          },
+          {
+            "id": "k1",
+            "color": "turf",
+            "points": [
+              {
+                "x": 0.1,
+                "y": 0.6
+              },
+              {
+                "x": 0.15000000000000002,
+                "y": 0.9
+              }
+            ]
+          },
+          {
+            "id": "k2",
+            "color": "amber",
+            "points": [
+              {
+                "x": 0.2,
+                "y": 0.6
+              },
+              {
+                "x": 0.25,
+                "y": 0.9
+              }
+            ]
+          },
+          {
+            "id": "k3",
+            "color": "white",
+            "points": [
+              {
+                "x": 0.30000000000000004,
+                "y": 0.6
+              },
+              {
+                "x": 0.35000000000000003,
+                "y": 0.9
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

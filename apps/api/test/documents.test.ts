@@ -1,5 +1,13 @@
 import { readFileSync } from "node:fs";
-import { cleanMemberRoles, createTeamRequestSchema, rolesData, saveRolesRequestSchema } from "@stall10/shared";
+import {
+  cleanMemberGrants,
+  cleanMemberRoles,
+  createTeamRequestSchema,
+  optionalTeamSections,
+  rolesData,
+  saveRolesRequestSchema,
+  sectionOn,
+} from "@stall10/shared";
 import { describe, expect, it } from "vitest";
 import { callerLabel } from "../src/auth.js";
 import { listingFor } from "../src/teams/access.js";
@@ -31,6 +39,37 @@ describe("new team documents match the app (fixtures/team_create.json)", () => {
 const fixture = (name: string) =>
   JSON.parse(readFileSync(new URL(`../../../packages/shared/fixtures/${name}`, import.meta.url), "utf8"));
 
+describe("a new team starts simple", () => {
+  const owner = { uid: "u1", label: "Pat" };
+  const docsFor = (request: object) =>
+    newTeamDocuments("t1", createTeamRequestSchema.parse(request), owner, "<serverTimestamp>");
+
+  it("a team stores Playbook, Videos, Stats and Meetings off", () => {
+    const team = docsFor({ name: "Haze", division: "open", level: "club" })["teams/t1"];
+    expect(team.sections).toEqual({ playbook: false, videos: false, stats: false, meetings: false });
+    for (const s of optionalTeamSections) expect(sectionOn(team, s)).toBe(false);
+  });
+
+  it("the switches stay off the directory listing", () => {
+    expect(docsFor({ name: "Haze", division: "open", level: "club" })["teamDirectory/t1"]).not.toHaveProperty("sections");
+  });
+
+  it("communities and organizations store none (their defaults are unchanged)", () => {
+    for (const kind of ["community", "organization"]) {
+      const team = docsFor({ name: "Pickup", division: "mixed", level: "pickup", kind })["teams/t1"];
+      expect(team).not.toHaveProperty("sections");
+    }
+  });
+
+  it("a team with nothing stored (from before) reads every section as on", () => {
+    for (const s of optionalTeamSections) {
+      expect(sectionOn({}, s)).toBe(true);
+      expect(sectionOn({ sections: {} }, s)).toBe(true);
+      expect(sectionOn({ sections: { [s]: true } }, s)).toBe(true);
+    }
+  });
+});
+
 describe("a team made in a community matches the app (fixtures/team_community_create.json)", () => {
   it("writes the same documents, naming the community", () => {
     const c = fixture("team_community_create.json") as Case & { org: { id: string; name: string } };
@@ -49,11 +88,11 @@ describe("directory listings match the app (fixtures/team_listing.json)", () => 
 });
 
 describe("saved custom roles match the app (fixtures/team_roles.json)", () => {
-  const cases: Array<{ case: string; members: string[]; roles: unknown; memberRoles: unknown; saved: unknown }> =
+  const cases: Array<{ case: string; members: string[]; roles: unknown; memberRoles: unknown; grants?: unknown; saved: unknown }> =
     fixture("team_roles.json");
   it.each(cases)("$case", (c) => {
     const input = saveRolesRequestSchema.parse({ roles: c.roles, memberRoles: c.memberRoles });
     const memberRoles = cleanMemberRoles(input.memberRoles, input.roles, c.members);
-    expect(rolesData(input.roles, memberRoles)).toEqual(c.saved);
+    expect(rolesData(input.roles, memberRoles, cleanMemberGrants(c.grants, c.members))).toEqual(c.saved);
   });
 });

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/stats.dart';
+import '../../core/themes/theme.dart';
+import '../../core/ui/scoreboard.dart' show ScoreText;
 import '../../core/ui/status_views.dart';
 import 'stats_glossary.dart';
 
@@ -155,9 +157,27 @@ class _StatSheetTableState extends State<StatSheetTable> {
         message: 'Stats appear once points are tracked.',
       );
     }
-    final theme = Theme.of(context);
+    final c = AppColors.of(context);
     final rows = _rows;
+    final heading = WidgetStatePropertyAll(c.field);
+    final headingText = TextStyle(
+      fontFamily: appFont,
+      fontSize: 11.5,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 0.4,
+      color: c.muted,
+    );
+    final cellText = TextStyle(
+      fontFamily: appFont,
+      fontSize: 13.5,
+      fontFeatures: tabularFigures,
+      color: c.ink,
+    );
     final names = DataTable(
+      headingRowColor: heading,
+      headingTextStyle: headingText,
+      dataTextStyle: cellText.copyWith(fontWeight: FontWeight.w700),
+      dividerThickness: 1,
       headingRowHeight: _headingHeight,
       dataRowMinHeight: _rowHeight,
       dataRowMaxHeight: _rowHeight,
@@ -181,6 +201,10 @@ class _StatSheetTableState extends State<StatSheetTable> {
       ],
     );
     final numbers = DataTable(
+      headingRowColor: heading,
+      headingTextStyle: headingText,
+      dataTextStyle: cellText,
+      dividerThickness: 1,
       headingRowHeight: _headingHeight,
       dataRowMinHeight: _rowHeight,
       dataRowMaxHeight: _rowHeight,
@@ -201,16 +225,16 @@ class _StatSheetTableState extends State<StatSheetTable> {
         for (final p in rows)
           DataRow(
             cells: [
-              for (final (i, c) in _columns.indexed)
+              for (final (i, col) in _columns.indexed)
                 DataCell(
                   Text(
-                    _fmt(c, p),
+                    _fmt(col, p),
+                    // +/- in turf when it's up; down is plain ink (red is
+                    // only for live games).
                     style: i == 0
-                        ? theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: p.plusMinus < 0
-                                ? theme.colorScheme.error
-                                : theme.colorScheme.primary,
+                        ? cellText.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: p.plusMinus < 0 ? c.ink : c.accent,
                           )
                         : null,
                   ),
@@ -226,9 +250,12 @@ class _StatSheetTableState extends State<StatSheetTable> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Material(
-              elevation: 1,
-              color: theme.colorScheme.surface,
+            // Pinned names: a card-coloured column with a hairline edge.
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: c.card,
+                border: Border(right: BorderSide(color: c.border)),
+              ),
               child: names,
             ),
             Expanded(
@@ -260,19 +287,21 @@ class _TeamEfficiencyBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final c = AppColors.of(context);
     Widget stat(String label, String value, String detail) => Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: theme.textTheme.labelMedium),
           Text(
-            value,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w800,
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: c.muted,
             ),
           ),
-          Text(detail, style: theme.textTheme.bodySmall),
+          ScoreText(value, size: 30),
+          Text(detail, style: TextStyle(fontSize: 12, color: c.muted)),
         ],
       ),
     );
@@ -296,7 +325,10 @@ class _TeamEfficiencyBar extends StatelessWidget {
             ],
           ),
           TextButton.icon(
-            style: TextButton.styleFrom(padding: EdgeInsets.zero),
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              foregroundColor: c.accent,
+            ),
             onPressed: () => showStatsGlossary(context),
             icon: const Icon(Icons.menu_book_outlined, size: 18),
             label: const Text('Stat key: what each column means'),

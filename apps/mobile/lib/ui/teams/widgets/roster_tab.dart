@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/roster_player.dart';
+import '../../../domain/models/team.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
+import '../../core/ui/layout.dart';
+import '../../core/ui/scoreboard.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/team_detail_viewmodel.dart';
 import 'player_dialog.dart';
@@ -50,11 +54,26 @@ class RosterTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = AppColors.of(context);
     final roster = viewModel.visibleRoster;
     final canEdit = viewModel.canEdit;
     final showStatus = viewModel.canSeeRosterStatus;
+    final editing = viewModel.editingLines;
+    final groups = viewModel.lineGroups;
+    Widget card(List<RosterPlayer> players) => Card(
+      margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          for (final (i, p) in players.indexed) ...[
+            if (i > 0) Divider(height: 1, color: c.border),
+            _row(context, p, canEdit: canEdit, showStatus: showStatus),
+          ],
+        ],
+      ),
+    );
     return Scaffold(
-      floatingActionButton: canEdit
+      floatingActionButton: canEdit && !editing
           ? FloatingActionButton.extended(
               heroTag: 'add-player',
               onPressed: () => _edit(context),
@@ -80,8 +99,10 @@ class RosterTab extends StatelessWidget {
                   ),
                 ),
               ),
-            if (showStatus && viewModel.roster.isNotEmpty)
+            if (showStatus && viewModel.roster.isNotEmpty && !editing)
               _PaidCard(viewModel: viewModel),
+            if (viewModel.canEditLines && viewModel.roster.isNotEmpty)
+              _LinesBar(viewModel: viewModel),
             if (viewModel.roster.isEmpty)
               EmptyView(
                 icon: Icons.badge_outlined,
@@ -93,48 +114,178 @@ class RosterTab extends StatelessWidget {
                 padding: EdgeInsets.all(24),
                 child: Center(child: Text('Everyone has paid.')),
               ),
-            for (final (i, p) in roster.indexed) ...[
-              if (i > 0) const Divider(height: 1),
-              ListTile(
-                leading: CircleAvatar(child: Text(p.number?.toString() ?? '–')),
-                title: Text(p.name),
-                subtitle: showStatus
-                    ? Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Wrap(
-                          spacing: 6,
-                          runSpacing: 4,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            Text(p.position.label),
-                            _PaidBadge(
-                              paid: p.paid,
-                              onTap: canEdit
-                                  ? () => viewModel.togglePaid(p)
-                                  : null,
-                            ),
-                          ],
-                        ),
-                      )
-                    : Text(p.position.label),
-                onTap: canEdit ? () => _edit(context, p) : null,
-                trailing: canEdit
-                    ? IconButton(
-                        tooltip: 'Remove',
-                        icon: const Icon(Icons.delete_outline),
-                        onPressed: () => _delete(context, p),
-                      )
-                    : null,
+            // O-line, D-line, Both lines, Unassigned; one list until anyone
+            // has a line (and while editing them).
+            if (groups.isEmpty && roster.isNotEmpty) card(roster),
+            for (final g in groups) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+                child: Eyebrow(
+                  '${g.line?.label ?? RosterLine.unassignedLabel} '
+                  '· ${g.players.length}',
+                ),
               ),
+              card(g.players),
             ],
           ],
         ),
       ),
     );
   }
+
+  /// A player: jersey number on navy, name, their role on the team (for a
+  /// spot linked to a member), position (and paid status). While editing
+  /// lines, the O / D / Both picker takes the place of Remove.
+  Widget _row(
+    BuildContext context,
+    RosterPlayer p, {
+    required bool canEdit,
+    required bool showStatus,
+  }) {
+    final c = AppColors.of(context);
+    final editing = viewModel.editingLines;
+    final team = viewModel.team;
+    final uid = p.userId;
+    final tier = uid == null ? null : team?.roleOf(uid);
+    final roles = uid == null || team == null
+        ? const <String>[]
+        : [for (final r in team.rolesOf(uid)) r.name];
+    final details = Wrap(
+      spacing: 6,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        // Staff tiers stand out as a tag; custom roles follow as text.
+        if (team != null && tier != null && tier != TeamRole.player)
+          Tag(team.roleLabel(tier)),
+        for (final r in roles) Text(r),
+        Text(p.position.label),
+        if (showStatus && !editing)
+          _PaidBadge(
+            paid: p.paid,
+            onTap: canEdit ? () => viewModel.togglePaid(p) : null,
+          ),
+      ],
+    );
+    return ListTile(
+      contentPadding: const EdgeInsets.fromLTRB(14, 4, 4, 4),
+      leading: Container(
+        width: 38,
+        height: 38,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: c.feature,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: ScoreText(
+          p.number?.toString() ?? '–',
+          size: 21,
+          color: c.onFeature,
+        ),
+      ),
+      title: Text(
+        p.name,
+        style: TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: 15,
+          color: c.ink,
+        ),
+      ),
+      subtitle: Padding(padding: const EdgeInsets.only(top: 4), child: details),
+      onTap: canEdit && !editing ? () => _edit(context, p) : null,
+      trailing: editing
+          ? _LinePicker(
+              line: viewModel.lineOf(p),
+              onPick: (l) => viewModel.pickLine(p, l),
+            )
+          : canEdit
+          ? IconButton(
+              tooltip: 'Remove',
+              icon: const Icon(Icons.delete_outline),
+              onPressed: () => _delete(context, p),
+            )
+          : null,
+    );
+  }
 }
 
-/// How many players have paid, with a filter for those who haven't.
+/// "Edit lines" for the team's admins; while editing, Cancel and Save.
+class _LinesBar extends StatelessWidget {
+  const _LinesBar({required this.viewModel});
+
+  final TeamDetailViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = viewModel;
+    final c = AppColors.of(context);
+    return ListenableBuilder(
+      listenable: vm.saveLines,
+      builder: (context, _) {
+        final saving = vm.saveLines.running;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 8, 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  vm.editingLines
+                      ? 'Tap O, D or Both for each player.'
+                      : 'Group the roster into O-line and D-line.',
+                  style: TextStyle(fontSize: 12.5, color: c.muted),
+                ),
+              ),
+              if (vm.editingLines) ...[
+                TextButton(
+                  onPressed: saving ? null : vm.cancelEditingLines,
+                  child: const Text('Cancel'),
+                ),
+                const SizedBox(width: 4),
+                FilledButton(
+                  onPressed: saving ? null : vm.saveLines.execute,
+                  child: Text(saving ? 'Saving…' : 'Save lines'),
+                ),
+              ] else
+                OutlinedButton.icon(
+                  onPressed: vm.startEditingLines,
+                  icon: const Icon(Icons.swap_vert, size: 18),
+                  label: const Text('Edit lines'),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// O / D / Both for one player; tapping the picked one clears it.
+class _LinePicker extends StatelessWidget {
+  const _LinePicker({required this.line, required this.onPick});
+
+  final RosterLine? line;
+  final ValueChanged<RosterLine> onPick;
+
+  @override
+  Widget build(BuildContext context) => SegmentedButton<RosterLine>(
+    segments: [
+      for (final l in RosterLine.values)
+        ButtonSegment(value: l, label: Text(l.short), tooltip: l.label),
+    ],
+    selected: {?line},
+    emptySelectionAllowed: true,
+    showSelectedIcon: false,
+    style: const ButtonStyle(
+      visualDensity: VisualDensity.compact,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    ),
+    // Tapping the picked segment empties the set: that clears it.
+    onSelectionChanged: (picked) =>
+        onPick(picked.isEmpty ? line! : picked.single),
+  );
+}
+
+// How many players have paid, with a filter for those who haven't.
 class _PaidCard extends StatelessWidget {
   const _PaidCard({required this.viewModel});
 

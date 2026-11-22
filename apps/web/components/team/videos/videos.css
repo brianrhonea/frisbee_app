@@ -18,7 +18,7 @@
 .video-card { display: grid; align-content: start; }
 .video-thumb {
   position: relative; display: block; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden;
-  background: var(--field);
+  background: var(--board-2);
 }
 .video-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .video-thumb-file { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: flex-end; padding: 8px; background: var(--accent-soft); }
@@ -28,13 +28,13 @@
 }
 .video-play {
   position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px;
-  border-radius: 50%; background: rgb(0 0 0 / 0.55);
+  border-radius: 50%; background: color-mix(in srgb, var(--board) 80%, transparent);
 }
 .video-play::after {
   content: ""; position: absolute; left: 21px; top: 16px;
-  border-style: solid; border-width: 10px 0 10px 16px; border-color: transparent transparent transparent #fff;
+  border-style: solid; border-width: 10px 0 10px 16px; border-color: transparent transparent transparent var(--on-board);
 }
-.video-thumb:hover .video-play, .video-thumb:focus-visible .video-play { background: rgb(0 0 0 / 0.75); }
+.video-thumb:hover .video-play, .video-thumb:focus-visible .video-play { background: var(--board); }
 .video-card-body { display: flex; align-items: flex-start; gap: 6px; }
 .video-card-text { flex: 1; min-width: 0; }
 .video-card h3 a { color: inherit; text-decoration: none; }
@@ -43,7 +43,70 @@
 .video-move { margin-top: 10px; gap: 10px; }
 
 .video-page { max-width: 960px; }
-.video-frame { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 12px; display: block; background: #000; }
-.video-frame-note { display: grid; place-items: center; color: #fff; padding: 16px; text-align: center; }
+.video-frame { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 12px; display: block; background: var(--board); }
+.video-frame-note { display: grid; place-items: center; color: var(--on-board); padding: 16px; text-align: center; }
 .video-title { font-size: 1.3rem; margin: 0 0 4px; }
 .video-description { white-space: pre-wrap; overflow-wrap: anywhere; margin: 14px 0 0; }
+
+/* The list: rows in one card, each with a 128x72 thumbnail (the app's videos list). */
+.video-list { display: grid; padding: 4px 16px; }
+.video-row { grid-template-columns: 128px minmax(0, 1fr); align-items: start; gap: 14px; padding: 12px 0; }
+.video-row + .video-row { border-top: 1px solid var(--line); }
+.video-row .video-thumb { width: 128px; height: 72px; aspect-ratio: auto; }
+.video-row .video-play { width: 30px; height: 30px; margin: -15px 0 0 -15px; }
+.video-row .video-play::after { left: 11px; top: 8px; border-width: 7px 0 7px 11px; }
+.video-row .video-thumb-file { padding: 4px; }
+.video-row .video-badge { font-size: 0.68rem; padding: 1px 6px; }
+.video-row h3 { margin: 2px 0; font-size: 0.98rem; font-weight: 800; }
+.video-row .video-card-body { min-width: 0; }
+.video-row .video-move { grid-column: 1 / -1; }
+@media (max-width: 420px) {
+  .video-list { padding: 4px 12px; }
+  .video-row { grid-template-columns: 104px minmax(0, 1fr); gap: 10px; }
+  .video-row .video-thumb { width: 104px; height: 58px; }
+}
+
+/* A video's extras (F4-F6): its tagged event, notes and comments (VideoDiscussion). */
+.watch-youtube > div, .watch-youtube iframe { width: 100%; height: 100%; display: block; border: 0; }
+.video-event { display: grid; gap: 8px; margin-top: 14px; }
+.video-event-link {
+  display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: var(--radius-control);
+  background: var(--field); color: var(--ink); text-decoration: none; max-width: 480px;
+}
+.video-event-link:hover { outline: 1px solid var(--accent); }
+.video-event-link > span { display: grid; min-width: 0; }
+.video-event-link b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.video-event-actions { display: flex; gap: 16px; flex-wrap: wrap; }
+.video-event-picker { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 360px; overflow-y: auto; max-width: 480px; }
+.video-event-picker button {
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 6px 10px; text-align: left;
+  border: 1px solid transparent; border-radius: var(--radius-control); background: none; color: var(--ink); font: inherit; cursor: pointer;
+}
+.video-event-picker button:hover { background: var(--field); }
+.video-event-picker button.on { border-color: var(--accent); background: var(--accent-soft); }
+.video-event-picker button > span { display: grid; min-width: 0; }
+.video-notes { display: grid; gap: 10px; }
+.video-notes h2 { font-size: 1.05rem; margin: 0; }
+.video-comments { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.video-comment { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; }
+.video-comment + .video-comment { border-top: 1px solid var(--line); }
+.video-comment-main { min-width: 0; flex: 1; }
+.video-comment-main p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.video-comment-main .text-btn { font-size: inherit; }
+.video-time {
+  flex: none; padding: 3px 10px; border: 0; border-radius: 999px; background: var(--accent-soft); color: var(--accent-ink);
+  font: inherit; font-size: 0.85rem; font-weight: 700; font-variant-numeric: tabular-nums; cursor: pointer;
+}
+.video-time:hover:not(:disabled) { outline: 1px solid var(--accent); }
+.video-time:disabled { cursor: default; }
+.video-marks { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.video-mark {
+  padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--ink);
+  font: inherit; font-size: 0.85rem; font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer;
+}
+.video-mark:hover { border-color: var(--accent); }
+.video-mark.on { background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; }
+.event-videos h3 { font-size: 0.95rem; margin: 12px 0 4px; }
+.event-videos ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.event-videos a { color: var(--accent); font-weight: 600; text-decoration: none; }
+.event-videos a:hover { text-decoration: underline; }

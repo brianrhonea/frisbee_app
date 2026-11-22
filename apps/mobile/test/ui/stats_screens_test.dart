@@ -43,7 +43,7 @@ void main() {
     await phone(tester, StatsTab(viewModel: vm));
     expect(find.text('Fall Classic'), findsOneWidget);
     expect(find.text('vs Alumni scrimmage'), findsOneWidget);
-    expect(find.text('Game / tournament'), findsOneWidget);
+    expect(find.text('Track stats'), findsOneWidget);
 
     await tester.tap(find.text('How stats work'));
     await tester.pumpAndSettle();
@@ -137,7 +137,7 @@ void main() {
       authRepository: FakeAuthRepository(user: testUser),
     );
     await phone(tester, StatsTab(viewModel: vm));
-    await tester.tap(find.text('Game / tournament'));
+    await tester.tap(find.text('Track stats'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('New game'));
     await tester.pumpAndSettle();

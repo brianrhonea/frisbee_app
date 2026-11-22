@@ -83,23 +83,9 @@ class PlayerProfileViewModel extends ChangeNotifier {
         userPostRepository: posts,
         authRepository: authRepository,
       )..addListener(notifyListeners);
-      _subs.add(
-        posts
-            .watchPostsBy(uid)
-            .listen(
-              (p) {
-                _posts = p;
-                actions?.track(p);
-                _postsLoaded = true;
-                notifyListeners();
-              },
-              onError: (Object e) {
-                _postsError = e;
-                _postsLoaded = true;
-                notifyListeners();
-              },
-            ),
-      );
+      // Someone else's: public posts until their profile says this user
+      // may see more (_watchPosts again from _watchProfile).
+      _watchPosts(includePrivate: isMe);
     }
     if (followRepository != null) {
       _subs.add(
@@ -144,6 +130,35 @@ class PlayerProfileViewModel extends ChangeNotifier {
   Object? _error;
   StreamSubscription<PlayerProfile?>? _profileSub;
 
+  StreamSubscription<List<UserPost>>? _postsSub;
+  bool? _postsIncludePrivate;
+
+  /// Watches the player's posts: every one for the user's own profile or a
+  /// private profile they're an accepted follower of (the rules check the
+  /// follow), else public ones only.
+  void _watchPosts({required bool includePrivate}) {
+    final posts = _userPosts;
+    if (posts == null || _postsIncludePrivate == includePrivate) return;
+    _postsIncludePrivate = includePrivate;
+    _postsSub?.cancel();
+    _postsSub = posts
+        .watchPostsBy(uid, includePrivate: includePrivate)
+        .listen(
+          (p) {
+            _posts = p;
+            _postsError = null;
+            actions?.track(p);
+            _postsLoaded = true;
+            notifyListeners();
+          },
+          onError: (Object e) {
+            _postsError = e;
+            _postsLoaded = true;
+            notifyListeners();
+          },
+        );
+  }
+
   void _watchProfile() {
     _profileSub?.cancel();
     _profileSub = _profiles
@@ -152,6 +167,9 @@ class PlayerProfileViewModel extends ChangeNotifier {
           (p) {
             _profile = p;
             _profileLoaded = true;
+            _watchPosts(
+              includePrivate: isMe || (p != null && p.isPrivate && !p.locked),
+            );
             _syncFollow();
             _maybePublish();
             notifyListeners();
@@ -239,11 +257,26 @@ class PlayerProfileViewModel extends ChangeNotifier {
   bool get showsTeams => isMe || visibility.teams;
   bool get showsGames => isMe || visibility.games;
 
-  // Seasons --------------------------------------------------------------
+  // Seasons and teams -----------------------------------------------------
 
-  /// Seasons with stats, newest first.
+  String? _statsTeam;
+
+  /// Which team's numbers show: the Team filter's options and pick.
+  ProfileStatsChoice get statsChoice =>
+      ProfileStatsChoice.of(summary, _statsTeam);
+
+  /// Narrows the numbers and season table to one team; null for all.
+  void selectStatsTeam(String? teamId) {
+    _statsTeam = teamId;
+    notifyListeners();
+  }
+
+  /// Season → totals for the team picked, or every team.
+  Map<String, StatTotals> get seasonTotals => statsChoice.seasons;
+
+  /// Seasons with stats, newest first (for the team picked, if any).
   List<String> get seasons =>
-      summary.seasons.keys.toList()..sort((a, b) => b.compareTo(a));
+      seasonTotals.keys.toList()..sort((a, b) => b.compareTo(a));
 
   String? _season;
 
@@ -255,11 +288,15 @@ class PlayerProfileViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Totals for [season].
+  /// Totals for [season] (and the team picked).
   StatTotals get totals => switch (season) {
-    final s? => summary.seasons[s] ?? const StatTotals(),
-    null => summary.career,
+    final s? => seasonTotals[s] ?? const StatTotals(),
+    null => career,
   };
+
+  /// Every season added up (for the team picked).
+  StatTotals get career =>
+      seasonTotals.values.fold(const StatTotals(), (a, b) => a + b);
 
   TeamKind? _teamKind;
 
@@ -402,6 +439,7 @@ class PlayerProfileViewModel extends ChangeNotifier {
   void _recompute() {
     final teams = <ProfileTeam>[];
     final seasons = <String, StatTotals>{};
+    final teamSeasons = <String, Map<String, StatTotals>>{};
     final games = <ProfileGame>[];
     for (final t in _teams) {
       final mine = t.isCommunity ? null : _mine(t.id);
@@ -425,6 +463,8 @@ class PlayerProfileViewModel extends ChangeNotifier {
         final line = StatTotals.fromPlayer(p);
         final year = '${g.date.year}';
         seasons[year] = (seasons[year] ?? const StatTotals()) + line;
+        final mineByYear = teamSeasons[t.id] ??= {};
+        mineByYear[year] = (mineByYear[year] ?? const StatTotals()) + line;
         games.add(
           ProfileGame(
             teamName: t.name,
@@ -441,6 +481,7 @@ class PlayerProfileViewModel extends ChangeNotifier {
     _live = ProfileSummary(
       teams: teams,
       seasons: seasons,
+      teamSeasons: teamSeasons,
       games: games.take(ProfileSummary.maxGames).toList(),
     );
     _maybePublish();
@@ -453,6 +494,8 @@ class PlayerProfileViewModel extends ChangeNotifier {
     return ProfileSummary(
       teams: v.teams ? _live.teams : const [],
       seasons: v.stats ? _live.seasons : const {},
+      // Says which teams they're on, so only with both shown.
+      teamSeasons: v.stats && v.teams ? _live.teamSeasons : const {},
       games: v.games ? _live.games : const [],
     );
   }
@@ -665,6 +708,7 @@ class PlayerProfileViewModel extends ChangeNotifier {
   void dispose() {
     _publishLater?.cancel();
     _profileSub?.cancel();
+    _postsSub?.cancel();
     _followed?.removeListener(_onFollowChanged);
     if (_watchesAccount) _auth.removeListener(notifyListeners);
     for (final s in [..._subs, ..._rosterSubs.values, ..._gameSubs.values]) {

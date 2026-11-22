@@ -4,16 +4,22 @@
 // throws an ApiError saying why not. The Admin SDK skips the rules, so
 // these are what guard team membership for writes through the API.
 import {
+  cleanMemberGrants,
+  cleanMemberRoles,
   type EditTeamInput,
   type GroupLocation,
+  memberPermsFor,
+  optionalTeamSections,
   roleLimits,
   searchKeywords,
+  type SetTeamSectionsRequest,
   type TeamKind,
   type TeamPermission,
+  teamPermissions,
   teamTiers,
 } from "@stall10/shared";
 import { ApiError } from "../errors.js";
-import type { Data } from "../store.js";
+import { type Data, deleteField } from "../store.js";
 
 // ---- Reading a team doc (no prototype keys: a uid can be "constructor") ----
 
@@ -109,6 +115,7 @@ export function removeMember(t: Data, caller: string, target: string): Data {
   };
   if ("memberRoles" in t) update.memberRoles = without(t.memberRoles);
   if ("memberPerms" in t) update.memberPerms = without(t.memberPerms);
+  if ("memberGrants" in t) update.memberGrants = without(t.memberGrants);
   if ("orgMembers" in t) update.orgMembers = strings(t.orgMembers).filter((u) => u !== target);
   return update;
 }
@@ -170,6 +177,54 @@ export function setStatKeeper(t: Data, caller: string, target: string, on: boole
   return { statKeepers: next };
 }
 
+// ---- setMemberPermissions (API only) ---------------------------------------
+
+/**
+ * The owner sets the permissions [target] has of their own (memberGrants,
+ * the per-person switches; a preset is just a set of them), on top of what
+ * their custom roles give. Only the owner, who holds every permission, so
+ * nobody grants what they don't have; never the owner's own (they have
+ * everything) nor a legacy coach's or captain's (their tier has every
+ * permission). Groups keep no stats. memberPerms is worked out again for
+ * everyone from the stored roles and grants, as a role save does. Turning
+ * Keep stats off also takes away stats access (statKeepers), so the switch
+ * is the whole answer. firestore.rules lets no client write memberGrants.
+ */
+export function setMemberPermissions(t: Data, caller: string, target: string, perms: readonly TeamPermission[]): Data {
+  if (!isOwner(t, caller)) throw denied("Only the owner can change permissions.");
+  if (!isMember(t, target) || !Object.hasOwn(mapOf(t.members), target)) {
+    throw new ApiError("not_found", `They're not in this ${nounOf(t)}.`);
+  }
+  if (target === t.ownerId || roleIn(t, target) === "owner") {
+    throw new ApiError("failed_precondition", "The owner has every permission.");
+  }
+  if (isEditor(t, target)) {
+    throw new ApiError("failed_precondition", "Coaches and captains have every permission. Make them a player first.");
+  }
+  if (isGroup(t) && perms.includes("keepStats")) {
+    throw new ApiError("invalid_argument", `A ${nounOf(t)} doesn't keep stats.`);
+  }
+  const ids = new Set(strings(t.memberIds));
+  const members = Object.keys(mapOf(t.members)).filter((u) => ids.has(u));
+  const grants = cleanMemberGrants(t.memberGrants, members);
+  const mine = teamPermissions.filter((p) => perms.includes(p));
+  if (mine.length > 0) grants[target] = mine;
+  else delete grants[target];
+  const roles: Record<string, { perms: string[] }> = {};
+  for (const [id, r] of Object.entries(mapOf(t.roles))) roles[id] = { perms: strings(own(r, "perms")) };
+  const memberRoles = cleanMemberRoles(
+    Object.fromEntries(Object.entries(mapOf(t.memberRoles)).map(([u, v]) => [u, strings(v)])),
+    roles,
+    members,
+  );
+  const update: Data = { memberGrants: grants, memberPerms: memberPermsFor(memberRoles, roles, grants) };
+  const keepers = strings(t.statKeepers);
+  if (!mine.includes("keepStats") && keepers.includes(target)) {
+    update.statKeepers = keepers.filter((u) => u !== target);
+  }
+  return update;
+}
+
 // ---- transferOwnership -----------------------------------------------------
 
 /** The owner hands the team to another member and becomes a player. */
@@ -209,6 +264,10 @@ export function listingFor(t: Data): Data {
     listing.location = isPrivateGroup(t) ? null : locationOf(t.location);
   }
   if (t.official === true) listing.official = true;
+  // Only when off (setPublicPage): the clients read it to show outsiders the card only.
+  if (kind === "team" && t.publicPage === false) listing.publicPage = false;
+  // Only when on (setAllowJoinRequests): outsiders' "Request to join" reads it.
+  if (kind === "team" && t.allowJoinRequests === true) listing.allowJoinRequests = true;
   listing.keywords = searchKeywords(`${name} ${city}`);
   return listing;
 }
@@ -234,3 +293,64 @@ export function editDetails(t: Data, caller: string, e: EditTeamInput): Data {
   }
   return update;
 }
+
+// ---- setSections ----------------------------------------------------------
+
+/**
+ * setSections(): the owner of a team (not a group or community) switches
+ * its optional sections (Playbook, Videos, Stats, Meetings) on or off.
+ * Only those keys are kept; ones left out keep what they had.
+ */
+export function setSections(t: Data, caller: string, e: SetTeamSectionsRequest): Data {
+  if (isGroup(t)) throw new ApiError("failed_precondition", `A ${nounOf(t)} has no sections to switch.`);
+  if (!isOwner(t, caller)) throw denied("Only the owner can turn sections on or off.");
+  const before = mapOf(t.sections);
+  const sections: Record<string, boolean> = {};
+  for (const s of optionalTeamSections) {
+    const next = e[s] ?? own(before, s);
+    if (typeof next === "boolean") sections[s] = next;
+  }
+  return { sections };
+}
+
+// ---- setPublicPage --------------------------------------------------------
+
+/**
+ * The "Public team page" switch (publicPageOn in packages/shared): an admin
+ * (manageTeam, as editDetails) of a team, not a group (groups use
+ * requiresApproval). Stored only when off; on removes the field, so teams
+ * from before the switch read as public. The listing is rewritten with it
+ * (listingFor), in the same transaction.
+ */
+export function setPublicPage(t: Data, caller: string, on: boolean): Data {
+  if (isGroup(t)) throw new ApiError("failed_precondition", `A ${nounOf(t)} is made private by approving who joins.`);
+  requirePermission(t, caller, "manageTeam", "Only the team's admins can change who sees its page.");
+  return { publicPage: on ? deleteField : false };
+}
+
+// ---- setAllowJoinRequests (API only, F26) -----------------------------------
+
+/**
+ * The "Allow join requests" switch (allowsJoinRequests in packages/shared):
+ * an admin (manageTeam) of a team, not a group (groups use
+ * requiresApproval) nor a league's team (the league makes those). Stored
+ * only when on; off removes the field, so a team takes requests only once
+ * its admins opt in. The listing is rewritten with it (listingFor), in the
+ * same transaction. Turning it off declines the requests waiting (the
+ * service deletes them).
+ */
+export function setAllowJoinRequests(t: Data, caller: string, on: boolean): Data {
+  if (isGroup(t)) throw new ApiError("failed_precondition", `A ${nounOf(t)} takes requests by approving who joins.`);
+  if (typeof t.leagueId === "string" && t.leagueId) {
+    throw new ApiError("failed_precondition", "A league's team takes players through its league.");
+  }
+  requirePermission(t, caller, "manageTeam", "Only the team's admins can change who may ask to join.");
+  return { allowJoinRequests: on ? true : deleteField };
+}
+
+/**
+ * Whether [t] takes join requests now: a group that approves who joins, or
+ * a team with the switch on (takesJoinRequests in packages/shared).
+ */
+export const takesRequests = (t: Data) =>
+  isGroup(t) ? t.requiresApproval === true : t.allowJoinRequests === true && !(typeof t.leagueId === "string" && t.leagueId);

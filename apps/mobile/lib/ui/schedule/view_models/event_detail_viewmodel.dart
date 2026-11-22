@@ -6,9 +6,11 @@ import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/event/event_repository.dart';
 import '../../../data/repositories/group_tournament/group_tournament_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
+import '../../../data/repositories/video/video_repository.dart';
 import '../../../domain/models/group_tournament.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/team_event.dart';
+import '../../../domain/models/team_video.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 
@@ -23,12 +25,15 @@ class EventDetailViewModel extends ChangeNotifier {
     required TeamRepository teamRepository,
     required AuthRepository authRepository,
     GroupTournamentRepository? tournamentRepository,
+    VideoRepository? videoRepository,
   }) : _events = eventRepository,
        _auth = authRepository,
-       _tournaments = tournamentRepository {
+       _tournaments = tournamentRepository,
+       _videoRepo = videoRepository {
     setRsvp = Command1<void, RsvpStatus?>(
       (s) => _events.setRsvp(teamId, eventId, uid, s),
     );
+    saveNote = Command1<void, String>(_saveNote);
     toggleReaction = Command1<void, Reaction>(_toggleReaction);
     vote = Command1<void, String>(_vote);
     deleteEvent = Command0<void>(() => _events.deleteEvent(teamId, eventId));
@@ -42,6 +47,7 @@ class EventDetailViewModel extends ChangeNotifier {
       teamRepository.watchTeam(teamId).listen((t) {
         _team = t;
         _watchTournament();
+        _watchVideos();
         notifyListeners();
       }, onError: _onError),
     ];
@@ -52,8 +58,30 @@ class EventDetailViewModel extends ChangeNotifier {
   final EventRepository _events;
   final AuthRepository _auth;
   final GroupTournamentRepository? _tournaments;
+  final VideoRepository? _videoRepo;
   late final List<StreamSubscription<Object?>> _subs;
   StreamSubscription<Object?>? _tournamentSub;
+  StreamSubscription<Object?>? _videosSub;
+
+  List<TeamVideo> _videos = const [];
+
+  /// The team's videos tagged to this event (F6), newest first: members
+  /// see them while the team's Videos section is on.
+  List<TeamVideo> get videos => _videos;
+
+  void _watchVideos() {
+    final repo = _videoRepo;
+    final team = _team;
+    if (repo == null || team == null || _videosSub != null) return;
+    if (team.roleOf(uid) == null ||
+        !team.hasSection(OptionalSection.videos)) {
+      return;
+    }
+    _videosSub = repo.watchEventVideos(teamId, eventId).listen((list) {
+      _videos = list;
+      notifyListeners();
+    }, onError: (Object _) {});
+  }
 
   GroupTournament? _tournament;
 
@@ -91,6 +119,10 @@ class EventDetailViewModel extends ChangeNotifier {
   Object? get error => _error;
 
   String get uid => _auth.currentUser?.uid ?? '';
+
+  /// The team's name, for the event's header (null until it loads).
+  String? get teamName => _team?.name;
+
   bool get canEdit => _team?.has(uid, TeamPermission.manageEvents) ?? false;
 
   /// Group organizers turn a Tournament event into a bracket.
@@ -101,6 +133,9 @@ class EventDetailViewModel extends ChangeNotifier {
       _event?.type == EventType.tournament;
 
   late final Command1<void, RsvpStatus?> setRsvp;
+
+  /// Saves the user's note on their answer (empty removes it).
+  late final Command1<void, String> saveNote;
   late final Command1<void, Reaction> toggleReaction;
 
   /// Toggles an option; in single-choice polls it replaces the old vote.
@@ -108,6 +143,30 @@ class EventDetailViewModel extends ChangeNotifier {
   late final Command0<void> deleteEvent;
 
   RsvpStatus? get myRsvp => _event?.rsvpOf(uid);
+
+  /// The user's note on their answer; empty when none.
+  String get myNote => _event?.noteOf(uid) ?? '';
+
+  Future<Result<void>> _saveNote(String raw) async {
+    if (myRsvp == null) {
+      return Result.error(Exception('Answer first, then add a note.'));
+    }
+    final note = cleanRsvpNote(raw);
+    if (note.length > rsvpNoteMax) {
+      return Result.error(
+        Exception('Keep the note under $rsvpNoteMax characters.'),
+      );
+    }
+    if (note == myNote) return const Result.ok(null);
+    return _events.setRsvpNote(teamId, eventId, uid, note);
+  }
+
+  /// The user hasn't answered and the event hasn't happened yet.
+  bool get needsRsvp {
+    final e = _event;
+    if (e == null || myRsvp != null) return false;
+    return (e.endsAt ?? e.startsAt).isAfter(DateTime.now());
+  }
 
   /// Only members going may react or vote.
   bool get canRespond => myRsvp == RsvpStatus.going;
@@ -125,6 +184,18 @@ class EventDetailViewModel extends ChangeNotifier {
     for (final s in RsvpStatus.values)
       s: _names(_event?.responders(s) ?? const []),
   };
+
+  /// Who gave each answer, with their notes, by name.
+  Map<RsvpStatus, List<Responder>> get responders {
+    final e = _event;
+    return {
+      for (final s in RsvpStatus.values)
+        s: sortedResponders([
+          for (final u in e?.responders(s) ?? const <String>[])
+            (name: nameOf(u), note: e!.noteOf(u)),
+        ]),
+    };
+  }
 
   /// Team members who haven't responded yet.
   List<String> get noResponse {
@@ -195,6 +266,7 @@ class EventDetailViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _tournamentSub?.cancel();
+    _videosSub?.cancel();
     for (final s in _subs) {
       s.cancel();
     }

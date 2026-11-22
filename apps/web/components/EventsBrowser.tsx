@@ -144,7 +144,7 @@ export function EventsBrowser({ events, tournaments }: EventsPage) {
                 </small>
                 {t.groupId && (
                   <small>
-                    <Link href={`/teams/${encodeURIComponent(t.groupId)}`}>Hosted by a group on Stall 10</Link>
+                    <Link href={`/teams/${encodeURIComponent(t.groupId)}`}>Hosted by a community on Stall 10</Link>
                   </small>
                 )}
               </EventItem>

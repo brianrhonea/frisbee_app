@@ -91,3 +91,51 @@ export function upcomingSchedule<T extends ScheduleItem>(items: readonly T[], op
 export function scheduleTeamLabel(teamName: string | undefined, teamCount: number): string {
   return teamCount > 1 && teamName ? teamName : "Team";
 }
+
+// Month view (F16) ------------------------------------------------------------
+
+/**
+ * The days of [month]'s grid, Monday first, at local midnight: from the
+ * Monday on or before the 1st to the Sunday on or after the last day
+ * (the app's monthGrid).
+ */
+export function monthGrid(month: Date): Date[] {
+  const first = new Date(month.getFullYear(), month.getMonth(), 1);
+  const last = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+  const mondayIndex = (d: Date) => (d.getDay() + 6) % 7;
+  const start = new Date(first.getFullYear(), first.getMonth(), 1 - mondayIndex(first));
+  const end = new Date(last.getFullYear(), last.getMonth(), last.getDate() + (6 - mondayIndex(last)));
+  const out: Date[] = [];
+  for (let d = start; d <= end; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) out.push(d);
+  return out;
+}
+
+/** Whether [a] and [b] fall on the same local day. */
+export function sameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+/**
+ * The entries starting on [day] (local), earliest first (the app's
+ * ScheduleViewModel.eventsOn): each once by key, matching [filter] and not
+ * on a hidden calendar. Finished ones stay, unlike [upcomingSchedule].
+ */
+export function scheduleOnDay<T extends ScheduleItem>(
+  items: readonly T[],
+  day: Date,
+  opts: Pick<ScheduleOptions, "filter" | "hiddenCalendars"> = {},
+): T[] {
+  const hidden = new Set(opts.hiddenCalendars ?? []);
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const i of items) {
+    if (seen.has(i.key)) continue;
+    const start = startOf(i);
+    if (!Number.isFinite(start) || !sameDay(new Date(start), day)) continue;
+    if (!scheduleFilterMatches(i, opts.filter)) continue;
+    if (i.calendarId && hidden.has(i.calendarId)) continue;
+    seen.add(i.key);
+    out.push(i);
+  }
+  return out.sort((a, b) => startOf(a) - startOf(b) || a.key.localeCompare(b.key));
+}

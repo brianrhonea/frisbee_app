@@ -132,6 +132,15 @@ describe("roster", () => {
     expect((await s.get("/v1/teams/t1/roster", "visitor")).statusCode).toBe(200);
   });
 
+  it("keeps a team's roster to its members while its public page is off", async () => {
+    s.store.put("teams/t1", { ...s.store.doc("teams/t1")!, publicPage: false });
+    const res = await s.get("/v1/teams/t1/roster", "visitor");
+    expect(res.statusCode).toBe(403);
+    expect(res.json().error.message).toBe("This team's page is private: only members see its roster.");
+    expect(res.body).not.toContain("Pat Public");
+    expect((await s.get("/v1/teams/t1/roster", "quinn")).statusCode).toBe(200);
+  });
+
   it("keeps a team in a youth league division to its members, whatever its level says", async () => {
     s.store.put("tournaments/lg", { name: "Junior League", divisions: [{ id: "d1", level: "youth", division: "mixed" }] });
     s.store.put("teams/lt", { name: "Team 1", level: "league", leagueId: "lg", memberIds: ["pat"], members: { pat: "owner" } });

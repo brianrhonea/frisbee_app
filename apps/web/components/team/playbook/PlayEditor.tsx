@@ -7,6 +7,7 @@ import {
   playCategories,
   playCategoryLabels,
   type PlayDoc,
+  type PlayDrawing,
   type PlayElement,
   type PlayElementKind,
   playLimits,
@@ -29,7 +30,7 @@ const tools: Array<[Tool, string, string]> = [
   ["cone", "Cone", "Click to place a cone."],
   ["cut", "Cut", "Drag to draw a cut."],
   ["throw_", "Throw", "Drag to draw a throw (drawn straight)."],
-  ["erase", "Erase", "Click a piece or arrow to remove it; in a step, its movement."],
+  ["erase", "Erase", "Click a piece, arrow or pen line to remove it; in a step, its movement."],
 ];
 const stepTools: Tool[] = ["select", "erase"];
 
@@ -37,6 +38,8 @@ interface Snapshot {
   elements: PlayElement[];
   arrows: PlayArrow[];
   steps: PlayStep[];
+  /** Pen strokes (from the whiteboard): shown under everything, erased or cleared here. */
+  drawings: PlayDrawing[];
 }
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
@@ -90,7 +93,12 @@ export function PlayEditor({ teamId, id, initial }: { teamId: string; id: string
   const [name, setName] = useState(initial?.name ?? "");
   const [category, setCategory] = useState<PlayCategory>(initial?.category ?? "offense");
   const [notes, setNotes] = useState(initial?.notes ?? "");
-  const [play, setPlay] = useState<Snapshot>({ elements: initial?.elements ?? [], arrows: initial?.arrows ?? [], steps: initial?.steps ?? [] });
+  const [play, setPlay] = useState<Snapshot>({
+    elements: initial?.elements ?? [],
+    arrows: initial?.arrows ?? [],
+    steps: initial?.steps ?? [],
+    drawings: initial?.drawings ?? [],
+  });
   const [past, setPast] = useState<Snapshot[]>([]);
   const [future, setFuture] = useState<Snapshot[]>([]);
   const [tool, setTool] = useState<Tool>("select");
@@ -148,6 +156,7 @@ export function PlayEditor({ teamId, id, initial }: { teamId: string; id: string
     change({
       elements: play.elements.filter((e) => e.id !== id),
       arrows: play.arrows.filter((a) => a.id !== id),
+      drawings: play.drawings.filter((d) => d.id !== id),
       steps: play.steps.map((s) => {
         const paths = { ...s.paths };
         delete paths[id];
@@ -245,7 +254,9 @@ export function PlayEditor({ teamId, id, initial }: { teamId: string; id: string
     setBusy(true);
     setError(null);
     try {
-      const body = { name: name.trim(), category, notes, elements: play.elements, arrows: play.arrows, steps: play.steps };
+      // Always sends the strokes, so erased ones don't come back; never the
+      // kind (a play stays a play).
+      const body = { name: name.trim(), category, notes, elements: play.elements, arrows: play.arrows, steps: play.steps, drawings: play.drawings };
       const base = `/v1/teams/${encodeURIComponent(teamId)}/plays`;
       if (id) await callApi(user, `${base}/${encodeURIComponent(id)}`, { method: "PUT", body });
       else {
@@ -316,6 +327,7 @@ export function PlayEditor({ teamId, id, initial }: { teamId: string; id: string
         <PlayField
           elements={play.elements}
           arrows={setup || playback.t !== null ? play.arrows : []}
+          drawings={play.drawings}
           positions={shown}
           trails={trails}
           ghost={drawing ? { kind: tool === "throw_" ? "throw_" : "cut", points: drawing } : null}
@@ -323,7 +335,12 @@ export function PlayEditor({ teamId, id, initial }: { teamId: string; id: string
           label={`${name || "Play"} diagram`}
           handlers={playback.t === null ? { onDown, onMove, onUp } : undefined}
         />
-        {caption && <p className="play-caption">{caption}</p>}
+        {caption && (
+          <p className="play-caption">
+            <small>Step {(playback.step ?? 0) + 1} note</small>
+            {caption}
+          </p>
+        )}
 
         <div className="play-steps" role="tablist" aria-label="Steps">
           <button type="button" role="tab" aria-selected={setup} className={`play-step${setup ? " on" : ""}`} onClick={() => { playback.stop(); setStep(0); setSelected(null); }}>
@@ -347,7 +364,7 @@ export function PlayEditor({ teamId, id, initial }: { teamId: string; id: string
             Add step
           </button>
           {play.steps.length > 0 && (
-            <button type="button" className="btn btn-small" onClick={() => (playback.t === null ? playback.start() : playback.stop())}>
+            <button type="button" className="btn btn-small btn-primary play-btn" onClick={() => (playback.t === null ? playback.start() : playback.stop())}>
               {playback.t === null ? "▶ Play" : "■ Stop"}
             </button>
           )}
@@ -368,7 +385,7 @@ export function PlayEditor({ teamId, id, initial }: { teamId: string; id: string
             </label>
             <button
               type="button"
-              className="text-btn danger"
+              className="text-btn"
               onClick={() => {
                 change({ ...play, steps: play.steps.filter((_, i) => i !== step - 1) });
                 setStep(step - 1);
@@ -405,17 +422,17 @@ export function PlayEditor({ teamId, id, initial }: { teamId: string; id: string
             {busy ? "Saving…" : dirty ? "Save" : "Saved"}
           </button>
           {id && (
-            <button type="button" className="btn btn-small btn-danger" disabled={busy} onClick={() => void destroy()}>
+            <button type="button" className="btn btn-small btn-quiet" disabled={busy} onClick={() => void destroy()}>
               Delete play
             </button>
           )}
           <button
             type="button"
             className="text-btn"
-            disabled={play.elements.length === 0 && play.arrows.length === 0}
+            disabled={play.elements.length === 0 && play.arrows.length === 0 && play.drawings.length === 0}
             onClick={() => {
               if (window.confirm("Clear the whole diagram?")) {
-                change({ elements: [], arrows: [], steps: [] });
+                change({ elements: [], arrows: [], steps: [], drawings: [] });
                 setStep(0);
               }
             }}
@@ -435,11 +452,16 @@ export function PlayViewer({ play }: { play: PlayDoc }) {
   const caption = playback.step !== null ? play.steps?.[playback.step]?.note : null;
   return (
     <div className="card play-viewer">
-      <PlayField elements={play.elements ?? []} arrows={play.arrows ?? []} positions={playback.positions ?? undefined} label={`${play.name ?? "Play"} diagram`} />
-      {caption && <p className="play-caption">{caption}</p>}
+      <PlayField elements={play.elements ?? []} arrows={play.arrows ?? []} drawings={play.drawings ?? []} positions={playback.positions ?? undefined} label={`${play.name ?? "Play"} diagram`} />
+      {caption && (
+        <p className="play-caption">
+          <small>Step {(playback.step ?? 0) + 1} note</small>
+          {caption}
+        </p>
+      )}
       {(play.steps?.length ?? 0) > 0 && (
         <div className="home-actions">
-          <button type="button" className="btn btn-small" onClick={() => (playback.t === null ? playback.start() : playback.stop())}>
+          <button type="button" className="btn btn-small btn-primary play-btn" onClick={() => (playback.t === null ? playback.start() : playback.stop())}>
             {playback.t === null ? "▶ Play" : "■ Stop"}
           </button>
           <span className="muted small">{play.steps!.length + 1} steps</span>

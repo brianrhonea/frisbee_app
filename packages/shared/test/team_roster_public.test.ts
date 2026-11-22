@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { competitionLevels, isYouthTeam, publicRosterLevels, rosterIsPublic } from "../src/team.js";
+import { competitionLevels, isYouthTeam, publicPageOn, publicRosterLevels, rosterIsPublic } from "../src/team.js";
 
 describe("rosterIsPublic", () => {
   it("opens adult teams' rosters", () => {
@@ -37,5 +37,19 @@ describe("rosterIsPublic", () => {
     expect(isYouthTeam({ level: "youth" })).toBe(true);
     expect(isYouthTeam({ kind: "community", level: "youth" })).toBe(false);
     expect(isYouthTeam({ level: "club" })).toBe(false);
+  });
+});
+
+describe("publicPageOn (the Public team page switch)", () => {
+  it("is on unless stored as false", () => {
+    expect(publicPageOn({})).toBe(true);
+    expect(publicPageOn({ publicPage: true })).toBe(true);
+    expect(publicPageOn(null)).toBe(true);
+    expect(publicPageOn({ publicPage: false })).toBe(false);
+  });
+
+  it("closes an adult team's roster while off", () => {
+    expect(rosterIsPublic({ kind: "team", level: "club", publicPage: false })).toBe(false);
+    expect(rosterIsPublic({ kind: "team", level: "club", publicPage: true })).toBe(true);
   });
 });

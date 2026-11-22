@@ -154,23 +154,45 @@ Map<String, Set<String>> cleanMemberRoles(
   };
 }
 
-/// Each member's permissions from their roles, as the team doc's
-/// `memberPerms` stores them. Members whose roles grant nothing are left
-/// out.
+/// [grants] (the team doc's `memberGrants`: permissions members have of
+/// their own, from the owner's per-person switches) for [members] only,
+/// with no empty entries.
+Map<String, Set<TeamPermission>> cleanMemberGrants(
+  Map<String, Set<TeamPermission>> grants,
+  Iterable<String> members,
+) {
+  final keep = members.toSet();
+  return {
+    for (final e in grants.entries)
+      if (keep.contains(e.key) && e.value.isNotEmpty) e.key: e.value,
+  };
+}
+
+/// Each member's permissions, as the team doc's `memberPerms` stores
+/// them: what their roles give plus their own [grants] (already cleaned).
+/// Members with none are left out.
 Map<String, Set<TeamPermission>> memberPermsFor(
   Map<String, Set<String>> memberRoles,
   Map<String, CustomRole> roles,
+  Map<String, Set<TeamPermission>> grants,
 ) => {
-  for (final e in memberRoles.entries)
-    if ({for (final id in e.value) ...?roles[id]?.permissions} case final perms
-        when perms.isNotEmpty)
-      e.key: perms,
+  for (final uid in {...memberRoles.keys, ...grants.keys})
+    if ({
+          for (final id in memberRoles[uid] ?? const <String>{})
+            ...?roles[id]?.permissions,
+          ...?grants[uid],
+        }
+        case final perms when perms.isNotEmpty)
+      uid: perms,
 };
 
-/// The team doc fields for [roles] and [memberRoles] (already cleaned).
+/// The team doc fields for [roles] and [memberRoles] (already cleaned);
+/// memberPerms also counts each member's own [grants] (cleaned), which a
+/// role save leaves as they are.
 Map<String, dynamic> rolesData(
   Map<String, CustomRole> roles,
   Map<String, Set<String>> memberRoles,
+  Map<String, Set<TeamPermission>> grants,
 ) {
   List<String> sorted(Iterable<String> s) => s.toList()..sort();
   return {
@@ -179,11 +201,122 @@ Map<String, dynamic> rolesData(
       for (final e in memberRoles.entries) e.key: sorted(e.value),
     },
     'memberPerms': {
-      for (final e in memberPermsFor(memberRoles, roles).entries)
+      for (final e in memberPermsFor(memberRoles, roles, grants).entries)
         e.key: [
           for (final p in TeamPermission.values)
             if (e.value.contains(p)) p.name,
         ],
     },
   };
+}
+
+/// A named bundle of permissions the owner gives someone in one tap
+/// (the per-person switches start from it). Only the six permissions exist,
+/// so there's no payments preset. The same lists as `teamRolePresets` and
+/// `groupRolePresets` in packages/shared (fixtures/role_presets.json).
+class RolePreset {
+  const RolePreset(this.id, this.name, this.summary, this.permissions);
+
+  final String id;
+  final String name;
+  final String summary;
+  final Set<TeamPermission> permissions;
+
+  static const team = [
+    RolePreset(
+      'member',
+      'Member',
+      'Plays, chats and RSVPs; no admin rights',
+      {},
+    ),
+    RolePreset('statKeeper', 'Stat keeper', 'Tracks games and edits stats', {
+      TeamPermission.keepStats,
+    }),
+    RolePreset(
+      'captain',
+      'Captain',
+      'Runs events and chat rooms, moderates and keeps stats',
+      {
+        TeamPermission.manageChats,
+        TeamPermission.manageEvents,
+        TeamPermission.moderate,
+        TeamPermission.keepStats,
+      },
+    ),
+    RolePreset(
+      'coach',
+      'Coach',
+      'Runs the team, its members, events and stats',
+      {
+        TeamPermission.manageTeam,
+        TeamPermission.manageMembers,
+        TeamPermission.manageEvents,
+        TeamPermission.keepStats,
+      },
+    ),
+    RolePreset(
+      'admin',
+      'Admin',
+      'Every permission; only the owner can do more',
+      {
+        TeamPermission.manageTeam,
+        TeamPermission.manageMembers,
+        TeamPermission.manageChats,
+        TeamPermission.manageEvents,
+        TeamPermission.moderate,
+        TeamPermission.keepStats,
+      },
+    ),
+  ];
+
+  /// Groups and communities don't keep stats.
+  static const group = [
+    RolePreset(
+      'member',
+      'Member',
+      'Joins in, chats and RSVPs; no admin rights',
+      {},
+    ),
+    RolePreset(
+      'moderator',
+      'Moderator',
+      "Runs chat rooms and deletes other people's messages",
+      {TeamPermission.manageChats, TeamPermission.moderate},
+    ),
+    RolePreset(
+      'organizer',
+      'Organizer',
+      'Runs events and chat rooms and moderates',
+      {
+        TeamPermission.manageChats,
+        TeamPermission.manageEvents,
+        TeamPermission.moderate,
+      },
+    ),
+    RolePreset(
+      'admin',
+      'Admin',
+      'Every permission; only the owner can do more',
+      {
+        TeamPermission.manageTeam,
+        TeamPermission.manageMembers,
+        TeamPermission.manageChats,
+        TeamPermission.manageEvents,
+        TeamPermission.moderate,
+      },
+    ),
+  ];
+
+  static List<RolePreset> forGroup(bool isGroup) => isGroup ? group : team;
+
+  /// The preset with exactly [permissions], or null ("Custom").
+  static RolePreset? matching(Set<TeamPermission> permissions, bool isGroup) {
+    for (final p in forGroup(isGroup)) {
+      if (p.permissions.length == permissions.length &&
+          p.permissions.containsAll(permissions)) {
+        return p;
+      }
+    }
+    return null;
+  }
 }

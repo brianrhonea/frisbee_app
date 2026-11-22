@@ -12,8 +12,11 @@ import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../../teams/widgets/team_post_widgets.dart';
+import '../../core/themes/theme.dart';
 import '../view_models/tournament_editor_viewmodel.dart';
+import 'hat_parts.dart';
 import 'tournament_widgets.dart';
+import '../../core/ui/time_picker.dart';
 
 /// Sets up a tournament: details and rules, players and teams, and the
 /// schedule. Organizers only.
@@ -95,9 +98,9 @@ class _TournamentEditorScreenState extends State<TournamentEditorScreen> {
   Future<void> _offerPost() async {
     final post = await confirmDialog(
       context,
-      title: 'Tell the group?',
+      title: 'Tell the community?',
       message:
-          'Post ${vm.name.trim()} to the group feed so people see it and '
+          'Post ${vm.name.trim()} to the community feed so people see it and '
           'sign up. You can edit the post first.',
       confirmLabel: 'Write post',
     );
@@ -118,7 +121,7 @@ class _TournamentEditorScreenState extends State<TournamentEditorScreen> {
     if (vm.announce.error) {
       showErrorSnackBar(context, vm.announce.result);
     } else {
-      showSnackBar(context, 'Posted to the group feed');
+      showSnackBar(context, 'Posted to the community feed');
     }
     vm.announce.clearResult();
   }
@@ -179,42 +182,53 @@ class _TournamentEditorScreenState extends State<TournamentEditorScreen> {
             ),
           },
           bottomNavigationBar: vm.load.completed
-              ? SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            vm.problem ??
-                                (vm.teamsChanged ? vm.saveProblem : null) ??
-                                (vm.todo == null
-                                    ? 'Ready to publish.'
-                                    : '${vm.todo}. You can still publish '
-                                          'and add players later.'),
-                            style: Theme.of(context).textTheme.bodySmall,
+              ? DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: AppColors.of(context).card,
+                    border: Border(
+                      top: BorderSide(color: AppColors.of(context).border),
+                    ),
+                  ),
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              vm.problem ??
+                                  (vm.teamsChanged ? vm.saveProblem : null) ??
+                                  (vm.todo == null
+                                      ? 'Ready to publish.'
+                                      : '${vm.todo}. You can still publish '
+                                            'and add players later.'),
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                color: AppColors.of(context).ink2,
+                              ),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        FilledButton.icon(
-                          onPressed: busy || vm.problem != null
-                              ? null
-                              : _publish,
-                          icon: vm.publish.running
-                              ? const SizedBox.square(
-                                  dimension: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.publish),
-                          label: Text(
-                            vm.wasPublished
-                                ? 'Republish schedule'
-                                : 'Publish schedule',
+                          const SizedBox(width: 12),
+                          FilledButton.icon(
+                            onPressed: busy || vm.problem != null
+                                ? null
+                                : _publish,
+                            icon: vm.publish.running
+                                ? const SizedBox.square(
+                                    dimension: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.publish),
+                            label: Text(
+                              vm.wasPublished
+                                  ? 'Republish schedule'
+                                  : 'Publish schedule',
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 )
@@ -231,9 +245,26 @@ class _Heading extends StatelessWidget {
   final String text;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 24, bottom: 8),
-    child: Text(text, style: Theme.of(context).textTheme.titleMedium),
+  Widget build(BuildContext context) => HatHeading(text, top: 22);
+}
+
+/// A white card of rows split by hairlines, for groups of settings.
+class _Group extends StatelessWidget {
+  const _Group({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    margin: const EdgeInsets.only(top: 8),
+    child: Column(
+      children: [
+        for (final (i, child) in children.indexed) ...[
+          if (i > 0) const Divider(height: 1),
+          child,
+        ],
+      ],
+    ),
   );
 }
 
@@ -254,7 +285,7 @@ class _Details extends StatelessWidget {
       lastDate: DateTime(initial.year + 2),
     );
     if (day == null || !context.mounted) return null;
-    final time = await showTimePicker(
+    final time = await showTypedTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(initial),
     );
@@ -267,6 +298,7 @@ class _Details extends StatelessWidget {
     final vm = viewModel;
     final s = vm.settings;
     final events = vm.tournamentEvents;
+    final c = AppColors.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -302,75 +334,82 @@ class _Details extends StatelessWidget {
             child: Text(
               'No upcoming Tournament events. Post one in Events so people '
               'can say whether they are coming.',
-              style: Theme.of(context).textTheme.bodySmall,
+              style: TextStyle(fontSize: 12.5, color: c.muted),
             ),
           ),
-        const SizedBox(height: 8),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.date_range_outlined),
-          title: const Text('Dates'),
-          subtitle: Text(tournamentDates(s)),
-          onTap: () async {
-            final range = await showDateRangePicker(
-              context: context,
-              initialDateRange: DateTimeRange(
-                start: DateUtils.dateOnly(s.startsAt),
-                end: DateUtils.dateOnly(s.days.last),
-              ),
-              firstDate: DateTime(s.startsAt.year - 1),
-              lastDate: DateTime(s.startsAt.year + 2),
-              helpText: 'First and last day of play',
-            );
-            if (range != null) vm.setDates(range.start, range.end);
-          },
-        ),
-        for (final (i, day) in s.days.indexed)
-          ListTile(
-            contentPadding: const EdgeInsets.only(left: 40),
-            dense: true,
-            leading: const Icon(Icons.schedule, size: 20),
-            title: Text(
-              s.days.length == 1
-                  ? 'Start time'
-                  : 'Day ${i + 1} · ${DateFormat('EEE, MMM d').format(day)}',
+        const SizedBox(height: 4),
+        _Group(
+          children: [
+            ListTile(
+              leading: Icon(Icons.date_range_outlined, color: c.accent),
+              title: const Text('Dates'),
+              subtitle: Text(tournamentDates(s)),
+              onTap: () async {
+                final range = await showDateRangePicker(
+                  context: context,
+                  initialDateRange: DateTimeRange(
+                    start: DateUtils.dateOnly(s.startsAt),
+                    end: DateUtils.dateOnly(s.days.last),
+                  ),
+                  firstDate: DateTime(s.startsAt.year - 1),
+                  lastDate: DateTime(s.startsAt.year + 2),
+                  helpText: 'First and last day of play',
+                );
+                if (range != null) vm.setDates(range.start, range.end);
+              },
             ),
-            trailing: Text(DateFormat.jm().format(day)),
-            onTap: () async {
-              final t = await showTimePicker(
-                context: context,
-                initialTime: TimeOfDay.fromDateTime(day),
-                helpText: s.days.length == 1
-                    ? 'Start time'
-                    : 'Day ${i + 1} starts',
-              );
-              if (t != null) {
-                vm.setDayStart(i, hour: t.hour, minute: t.minute);
-              }
-            },
-          ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.flag_outlined),
-          title: const Text('Ideal end'),
-          subtitle: Text(
-            s.idealEndsAt == null ? 'Not set' : tournamentWhen(s.idealEndsAt!),
-          ),
-          trailing: s.idealEndsAt == null
-              ? null
-              : IconButton(
-                  tooltip: 'Clear',
-                  icon: const Icon(Icons.close),
-                  onPressed: () =>
-                      vm.updateSettings(s.copyWith(idealEndsAt: () => null)),
+            for (final (i, day) in s.days.indexed)
+              ListTile(
+                contentPadding: const EdgeInsets.only(left: 56, right: 16),
+                dense: true,
+                leading: const Icon(Icons.schedule, size: 20),
+                title: Text(
+                  s.days.length == 1
+                      ? 'Start time'
+                      : 'Day ${i + 1} · ${DateFormat('EEE, MMM d').format(day)}',
                 ),
-          onTap: () async {
-            final d = await _pickDateTime(
-              context,
-              s.idealEndsAt ?? s.days.last.add(const Duration(hours: 6)),
-            );
-            if (d != null) vm.updateSettings(s.copyWith(idealEndsAt: () => d));
-          },
+                trailing: Text(DateFormat.jm().format(day)),
+                onTap: () async {
+                  final t = await showTypedTimePicker(
+                    context: context,
+                    initialTime: TimeOfDay.fromDateTime(day),
+                    helpText: s.days.length == 1
+                        ? 'Start time'
+                        : 'Day ${i + 1} starts',
+                  );
+                  if (t != null) {
+                    vm.setDayStart(i, hour: t.hour, minute: t.minute);
+                  }
+                },
+              ),
+            ListTile(
+              leading: Icon(Icons.flag_outlined, color: c.accent),
+              title: const Text('Ideal end'),
+              subtitle: Text(
+                s.idealEndsAt == null
+                    ? 'Not set'
+                    : tournamentWhen(s.idealEndsAt!),
+              ),
+              trailing: s.idealEndsAt == null
+                  ? null
+                  : IconButton(
+                      tooltip: 'Clear',
+                      icon: const Icon(Icons.close),
+                      onPressed: () => vm.updateSettings(
+                        s.copyWith(idealEndsAt: () => null),
+                      ),
+                    ),
+              onTap: () async {
+                final d = await _pickDateTime(
+                  context,
+                  s.idealEndsAt ?? s.days.last.add(const Duration(hours: 6)),
+                );
+                if (d != null) {
+                  vm.updateSettings(s.copyWith(idealEndsAt: () => d));
+                }
+              },
+            ),
+          ],
         ),
       ],
     );
@@ -393,11 +432,11 @@ class _Rules extends StatelessWidget {
         RadioGroup<TournamentFormat>(
           groupValue: s.format,
           onChanged: (f) => set(s.copyWith(format: f)),
-          child: Column(
+          child: _Group(
             children: [
               for (final f in TournamentFormat.values)
                 RadioListTile<TournamentFormat>(
-                  contentPadding: EdgeInsets.zero,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
                   value: f,
                   title: Text(f.label),
                   subtitle: Text(f.summary),
@@ -405,10 +444,14 @@ class _Rules extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 16),
         Text(
           'Players on the field',
-          style: Theme.of(context).textTheme.labelLarge,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppColors.of(context).ink2,
+          ),
         ),
         const SizedBox(height: 8),
         Wrap(
@@ -423,60 +466,64 @@ class _Rules extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 8),
-        _Stepper(
-          label: 'Teams',
-          value: vm.teams.length,
-          min: 2,
-          max: TournamentSettings.maxTeams,
-          onChanged: vm.setTeamCount,
-        ),
-        if (s.format == TournamentFormat.poolsSingleElim)
-          _Stepper(
-            label: 'Pools',
-            value: s.poolCount,
-            min: 1,
-            max: (vm.teams.length ~/ 2).clamp(1, 8),
-            onChanged: (v) => set(s.copyWith(poolCount: v)),
-          ),
-        _Stepper(
-          label: 'Game length',
-          value: s.gameMinutes,
-          min: 10,
-          max: 120,
-          step: 5,
-          unit: 'min',
-          onChanged: (v) => set(s.copyWith(gameMinutes: v)),
-        ),
-        _Stepper(
-          label: 'Break between games',
-          value: s.breakMinutes,
-          min: 0,
-          max: 60,
-          step: 5,
-          unit: 'min',
-          onChanged: (v) => set(s.copyWith(breakMinutes: v)),
-        ),
-        _Stepper(
-          label: 'Game to',
-          value: s.scoreCap,
-          min: 3,
-          max: 21,
-          unit: 'points',
-          onChanged: (v) => set(s.copyWith(scoreCap: v)),
-        ),
-        _Stepper(
-          label: 'Timeouts per half',
-          value: s.timeoutsPerHalf,
-          min: 0,
-          max: 4,
-          onChanged: (v) => set(s.copyWith(timeoutsPerHalf: v)),
-        ),
-        _Stepper(
-          label: 'Fields',
-          value: s.fields,
-          min: 1,
-          max: 12,
-          onChanged: (v) => set(s.copyWith(fields: v)),
+        _Group(
+          children: [
+            _Stepper(
+              label: 'Teams',
+              value: vm.teams.length,
+              min: 2,
+              max: TournamentSettings.maxTeams,
+              onChanged: vm.setTeamCount,
+            ),
+            if (s.format == TournamentFormat.poolsSingleElim)
+              _Stepper(
+                label: 'Pools',
+                value: s.poolCount,
+                min: 1,
+                max: (vm.teams.length ~/ 2).clamp(1, 8),
+                onChanged: (v) => set(s.copyWith(poolCount: v)),
+              ),
+            _Stepper(
+              label: 'Game length',
+              value: s.gameMinutes,
+              min: 10,
+              max: 120,
+              step: 5,
+              unit: 'min',
+              onChanged: (v) => set(s.copyWith(gameMinutes: v)),
+            ),
+            _Stepper(
+              label: 'Break between games',
+              value: s.breakMinutes,
+              min: 0,
+              max: 60,
+              step: 5,
+              unit: 'min',
+              onChanged: (v) => set(s.copyWith(breakMinutes: v)),
+            ),
+            _Stepper(
+              label: 'Game to',
+              value: s.scoreCap,
+              min: 3,
+              max: 21,
+              unit: 'points',
+              onChanged: (v) => set(s.copyWith(scoreCap: v)),
+            ),
+            _Stepper(
+              label: 'Timeouts per half',
+              value: s.timeoutsPerHalf,
+              min: 0,
+              max: 4,
+              onChanged: (v) => set(s.copyWith(timeoutsPerHalf: v)),
+            ),
+            _Stepper(
+              label: 'Fields',
+              value: s.fields,
+              min: 1,
+              max: 12,
+              onChanged: (v) => set(s.copyWith(fields: v)),
+            ),
+          ],
         ),
       ],
     );
@@ -503,32 +550,61 @@ class _Stepper extends StatelessWidget {
   final ValueChanged<int> onChanged;
 
   @override
-  Widget build(BuildContext context) => ListTile(
-    contentPadding: EdgeInsets.zero,
-    title: Text(label),
-    trailing: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(
-          tooltip: 'Less',
-          icon: const Icon(Icons.remove_circle_outline),
-          onPressed: value - step >= min ? () => onChanged(value - step) : null,
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return ListTile(
+      contentPadding: const EdgeInsets.only(left: 16, right: 4),
+      title: Text(
+        label,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: c.ink,
         ),
-        SizedBox(
-          width: 72,
-          child: Text(
-            unit == null ? '$value' : '$value $unit',
-            textAlign: TextAlign.center,
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            tooltip: 'Less',
+            color: c.accent,
+            icon: const Icon(Icons.remove_circle_outline),
+            onPressed: value - step >= min
+                ? () => onChanged(value - step)
+                : null,
           ),
-        ),
-        IconButton(
-          tooltip: 'More',
-          icon: const Icon(Icons.add_circle_outline),
-          onPressed: value + step <= max ? () => onChanged(value + step) : null,
-        ),
-      ],
-    ),
-  );
+          SizedBox(
+            width: 72,
+            child: Text(
+              unit == null ? '$value' : '$value $unit',
+              textAlign: TextAlign.center,
+              style: unit == null
+                  ? TextStyle(
+                      fontFamily: scoreFont,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 22,
+                      height: 1.1,
+                      color: c.ink,
+                    )
+                  : TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: c.ink2,
+                    ),
+            ),
+          ),
+          IconButton(
+            tooltip: 'More',
+            color: c.accent,
+            icon: const Icon(Icons.add_circle_outline),
+            onPressed: value + step <= max
+                ? () => onChanged(value + step)
+                : null,
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _Teams extends StatelessWidget {
@@ -612,17 +688,17 @@ class _Teams extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final vm = viewModel;
-    final theme = Theme.of(context);
+    final c = AppColors.of(context);
     final going = vm.rsvps(RsvpStatus.going);
     final maybe = vm.rsvps(RsvpStatus.maybe);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (vm.event != null)
-          Card.outlined(
+          Card(
             margin: EdgeInsets.zero,
             child: ListTile(
-              leading: const Icon(Icons.how_to_reg_outlined),
+              leading: Icon(Icons.how_to_reg_outlined, color: c.accent),
               title: Text(
                 '${going.length} attending · ${maybe.length} planning to attend',
               ),
@@ -666,20 +742,22 @@ class _Teams extends StatelessWidget {
         Text(
           'Players can be added before or after the schedule is published. '
           'Tap a player to move them or make them captain.',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
+          style: TextStyle(fontSize: 12.5, color: c.muted),
         ),
         if (vm.bench.isNotEmpty) ...[
           const SizedBox(height: 16),
           Text(
             'Not on a team (${vm.bench.length})',
-            style: theme.textTheme.labelLarge,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: c.ink2,
+            ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Wrap(
-            spacing: 8,
-            runSpacing: 4,
+            spacing: 6,
+            runSpacing: 6,
             children: [
               for (final p in vm.bench)
                 _PlayerChip(viewModel: vm, player: p, teamId: null),
@@ -689,9 +767,9 @@ class _Teams extends StatelessWidget {
         const SizedBox(height: 16),
         for (final t in vm.teams)
           Card(
-            margin: const EdgeInsets.only(bottom: 8),
+            margin: const EdgeInsets.only(bottom: 10),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 4, 12),
+              padding: const EdgeInsets.fromLTRB(14, 4, 4, 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -700,7 +778,11 @@ class _Teams extends StatelessWidget {
                       Expanded(
                         child: Text(
                           '${t.name} (${t.playerIds.length})',
-                          style: theme.textTheme.titleSmall,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: c.ink,
+                          ),
                         ),
                       ),
                       IconButton(
@@ -718,10 +800,13 @@ class _Teams extends StatelessWidget {
                     ],
                   ),
                   if (t.playerIds.isEmpty)
-                    Text('No players yet.', style: theme.textTheme.bodySmall),
+                    Text(
+                      'No players yet.',
+                      style: TextStyle(fontSize: 12.5, color: c.muted),
+                    ),
                   Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
+                    spacing: 6,
+                    runSpacing: 6,
                     children: [
                       for (final uid in t.playerIds)
                         _PlayerChip(
@@ -778,8 +863,15 @@ class _PlayerChip extends StatelessWidget {
           const PopupMenuItem(value: 'remove', child: Text('Leave out')),
       ],
       child: Chip(
-        avatar: captain ? const Icon(Icons.star, size: 18) : null,
+        avatar: captain
+            ? Icon(Icons.star, size: 18, color: AppColors.of(context).accent)
+            : null,
         label: Text(captain ? '${player.name} (C)' : player.name),
+        labelStyle: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: AppColors.of(context).ink,
+        ),
       ),
     );
   }
@@ -794,6 +886,7 @@ class _SchedulePreview extends StatelessWidget {
   Widget build(BuildContext context) {
     final vm = viewModel;
     final theme = Theme.of(context);
+    final c = AppColors.of(context);
     final plan = vm.plan;
     final names = {for (final t in vm.teams) t.id: t.name};
     final numbers = {
@@ -830,26 +923,36 @@ class _SchedulePreview extends StatelessWidget {
             ),
           ),
         if (plan != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            plan.days.length == 1
+          const SizedBox(height: 10),
+          NotePanel(
+            turf: true,
+            icon: Icons.calendar_view_day_outlined,
+            title: plan.days.length == 1
                 ? '${plan.games.length} games · ends about '
                       '${DateFormat.jm().format(plan.endsAt)}'
                 : '${plan.games.length} games over ${plan.days.length} days',
-            style: theme.textTheme.bodyMedium,
           ),
           if (vm.overrunMinutes > 0)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
+            Container(
+              margin: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              decoration: BoxDecoration(
+                color: c.highlightSoft,
+                borderRadius: BorderRadius.circular(controlRadius),
+              ),
               child: Row(
                 children: [
-                  Icon(Icons.warning_amber, color: theme.colorScheme.error),
+                  Icon(Icons.warning_amber, color: c.highlightInk),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'Runs ${vm.overrunMinutes} min past the ideal end. '
                       'Add fields, shorten games or use fewer teams.',
-                      style: TextStyle(color: theme.colorScheme.error),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: c.highlightInk,
+                      ),
                     ),
                   ),
                 ],
@@ -872,7 +975,11 @@ class _SchedulePreview extends StatelessWidget {
                       '${day.games} games, '
                       '${DateFormat.jm().format(day.startsAt)}–'
                       '${DateFormat.jm().format(day.endsAt)}',
-                      style: theme.textTheme.labelLarge,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: c.ink,
+                      ),
                     ),
                   ),
             Padding(
@@ -881,7 +988,7 @@ class _SchedulePreview extends StatelessWidget {
                 'Game ${g.order + 1} · ${gameTime(g.startsAt)} · Field ${g.field} · '
                 '${g.label}: ${side(g, a: true)} vs ${side(g, a: false)}'
                 '${g.ifNeeded ? ' (if needed)' : ''}',
-                style: theme.textTheme.bodySmall,
+                style: TextStyle(fontSize: 12.5, height: 1.35, color: c.ink2),
               ),
             ),
           ],

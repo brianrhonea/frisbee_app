@@ -3,9 +3,14 @@
 .gt-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .gt-head .card-title { margin: 0; }
 .gt-head-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.gt-title { margin: 0; font-size: 1.3rem; }
+.gt-title { margin: 0; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; }
 .gt-day { gap: 8px; }
-.gt-day-title { margin: 8px 0 0; font-size: 0.95rem; }
+.gt-day-title { margin: 12px 0 0; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+
+/* Tabs: underlined, turf on the open one (the event page's tabs). */
+.segmented.gt-tabs { display: flex; padding: 0; gap: 4px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; flex-wrap: nowrap; overflow-x: auto; }
+.segmented.gt-tabs button { flex: none; border-radius: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; padding: 10px 14px; font-size: 0.95rem; }
+.segmented.gt-tabs button.on { background: none; box-shadow: none; color: var(--accent); border-bottom-color: var(--accent); font-weight: 700; }
 
 .gt-game {
   display: grid; gap: 4px; width: 100%; text-align: left; font: inherit; color: inherit;
@@ -14,15 +19,26 @@
 button.gt-game { cursor: pointer; }
 button.gt-game:hover { border-color: var(--accent); }
 .gt-game-meta { font-size: 0.8rem; color: var(--muted); }
-.gt-side { display: flex; justify-content: space-between; gap: 12px; }
-.gt-side b { font-variant-numeric: tabular-nums; }
-.gt-won { font-weight: 700; }
-.gt-lost { color: var(--muted); }
+.gt-side { display: flex; align-items: center; gap: 10px; font-weight: 600; min-width: 0; }
+.gt-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gt-side b { font-family: var(--font-score); font-weight: 800; font-size: 1.45rem; line-height: 1; }
+.gt-mark {
+  flex: none; width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center;
+  background: var(--field); color: var(--ink-soft); font-size: 0.66rem; font-weight: 800;
+}
+.gt-won { font-weight: 700; color: var(--ink); }
+.gt-lost, .gt-lost b { color: var(--muted); }
 .gt-game-status { display: flex; gap: 8px; flex-wrap: wrap; }
-.gt-badge { color: var(--accent); font-weight: 700; font-size: 0.85rem; }
-.gt-mine { border-color: var(--accent); background: var(--accent-soft); }
+.gt-badge { color: var(--muted); font-weight: 700; font-size: 0.85rem; }
+.gt-badge.gt-due { background: var(--disc); color: var(--on-disc); padding: 1px 10px; border-radius: 999px; font-size: 0.78rem; }
+.gt-mine { border-color: var(--accent); }
 .card.gt-mine { display: grid; gap: 2px; }
-.gt-champion { background: var(--amber); color: var(--on-amber); font-weight: 700; }
+.gt-teams .card.gt-mine { background: var(--accent-soft); }
+.card.gt-game.gt-game-due { border: 2px solid var(--disc); }
+.btn.gt-btn-due { background: var(--disc); color: var(--on-disc); border-color: var(--disc); }
+.gt-champion { background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; font-weight: 800; font-size: 1.1rem; }
+.gt-standings td.num, .gt-standings td.narrow { font-family: var(--font-score); font-weight: 800; font-size: 1.1rem; }
+.gt-standings th { font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; }
 
 .gt-teams { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); }
 .gt-players { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
@@ -44,10 +60,31 @@ button.gt-game:hover { border-color: var(--accent); }
   border: 1px solid var(--line); border-radius: 999px; background: var(--field); font-size: 0.88rem;
 }
 .gt-chip select { border: 0; background: transparent; color: var(--ink); font: inherit; padding: 2px; width: 2.2em; }
-.gt-captain { border-color: var(--accent); }
+.gt-captain { border-color: transparent; background: var(--accent-soft); color: var(--accent-ink); font-weight: 700; }
+.gt-captain select { color: var(--accent-ink); }
 .gt-team-card { display: grid; gap: 8px; }
 .gt-team-card input { font-weight: 700; }
 .gt-preview-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
 .gt-preview-day { display: block; margin-top: 8px; font-size: 0.9rem; }
 .gt-bar { position: sticky; bottom: 8px; display: grid; gap: 6px; box-shadow: var(--shadow); }
 .gt-bar .home-actions { margin: 0; }
+
+/* Teams / Games / Final tiles (the app's StatTiles): big Barlow numbers. */
+.gt-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.gt-stat { display: grid; gap: 2px; padding: 10px 14px; border-radius: var(--radius-control); background: var(--field); }
+.gt-stat b { font-family: var(--font-score); font-weight: 800; font-size: 1.8rem; line-height: 1; }
+.gt-stat b small { font-size: 0.55em; color: var(--muted); }
+.gt-stat span { font-size: 0.78rem; color: var(--muted); }
+
+/* The editor: section titles, full-width choices, chips as turf picks. */
+.gt-editor > .card > .card-title { font-size: 1.05rem; font-weight: 800; }
+.gt-editor .segmented { display: flex; width: 100%; border-radius: var(--radius-control); }
+.gt-editor .segmented button { flex: 1 1 0; border-radius: 9px; }
+.gt-chip { font-weight: 600; }
+.gt-team-card { border-radius: var(--radius); }
+.gt-inline .btn[aria-label^="Fewer"], .gt-inline .btn[aria-label^="More"] { min-width: 36px; }
+.gt-preview-day { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.gt-bar { border-color: var(--line-2); }
+.gt-list-row { display: flex; align-items: center; gap: 12px; }
+.gt-list-row > span:nth-child(2) { flex: 1; }
+.gt-list-row .pill { margin: 0; }

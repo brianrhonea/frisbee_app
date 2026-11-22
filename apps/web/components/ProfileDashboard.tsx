@@ -2,6 +2,7 @@ import type { PublicProfile, StatTotals } from "@stall10/shared";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Avatar } from "./Avatar";
+import "./member.css";
 
 /**
  * The profile dashboard: the person on the left (card, season stats,
@@ -53,14 +54,15 @@ const tiles: Array<[keyof StatTotals, string]> = [
   ["blocks", "Blocks"],
 ];
 
-/** The latest season's totals as tiles. */
-export function StatTiles({ stats }: { stats?: Record<string, StatTotals> }) {
+/** The latest season's totals as tiles (for [teamName]'s games, when the Team filter picked one). */
+export function StatTiles({ stats, teamName }: { stats?: Record<string, StatTotals>; teamName?: string }) {
   const seasons = Object.keys(stats ?? {}).sort().reverse();
   const season = seasons[0];
   const s = season ? stats![season] : undefined;
+  const title = season ? `${season} season` : "Stats";
   return (
     <div className="card">
-      <h2 className="card-title">{season ? `${season} season` : "Stats"}</h2>
+      <h2 className="card-title">{teamName ? `${title} · ${teamName}` : title}</h2>
       {s ? (
         <div className="tiles">
           {tiles.map(([k, label]) => (

@@ -6,7 +6,9 @@ import '../../../domain/models/roster_player.dart';
 import '../../../domain/models/stats.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/error_message.dart';
+import '../../core/ui/scoreboard.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/tournament_viewmodel.dart';
 import 'game_to_field.dart';
@@ -128,26 +130,41 @@ class TournamentScreen extends StatelessWidget {
                       message: 'Add a game to start tracking stats.',
                     )
                   : ListView(
-                      padding: const EdgeInsets.only(bottom: 96),
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 96),
                       children: [
-                        for (final (i, g) in vm.games.indexed)
-                          GameRow(
-                            game: g,
-                            onTap: () =>
-                                context.push(Routes.statsGame(vm.teamId, g.id)),
-                            onDelete: vm.canDelete
-                                ? () async {
-                                    if (await confirmDeleteGame(context, g)) {
-                                      if (!context.mounted) return;
-                                      await runDelete(
-                                        context,
-                                        vm.deleteGame,
-                                        () => vm.deleteGame.execute(g.id),
-                                      );
-                                    }
-                                  }
-                                : null,
-                          ).withRound(i + 1),
+                        _Summary(viewModel: vm),
+                        const SizedBox(height: 16),
+                        const SectionHeader('Games'),
+                        Card(
+                          child: Column(
+                            children: [
+                              for (final (i, g) in vm.games.indexed) ...[
+                                if (i > 0) const Divider(height: 1),
+                                GameRow(
+                                  game: g,
+                                  onTap: () => context.push(
+                                    Routes.statsGame(vm.teamId, g.id),
+                                  ),
+                                  onDelete: vm.canDelete
+                                      ? () async {
+                                          if (await confirmDeleteGame(
+                                            context,
+                                            g,
+                                          )) {
+                                            if (!context.mounted) return;
+                                            await runDelete(
+                                              context,
+                                              vm.deleteGame,
+                                              () => vm.deleteGame.execute(g.id),
+                                            );
+                                          }
+                                        }
+                                      : null,
+                                ).withRound(i + 1),
+                              ],
+                            ],
+                          ),
+                        ),
                       ],
                     ),
               _RosterAndLines(viewModel: vm),
@@ -164,10 +181,63 @@ extension on GameRow {
   /// Prefixes the row with its round number.
   Widget withRound(int round) => Row(
     children: [
-      SizedBox(width: 48, child: Center(child: Text('R$round'))),
+      SizedBox(
+        width: 40,
+        child: Center(
+          child: Builder(
+            builder: (context) => Text(
+              'R$round',
+              style: TextStyle(
+                fontFamily: scoreFont,
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+                color: AppColors.of(context).muted,
+              ),
+            ),
+          ),
+        ),
+      ),
       Expanded(child: this),
     ],
   );
+}
+
+/// The tournament at a glance: record, O efficiency and break rate.
+class _Summary extends StatelessWidget {
+  const _Summary({required this.viewModel});
+
+  final TournamentViewModel viewModel;
+
+  static String _pct(double? v) => v == null ? '–' : '${(v * 100).round()}%';
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = viewModel;
+    final c = AppColors.of(context);
+    final team = vm.sheet.team;
+    Widget number(String value, String label) => Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ScoreText(value, size: 30),
+          const SizedBox(height: 2),
+          Text(label, style: TextStyle(fontSize: 12, color: c.muted)),
+        ],
+      ),
+    );
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            number('${vm.wins}–${vm.losses}', 'Record'),
+            number(_pct(team.oEfficiency), 'O efficiency'),
+            number(_pct(team.breakRate), 'Break rate'),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _RosterAndLines extends StatelessWidget {
@@ -237,7 +307,10 @@ class _RosterAndLines extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
               'Add at least ${StatLine.size} players to build lines.',
-              style: TextStyle(color: theme.colorScheme.error),
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: AppColors.of(context).highlightInk,
+              ),
             ),
           ),
         Wrap(

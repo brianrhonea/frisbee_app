@@ -101,6 +101,8 @@ class HostedTournamentViewModel extends ChangeNotifier {
     report = Command1<void, HostedScore>(_report);
     confirm = Command1<void, GroupGame>(_confirm);
     setFinalScore = Command1<void, HostedScore>(_setFinalScore);
+    liveScore = Command1<void, String>(_sendLive);
+    stopLive = Command1<void, String>(_stopLive);
     seedBracket = Command0<void>(_seedBracket);
     delete = Command0<void>(() => _repo.deleteTournament(tournamentId));
     saveDivision = Command1<void, TournamentDivision>(_saveDivision);
@@ -146,6 +148,9 @@ class HostedTournamentViewModel extends ChangeNotifier {
   final TeamRepository _teams;
   final TeamPostRepository? _posts;
   final DateTime Function() _now;
+
+  /// The page's clock (tests set it): which league week opens first.
+  DateTime now() => _now();
   final AuthRepository _auth;
   final String _uid;
   final FollowSlot _followSlot;
@@ -187,6 +192,13 @@ class HostedTournamentViewModel extends ChangeNotifier {
   late final Command1<void, HostedScore> report;
   late final Command1<void, GroupGame> confirm;
   late final Command1<void, HostedScore> setFinalScore;
+
+  /// Sends running scores (from a game, by id) until the server has the
+  /// last one asked for on every game ([setLive] calls it).
+  late final Command1<void, String> liveScore;
+
+  /// Takes a game's running score off (by id).
+  late final Command1<void, String> stopLive;
   late final Command0<void> seedBracket;
   late final Command0<void> delete;
   late final Command1<void, TournamentDivision> saveDivision;
@@ -206,6 +218,8 @@ class HostedTournamentViewModel extends ChangeNotifier {
     report,
     confirm,
     setFinalScore,
+    liveScore,
+    stopLive,
     seedBracket,
     delete,
     saveDivision,
@@ -496,8 +510,12 @@ class HostedTournamentViewModel extends ChangeNotifier {
     _games = const [];
     final id = _divisionId;
     if (id == null) return;
+    _pendingLive.clear();
+    _unsentLive.clear();
     _gamesSub = _repo.watchGames(tournamentId, id).listen((g) {
       _games = g;
+      // The server's running scores take over once nothing is on its way.
+      if (!liveScore.running) _pendingLive.clear();
       _catchUp();
       _goLive();
       _recordPlacements();
@@ -1098,8 +1116,129 @@ class HostedTournamentViewModel extends ChangeNotifier {
         : HostedGameAction.confirm;
   }
 
+  /// The user's first game that waits on them for a score (to report or
+  /// to confirm), for the "your game" card on the schedule.
+  GroupGame? get gameNeedingMe => myUpcoming
+      .where(
+        (g) => switch (actionFor(g)) {
+          HostedGameAction.report || HostedGameAction.confirm => true,
+          _ => false,
+        },
+      )
+      .firstOrNull;
+
   bool canSetScore(GroupGame g) =>
       isManager && g.hasTeams && !laterGamesPlayed(g, _games);
+
+  // ---- Live running scores -------------------------------------------------
+
+  /// Running scores the user set that the server may not have yet, by
+  /// game id: shown straight away, sent in order (latest wins).
+  final _pendingLive = <String, ({int a, int b})>{};
+
+  /// Games whose pending running score isn't sent yet.
+  final _unsentLive = <String>{};
+
+  /// Whether this build keeps running scores (they need the API).
+  bool get canKeepLiveScores => _repo.canKeepLiveScores;
+
+  /// Whether the user may keep [g]'s running score now: either team's
+  /// captain (who report its score) or one of the host's managers, on the
+  /// game's day, while it's still to be scored (not reported or final).
+  /// The API checks all of it again.
+  bool canKeepLive(GroupGame g) {
+    final t = _tournament;
+    if (!_repo.canKeepLiveScores || t == null) return false;
+    if (t.status == HostedStatus.draft || t.status == HostedStatus.finished) {
+      return false;
+    }
+    if (!g.hasTeams || g.status != GameStatus.scheduled) return false;
+    final mine = _captainOf;
+    if (!isManager && !mine.contains(g.teamA) && !mine.contains(g.teamB)) {
+      return false;
+    }
+    return g.inLiveWindow(_now());
+  }
+
+  /// [g]'s running score if it's being played: what the user just set,
+  /// else the server's while it's fresh ([GroupGame.liveAt]).
+  LiveScore? liveOf(GroupGame g) {
+    if (g.status != GameStatus.scheduled) return null;
+    if (_pendingLive[g.id] case final p?) {
+      return LiveScore(
+        scoreA: p.a,
+        scoreB: p.b,
+        startedAt: g.live?.startedAt ?? _now(),
+        updatedAt: _now(),
+      );
+    }
+    return g.liveAt(_now());
+  }
+
+  /// The selected division's games being played now, in schedule order.
+  List<GroupGame> get liveGames => [
+    for (final g in _games)
+      if (liveOf(g) != null) g,
+  ];
+
+  /// Sets [gameId]'s running score to [a]–[b] (0–0 starts the game).
+  /// Shown at once; sent in the background, so quick taps aren't lost.
+  void setLive(String gameId, int a, int b) {
+    _pendingLive[gameId] = (a: a.clamp(0, 99), b: b.clamp(0, 99));
+    _unsentLive.add(gameId);
+    notifyListeners();
+    if (!liveScore.running) liveScore.execute(gameId);
+  }
+
+  /// Adds [by] (1, or -1 to undo) to team A's ([teamA]) or B's running score.
+  void bumpLive(String gameId, {required bool teamA, int by = 1}) {
+    final g = _games.where((x) => x.id == gameId).firstOrNull;
+    if (g == null) return;
+    final l = liveOf(g);
+    final a = l?.scoreA ?? 0;
+    final b = l?.scoreB ?? 0;
+    setLive(gameId, teamA ? a + by : a, teamA ? b : b + by);
+  }
+
+  /// Starts [gameId] at 0–0.
+  void startLive(String gameId) => setLive(gameId, 0, 0);
+
+  /// Sends [first]'s pending running score, then any tapped meanwhile
+  /// (on it or another game), each game's latest only.
+  Future<Result<void>> _sendLive(String first) async {
+    final d = division;
+    if (d == null) return Result.error(Exception('Game not found.'));
+    Result<void> result = const Result.ok(null);
+    while (_unsentLive.isNotEmpty) {
+      final gameId = _unsentLive.contains(first) ? first : _unsentLive.first;
+      _unsentLive.remove(gameId);
+      final want = _pendingLive[gameId];
+      if (want == null) continue;
+      final r = await _repo.setLiveScore(
+        tournamentId,
+        d.id,
+        gameId,
+        scoreA: want.a,
+        scoreB: want.b,
+      );
+      if (r is Error<void>) {
+        // Back to the server's score; a newer tap still goes.
+        if (_pendingLive[gameId] == want) _pendingLive.remove(gameId);
+        notifyListeners();
+        result = r;
+      }
+    }
+    return result;
+  }
+
+  Future<Result<void>> _stopLive(String gameId) async {
+    final d = division;
+    if (d == null) return Result.error(Exception('Game not found.'));
+    _pendingLive.remove(gameId);
+    _unsentLive.remove(gameId);
+    notifyListeners();
+    return _repo.clearLiveScore(tournamentId, d.id, gameId);
+  }
 
   Future<Result<void>> _report(HostedScore s) async {
     final why = scoreError(s.scoreA, s.scoreB);

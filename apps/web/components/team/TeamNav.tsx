@@ -1,13 +1,20 @@
 "use client";
+import {
+  type EnteredTournamentDoc,
+  hasTournamentAhead,
+  manageRowLabel,
+  type OptionalTeamSection,
+  type TeamMoreRow,
+  teamMoreSubtitles,
+} from "@stall10/shared";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { callApi, problem } from "@/lib/client";
-import { useLiveDoc } from "@/lib/live";
+import { useLiveDoc, useLiveQuery } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
-import { NavIcon } from "../NavIcons";
 import { ErrorNote, Loading } from "../StatusViews";
-import { useTeamHub } from "./TeamContext";
+import { LEAVE_CONFIRM, useTeamHub, viewerSectionOn } from "./TeamContext";
 
 type Kind = "team" | "community" | "organization";
 
@@ -17,6 +24,8 @@ export interface HubSection {
   label: string;
   /** Detail pages under another path (a play under /plays) that light up this tab. */
   also?: string[];
+  /** The switch in Settings › Sections it follows, if any (optionalTeamSections). */
+  optional?: OptionalTeamSection;
 }
 
 /**
@@ -25,22 +34,40 @@ export interface HubSection {
  * (Members, for groups); members also get Chat, a team's Playbook, Stats
  * and Videos, and Tournaments and Meetings. Only a school or club
  * (organization) links teams, so only it has Teams (TeamSection._forKind
- * in the app). Settings is the gear beside the tabs.
+ * in the app). Settings is the gear in the header. A team with a
+ * tournament ahead ([tournamentsAhead], hasTournamentAhead in
+ * packages/shared) has Tournaments as a tab of its own after Chat, out of
+ * More. A section the owner turned off (Settings › Sections; [sectionOn],
+ * sectionOn in packages/shared) has no tab or More entry.
  */
-export function hubSections(kind: Kind, member: boolean): { tabs: HubSection[]; more: HubSection[] } {
+export function hubSections(
+  kind: Kind,
+  member: boolean,
+  { tournamentsAhead = false, sectionOn = () => true }: { tournamentsAhead?: boolean; sectionOn?: (s: OptionalTeamSection) => boolean } = {},
+): { tabs: HubSection[]; more: HubSection[] } {
+  const all = allHubSections(kind, member, tournamentsAhead);
+  const shown = (s: HubSection) => !s.optional || sectionOn(s.optional);
+  return { tabs: all.tabs.filter(shown), more: all.more.filter(shown) };
+}
+
+function allHubSections(kind: Kind, member: boolean, tournamentsAhead: boolean): { tabs: HubSection[]; more: HubSection[] } {
   const feed: HubSection = { sub: "", label: "Feed" };
   const schedule: HubSection = { sub: "/schedule", label: "Schedule" };
   const chat: HubSection = { sub: "/chat", label: "Chat" };
   const roster: HubSection = { sub: "/roster", label: kind === "team" ? "Roster" : "Members" };
   const teams: HubSection = { sub: "/teams", label: "Teams" };
-  const playbook: HubSection = { sub: "/playbook", label: "Playbook", also: ["/plays"] };
-  const stats: HubSection = { sub: "/stats", label: "Stats" };
-  const videos: HubSection = { sub: "/videos", label: "Videos" };
+  const playbook: HubSection = { sub: "/playbook", label: "Playbook", also: ["/plays", "/whiteboards"], optional: "playbook" };
+  const stats: HubSection = { sub: "/stats", label: "Stats", optional: "stats" };
+  const videos: HubSection = { sub: "/videos", label: "Videos", optional: "videos" };
   const tournaments: HubSection = { sub: "/tournaments", label: "Tournaments" };
-  const meetings: HubSection = { sub: "/meetings", label: "Meetings" };
+  const meetings: HubSection = { sub: "/meetings", label: "Meetings", optional: "meetings" };
   const org = kind === "organization";
   if (!member) return { tabs: [feed, schedule, roster, ...(org ? [teams] : [])], more: [] };
-  if (kind === "team") return { tabs: [feed, schedule, chat, roster, playbook, stats], more: [videos, tournaments, meetings] };
+  if (kind === "team") {
+    return tournamentsAhead
+      ? { tabs: [feed, schedule, chat, tournaments, roster, playbook, stats], more: [videos, meetings] }
+      : { tabs: [feed, schedule, chat, roster, playbook, stats], more: [videos, tournaments, meetings] };
+  }
   if (org) return { tabs: [feed, schedule, chat, roster, teams, tournaments], more: [meetings] };
   return { tabs: [feed, schedule, chat, roster, tournaments, meetings], more: [] };
 }
@@ -54,16 +81,20 @@ export function inSection(path: string, base: string, section: HubSection): bool
 /**
  * The hub's tabs, sticky under the top bar: up to six in a row (it
  * scrolls sideways on narrow screens, with a fade at the hidden edge),
- * then More ▾ for the rest and the Settings gear, which stay put.
+ * then More ▾ for the rest, which stays put. Members' Settings gear is
+ * in the header (TeamBannerActions).
  */
 export function TeamNav() {
   const { teamId, kind, viewer } = useTeamHub();
   const path = usePathname();
   const base = `/teams/${teamId}`;
   const member = viewer.state === "member";
-  const { tabs, more } = hubSections(kind, member);
+  const { user } = useAuth();
+  // Only members may read a team's entries; the rule is shared with the app.
+  const entered = useLiveQuery<EnteredTournamentDoc>(user && member && kind === "team" ? `teams/${teamId}/tournamentEntries` : null, [], teamId);
+  const tournamentsAhead = hasTournamentAhead(entered.data ?? [], new Date());
+  const { tabs, more } = hubSections(kind, member, { tournamentsAhead, sectionOn: (s) => viewerSectionOn(viewer, s) });
   const scroller = useScrollEdges<HTMLElement>();
-  const onSettings = path.startsWith(`${base}/settings`);
 
   return (
     <div className="team-tabs-bar">
@@ -78,17 +109,6 @@ export function TeamNav() {
         })}
       </nav>
       {more.length > 0 && <MoreMenu base={base} sections={more} path={path} />}
-      {member && (
-        <Link
-          href={`${base}/settings`}
-          className={`icon-btn team-gear${onSettings ? " on" : ""}`}
-          aria-label="Settings"
-          title="Settings"
-          aria-current={onSettings ? "page" : undefined}
-        >
-          <NavIcon name="settings" size={20} />
-        </Link>
-      )}
     </div>
   );
 }
@@ -115,8 +135,44 @@ function useScrollEdges<T extends HTMLElement>() {
   return { ref, edges, update };
 }
 
-/** More ▾: the sections that don't fit in the row. Closes on Esc, a click outside, or opening a page. */
+/** More's line under a section (teamMoreSubtitles, as in the app), if it has one. */
+function moreSubtitle(section: HubSection): string | undefined {
+  const row = section.sub.slice(1);
+  return row in teamMoreSubtitles ? teamMoreSubtitles[row as TeamMoreRow] : undefined;
+}
+
+/**
+ * More ▾: the sections that don't fit in the row, each with a line on
+ * what's there; then, as in the app's More, "Manage team" for the team's
+ * admins (Settings, as the header's gear) and Leave for everyone but the
+ * owner (who hands the team on first, in Settings, and is told so),
+ * with Settings' own confirm (LEAVE_CONFIRM). Closes on Esc, a click
+ * outside, or opening a page.
+ */
 function MoreMenu({ base, sections, path }: { base: string; sections: HubSection[]; path: string }) {
+  const { teamId, kind, viewer } = useTeamHub();
+  const { user } = useAuth();
+  const router = useRouter();
+  const [leaving, setLeaving] = useState(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
+  const member = viewer.state === "member" ? viewer : null;
+  // The app's Settings menu item: a team's admins, not a league's drafted team.
+  const manage = !!member && kind === "team" && member.can("manageTeam") && !member.team.leagueId;
+  const canLeave = !!member && member.tier !== "owner";
+  const noun = kind === "team" ? "team" : "community";
+  const onSettings = path.startsWith(`${base}/settings`);
+  async function leave() {
+    if (!user || !window.confirm(LEAVE_CONFIRM)) return;
+    setLeaving(true);
+    setLeaveError(null);
+    try {
+      await callApi(user, `/v1/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(user.uid)}`, { method: "DELETE" });
+      router.push("/teams");
+    } catch (e) {
+      setLeaveError(problem(e));
+      setLeaving(false);
+    }
+  }
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
@@ -151,7 +207,7 @@ function MoreMenu({ base, sections, path }: { base: string; sections: HubSection
         aria-controls="team-more-menu"
         onClick={() => setOpen((o) => !o)}
       >
-        {active ? active.label : "More"} <span aria-hidden="true">▾</span>
+        {active ? `More: ${active.label}` : "More"} <span aria-hidden="true">▾</span>
       </button>
       {open && (
         <ul className="team-more-menu card" id="team-more-menu">
@@ -161,10 +217,34 @@ function MoreMenu({ base, sections, path }: { base: string; sections: HubSection
               <li key={s.sub}>
                 <Link href={base + s.sub} className={on ? "active" : undefined} aria-current={on ? "page" : undefined}>
                   {s.label}
+                  {moreSubtitle(s) && <small>{moreSubtitle(s)}</small>}
                 </Link>
               </li>
             );
           })}
+          {manage && (
+            <li>
+              <Link href={`${base}/settings`} className={onSettings ? "active" : undefined} aria-current={onSettings ? "page" : undefined}>
+                {manageRowLabel(kind)}
+                <small>{teamMoreSubtitles.manage}</small>
+              </Link>
+            </li>
+          )}
+          {canLeave && (
+            <li>
+              <div className="team-more-sep" role="separator" />
+              <button type="button" className="team-more-leave" disabled={leaving || !user} onClick={() => void leave()}>
+                {leaving ? "Leaving…" : `Leave ${noun}`}
+              </button>
+              {leaveError && <span className="post-error">{leaveError}</span>}
+            </li>
+          )}
+          {member?.tier === "owner" && (
+            <li>
+              <div className="team-more-sep" role="separator" />
+              <small className="team-more-note">Owners can&apos;t leave. To leave, make someone else the owner first (Settings).</small>
+            </li>
+          )}
         </ul>
       )}
     </div>
@@ -173,18 +253,20 @@ function MoreMenu({ base, sections, path }: { base: string; sections: HubSection
 
 /**
  * Join from the page: a community anyone may join, or ask to join one that
- * approves members. A team takes members by invite only, so its outsiders
- * get the invite-only hint (TeamBanner) instead. Members see their role
- * beside the member count (MemberCount).
+ * approves members, or a team that takes join requests (F26: "Request to
+ * join", the club age rule checked by the API). Other teams take members
+ * by invite only, so their outsiders get the invite-only hint (TeamBanner)
+ * instead. Members see their role beside the member count (MemberCount).
  */
 export function JoinButton() {
-  const { teamId, kind, privateGroup, viewer } = useTeamHub();
+  const { teamId, kind, privateGroup, joinRequests, viewer } = useTeamHub();
   const { user } = useAuth();
-  const request = useLiveDoc(viewer.state === "outsider" && privateGroup ? `teams/${teamId}/joinRequests/${viewer.uid}` : null);
+  const asks = kind === "team" ? joinRequests === true : privateGroup;
+  const request = useLiveDoc(viewer.state === "outsider" && asks ? `teams/${teamId}/joinRequests/${viewer.uid}` : null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (viewer.state !== "outsider" || kind === "team" || !user) return null;
+  if (viewer.state !== "outsider" || (kind === "team" && !asks) || !user) return null;
 
   async function run(method: string, path: string) {
     setBusy(true);
@@ -199,7 +281,7 @@ export function JoinButton() {
   }
 
   let button;
-  if (!privateGroup) {
+  if (!asks) {
     button = (
       <button type="button" className="btn btn-primary btn-small" disabled={busy} onClick={() => void run("POST", `/v1/teams/${teamId}/members`)}>
         Join
@@ -225,7 +307,7 @@ export function JoinButton() {
         disabled={busy || request.data === undefined}
         onClick={() => void run("POST", `/v1/teams/${teamId}/join-requests`)}
       >
-        Ask to join
+        {kind === "team" ? "Request to join" : "Ask to join"}
       </button>
     );
   }
@@ -256,7 +338,7 @@ export function MembersOnlySection({ what }: { what: string }) {
   return (
     <div className="card hub-empty">
       <p>
-        Only members see this {kind === "team" ? "team" : "group"}&apos;s {what}.
+        Only members see this {kind === "team" ? "team" : "community"}&apos;s {what}.
       </p>
       {viewer.state === "visitor" && (
         <Link className="btn btn-primary btn-small" href={`/sign-in?next=${encodeURIComponent(path + query)}`}>

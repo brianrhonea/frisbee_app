@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../data/repositories/hosted_tournament/hosted_tournament_repository.dart';
+import '../../../data/repositories/hosted_tournament/tournament_days.dart';
 import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/event/event_repository.dart';
 import '../../../data/repositories/follow/follow_repository.dart';
@@ -35,7 +37,7 @@ typedef FeedPostDraft = ({String teamId, PostDraft draft});
 enum OnboardingStep {
   username('Pick a username'),
   join('Join or create a team'),
-  find('Find a team or group near you'),
+  find('Find a team or community near you'),
   follow('Follow people');
 
   const OnboardingStep(this.label);
@@ -60,6 +62,7 @@ class HomeViewModel extends ChangeNotifier {
     required FollowRepository followRepository,
     required UserPostRepository userPostRepository,
     required FilePickerService filePicker,
+    HostedTournamentRepository? tournamentRepository,
     DateTime Function()? clock,
   }) : _auth = authRepository,
        _teamRepo = teamRepository,
@@ -69,6 +72,15 @@ class HomeViewModel extends ChangeNotifier {
        _picker = filePicker,
        _clock = clock ?? DateTime.now {
     joinTeam = Command1<String, String>(_joinTeam);
+    final me = authRepository.currentUser?.uid ?? '';
+    if (tournamentRepository != null && me.isNotEmpty) {
+      _days = TournamentDays(
+        repository: tournamentRepository,
+        teams: teamRepository.watchMyTeams(me),
+        uid: me,
+        clock: clock,
+      )..addListener(notifyListeners);
+    }
     savePost = Command1<void, FeedPostDraft>(_savePost);
     deletePost = Command1<void, TeamPostItem>(
       (p) => _posts.deletePost(p.teamId, p.post.id),
@@ -195,12 +207,14 @@ class HomeViewModel extends ChangeNotifier {
   final _requestSubs = <String, StreamSubscription<List<GroupJoinRequest>>>{};
   final _requestCounts = <String, int>{};
 
-  /// Groups that approve who joins and the user may approve for (Manage
-  /// members), by name: the only ones with join requests, and the rules
-  /// let these members read them.
+  /// Groups that approve who joins and teams that allow join requests
+  /// (F26) the user may approve for (Manage members), by name: the only
+  /// ones with join requests, and the rules let these members read them.
   List<Team> get _approvingGroups => ([
     for (final t in teams)
-      if (t.isPrivateGroup && t.has(_uid, TeamPermission.manageMembers)) t,
+      if ((t.isPrivateGroup || t.allowJoinRequests) &&
+          t.has(_uid, TeamPermission.manageMembers))
+        t,
   ]..sort((a, b) => a.name.compareTo(b.name))).take(needsYouGroups).toList();
 
   void _watchJoinRequests() {
@@ -356,6 +370,12 @@ class HomeViewModel extends ChangeNotifier {
   // Schedule ---------------------------------------------------------------
 
   /// The next event of one of the user's teams, for the "Up next" card.
+  TournamentDays? _days;
+
+  /// The user's teams on a tournament day (today, or this evening for
+  /// tomorrow): shown in place of the next event.
+  List<TeamTournamentDay> get tournamentDays => _days?.days ?? const [];
+
   ScheduleEntry? get nextTeamEvent =>
       _feed.upcoming(limit: 1, personal: false).firstOrNull;
 
@@ -393,6 +413,9 @@ class HomeViewModel extends ChangeNotifier {
     );
     _feed
       ..removeListener(_onFeed)
+      ..dispose();
+    _days
+      ?..removeListener(notifyListeners)
       ..dispose();
     for (final sub in _requestSubs.values) {
       sub.cancel();

@@ -80,9 +80,15 @@ class PostActions extends ChangeNotifier {
   bool isLiked(UserPost post) => target(post)?.likedBy.contains(_uid) ?? false;
 
   /// Someone else's post (or a repost of one) the user hasn't reposted.
+  /// Someone else's post, and not a private profile's (a repost would
+  /// reach the reposter's followers; the rules refuse it). One reposted
+  /// before can still be taken back.
   bool canRepost(UserPost post) {
     final t = target(post);
-    return t != null && _uid.isNotEmpty && t.authorId != _uid;
+    return t != null &&
+        _uid.isNotEmpty &&
+        t.authorId != _uid &&
+        (!t.isPrivate || isReposted(post));
   }
 
   bool isReposted(UserPost post) =>

@@ -208,6 +208,14 @@ describe("post photos", () => {
     await assertFails(visitor("pub").getMetadata());
   });
 
+  it("website visitors don't see a team's public post photos while its public page is off", async () => {
+    await seed();
+    const visitor = () => env.unauthenticatedContext().storage().ref(`teams/${TEAM}/posts/pub/1/0-photo.png`);
+    await env.withSecurityRulesDisabled((ctx) => updateDoc(doc(ctx.firestore(), "teams", TEAM), { publicPage: false }));
+    await assertFails(visitor().getMetadata());
+    await assertSucceeds(photo(PLAYER, "pub").getMetadata());
+  });
+
   it("owners, coaches and captains upload photos; players cannot", async () => {
     for (const uid of [OWNER, COACH, CAPTAIN]) {
       await assertSucceeds(
@@ -323,5 +331,16 @@ describe("user post photos", () => {
     await assertFails(visitor(OWNER).getMetadata());
     // No profile: hidden.
     await assertFails(visitor(COACH).getMetadata());
+  });
+
+  it("a private profile's photos: the author and accepted followers only (S1)", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "profiles", OWNER), { name: "Olive", private: true });
+      await setDoc(doc(ctx.firestore(), "users", COACH, "follows", `user_${OWNER}`), { key: `user_${OWNER}` });
+      await ctx.storage().ref(`users/${OWNER}/posts/p1/1/0-photo.png`).put(bytes(10)).then();
+    });
+    await assertSucceeds(photo(OWNER).getMetadata());
+    await assertSucceeds(photo(COACH, OWNER).getMetadata());
+    await assertFails(photo(OUTSIDER, OWNER).getMetadata());
   });
 });

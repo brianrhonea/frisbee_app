@@ -369,6 +369,50 @@ void main() {
     );
   });
 
+  test('picking channels (discord/pick.json)', () {
+    final plan = DiscordImportPlan.fromMap(_splitPlan);
+    const overrides = <int, String?>{0: null, 1: 'woof', 5: 'whip'};
+    final cases = <(String, List<int>)>[
+      ('every channel', [0, 1, 2, 3, 4, 5]),
+      ('none: only categories that had no channels stay', []),
+      ('one channel of a category keeps it', [1, 3, 5]),
+      ('a whole category unticked leaves it out', [0, 3, 4, 5]),
+      ('out of range and repeated indexes are ignored', [5, 99, -1, 0, 5]),
+    ];
+    checkFixture(
+      'discord/pick.json',
+      'ChannelGroup.of(plan) (channelGroups) and PickedPlan.of(plan, picked, '
+          'overrides) (pickRooms in discord.ts) on the split.json plan.',
+      [
+        for (final (name, picked) in cases)
+          () {
+            final p = PickedPlan.of(plan, picked.toSet(), overrides: overrides);
+            return {
+              'name': name,
+              'plan': _splitPlan,
+              'picked': picked,
+              'overrides': [
+                for (final e in overrides.entries) [e.key, e.value],
+              ],
+              'groups': [
+                for (final g in ChannelGroup.of(plan))
+                  {'folderKey': g.folderKey, 'name': g.name, 'rooms': g.rooms},
+              ],
+              'expected': {
+                'folders': [for (final f in p.plan.folders) f.key],
+                'rooms': [for (final r in p.plan.rooms) r.name],
+                'roles': [for (final r in p.plan.roles) r.key],
+                'from': p.from,
+                'overrides': [
+                  for (final e in p.overrides.entries) [e.key, e.value],
+                ],
+              },
+            };
+          }(),
+      ],
+    );
+  });
+
   test('a linked team\'s share (discord/team_chat.json)', () {
     final plan = DiscordImportPlan.fromMap(_splitPlan);
     final split = DiscordTeamSplit.of(

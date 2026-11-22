@@ -1,5 +1,6 @@
 import {
   isYouthTeam,
+  publicPageOn,
   type PublicRoster,
   type PublicRosterPlayer,
   rosterIsPublic,
@@ -7,20 +8,24 @@ import {
   type RosterPerson,
   type RosterPlayer,
   type RosterTeam,
+  rosterLineOf,
   rosterMax,
+  setRosterLinesRequestSchema,
   type TeamRoster,
 } from "@stall10/shared";
 import type { Caller } from "../auth.js";
 import { isPrivateProfile, validId } from "../browse/model.js";
 import { isDraftedLeagueTeam, pinnedImageUrl } from "../browse/visibility.js";
-import { ApiError } from "../errors.js";
+import { ApiError, parseBody } from "../errors.js";
 import { docIdParam } from "../ids.js";
-import type { Data, DocStore } from "../store.js";
-import { can, mapOf } from "./access.js";
+import { type Data, type DocStore, deleteField } from "../store.js";
+import { can, isGroup, mapOf } from "./access.js";
 
 const positions = ["handler", "cutter", "hybrid"] as const;
 /** What anyone who isn't on a youth team sees in place of its roster (the app and website say the same). */
 export const youthRosterPrivate = "Rosters of youth teams are private: only members see them.";
+/** What anyone who isn't on a team with its public page off sees in place of its roster. */
+export const teamPagePrivate = "This team's page is private: only members see its roster.";
 const kinds = ["team", "community", "organization"] as const;
 /** Tiers first by rank, then everyone else by name (the app's roster order). */
 const tierOrder = ["owner", "coach", "captain", "stats", "player"];
@@ -64,13 +69,17 @@ export class RosterService {
     const kind = kinds.find((k) => k === team.kind) ?? "team";
     const isMember = Array.isArray(team.memberIds) && team.memberIds.includes(caller.uid);
     if (kind !== "team" && team.requiresApproval === true && !isMember) {
-      throw new ApiError("permission_denied", "Only members see who's in this group.");
+      throw new ApiError("permission_denied", "Only members see who's in this community.");
     }
     // A youth team's roster is its members' (and its school or club's
     // admins'), and so is a team's in a youth division of a league, whatever
     // level the team doc says (drafted before league teams kept "youth").
     if (!isMember && (isYouthTeam(team) || (await this.inYouthLeague(team, teamId)))) {
       if (!(await this.managesOrgOf(team, teamId, caller.uid))) throw new ApiError("permission_denied", youthRosterPrivate);
+    }
+    // A team whose public page is off (publicPageOn) shows outsiders its card only.
+    if (!isMember && !publicPageOn(team) && !(await this.managesOrgOf(team, teamId, caller.uid))) {
+      throw new ApiError("permission_denied", teamPagePrivate);
     }
 
     const players = kind === "team" ? await this.store.list(`teams/${teamId}/roster`, rosterMax) : [];
@@ -154,6 +163,28 @@ export class RosterService {
   }
 
   /**
+   * Puts roster spots on the O-line, D-line or both, or takes their line
+   * away (null): the roster's "Edit lines". Only for a team (groups keep
+   * no roster), by its admins who may change the roster (manageTeam, as
+   * the roster rules and roster-players). Every spot named must still be
+   * on the roster. The rules keep clients from writing `line` themselves.
+   */
+  async setLines(caller: Caller, rawTeamId: unknown, body: unknown): Promise<void> {
+    const teamId = docIdParam(rawTeamId);
+    const { lines } = parseBody(setRosterLinesRequestSchema, body);
+    const ids = Object.keys(lines);
+    await this.store.transact(async (tx) => {
+      const team = await tx.get(`teams/${teamId}`);
+      if (!team) throw new ApiError("not_found", "That team doesn't exist any more.");
+      if (isGroup(team)) throw new ApiError("failed_precondition", "Only teams have lines.");
+      if (!can(team, caller.uid, "manageTeam")) throw new ApiError("permission_denied", "Only the team's admins can change the roster.");
+      const spots = await Promise.all(ids.map((id) => tx.get(`teams/${teamId}/roster/${id}`)));
+      if (spots.some((s) => !s)) throw new ApiError("not_found", "Someone was taken off the roster. Refresh and try again.");
+      for (const id of ids) tx.update(`teams/${teamId}/roster/${id}`, { line: lines[id] ?? deleteField });
+    });
+  }
+
+  /**
    * Whether [team] plays in a league (leagueId) in a youth division: its
    * entry's division by the league's division summaries, or, without an
    * entry, any youth division of the league (refused to be safe).
@@ -208,6 +239,8 @@ function player(id: string, d: Data, cards: Map<string, RosterPerson>): RosterPl
   if (typeof d.number === "number" && Number.isInteger(d.number)) out.number = d.number;
   const pos = positions.find((p) => p === d.position);
   if (pos) out.position = pos;
+  const line = rosterLineOf(d.line);
+  if (line) out.line = line;
   const person = cards.get(str(d.userId));
   if (person) out.person = person;
   return out;

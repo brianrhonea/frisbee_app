@@ -5,16 +5,19 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../domain/models/team_video.dart';
 import '../../../routing/routes.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/back_or.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/video_viewmodel.dart';
 import 'file_video_player.dart';
+import 'video_discussion.dart';
 import 'youtube_player_view.dart';
 
 /// A team video: the player (YouTube's, or media_kit for uploads), its
-/// title and description.
+/// title and description, the event it's tagged to, its notes (tap one to
+/// play from there) and comments.
 class VideoScreen extends StatefulWidget {
   const VideoScreen({
     super.key,
@@ -25,7 +28,7 @@ class VideoScreen extends StatefulWidget {
 
   final VideoViewModel viewModel;
   final YouTubePlayerBuilder player;
-  final FileVideoPlayerBuilder filePlayer;
+  final SeekableFilePlayerBuilder filePlayer;
 
   @override
   State<VideoScreen> createState() => _VideoScreenState();
@@ -38,12 +41,45 @@ class _VideoScreenState extends State<VideoScreen> {
   void initState() {
     super.initState();
     vm.deleteVideo.addListener(_onDelete);
+    vm.addComment.addListener(_onAdd);
+    vm.deleteComment.addListener(_onDeleteComment);
+    vm.tagEvent.addListener(_onTag);
   }
 
   @override
   void dispose() {
     vm.deleteVideo.removeListener(_onDelete);
+    vm.addComment.removeListener(_onAdd);
+    vm.deleteComment.removeListener(_onDeleteComment);
+    vm.tagEvent.removeListener(_onTag);
     super.dispose();
+  }
+
+  void _onAdd() {
+    final cmd = vm.addComment;
+    if (cmd.error) {
+      showErrorSnackBar(context, cmd.result);
+      cmd.clearResult();
+    }
+  }
+
+  void _onDeleteComment() {
+    final cmd = vm.deleteComment;
+    if (cmd.completed) {
+      cmd.clearResult();
+      showSnackBar(context, 'Deleted');
+    } else if (cmd.error) {
+      showErrorSnackBar(context, cmd.result);
+      cmd.clearResult();
+    }
+  }
+
+  void _onTag() {
+    final cmd = vm.tagEvent;
+    if (cmd.error) {
+      showErrorSnackBar(context, cmd.result);
+      cmd.clearResult();
+    }
   }
 
   void _onDelete() {
@@ -78,8 +114,12 @@ class _VideoScreenState extends State<VideoScreen> {
   }
 
   Widget _player(TeamVideo video) {
-    if (video.isYouTube) return widget.player(video.youtubeId);
-    if (vm.fileUrl case final url?) return widget.filePlayer(url);
+    if (video.isYouTube) {
+      return widget.player(video.youtubeId, vm.attachPlayer);
+    }
+    if (vm.fileUrl case final url?) {
+      return widget.filePlayer(url, vm.attachPlayer);
+    }
     return AspectRatio(
       aspectRatio: 16 / 9,
       child: ColoredBox(
@@ -120,7 +160,7 @@ class _VideoScreenState extends State<VideoScreen> {
                 ),
         );
       }
-      final theme = Theme.of(context);
+      final c = AppColors.of(context);
       final when = video.createdAt;
       final byline = [
         if (video.authorName.isNotEmpty) 'Shared by ${video.authorName}',
@@ -164,34 +204,74 @@ class _VideoScreenState extends State<VideoScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(video.title, style: theme.textTheme.titleLarge),
+                      Text(
+                        video.title,
+                        style: TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                          color: c.ink,
+                        ),
+                      ),
                       if (byline.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
                             byline,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
+                            style: TextStyle(fontSize: 13, color: c.muted),
+                          ),
+                        ),
+                      if (video.isYouTube)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: OutlinedButton.icon(
+                            onPressed: () => launchUrl(
+                              Uri.parse(video.watchUrl),
+                              mode: LaunchMode.externalApplication,
                             ),
+                            style: OutlinedButton.styleFrom(
+                              shape: const StadiumBorder(),
+                              minimumSize: const Size(0, 36),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                              ),
+                              textStyle: const TextStyle(
+                                fontFamily: appFont,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            icon: const Icon(Icons.open_in_new, size: 16),
+                            label: const Text('Open on YouTube'),
                           ),
                         ),
                       if (video.description.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 16),
-                          child: SelectableText(video.description),
+                          child: SelectableText(
+                            video.description,
+                            style: TextStyle(
+                              fontSize: 14,
+                              height: 1.45,
+                              color: c.ink2,
+                            ),
+                          ),
                         ),
                       const SizedBox(height: 12),
-                      if (video.isYouTube)
-                        TextButton.icon(
-                          onPressed: () => launchUrl(
-                            Uri.parse(video.watchUrl),
-                            mode: LaunchMode.externalApplication,
-                          ),
-                          icon: const Icon(Icons.open_in_new),
-                          label: const Text('Open on YouTube'),
-                        ),
+                      VideoEventTag(viewModel: vm),
                     ],
                   ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: VideoNotes(
+                    viewModel: vm,
+                    watchUrl: video.isYouTube ? video.watchUrl : null,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: VideoComments(viewModel: vm),
                 ),
               ],
             ),

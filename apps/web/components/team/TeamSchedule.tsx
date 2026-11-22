@@ -6,14 +6,17 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useRef, useState } from "react";
 import { useAuth } from "../AuthProvider";
-import { EventItem } from "../EventItem";
 import { LocalTime } from "../LocalTime";
-import { downloadIcs } from "@/lib/calendar";
+import { AddToCalendar } from "../AddToCalendar";
 import { callApi } from "@/lib/client";
 import { type Doc, useLiveDoc, useLiveQueries, useLiveQuery } from "@/lib/live";
 import { type Meeting, meetingHref, meetingsHref, useTeamMeetings } from "./meetings/model";
-import { type TeamViewer, useTeamHub } from "./TeamContext";
+import { type TeamViewer, useTeamHub, viewerSectionOn } from "./TeamContext";
 import { TeamEventEditor } from "./TeamEventEditor";
+import { EventVideos } from "./videos/EventVideos";
+import { DateTile, isToday } from "./DateTile";
+import { needsRsvp, RsvpPill } from "../RsvpPill";
+import { NoteQuote, RsvpNoteField } from "../RsvpNote";
 import "./team_schedule_meetings.css";
 import { startOfToday } from "@/lib/dates";
 import { validId } from "@/lib/text";
@@ -23,6 +26,8 @@ import { EmptyState, Loading } from "../StatusViews";
 export interface TeamEventDoc extends PublicEvent {
   poll?: { question?: string; options?: Array<{ id: string; text: string }>; multiple?: boolean };
   rsvps?: Record<string, string>;
+  /** uid → a short note on their answer ("Late 15 min"), only while they have one. */
+  rsvpNotes?: Record<string, string>;
   votes?: Record<string, string[]>;
   reactions?: Record<string, string[]>;
   public?: boolean;
@@ -30,7 +35,7 @@ export interface TeamEventDoc extends PublicEvent {
   tournamentId?: string;
 }
 
-const typeLabels: Record<string, string> = {
+export const typeLabels: Record<string, string> = {
   practice: "Practice",
   game: "Game",
   tournament: "Tournament",
@@ -153,12 +158,12 @@ const entryStart = (x: Entry) => (x.kind === "event" ? x.event.startsAt : x.meet
 
 /** The schedule: events and meetings down the left, the open event (?event=) beside them; a meeting opens its own page. */
 export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) {
-  const { teamId, kind, privateGroup, youth, viewer } = useTeamHub();
+  const { teamId, kind, privateGroup, privatePage, youth, viewer } = useTeamHub();
   const params = useSearchParams();
   const pathname = usePathname();
   const past = params.get("when") === "past";
-  // A youth team's upcoming public events, live, for someone signed in who isn't on it.
-  const outsiderYouth = youth && viewer.state === "outsider";
+  // A youth team's upcoming public events, live, for someone signed in who isn't on it (not while its page is off).
+  const outsiderYouth = youth && !privatePage && viewer.state === "outsider";
   const outsider = useYouthOutsiderPublic(teamId, outsiderYouth && !past, { posts: false, eventLimit: upcomingEventCap });
   // Pages of the past shown; back to one on switching tabs.
   const [pastPages, setPastPages] = useState({ past, n: 1 });
@@ -169,6 +174,8 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
   const router = useRouter();
   const [editing, setEditing] = useState<string | null>(null);
   const manager = member?.can("manageEvents") ?? false;
+  // ?new=event (the community page's New event, F27) opens the editor for those who add events.
+  const shownEditor = editing ?? (manager && params.get("new") === "event" ? "new" : null);
   // ?event= for an event that isn't in the list showing (a past one, say): read it by id.
   const wanted = validId(params.get("event"));
   const listed = !!wanted && (member ? (live.data ?? []) : publicEvents).some((e) => e.id === wanted);
@@ -176,7 +183,10 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
 
   if (viewer.state === "loading") return <Loading />;
   if (!member && privateGroup) {
-    return <EmptyState>Only members see this group&apos;s events.</EmptyState>;
+    return <EmptyState>Only members see this community&apos;s events.</EmptyState>;
+  }
+  if (!member && privatePage) {
+    return <EmptyState>This team&apos;s page is private. Only members see its events.</EmptyState>;
   }
   // Signed out: a youth team's card only.
   if (youth && viewer.state === "visitor") return <EmptyState>{youthVisitorNote}</EmptyState>;
@@ -198,52 +208,70 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
   };
 
   return (
-    <div className="hub-split">
+    <div className="hub-split sched-split">
       <div className="hub-list">
-        {manager && (
-          <p className="schedule-new">
-            <button type="button" className="btn btn-primary btn-small" onClick={() => setEditing("new")}>
-              New event
-            </button>
-            {/* The app's New → Meeting; the API lets the same admins schedule meetings. */}
-            <Link className="btn btn-small" href={`${meetingsHref(teamId)}/new`}>
-              New meeting
-            </Link>
-          </p>
-        )}
-        {member && (
-          <div className="segmented" role="tablist" aria-label="Show">
-            <Link href={link({ when: null, event: null })} className={past ? "" : "on"} aria-selected={!past} role="tab">
-              Upcoming
-            </Link>
-            <Link href={link({ when: "past", event: null })} className={past ? "on" : ""} aria-selected={past} role="tab">
-              Past
-            </Link>
+        {(manager || member) && (
+          <div className="sched-tools">
+            {member && (
+              <div className="segmented" role="tablist" aria-label="Show">
+                <Link href={link({ when: null, event: null })} className={past ? "" : "on"} aria-selected={!past} role="tab">
+                  Upcoming
+                </Link>
+                <Link href={link({ when: "past", event: null })} className={past ? "on" : ""} aria-selected={past} role="tab">
+                  Past
+                </Link>
+              </div>
+            )}
+            {manager && (
+              <p className="schedule-new">
+                <button type="button" className="btn btn-primary btn-small" onClick={() => setEditing("new")}>
+                  New event
+                </button>
+                {/* The app's New → Meeting; the API lets the same admins schedule meetings. With Meetings off (Settings › Sections) New adds an event only. */}
+                {viewerSectionOn(viewer, "meetings") && (
+                  <Link className="btn btn-small btn-quiet" href={`${meetingsHref(teamId)}/new`}>
+                    New meeting
+                  </Link>
+                )}
+              </p>
+            )}
           </div>
         )}
         {entries.length === 0 ? (
           <EmptyState>{past ? "No past events." : "Nothing scheduled."}</EmptyState>
         ) : (
-          <ul className="hub-items">
-            {entries.map((x) => {
-              if (x.kind === "meeting") return <MeetingItem key={`m-${x.meeting.id}`} teamId={teamId} meeting={x.meeting} />;
-              const e = x.event;
-              return (
-              <li key={e.id}>
-                <Link href={link({ event: e.id })} scroll={false} className={e.id === open?.id ? "active" : ""} aria-current={e.id === open?.id ? "true" : undefined}>
-                  <EventItem startsAt={e.startsAt}>
-                    <b>{e.title || typeLabels[e.type ?? ""] || "Event"}</b>
-                    <small>
-                      <LocalTime iso={e.startsAt} style="dateTime" />
-                      {e.location ? ` · ${e.location}` : ""}
-                    </small>
-                    {member && <RsvpLine event={e} uid={member.uid} />}
-                  </EventItem>
-                </Link>
-              </li>
-              );
-            })}
-          </ul>
+          <div className="card sched-card">
+            <ul className="hub-items sched-list">
+              {entries.map((x) => {
+                if (x.kind === "meeting") return <MeetingItem key={`m-${x.meeting.id}`} teamId={teamId} meeting={x.meeting} />;
+                const e = x.event;
+                const on = e.id === open?.id;
+                return (
+                  <li key={e.id}>
+                    <Link
+                      href={link({ event: e.id })}
+                      scroll={false}
+                      className={`team-sched-row${on ? " active" : ""}${isToday(e.startsAt) ? " today" : ""}`}
+                      aria-current={on ? "true" : undefined}
+                    >
+                      <DateTile startsAt={e.startsAt} />
+                      <span className="sched-main">
+                        <b>
+                          <span className="type-dot" aria-hidden="true" />
+                          {e.title || typeLabels[e.type ?? ""] || "Event"}
+                        </b>
+                        <small>
+                          <LocalTime iso={e.startsAt} style="dateTime" />
+                          {e.location ? ` · ${e.location}` : ""}
+                        </small>
+                      </span>
+                      {member && <RsvpLine event={e} uid={member.uid} past={past} />}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         )}
         {live.more && (
           <div className="pager">
@@ -254,17 +282,18 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
         )}
         {!member && (
           <p className="muted small">
-            {viewer.state === "visitor" ? "Members see the full schedule." : `Only ${kind === "team" ? "the team's" : "the group's"} public events show here.`}
+            {viewer.state === "visitor" ? "Members see the full schedule." : `Only ${kind === "team" ? "the team's" : "the community's"} public events show here.`}
           </p>
         )}
       </div>
       <div className="hub-detail">
-        {editing ? (
+        {shownEditor ? (
           <TeamEventEditor
-            event={editing === "new" ? undefined : (events.find((e) => e.id === editing) ?? (open?.id === editing ? open : undefined))}
+            event={shownEditor === "new" ? undefined : (events.find((e) => e.id === shownEditor) ?? (open?.id === shownEditor ? open : undefined))}
             onDone={(id) => {
               setEditing(null);
-              if (id) router.replace(link({ event: id }), { scroll: false });
+              if (id) router.replace(link({ event: id, new: null }), { scroll: false });
+              else if (params.get("new")) router.replace(link({ new: null }), { scroll: false });
             }}
           />
         ) : open ? (
@@ -280,28 +309,37 @@ function MeetingItem({ teamId, meeting }: { teamId: string; meeting: Meeting }) 
   const live = meeting.status === "live";
   return (
     <li className="schedule-meeting">
-      <Link href={meetingHref(teamId, meeting.id)}>
-        <EventItem startsAt={meeting.startsAt}>
-          <b>{meeting.title || "Meeting"}</b>
+      <Link href={meetingHref(teamId, meeting.id)} className={`team-sched-row${live ? " today" : ""}`}>
+        <DateTile startsAt={meeting.startsAt} />
+        <span className="sched-main">
+          <b>
+            <span className="type-dot" aria-hidden="true" />
+            {meeting.title || "Meeting"}
+          </b>
           <small>
             <LocalTime iso={meeting.startsAt} style="dateTime" />
             {" · "}
             <span className={live ? "schedule-meeting-live" : ""}>{live ? "Live now" : "Video meeting"}</span>
           </small>
-        </EventItem>
+        </span>
       </Link>
     </li>
   );
 }
 
-function RsvpLine({ event, uid }: { event: TeamEventDoc; uid: string }) {
+/**
+ * A row's answers: how many are going and the member's own answer as a
+ * pill (the app's RsvpStatusPill): Going in turf, others neutral, and
+ * "Needs RSVP" in amber only on an upcoming event they haven't answered.
+ */
+function RsvpLine({ event, uid, past }: { event: TeamEventDoc; uid: string; past: boolean }) {
   const mine = event.rsvps?.[uid];
   const going = Object.values(event.rsvps ?? {}).filter((s) => s === "going").length;
   return (
-    <small className="rsvp-line">
-      {going} going
-      {mine && <span className={`rsvp-mine ${mine}`}> · You: {rsvpLabels.find(([k]) => k === mine)?.[1] ?? mine}</span>}
-    </small>
+    <span className="rsvp-line">
+      <small>{going} going</small>
+      <RsvpPill answer={mine} type={event.type} needs={!past && needsRsvp(mine, event.startsAt, event.endsAt)} />
+    </span>
   );
 }
 
@@ -335,6 +373,8 @@ function EventDetail({ event, onEdit }: { event: Doc<TeamEventDoc>; onEdit?: () 
 
   const mine = member ? event.rsvps?.[member.uid] : undefined;
   const going = mine === "going";
+  // "Needs RSVP" (amber) only while it's the member's to answer: unanswered and not over.
+  const unanswered = !!member && !mine && !scheduleEntryOver(event.startsAt, event.endsAt, Date.now());
   const myReactions = member ? (event.reactions?.[member.uid] ?? []) : [];
   const myVotes = member ? (event.votes?.[member.uid] ?? []) : [];
   function vote(id: string) {
@@ -346,17 +386,20 @@ function EventDetail({ event, onEdit }: { event: Doc<TeamEventDoc>; onEdit?: () 
   return (
     <article className="card event-detail">
       <div className="event-detail-head">
-        <p className="pill">{typeLabels[event.type ?? ""] ?? "Event"}</p>
+        <p className="pill type-chip">
+          <span className="type-dot" aria-hidden="true" />
+          {typeLabels[event.type ?? ""] ?? "Event"}
+        </p>
         {onEdit && (
           <span className="post-admin">
             {!event.tournamentId && (
-              <button type="button" className="text-btn" onClick={onEdit}>
+              <button type="button" className="btn btn-small btn-quiet" onClick={onEdit}>
                 Edit
               </button>
             )}
             <button
               type="button"
-              className="text-btn danger"
+              className="btn btn-small btn-quiet"
               disabled={busy}
               onClick={() => {
                 if (window.confirm("Delete this event for everyone?")) void send("", "DELETE");
@@ -378,38 +421,44 @@ function EventDetail({ event, onEdit }: { event: Doc<TeamEventDoc>; onEdit?: () 
         )}
       </p>
       {event.location && (
-        <p>
+        <p className="event-place">
+          <span>{event.location}</span>
           <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location)}`} target="_blank" rel="noopener">
-            {event.location}
+            Directions
           </a>
         </p>
       )}
-      {event.notes && <p className="post-body">{event.notes}</p>}
+      {event.notes && (
+        <div className="event-notes">
+          <h3>Notes</h3>
+          <p className="post-body">{event.notes}</p>
+        </div>
+      )}
       {event.startsAt && (
-        <p>
-          <button
-            type="button"
-            className="text-btn"
-            onClick={() =>
-              downloadIcs({
-                uid: `team-${teamId}-${event.id}@stall10.app`,
-                title: event.title || typeLabels[event.type ?? ""] || "Event",
-                startsAt: event.startsAt!,
-                endsAt: event.endsAt,
-                location: event.location,
-                description: event.notes,
-              })
-            }
-          >
-            Add to calendar
-          </button>
-        </p>
+        <div className="event-cal">
+          <AddToCalendar
+            event={{
+              uid: `team-${teamId}-${event.id}@stall10.app`,
+              title: event.title || typeLabels[event.type ?? ""] || "Event",
+              startsAt: event.startsAt,
+              endsAt: event.endsAt,
+              location: event.location,
+              description: event.notes,
+            }}
+          />
+        </div>
       )}
 
       <EventTournamentLink event={event} />
+      <EventVideos eventId={event.id} />
 
       {member && (
         <>
+          <div className={`rsvp-ask${unanswered ? " needs" : ""}`}>
+            <p className="rsvp-ask-title">
+              Are you in?
+              {unanswered && <span className="rsvp-pill needs">Needs RSVP</span>}
+            </p>
           <div className="segmented rsvp-buttons" role="group" aria-label="Your answer">
             {rsvpLabels.map(([status, label, tLabel]) => (
               <button
@@ -420,9 +469,19 @@ function EventDetail({ event, onEdit }: { event: Doc<TeamEventDoc>; onEdit?: () 
                 disabled={busy}
                 onClick={() => void send("/rsvp", "PUT", { status: mine === status ? null : status })}
               >
-                {tournament ? tLabel : label}
+                <span>{tournament ? tLabel : label}</span>
+                <small className="rsvp-count">{Object.values(event.rsvps ?? {}).filter((x) => x === status).length}</small>
               </button>
             ))}
+          </div>
+          {/* A note goes with an answer, and goes when it's taken back. */}
+          {mine && (
+            <RsvpNoteField
+              note={event.rsvpNotes?.[member.uid] ?? ""}
+              disabled={busy}
+              onSave={(note) => send("/rsvp", "PUT", { status: mine, note })}
+            />
+          )}
           </div>
           {going && (
             <p className="reaction-picker" role="group" aria-label="React">
@@ -446,21 +505,29 @@ function EventDetail({ event, onEdit }: { event: Doc<TeamEventDoc>; onEdit?: () 
             </p>
           )}
           <div className="rsvp-columns">
-            {rsvpLabels.map(([status, label, tLabel]) => {
-              const who = Object.entries(event.rsvps ?? {}).filter(([, s]) => s === status).map(([u]) => u);
-              return (
-                <div key={status}>
-                  <h3>
-                    {tournament ? tLabel : label} <span className="muted">{who.length}</span>
-                  </h3>
-                  <ul>
-                    {who.map((u) => (
-                      <li key={u}>{name(u)}</li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            })}
+            {[
+              ...rsvpLabels.map(([status, label, tLabel]) => ({
+                status,
+                label: tournament ? tLabel : label,
+                who: Object.entries(event.rsvps ?? {}).filter(([, s]) => s === status).map(([u]) => u),
+              })),
+              // The app's "No reply": members who haven't answered.
+              { status: "none", label: "No reply", who: (member.team.memberIds ?? []).filter((u) => !event.rsvps?.[u]) },
+            ].map(({ status, label, who }) => (
+              <div key={status} className={`rsvp-group ${status}`}>
+                <h3>
+                  <b>{who.length}</b> <span>{label}</span>
+                </h3>
+                <ul>
+                  {who.map((u) => (
+                    <li key={u}>
+                      {name(u)}
+                      {event.rsvps?.[u] && <NoteQuote note={event.rsvpNotes?.[u]} />}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
           {tally.length > 0 && (
             <p className="reaction-tally">

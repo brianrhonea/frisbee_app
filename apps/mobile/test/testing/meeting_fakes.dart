@@ -123,6 +123,7 @@ class FakeMeetingRepository implements MeetingRepository {
     TeamMeeting m, {
     MeetingStatus? status,
     Map<String, MeetingRsvp>? rsvps,
+    Map<String, String>? rsvpNotes,
   }) => TeamMeeting(
     id: m.id,
     title: m.title,
@@ -134,6 +135,7 @@ class FakeMeetingRepository implements MeetingRepository {
     requireApproval: m.requireApproval,
     status: status ?? m.status,
     rsvps: rsvps ?? m.rsvps,
+    rsvpNotes: rsvpNotes ?? m.rsvpNotes,
     createdBy: m.createdBy,
   );
 
@@ -153,7 +155,26 @@ class FakeMeetingRepository implements MeetingRepository {
     final m = meetings[meetingId]!;
     final rsvps = {...m.rsvps};
     answer == null ? rsvps.remove(uid) : rsvps[uid] = answer;
-    meetings[meetingId] = _with(m, rsvps: rsvps);
+    meetings[meetingId] = _with(
+      m,
+      rsvps: rsvps,
+      rsvpNotes: answer == null ? ({...m.rsvpNotes}..remove(uid)) : null,
+    );
+    emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> setRsvpNote(
+    String teamId,
+    String meetingId,
+    String uid,
+    String note,
+  ) async {
+    final m = meetings[meetingId]!;
+    final notes = {...m.rsvpNotes};
+    note.isEmpty ? notes.remove(uid) : notes[uid] = note;
+    meetings[meetingId] = _with(m, rsvpNotes: notes);
     emit();
     return const Result.ok(null);
   }

@@ -122,10 +122,10 @@ export function nameMap(players: StatsPlayer[] | undefined) {
 }
 
 /** "W", "L", "T" or "LIVE" for a game row (GameRow). */
-export function badge(g: StatsGame, won: boolean | null): { text: string; tone: "win" | "loss" | "live" } {
+export function badge(g: StatsGame, won: boolean | null): { text: string; tone: "win" | "loss" | "tie" | "live" } {
   if (won === true) return { text: "W", tone: "win" };
   if (won === false) return { text: "L", tone: "loss" };
-  return { text: g.finished ? "T" : "LIVE", tone: "live" };
+  return g.finished ? { text: "T", tone: "tie" } : { text: "LIVE", tone: "live" };
 }
 
 export const shortDate = (iso: string) => formatDate(iso, { month: "short", day: "numeric" });

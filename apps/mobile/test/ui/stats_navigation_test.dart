@@ -113,7 +113,7 @@ void main() {
     expect(find.text('vs Sockeye'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
-    expect(find.text('Game / tournament'), findsOneWidget);
+    expect(find.text('Track stats'), findsOneWidget);
   });
 
   testWidgets('add a game to a new tournament', (tester) async {
