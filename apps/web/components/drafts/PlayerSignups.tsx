@@ -15,6 +15,7 @@ import Link from "next/link";
 import { type FormEvent, useState } from "react";
 import type { Doc } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
+import { HostPaymentControls, PayOnline } from "../payments/Payments";
 import {
   attempt,
   dateLabel,
@@ -178,6 +179,7 @@ function MySignup({ user, tournamentId, tournament: t, divisions }: { user: User
               : `Entry fee ${feeLabel(fee)} to pay. ${howToPay(fee)}${fee.dueAt ? ` Due ${dateLabel(fee.dueAt)}.` : ""}`}
         </p>
       )}
+      {fee && !paid && (mine.status === "accepted" || mine.status === "applied") && <PayOnline user={user} tournamentId={tournamentId} />}
       {error && <p className="form-error">{error}</p>}
       <div className="home-actions">
         {t.status === "registration" && mine.status !== "accepted" && (
@@ -359,6 +361,7 @@ function SignupList({ user, tournamentId, tournament: t, division: d }: { user: 
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fee = t.bidFee ?? null;
+  const paymentById = new Map(payments.map((x) => [x.id, x]));
   const paidById = new Map(payments.map((x) => [x.id, x.paid === true]));
   const isPaid = (uid: string) => paidById.get(uid) ?? false;
   const all = (signups.data ?? []).filter((s) => s.divisionId === d.id).sort((a, b) => a.name.localeCompare(b.name));
@@ -464,10 +467,7 @@ function SignupList({ user, tournamentId, tournament: t, division: d }: { user: 
                   {fee && (
                     <td>
                       {owes(s) && (
-                        <label className="check-row small">
-                          <input type="checkbox" checked={isPaid(s.id)} disabled={busy === s.id} onChange={(e) => run(s.id, () => draftApi.setPaid(user, tournamentId, s.id, e.target.checked))} />
-                          {isPaid(s.id) ? "Paid" : overdue(fee, false) ? "Overdue" : "Unpaid"}
-                        </label>
+                        <HostPaymentControls user={user} tournamentId={tournamentId} payerId={s.id} payment={paymentById.get(s.id)} overdue={overdue(fee, false)} />
                       )}
                     </td>
                   )}

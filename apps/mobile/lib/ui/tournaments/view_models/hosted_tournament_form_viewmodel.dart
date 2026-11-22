@@ -178,6 +178,7 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
   String currency = 'USD';
   String feeInstructions = '';
   DateTime? _feeDue;
+  bool _payerCoversFees = false;
   HostedKind _kind = HostedKind.tournament;
   TournamentEntryType _entryType = TournamentEntryType.teams;
   DraftMode draftMode = DraftMode.balanced;
@@ -196,6 +197,16 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
   DateTime? get endsOn => _endsOn;
   bool get hasFee => _hasFee;
   DateTime? get feeDue => _feeDue;
+
+  /// Paid online, payers also pay the processing fees so the host gets the
+  /// whole fee.
+  bool get payerCoversFees => _payerCoversFees;
+
+  void setPayerCoversFees(bool v) {
+    _payerCoversFees = v;
+    notifyListeners();
+  }
+
   HostedKind get kind => _kind;
   TournamentEntryType get entryType => _entryType;
   LeagueSeason get season => _season;
@@ -342,6 +353,7 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
       currency = fee.currency;
       feeInstructions = fee.instructions;
       _feeDue = fee.dueAt;
+      _payerCoversFees = fee.payerCoversFees;
     }
   }
 
@@ -470,6 +482,7 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
             currency: currency,
             instructions: feeInstructions.trim(),
             dueAt: _feeDue,
+            payerCoversFees: _payerCoversFees,
           )
         : null;
     final base =
@@ -502,6 +515,7 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
               currency: fee.currency,
               instructions: fee.instructions,
               dueAt: fee.dueAt,
+              payerCoversFees: fee.payerCoversFees,
             )
           : null,
       season: () => isLeague ? _season : null,

@@ -8,6 +8,7 @@ import '../../../utils/result.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
+import '../../payments/widgets/payment_widgets.dart';
 import '../view_models/hosted_tournament_form_viewmodel.dart';
 import 'event_format_section.dart';
 
@@ -758,13 +759,16 @@ class _HostedTournamentFormScreenState
                         subtitle: Text(
                           vm.teamEntry
                               ? 'What each player who signs up pays, and what '
-                                    'a team pays to reserve a spot. They pay '
-                                    'you directly; you mark them paid.'
+                                    'a team pays to reserve a spot. You mark '
+                                    'them paid, or Stall 10 does when they '
+                                    'pay online.'
                               : vm.takesPlayers
-                              ? 'What each player pays to sign up. Players pay '
-                                    'you directly; you mark them paid.'
-                              : 'What each team pays to hold its spot. Teams '
-                                    'pay you directly; you mark them paid.',
+                              ? 'What each player pays to sign up. You mark '
+                                    'them paid, or Stall 10 does when they '
+                                    'pay online.'
+                              : 'What each team pays to hold its spot. You '
+                                    'mark them paid, or Stall 10 does when '
+                                    'they pay online.',
                         ),
                         value: vm.hasFee,
                         onChanged: vm.setHasFee,
@@ -817,6 +821,11 @@ class _HostedTournamentFormScreenState
                             ),
                           ],
                         ),
+                        FeeBreakdownNote(
+                          amountCents: vm.feeCents,
+                          currency: vm.currency,
+                          payerCovers: vm.payerCoversFees,
+                        ),
                         if (vm.teamEntry) ...[
                           const SizedBox(height: 12),
                           TextField(
@@ -838,19 +847,38 @@ class _HostedTournamentFormScreenState
                               setState(() {});
                             },
                           ),
-                        ],
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: _instructions,
-                          maxLength: 500,
-                          maxLines: 3,
-                          minLines: 1,
-                          decoration: const InputDecoration(
-                            labelText: 'How to pay',
-                            hintText:
-                                'e.g. Venmo @club-treasurer with your team name',
+                          FeeBreakdownNote(
+                            amountCents: vm.teamFeeCents,
+                            currency: vm.currency,
+                            payerCovers: vm.payerCoversFees,
                           ),
-                          onChanged: (v) => vm.feeInstructions = v,
+                        ],
+                        PayerCoversFeesSwitch(
+                          value: vm.payerCoversFees,
+                          onChanged: vm.setPayerCoversFees,
+                          players: vm.takesPlayers,
+                        ),
+                        const SizedBox(height: 12),
+                        // With online payments on, these are the other ways
+                        // (a school's check or PO).
+                        PaymentsOnBuilder(
+                          builder: (context, on) => TextField(
+                            controller: _instructions,
+                            maxLength: 500,
+                            maxLines: 3,
+                            minLines: 1,
+                            decoration: InputDecoration(
+                              labelText: on
+                                  ? 'Other ways to pay'
+                                  : 'How to pay',
+                              hintText: on
+                                  ? 'e.g. Checks payable to Fling Crew, '
+                                        'mailed to 12 Main St'
+                                  : 'e.g. Venmo @club-treasurer with your '
+                                        'team name',
+                            ),
+                            onChanged: (v) => vm.feeInstructions = v,
+                          ),
                         ),
                         ListTile(
                           contentPadding: EdgeInsets.zero,

@@ -184,6 +184,7 @@ class BidFee {
     this.currency = 'USD',
     this.instructions = '',
     this.dueAt,
+    this.payerCoversFees = false,
   });
 
   final int amountCents;
@@ -192,6 +193,10 @@ class BidFee {
   /// How to pay, e.g. "Venmo @club-treasurer".
   final String instructions;
   final DateTime? dueAt;
+
+  /// Paid online, the payer also pays Stripe's and Stall 10's fees, so the
+  /// host gets the whole [amountCents].
+  final bool payerCoversFees;
 
   /// "$250" or "$250.50".
   String get label {
@@ -210,6 +215,7 @@ class BidFee {
       currency: raw['currency'] as String? ?? 'USD',
       instructions: raw['instructions'] as String? ?? '',
       dueAt: parseDate(raw['dueAt']),
+      payerCoversFees: raw['payerCoversFees'] == true,
     );
   }
 
@@ -218,6 +224,8 @@ class BidFee {
     'currency': currency,
     'instructions': instructions,
     'dueAt': dueAt,
+    // Only when on, so events without it still pass rules from before it.
+    if (payerCoversFees) 'payerCoversFees': true,
   };
 
   @override
@@ -226,10 +234,12 @@ class BidFee {
       other.amountCents == amountCents &&
       other.currency == currency &&
       other.instructions == instructions &&
-      other.dueAt == dueAt;
+      other.dueAt == dueAt &&
+      other.payerCoversFees == payerCoversFees;
 
   @override
-  int get hashCode => Object.hash(amountCents, currency, instructions, dueAt);
+  int get hashCode =>
+      Object.hash(amountCents, currency, instructions, dueAt, payerCoversFees);
 }
 
 /// What each player pays to enter a player-entry event. Same shape as a
@@ -960,6 +970,7 @@ class EntryPayment {
     this.paid = false,
     this.paidAt,
     this.note = '',
+    this.offlineAt,
   });
 
   static const maxNoteLength = 200;
@@ -971,18 +982,27 @@ class EntryPayment {
   /// The host's own note, e.g. "Venmo 3/2".
   final String note;
 
+  /// When the payer said they'll pay another way (a check, a PO); set
+  /// through the API. Kept by the host's marks.
+  final DateTime? offlineAt;
+
+  /// Unpaid, but the payer said they'll pay another way.
+  bool get payingAnotherWay => !paid && offlineAt != null;
+
   factory EntryPayment.fromMap(String teamId, Map<String, dynamic> map) =>
       EntryPayment(
         teamId: teamId,
         paid: map['paid'] as bool? ?? false,
         paidAt: parseDate(map['paidAt']),
         note: map['note'] as String? ?? '',
+        offlineAt: parseDate(map['offlineAt']),
       );
 
   Map<String, dynamic> toMap() => {
     'paid': paid,
     'paidAt': paidAt,
     'note': note,
+    'offlineAt': ?offlineAt,
   };
 }
 

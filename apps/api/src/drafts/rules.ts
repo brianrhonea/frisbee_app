@@ -125,7 +125,8 @@ export function signupUpdateProblem(c: SignupCtx, before: Data, next: Data): Pro
 /** allow create, update on payments: manages && the fields. */
 export function paymentProblem(manages: boolean, p: Data): Problem {
   if (!manages) return denied("Only the event's organizers can mark fees paid.");
-  if (!Object.keys(p).every((k) => ["paid", "paidAt", "note"].includes(k))) return bad("A payment can't have other fields.");
+  if (!Object.keys(p).every((k) => ["paid", "paidAt", "note", "offlineAt"].includes(k))) return bad("A payment can't have other fields.");
+  if (!(p.offlineAt === undefined || p.offlineAt === null || isTimestamp(p.offlineAt))) return bad("offlineAt must be a time.");
   if (typeof p.paid !== "boolean") return bad("Say whether it's paid.");
   if (!(p.paidAt === null || isTimestamp(p.paidAt))) return bad("paidAt must be a time.");
   if (!validString(p.note, 200)) return bad("The note can be up to 200 characters.");

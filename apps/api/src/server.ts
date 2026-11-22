@@ -30,6 +30,8 @@ import { LocalCipher, type PersonalCipher } from "./personal/cipher.js";
 import { KmsCipher } from "./personal/kms.js";
 import { webRevalidator } from "./web/revalidate.js";
 import { livekitFromEnv } from "./meetings/livekit.js";
+import { platformFeeFromEnv } from "./payments/service.js";
+import { stripeFromEnv } from "./payments/stripe.js";
 
 const projectId = process.env.FIREBASE_PROJECT_ID ?? "frisbee-app-brianrhonea-dev";
 const firebase = initializeApp({ projectId });
@@ -122,6 +124,7 @@ const app = buildApp({
   images: emulated || process.env.SAFE_SEARCH === "off" ? undefined : visionChecker(),
   personal: personalCipher(),
   livekit: livekitFromEnv(),
+  payments: paymentsConfig(),
 });
 
 /** Vision with the API's own credentials (Application Default Credentials). */
@@ -131,6 +134,18 @@ function visionChecker() {
   return new VisionImageChecker(async () => (await credential.getAccessToken()).access_token, {
     quotaProject: process.env.GOOGLE_CLOUD_QUOTA_PROJECT || undefined,
   });
+}
+
+/**
+ * Stripe (STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET) and where it sends
+ * people back (PAYMENTS_RETURN_URL, else WEB_SITE_URL). Missing any:
+ * online payments are off and hosts collect fees themselves.
+ */
+function paymentsConfig() {
+  const gateway = stripeFromEnv();
+  const returnUrl = (process.env.PAYMENTS_RETURN_URL || process.env.WEB_SITE_URL || "").trim().replace(/\/+$/, "");
+  if (!gateway || !returnUrl) return undefined;
+  return { gateway, fee: platformFeeFromEnv(), returnUrl };
 }
 
 /**

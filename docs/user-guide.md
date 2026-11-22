@@ -372,8 +372,9 @@ run it.
 
 1. Tap **Host a tournament**: name, dates, location, about, **Public**
    (any team can apply) or **Invite only** (only teams you invite play),
-   and an optional **bid fee**: amount, how to pay and a due date. Stall
-   10 doesn't take payments; teams pay you and you mark them paid.
+   and an optional **bid fee**: amount, how to pay and a due date. Teams
+   pay you your way and you mark them paid, or take payments online (see
+   **Taking payments online** below).
 2. It starts as a **draft** only your managers see. On its page, **Add**
    divisions: level and division (e.g. Club Mixed), team cap, format and
    game rules (game to, timeouts, length, fields, first game).
@@ -399,7 +400,33 @@ run it.
 A team's owner or captain taps **Apply with a team**, picks the division
 and up to 4 captains (they report scores), or **Accept invite** if
 invited. The Overview tab shows your status and whether your bid fee is
-marked paid.
+marked paid. When the host takes payments online, it also has **Pay
+online** for your team's fee (and on your signup, for your own entry
+fee): a secure Stripe checkout, after which the fee shows as paid.
+
+**Taking payments online**: the owner of the hosting team or community
+sees **Take payments online** on the event's Overview and connects a
+Stripe account (**Set up with Stripe**; **Continue with Stripe** if
+Stripe needs more). After that, teams and players can pay their fees in
+Stall 10. The money goes to your Stripe account: Stripe keeps its card
+fee and Stall 10 keeps 1% + $1 of each payment. When you set a fee, the
+form shows what you'd get of it paid online: on $100, about $94.80 after
+Stall 10's $2 and Stripe's card fee of about $3.20 (Stripe's usual 2.9% +
+30¢; some cards cost more). Switch on **Teams cover the processing
+fee** (or **Payers cover…**) and they pay the fees instead: $105.41 for a
+$100 fee, shown as a separate processing fee, and you get the whole $100.
+Payers can pay by card, or from a bank account if you switch it on in your
+Stripe Dashboard (bank payments take up to 4 business days and show as
+processing until then). Teams and players who pay by check, purchase
+order or another way tap **We'll pay another way**, and your lists show
+**Paying another way** until you mark it paid; tap the note button beside
+the paid switch to record how ("Check #1042"). With online payments on,
+the form's **How to pay** becomes **Other ways to pay**. Stall 10 keeps a
+history of every payment change (who, when, how much) for questions and
+disputes. Refunds, disputes and
+payouts are in your Stripe Dashboard; a full refund marks the fee unpaid
+again. You can still mark anyone paid by hand. (Online payments aren't
+switched on in test builds yet.)
 
 **On the day**: from the evening before, Home and your team's page show
 a tournament card in place of your next event: who you play next, when

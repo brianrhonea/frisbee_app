@@ -11,6 +11,7 @@ import '../../core/ui/layout.dart' show PersonAvatar;
 import '../../core/ui/status_views.dart';
 import '../../group_tournaments/widgets/hat_parts.dart'
     show GenderSplitBar, LegendDot, genderColor;
+import '../../payments/widgets/payment_widgets.dart';
 import '../view_models/hosted_tournament_viewmodel.dart';
 import '../view_models/player_signups_viewmodel.dart';
 import 'tournament_dialogs.dart';
@@ -204,6 +205,11 @@ class PlayerSignupCard extends StatelessWidget {
                     ),
                   ),
                 ),
+              if (fee != null &&
+                  !signups.isPaid(mine.uid) &&
+                  (mine.status == SignupStatus.accepted ||
+                      mine.status == SignupStatus.applied))
+                PayOnlineButton(tournamentId: viewModel.tournamentId),
               Wrap(
                 spacing: 8,
                 children: [
@@ -652,17 +658,39 @@ class _PlayersTabState extends State<PlayersTab> {
                     if (fee != null &&
                         s.status != SignupStatus.withdrawn &&
                         s.status != SignupStatus.declined)
-                      signups.isPaid(s.uid)
-                          ? 'Paid'
-                          : signups.isOverdue(s.uid, fee, now)
-                          ? 'Overdue'
-                          : 'Unpaid',
+                      paymentStatusLabel(
+                        signups.paymentOf(s.uid),
+                        overdue: signups.isOverdue(s.uid, fee, now),
+                      ),
+                    if ((signups.paymentOf(s.uid)?.note ?? '').isNotEmpty)
+                      signups.paymentOf(s.uid)!.note,
                   ].join(' · '),
                   style: TextStyle(fontSize: 12, color: c.muted),
                 ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (fee != null &&
+                        s.status != SignupStatus.withdrawn &&
+                        s.status != SignupStatus.declined)
+                      IconButton(
+                        tooltip: 'Payment note',
+                        icon: Icon(
+                          (signups.paymentOf(s.uid)?.note ?? '').isEmpty
+                              ? Icons.note_add_outlined
+                              : Icons.sticky_note_2,
+                        ),
+                        onPressed: () async {
+                          final note = signups.paymentOf(s.uid)?.note ?? '';
+                          final next = await editPaymentNote(context, note);
+                          if (next != null && next != note) {
+                            await signups.setPaymentNote.execute((
+                              uid: s.uid,
+                              note: next,
+                            ));
+                          }
+                        },
+                      ),
                     if (fee != null &&
                         s.status != SignupStatus.withdrawn &&
                         s.status != SignupStatus.declined)

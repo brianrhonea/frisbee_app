@@ -4243,6 +4243,11 @@ describe("hosted tournaments", () => {
       updateDoc(tRef(DIRECTOR), { bidFee: { amountCents: -5, currency: "USD", instructions: "", dueAt: null } }),
     );
     await assertSucceeds(updateDoc(tRef(DIRECTOR), { bidFee: null }));
+    // The host can pass the online fees on to payers; only as a yes or no.
+    const covered = { amountCents: 10000, currency: "USD", instructions: "", dueAt: null, payerCoversFees: true };
+    await assertSucceeds(updateDoc(tRef(DIRECTOR), { bidFee: covered }));
+    await assertFails(updateDoc(tRef(DIRECTOR), { bidFee: { ...covered, payerCoversFees: "yes" } }));
+    await assertFails(updateDoc(tRef(DIRECTOR), { bidFee: { ...covered, surcharge: 5 } }));
   });
 
   it("only an official host badges its events, and the app can't make a host official", async () => {
@@ -4384,6 +4389,11 @@ describe("hosted tournaments", () => {
     await assertFails(setDoc(payRef(CAPTAIN), { paid: true, paidAt: null, note: "" }));
     await assertSucceeds(setDoc(payRef(DIRECTOR), { paid: true, paidAt: new Date(), note: "Venmo" }));
     await assertFails(setDoc(payRef(DIRECTOR), { paid: "yes", paidAt: null, note: "" }));
+    // The payer's "paying another way" (written by the API) survives the host's marks.
+    await assertSucceeds(setDoc(payRef(DIRECTOR), { paid: false, paidAt: null, note: "Check #1042", offlineAt: new Date() }));
+    await assertSucceeds(setDoc(payRef(DIRECTOR), { paid: false, paidAt: null, note: "", offlineAt: null }));
+    await assertFails(setDoc(payRef(DIRECTOR), { paid: false, paidAt: null, note: "", offlineAt: "soon" }));
+    await assertFails(setDoc(payRef(CAPTAIN), { paid: false, paidAt: null, note: "", offlineAt: new Date() }));
     await assertSucceeds(getDoc(payRef(CAPTAIN)));
     await assertFails(getDoc(payRef(PLAYER)));
     await assertFails(getDoc(payRef(OUTSIDER)));

@@ -80,6 +80,7 @@ List<GoRoute> hostedTournamentRoutes() => [
               postRepository: c.read(),
               followRepository: c.read(),
               notificationRepository: c.read(),
+              paymentRepository: readOptional(c),
             ),
             builder: (_, vm) => ViewModelHost(
               key: ValueKey('tournament-signups-$id'),
@@ -87,6 +88,7 @@ List<GoRoute> hostedTournamentRoutes() => [
                 tournamentId: id,
                 tournamentRepository: c.read(),
                 authRepository: c.read(),
+                paymentRepository: readOptional(c),
               ),
               builder: (_, signups) => HostedTournamentScreen(
                 viewModel: vm,

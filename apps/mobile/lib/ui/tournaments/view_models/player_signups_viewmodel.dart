@@ -6,6 +6,7 @@ import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/hosted_tournament/hosted_tournament_repository.dart';
 import '../../../domain/models/hosted_tournament.dart';
 import '../../../domain/models/live_draft.dart';
+import '../../../data/repositories/payment/payment_repository.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 
@@ -27,14 +28,19 @@ class PlayerSignupsViewModel extends ChangeNotifier {
     required this.tournamentId,
     required HostedTournamentRepository tournamentRepository,
     required AuthRepository authRepository,
+    PaymentRepository? paymentRepository,
     bool manager = false,
   }) : _repo = tournamentRepository,
+       _paymentsApi = paymentRepository,
        _auth = authRepository,
        _uid = authRepository.currentUser?.uid ?? '' {
     signUp = Command1<void, SignupAnswers>(_signUp);
     withdraw = Command0<void>(_withdraw);
     decide = Command1<void, SignupDecision>(_decide);
     setPaid = Command1<void, ({String uid, bool paid})>(_setPaid);
+    setPaymentNote = Command1<void, ({String uid, String note})>(
+      _setPaymentNote,
+    );
     if (_uid.isNotEmpty) {
       _subs = [
         _repo.watchSignup(tournamentId, _uid).listen((s) {
@@ -67,11 +73,15 @@ class PlayerSignupsViewModel extends ChangeNotifier {
   EntryPayment? _myPayment;
   List<PlayerSignup> _signups = const [];
   Map<String, EntryPayment> _payments = const {};
+  final PaymentRepository? _paymentsApi;
 
   late final Command1<void, SignupAnswers> signUp;
   late final Command0<void> withdraw;
   late final Command1<void, SignupDecision> decide;
   late final Command1<void, ({String uid, bool paid})> setPaid;
+
+  /// The host's note on a player's payment ("Cash at check-in").
+  late final Command1<void, ({String uid, String note})> setPaymentNote;
 
   List<Command<void>> get commands => [signUp, withdraw, decide, setPaid];
 
@@ -223,15 +233,58 @@ class PlayerSignupsViewModel extends ChangeNotifier {
       return Result.error(Exception('Only the host can do that.'));
     }
     final old = _payments[p.uid];
-    return _repo.savePayment(
-      tournamentId,
+    return _savePayment(
       EntryPayment(
         teamId: p.uid,
         paid: p.paid,
-        paidAt: p.paid ? DateTime.now() : null,
+        paidAt: p.paid ? (old?.paidAt ?? DateTime.now()) : null,
         note: old?.note ?? '',
+        offlineAt: old?.offlineAt,
       ),
     );
+  }
+
+  Future<Result<void>> _setPaymentNote(({String uid, String note}) p) async {
+    if (!_manager) {
+      return Result.error(Exception('Only the host can do that.'));
+    }
+    final old = _payments[p.uid] ?? EntryPayment(teamId: p.uid);
+    return _savePayment(
+      EntryPayment(
+        teamId: p.uid,
+        paid: old.paid,
+        paidAt: old.paidAt,
+        note: p.note,
+        offlineAt: old.offlineAt,
+      ),
+    );
+  }
+
+  /// Shows [payment] at once, then saves it through the API when it's there
+  /// (the payment history), else to Firestore; undone if the save fails.
+  Future<Result<void>> _savePayment(EntryPayment payment) async {
+    final old = _payments[payment.teamId];
+    _payments = {..._payments, payment.teamId: payment};
+    notifyListeners();
+    final api = _paymentsApi;
+    final r = api != null && api.available
+        ? await api.mark(
+            tournamentId,
+            payment.teamId,
+            paid: payment.paid,
+            note: payment.note,
+          )
+        : await _repo.savePayment(tournamentId, payment);
+    if (r is Error) {
+      _payments = {..._payments};
+      if (old == null) {
+        _payments.remove(payment.teamId);
+      } else {
+        _payments[payment.teamId] = old;
+      }
+      notifyListeners();
+    }
+    return r;
   }
 
   @override

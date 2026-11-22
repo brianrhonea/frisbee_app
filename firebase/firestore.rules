@@ -1765,7 +1765,9 @@ service cloud.firestore {
 
       function validBidFee(f) {
         return f == null
-          || (f.keys().hasOnly(['amountCents', 'currency', 'instructions', 'dueAt'])
+          || (f.keys().hasOnly(['amountCents', 'currency', 'instructions', 'dueAt',
+                                'payerCoversFees'])
+              && (!('payerCoversFees' in f) || f.payerCoversFees is bool)
               && f.amountCents is int && f.amountCents >= 0
               && f.amountCents <= 10000000
               && f.currency is string && f.currency.matches('[A-Z]{3}')
@@ -2129,8 +2131,13 @@ service cloud.firestore {
         allow read: if signedIn()
           && (uid() == teamId || manages(current()) || teamAdmin(teamId));
         allow create, update: if signedIn() && manages(current())
-          && request.resource.data.keys().hasOnly(['paid', 'paidAt', 'note'])
+          && request.resource.data.keys().hasOnly(['paid', 'paidAt', 'note',
+                                                   'offlineAt'])
           && request.resource.data.paid is bool
+          // When the payer said they'll pay another way (set by the API).
+          && (!('offlineAt' in request.resource.data)
+              || request.resource.data.offlineAt == null
+              || request.resource.data.offlineAt is timestamp)
           && (request.resource.data.paidAt == null
               || request.resource.data.paidAt is timestamp)
           && validString(request.resource.data.note, 200);

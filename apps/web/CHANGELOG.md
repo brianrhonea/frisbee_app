@@ -4,6 +4,41 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.53.0 — 2026-11-21
+
+Works with API 0.40.0 (online payments; shows nothing until Stripe is set
+up on the API).
+
+**Added**
+- Hosts: the host's owner sees "Take payments online" on the event page
+  and connects Stripe (`PayoutsCard`); `/payments/payouts` is where
+  Stripe sends them back, and asks for a fresh link when one expired.
+- Payers: "Pay $400 online" on each of your teams' entries (with whether
+  its fee is paid) and on your own signup when the host takes payments
+  (`PayOnline`); Stripe Checkout opens in the tab and comes back to
+  `/payments/done`.
+- Hosts see what reaches them of a fee paid online, under the price in
+  the event form ("Paid online in Stall 10, you get about $94.80 of each
+  $100…", `FeeBreakdownNote`) and on the payout card for the event's own
+  fee. The fee section no longer says teams always pay the host directly.
+- "Teams cover the processing fee" in the event form: paid online, the
+  payer pays e.g. $105.41 for a $100 fee and the host gets $100; the Pay
+  button shows the total and the processing fee.
+- After paying: "Checking your payment…" until the API has asked Stripe
+  (no second Pay button meanwhile), and "Your bank payment is
+  processing…" while a bank payment clears.
+- Marking a player's entry fee paid ticks at once and undoes itself if
+  the save fails.
+- "We'll pay another way" under the Pay button (and in its place when the
+  host doesn't take payments online), with Undo; the host's lists show
+  "Paying another way".
+- Hosts mark teams' bid and spot fees paid on the Teams tab, as in the
+  app (it wasn't possible on the website before), and add a note to any
+  payment ("Check #1042"; `HostPaymentControls`), through
+  `PUT /v1/tournaments/:id/payments/:payerId`.
+- With online payments on, the form's "How to pay" reads "Other ways to
+  pay".
+
 ## 0.52.0 — 2026-11-21
 
 With app 0.0.43 and API 0.39.0.

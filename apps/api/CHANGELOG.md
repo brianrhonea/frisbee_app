@@ -7,6 +7,75 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.40.0 — 2026-11-21
+
+With app 0.0.44 and web 0.53.0. Never released before: payments were
+built as 0.29.0 on `feature/payments` and renumbered on merging
+`development`.
+
+Online payments for tournament and league fees (Stripe Connect). Off
+until `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` and
+`PAYMENTS_RETURN_URL` (or `WEB_SITE_URL`) are set (DEPLOY.md,
+"Payments"); without them the routes below say payments aren't set up.
+
+**Added**
+- `GET /v1/teams/:id/payouts` and `POST /v1/teams/:id/payouts/link`: the
+  host's owner connects a Stripe account (made once per team; the host
+  pays Stripe's fees, Stripe covers losses, full Dashboard) and gets a
+  single-use onboarding link back to the website's `/payments/payouts`.
+- `GET /v1/tournaments/:id/pay[?team=]` and `POST
+  /v1/tournaments/:id/checkout`: whether the caller can pay a team's bid
+  or spot fee (the team's admins) or their own entry fee (a signed-up
+  player) online, and a Stripe Checkout session for it: a direct charge
+  on the host's account with Stall 10's fee (`PLATFORM_FEE_BPS`,
+  `PLATFORM_FEE_FIXED_CENTS`, 1% + $1 by default) as the application
+  fee. The amount comes from the tournament, never the request.
+- `POST /v1/payments/stripe/webhook` (Connect endpoint, signed, raw
+  body, each event handled once): a completed payment marks
+  `tournaments/{id}/payments/{payer}` paid with the host's own three
+  fields; a second payment for something already paid is refunded in
+  full; a full refund in the host's Dashboard un-marks it (unless the
+  host has since marked it by hand) and refunds Stall 10's fee; expired
+  sessions, disputes and account updates are recorded.
+- Server-only collections, outside tournaments so deletions keep the
+  money records: `payoutAccounts`, `stripeAccounts`, `charges`,
+  `stripePayments`, `stripeEvents`. No client rules match them.
+- The `stripe` SDK (23.1.0).
+- `GET /v1/payments/fees` (signed in): Stall 10's fee and Stripe's
+  estimated card fee (2.9% + 30¢, `stripeCardFeeEstimate`), so hosts see
+  what reaches them of a fee paid online while they set the price.
+  `feeBreakdown` in `@stall10/shared` does the arithmetic.
+- Payers covering the fees: a fee's `payerCoversFees` (tournament save
+  and the Firestore rule) charges the payer enough that the host gets the
+  whole fee (`chargeCoveringFees`, Stripe's card rate), as a separate
+  "Processing fee" line on Checkout, the same for every payment method.
+  `PayOptions` gains `chargeCents`, `processingCents` and `pending`.
+- Bank payments: new host accounts request
+  `us_bank_account_ach_payments`; a bank payment's charge is `processing`
+  until `checkout.session.async_payment_succeeded` or `_failed` (now
+  handled: the payer can pay again). Add `async_payment_failed` to the
+  webhook's events (DEPLOY.md).
+- Lost connections: `payerCharges/{tournament}~{payer}` keeps the payer's
+  latest session. Pay again reuses an open one (a fresh one, after
+  expiring the old, when the fee changed or it has under 10 minutes
+  left); `GET .../pay` asks Stripe about it first, so a payer back from
+  Stripe sees it paid (or processing) before the webhook arrives. The
+  webhook and that check share one idempotent settle path; if Stripe
+  doesn't answer, the stored state stands.
+- Paying another way: `PUT /v1/tournaments/:id/pay/offline` lets the
+  payer say they'll pay by check, PO or the host's own way (or take it
+  back); the payment record's `offlineAt` (allowed by the rule, kept by
+  every mark) and `PayOptions.offlineAt` show it.
+- `PUT /v1/tournaments/:id/payments/:payerId`: the host marks a team's or
+  player's fee paid or unpaid with a note ("Check #1042"); the website's
+  way to mark teams' bid fees, and the app's when the API is there.
+- The payment history: `paymentLog/{id}` (server only, never changed or
+  deleted, kept when a tournament goes) records every step with who, when,
+  amount and Stripe's ids: checkout started, paid online, bank payment
+  processing or failed, expired, duplicate and its refund, the host's
+  refunds (full or part) and disputes, the host's marks with notes, and
+  the payer's "paying another way". `src/payments/log.ts`.
+
 ## 0.39.0 — 2026-11-21
 
 With app 0.0.43 and web 0.52.0. Needs the Firestore rules and the

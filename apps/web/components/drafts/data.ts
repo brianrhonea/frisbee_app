@@ -44,10 +44,12 @@ export interface DivisionDoc {
   teams?: unknown[];
 }
 
-interface PaymentDoc {
+export interface PaymentDoc {
   paid?: boolean;
   paidAt?: string | null;
   note?: string;
+  /** When the payer said they'll pay another way (set by the API). */
+  offlineAt?: string | null;
 }
 
 const statusOrder = ["draft", "registration", "seeding", "scheduled", "live", "finished"];

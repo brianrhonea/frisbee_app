@@ -22,6 +22,7 @@ import '../../teams/widgets/team_post_widgets.dart';
 import '../view_models/event_guide.dart';
 import '../view_models/hosted_tournament_viewmodel.dart';
 import '../view_models/player_signups_viewmodel.dart';
+import '../../payments/widgets/payment_widgets.dart';
 import 'event_guide_cards.dart';
 import 'event_page_header.dart';
 import 'live_score_sheet.dart';
@@ -678,6 +679,43 @@ class _OverviewTab extends StatelessWidget {
               onAction: (b) => _act(context, b),
             ),
           ],
+          // The host's owner connects Stripe here (hidden for others).
+          if (vm.isManager && (fee != null || t.entryFee != null))
+            PayoutsCard(
+              teamId: t.hostId,
+              amountCents: (fee ?? t.entryFee)?.amountCents,
+              payerCovers: (fee ?? t.entryFee)?.payerCoversFees ?? false,
+            ),
+          // Each of the user's teams that still owes its bid or spot fee.
+          if (fee != null && fee.amountCents > 0)
+            for (final e in vm.myEntries)
+              if (vm.owesSpotFee(e.teamId) &&
+                  !vm.isPaid(e.teamId) &&
+                  (e.status == EntryStatus.accepted ||
+                      e.status == EntryStatus.applied ||
+                      e.status == EntryStatus.waitlisted))
+                Card(
+                  margin: const EdgeInsets.only(top: 12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${e.teamName}: ${t.takesPlayers ? 'team fee' : 'bid fee'} '
+                          '${fee.label} to pay',
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        if (fee.instructions.isNotEmpty) Text(fee.instructions),
+                        PayOnlineButton(
+                          key: ValueKey('pay-${e.teamId}'),
+                          tournamentId: vm.tournamentId,
+                          teamId: e.teamId,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
           // Their signup, until they're on a team.
           if (t.takesPlayers &&
               signups != null &&
@@ -1083,11 +1121,10 @@ class _TeamsTabState extends State<_TeamsTab> {
                   [
                     e.status.label,
                     if (fee != null && e.status == EntryStatus.accepted)
-                      vm.isPaid(e.teamId)
-                          ? 'Paid'
-                          : vm.isOverdue(e.teamId)
-                          ? 'Overdue'
-                          : 'Unpaid',
+                      paymentStatusLabel(
+                        vm.paymentOf(e.teamId),
+                        overdue: vm.isOverdue(e.teamId),
+                      ),
                   ].join(' · '),
                   style: TextStyle(fontSize: 12.5, color: c.muted),
                 ),
@@ -1119,6 +1156,21 @@ class _TeamsTabState extends State<_TeamsTab> {
           ),
         ],
       ),
+    );
+  }
+
+  /// The host's note on a team's payment ("Check #1042").
+  Widget _noteButton(BuildContext context, String teamId) {
+    final note = vm.paymentOf(teamId)?.note ?? '';
+    return IconButton(
+      tooltip: note.isEmpty ? 'Add a payment note' : 'Payment note: $note',
+      icon: Icon(note.isEmpty ? Icons.note_add_outlined : Icons.sticky_note_2),
+      onPressed: () async {
+        final next = await editPaymentNote(context, note);
+        if (next != null && next != note) {
+          await vm.setPaymentNote.execute((teamId: teamId, note: next));
+        }
+      },
     );
   }
 
@@ -1201,6 +1253,8 @@ class _TeamsTabState extends State<_TeamsTab> {
                       Pill(
                         vm.isPaid(id)
                             ? 'Bid paid'
+                            : vm.paymentOf(id)?.payingAnotherWay ?? false
+                            ? 'Paying another way'
                             : overdue
                             ? 'Bid fee overdue'
                             : 'Bid fee unpaid',
@@ -1211,11 +1265,23 @@ class _TeamsTabState extends State<_TeamsTab> {
                             ? PillTone.needsYou
                             : PillTone.neutral,
                       ),
+                      if (vm.isManager &&
+                          (vm.paymentOf(id)?.note ?? '').isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            vm.paymentOf(id)!.note,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 12, color: c.muted),
+                          ),
+                        ),
                     ],
                   ],
                 ),
               ),
               if (vm.isManager) ...[
+                if (fee != null) _noteButton(context, id),
                 if (fee != null) _paidSwitch(id),
                 PopupMenuButton<EntryStatus>(
                   onSelected: (s) async {

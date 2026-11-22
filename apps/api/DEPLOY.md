@@ -416,6 +416,64 @@ version of each secret and a new revision (deploy again); tokens already
 handed out last up to 6 hours. Locally, put the dev values in the
 gitignored `apps/api/.env` (`.env.example` lists the names).
 
+## Payments (Stripe Connect)
+
+Online payments for tournament fees (`src/payments`) need a Stripe
+account for Stall 10 (the platform) with Connect turned on. Until the
+API has all of `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` and a return
+address (`PAYMENTS_RETURN_URL`, else `WEB_SITE_URL`), the payment routes
+say payments aren't set up and the app and website hide them.
+
+1. In the Stripe Dashboard (test mode for dev): Connect → get started as
+   a platform. Hosts' accounts are made by the API with the host paying
+   Stripe's fees, Stripe covering losses and the full Dashboard, so pick
+   those when asked. Fill in the platform profile and branding.
+2. Developers → Webhooks → add an endpoint **on connected accounts**
+   ("Events on Connected accounts") at
+   `https://<api host>/v1/payments/stripe/webhook`, with the events
+   `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
+   `checkout.session.async_payment_failed`, `checkout.session.expired`, `charge.refunded`,
+   `charge.dispute.created` and `account.updated`. Its signing secret
+   (`whsec_...`) is `STRIPE_WEBHOOK_SECRET`.
+3. Store both in Secret Manager and let `api-runtime` read them:
+
+```sh
+printf %s "<sk_test_...>" | gcloud secrets create STRIPE_SECRET_KEY --project="$PROJECT" --data-file=-
+printf %s "<whsec_...>" | gcloud secrets create STRIPE_WEBHOOK_SECRET --project="$PROJECT" --data-file=-
+for s in STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET; do
+  gcloud secrets add-iam-policy-binding "$s" --project="$PROJECT" \
+    --member="serviceAccount:$RUNTIME_SA" --role=roles/secretmanager.secretAccessor
+done
+```
+
+4. Only then add them under `env:` in `deploy/service.yaml`, the same way
+   as LiveKit above (a missing secret fails the whole revision):
+   `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` as `secretKeyRef`s.
+   `WEB_SITE_URL` is already there for the return address. The fee
+   defaults to 1% + $1; set `PLATFORM_FEE_BPS` / `PLATFORM_FEE_FIXED_CENTS`
+   there to change it (new payments only).
+
+Bank payments (ACH Direct Debit): the API requests the
+`us_bank_account_ach_payments` capability on each host's account. Checkout
+shows bank payment once it's active and the host has it switched on in
+their own Stripe Dashboard (Settings → Payment methods); they clear in up
+to 4 business days (`checkout.session.async_payment_succeeded` or
+`_failed`). Hosts can also have teams cover the fees (`payerCoversFees` on
+the fee): the charge is grossed up with Stripe's card rate
+(`chargeCoveringFees`) and shown as a "Processing fee" line, the same for
+every payment method. Check card-network and state rules on passing fees
+to payers before switching payments on in production.
+
+`paymentLog` (the payment history) is never deleted by the API; keep it
+out of any clean-up script. It holds no card or bank details, only who,
+when, amounts and Stripe's ids.
+
+Locally, put test-mode values in the gitignored `apps/api/.env` and
+forward events with the Stripe CLI:
+`stripe listen --forward-connect-to localhost:8787/v1/payments/stripe/webhook`
+(its printed `whsec_...` is the local `STRIPE_WEBHOOK_SECRET`). Use live
+keys only on prod, and only once the legal pages cover payments.
+
 ## Video transcoding (later)
 
 The same Dockerfile's `media` target adds ffmpeg (Debian's: libx264, AAC,
