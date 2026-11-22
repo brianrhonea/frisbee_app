@@ -108,3 +108,29 @@ class PayOnlineViewModel extends ChangeNotifier {
     }
   }
 }
+
+/// Stall 10's fee and Stripe's, so a host sees what reaches them of a fee
+/// paid online. Unavailable (nothing shown) until the server says
+/// payments are on.
+class PaymentFeesViewModel extends ChangeNotifier {
+  PaymentFeesViewModel({required PaymentRepository payments})
+    : _payments = payments {
+    load = Command0(_load)..execute();
+  }
+
+  final PaymentRepository _payments;
+
+  late final Command0<void> load;
+
+  PaymentFees _fees = PaymentFees.unavailable;
+  PaymentFees get fees => _fees;
+
+  Future<Result<void>> _load() async {
+    final r = await _payments.fees();
+    if (r case Ok(:final value)) {
+      _fees = value;
+      notifyListeners();
+    }
+    return r;
+  }
+}

@@ -29,6 +29,15 @@ class PaymentRepositoryApi implements PaymentRepository {
   }
 
   @override
+  Future<Result<PaymentFees>> fees() async {
+    if (_api == null) return const Result.ok(PaymentFees.unavailable);
+    return guard(
+      () async =>
+          PaymentFees.fromMap(await _client.send('GET', '/v1/payments/fees')),
+    );
+  }
+
+  @override
   Future<Result<PayoutAccount>> payouts(String teamId) async {
     if (_api == null) return const Result.ok(PayoutAccount.unavailable);
     return guard(

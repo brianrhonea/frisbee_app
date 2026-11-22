@@ -3,6 +3,10 @@ import '../../../utils/result.dart';
 
 /// Online payments for tournament fees (Stripe Connect), through the API.
 abstract class PaymentRepository {
+  /// Stall 10's fee and Stripe's estimated card fee, for hosts setting a
+  /// price.
+  Future<Result<PaymentFees>> fees();
+
   /// The host team's payout account (owners only).
   Future<Result<PayoutAccount>> payouts(String teamId);
 

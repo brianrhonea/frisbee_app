@@ -4,7 +4,18 @@
 // spot fee or a player's own entry fee. Both show nothing until the API
 // says online payments are available. Stripe's pages open in this tab
 // and send people back to /payments/*.
-import { centsLabel, type CheckoutResult, type PayOptions, type PayoutAccountView, type PayoutLinkResult, paymentPaths } from "@stall10/shared";
+import {
+  centsLabel,
+  type CheckoutResult,
+  feeBreakdown,
+  onlinePaymentProblem,
+  type PaymentFees,
+  type PayOptions,
+  type PayoutAccountView,
+  type PayoutLinkResult,
+  paymentPaths,
+  platformFeeLabel,
+} from "@stall10/shared";
 import type { User } from "firebase/auth";
 import { useCallback, useEffect, useState } from "react";
 import { callApi, problem } from "@/lib/client";
@@ -25,8 +36,8 @@ export async function goToStripe(user: User, path: string, body: unknown): Promi
   window.location.assign(url);
 }
 
-/** The host owner's "Take payments online" card. */
-export function PayoutsCard({ user, teamId }: { user: User; teamId: string }) {
+/** The host owner's "Take payments online" card; [amountCents] is the event's fee, for the "you get about…" line ($100 without one). */
+export function PayoutsCard({ user, teamId, amountCents }: { user: User; teamId: string; amountCents?: number }) {
   const [account, setAccount] = useState<PayoutAccountView | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -63,6 +74,7 @@ export function PayoutsCard({ user, teamId }: { user: User; teamId: string }) {
     <section className="card payouts-card">
       <h2 className="card-title">{copy.title}</h2>
       <p>{copy.body}</p>
+      <FeeBreakdownNote user={user} amountCents={amountCents ?? 10_000} currency="USD" compact />
       {error && <p className="form-error">{error}</p>}
       {copy.action && (
         <button type="button" className="btn btn-primary btn-small" disabled={busy} onClick={connect}>
@@ -114,4 +126,48 @@ export function PayOnline({ user, tournamentId, teamId, withStatus = false }: { 
       {error && <p className="form-error">{error}</p>}
     </div>
   );
+}
+
+/**
+ * What reaches the host of [amountCents] paid online: the host form's note
+ * under the price, and (with [compact]) the payout card's example. Mirrors
+ * feeNote in apps/mobile/lib/ui/payments/widgets/payment_widgets.dart.
+ */
+export function feeNote(fees: PaymentFees, amountCents: number, currency: string, compact = false): string | null {
+  if (!fees.available || amountCents <= 0) return null;
+  const why = onlinePaymentProblem(amountCents, currency, fees.platform);
+  if (why) return compact ? null : why;
+  const b = feeBreakdown(amountCents, fees.platform, fees.card);
+  const [amount, host, ours, stripe] = [b.amountCents, b.hostCents, b.platformCents, b.stripeCents].map(centsLabel);
+  if (compact) return `On a ${amount} fee you get about ${host}: Stall 10 keeps ${ours} and Stripe about ${stripe}.`;
+  return (
+    `Paid online in Stall 10, you get about ${host} of each ${amount}. ` +
+    `Stall 10 keeps ${ours} (${platformFeeLabel(fees.platform)}) and Stripe about ${stripe} (${platformFeeLabel(fees.card)}, its usual card fee). ` +
+    "Paid your own way, you keep it all."
+  );
+}
+
+/** The fees on a payment made online; null until the API answers (or when it can't). */
+export function usePaymentFees(user: User | null | undefined): PaymentFees | null {
+  const [fees, setFees] = useState<PaymentFees | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    let live = true;
+    callApi<PaymentFees>(user, paymentPaths.fees).then(
+      (f) => live && setFees(f),
+      () => live && setFees(null),
+    );
+    return () => {
+      live = false;
+    };
+  }, [user]);
+  return fees;
+}
+
+/** [feeNote] for a price a host is setting; nothing while online payments are off. */
+export function FeeBreakdownNote({ user, amountCents, currency, compact = false }: { user: User | null | undefined; amountCents: number | null; currency: string; compact?: boolean }) {
+  const fees = usePaymentFees(user);
+  const note = fees && amountCents != null ? feeNote(fees, amountCents, currency, compact) : null;
+  if (!note) return null;
+  return compact ? <p className="fee-note">{note}</p> : <small className="muted fee-note">{note}</small>;
 }

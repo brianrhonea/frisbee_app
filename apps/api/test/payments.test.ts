@@ -135,6 +135,21 @@ describe("the fee", () => {
   });
 });
 
+describe("fees for hosts", () => {
+  it("gives Stall 10's fee and Stripe's estimated card fee to signed-in people", async () => {
+    const { call } = setup();
+    const res = await call("GET", "/v1/payments/fees");
+    expect(res.status).toBe(200);
+    expect(res.json()).toEqual({ available: true, platform: { percentBps: 100, fixedCents: 100 }, card: { percentBps: 290, fixedCents: 30 } });
+    expect((await call("GET", "/v1/payments/fees", undefined, null)).status).toBe(401);
+  });
+
+  it("says they aren't available without Stripe", async () => {
+    const { call } = setup(null);
+    expect((await call("GET", "/v1/payments/fees")).json().available).toBe(false);
+  });
+});
+
 describe("payouts", () => {
   it("only the owner sees or sets them up", async () => {
     expect((await s.call("GET", "/v1/teams/host/payouts", undefined, "coach")).status).toBe(403);

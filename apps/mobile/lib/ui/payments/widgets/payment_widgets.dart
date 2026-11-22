@@ -61,9 +61,17 @@ void _showError(BuildContext context, Object? error) => ScaffoldMessenger.of(
 /// The host owner's "Get paid online" card. Shows nothing until the server
 /// says online payments are available (and the user is the owner).
 class PayoutsCard extends StatelessWidget {
-  const PayoutsCard({super.key, required this.teamId, this.open});
+  const PayoutsCard({
+    super.key,
+    required this.teamId,
+    this.amountCents,
+    this.open,
+  });
 
   final String teamId;
+
+  /// The event's fee, for the "you get about..." line ($100 without one).
+  final int? amountCents;
 
   /// Opens Stripe's page; tests pass a fake.
   final OpenPage? open;
@@ -137,6 +145,11 @@ class PayoutsCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(body),
+            FeeBreakdownNote(
+              amountCents: amountCents ?? 10000,
+              currency: 'USD',
+              compact: true,
+            ),
             if (action != null) ...[
               const SizedBox(height: 12),
               FilledButton(
@@ -219,6 +232,78 @@ class PayOnlineButton extends StatelessWidget {
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+/// What reaches the host of [amountCents] paid online: the host form's
+/// note under the price, and (with [compact]) the payout card's example.
+/// Mirrors feeNote in apps/web/components/payments/Payments.tsx.
+String? feeNote(
+  PaymentFees fees,
+  int amountCents,
+  String currency, {
+  bool compact = false,
+}) {
+  if (!fees.available || amountCents <= 0) return null;
+  final problem = fees.problem(amountCents, currency);
+  if (problem != null) return compact ? null : problem;
+  final b = fees.breakdown(amountCents);
+  final amount = centsLabel(b.amountCents);
+  final host = centsLabel(b.hostCents);
+  final ours = centsLabel(b.platformCents);
+  final stripe = centsLabel(b.stripeCents);
+  if (compact) {
+    return 'On a $amount fee you get about $host: Stall 10 keeps $ours and '
+        'Stripe about $stripe.';
+  }
+  return 'Paid online in Stall 10, you get about $host of each $amount. '
+      'Stall 10 keeps $ours (${fees.platform.label}) and Stripe about '
+      '$stripe (${fees.card.label}, its usual card fee). Paid your own way, '
+      'you keep it all.';
+}
+
+/// [feeNote] for a price a host is setting. Shows nothing while online
+/// payments are off.
+class FeeBreakdownNote extends StatelessWidget {
+  const FeeBreakdownNote({
+    super.key,
+    required this.amountCents,
+    required this.currency,
+    this.compact = false,
+  });
+
+  final int? amountCents;
+  final String currency;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final payments = _payments(context);
+    final amount = amountCents;
+    if (payments == null || amount == null) return const SizedBox.shrink();
+    return ViewModelHost<PaymentFeesViewModel>(
+      create: (c) => PaymentFeesViewModel(payments: payments),
+      builder: (context, vm) => ListenableBuilder(
+        listenable: vm,
+        builder: (context, _) {
+          final note = feeNote(vm.fees, amount, currency, compact: compact);
+          if (note == null) return const SizedBox.shrink();
+          final theme = Theme.of(context);
+          return Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              note,
+              key: const Key('fee-breakdown'),
+              style: compact
+                  ? null
+                  : theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+            ),
+          );
+        },
       ),
     );
   }

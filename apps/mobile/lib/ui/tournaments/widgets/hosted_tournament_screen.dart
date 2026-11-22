@@ -681,7 +681,10 @@ class _OverviewTab extends StatelessWidget {
           ],
           // The host's owner connects Stripe here (hidden for others).
           if (vm.isManager && (fee != null || t.entryFee != null))
-            PayoutsCard(teamId: t.hostId),
+            PayoutsCard(
+              teamId: t.hostId,
+              amountCents: (fee ?? t.entryFee)?.amountCents,
+            ),
           // Each of the user's teams that still owes its bid or spot fee.
           if (fee != null && fee.amountCents > 0)
             for (final e in vm.myEntries)

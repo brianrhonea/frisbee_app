@@ -409,7 +409,10 @@ sees **Take payments online** on the event's Overview and connects a
 Stripe account (**Set up with Stripe**; **Continue with Stripe** if
 Stripe needs more). After that, teams and players can pay their fees in
 Stall 10. The money goes to your Stripe account: Stripe keeps its card
-fee and Stall 10 keeps 1% + $1 of each payment. Refunds, disputes and
+fee and Stall 10 keeps 1% + $1 of each payment. When you set a fee, the
+form shows what you'd get of it paid online: on $100, about $94.80 after
+Stall 10's $2 and Stripe's card fee of about $3.20 (Stripe's usual 2.9% +
+30¢; some cards cost more). Refunds, disputes and
 payouts are in your Stripe Dashboard; a full refund marks the fee unpaid
 again. You can still mark anyone paid by hand. (Online payments aren't
 switched on in test builds yet.)

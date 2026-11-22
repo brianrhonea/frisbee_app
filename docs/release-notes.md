@@ -10,6 +10,20 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.44
+
+**Paying for tournaments**
+- When a tournament's host takes payments through Stall 10, your team's
+  bid fee and your own entry fee have a "Pay online" button. It opens a
+  secure Stripe checkout; the fee shows as paid once Stripe confirms it.
+  Hosts who don't take payments online still give their own instructions.
+- Hosting? The owner of the hosting team sees "Take payments online" on
+  the event page to connect a Stripe account. Refunds happen in Stripe.
+  (Not switched on in test builds yet.)
+- Setting a fee, hosts see what they'd get when it's paid online: on a
+  $100 fee, about $94.80 after Stall 10's $2 and Stripe's card fee of
+  about $3.20.
+
 ## 0.0.40
 
 **Schedule**

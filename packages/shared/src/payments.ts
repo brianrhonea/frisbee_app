@@ -49,6 +49,33 @@ export function platformFeeLabel(fee: PlatformFee): string {
   return [pct, fixed].filter(Boolean).join(" + ") || "nothing";
 }
 
+/**
+ * Stripe's standard US online card rate (2.9% + 30¢), which the host pays
+ * on each payment. An estimate for showing hosts what they'll get:
+ * international cards, other payment methods or a host's own Stripe
+ * pricing cost more or less.
+ */
+export const stripeCardFeeEstimate: PlatformFee = { percentBps: 290, fixedCents: 30 };
+
+/** Where a fee paid online goes. */
+export interface FeeBreakdown {
+  /** What the payer is charged: the fee itself, nothing added. */
+  amountCents: number;
+  /** Stall 10's fee. */
+  platformCents: number;
+  /** Stripe's card fee (an estimate). */
+  stripeCents: number;
+  /** What reaches the host's Stripe balance, about. */
+  hostCents: number;
+}
+
+/** How [amountCents] paid online splits between Stall 10, Stripe and the host. */
+export function feeBreakdown(amountCents: number, platform: PlatformFee, card: PlatformFee = stripeCardFeeEstimate): FeeBreakdown {
+  const platformCents = platformFeeCents(amountCents, platform);
+  const stripeCents = platformFeeCents(amountCents, card);
+  return { amountCents, platformCents, stripeCents, hostCents: Math.max(0, amountCents - platformCents - stripeCents) };
+}
+
 /** "$1", "$1.50". */
 export function centsLabel(cents: number): string {
   const whole = Math.floor(cents / 100);
@@ -75,6 +102,16 @@ export interface PayoutAccountView {
 /** POST /v1/teams/:teamId/payouts/link: the Stripe page to open (single use, expires in minutes). */
 export interface PayoutLinkResult {
   url: string;
+}
+
+/** GET /v1/payments/fees: the fees on a payment made online, for hosts setting a price. */
+export interface PaymentFees {
+  /** false: online payments aren't set up on this server; say nothing about them. */
+  available: boolean;
+  /** Stall 10's fee. */
+  platform: PlatformFee;
+  /** Stripe's card fee, an estimate (stripeCardFeeEstimate). */
+  card: PlatformFee;
 }
 
 /** Who is paying a tournament fee. */
@@ -121,5 +158,6 @@ export const paymentPaths = {
   payoutLink: (teamId: string) => `/v1/teams/${teamId}/payouts/link`,
   payOptions: (tournamentId: string) => `/v1/tournaments/${tournamentId}/pay`,
   checkout: (tournamentId: string) => `/v1/tournaments/${tournamentId}/checkout`,
+  fees: "/v1/payments/fees",
   webhook: "/v1/payments/stripe/webhook",
 } as const;

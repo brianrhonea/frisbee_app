@@ -23,6 +23,7 @@ import {
   onlinePaymentProblem,
   paidOnlineNote,
   type PayerKind,
+  type PaymentFees,
   type PayOptions,
   type PayoutAccountView,
   type PayoutLinkResult,
@@ -34,6 +35,7 @@ import {
   platformFeeLabel,
   refundedOnlineNote,
   spotFee,
+  stripeCardFeeEstimate,
   type TournamentDoc,
 } from "@stall10/shared";
 import type { FastifyInstance, FastifyRequest } from "fastify";
@@ -117,6 +119,13 @@ export class PaymentService {
 
   private get fee(): PlatformFee {
     return this.config?.fee ?? defaultPlatformFee;
+  }
+
+  // ---- Fees ---------------------------------------------------------------
+
+  /** Stall 10's fee and Stripe's (estimated) card fee, for hosts setting a price. */
+  fees(): PaymentFees {
+    return { available: this.config !== undefined, platform: this.fee, card: stripeCardFeeEstimate };
   }
 
   // ---- Hosts --------------------------------------------------------------
@@ -408,6 +417,10 @@ export function paymentRoutes(app: FastifyInstance, payments: PaymentService, li
   };
   type T = { Params: { teamId: string } };
   type Id = { Params: { id: string } };
+  app.get(paymentPaths.fees, async (req) => {
+    caller(req, "status");
+    return payments.fees();
+  });
   app.get<T>(paymentPaths.payouts(":teamId"), async (req) => payments.payouts(caller(req, "status"), req.params.teamId));
   app.post<T>(paymentPaths.payoutLink(":teamId"), async (req) => payments.payoutLink(caller(req, "link"), req.params.teamId));
   app.get<Id & { Querystring: { team?: string } }>(paymentPaths.payOptions(":id"), async (req) =>

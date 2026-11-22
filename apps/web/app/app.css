@@ -1652,3 +1652,9 @@ dialog.dialog:has(.invite-dialog) { width: min(100% - 32px, 560px); }
 .payouts-card p {
   margin: 0 0 12px;
 }
+small.fee-note {
+  display: block;
+  margin: -4px 0 12px;
+  font-weight: 400;
+  line-height: 1.4;
+}

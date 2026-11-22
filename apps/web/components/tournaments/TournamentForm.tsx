@@ -39,6 +39,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { FeeBreakdownNote } from "@/components/payments/Payments";
 import type { TeamDoc } from "@/components/team/TeamContext";
 import { type Doc, useLiveDoc, useLiveQuery } from "@/lib/live";
 import { tournamentHref } from "./TournamentLists";
@@ -636,10 +637,10 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
               <small className="muted">
                 {" "}
                 {players && f.teamEntry
-                  ? "What each player who signs up pays, and what a team pays to reserve a spot. They pay you directly; you mark them paid."
+                  ? "What each player who signs up pays, and what a team pays to reserve a spot. You mark them paid, or Stall 10 does when they pay online."
                   : players
-                    ? "What each player pays to sign up. Players pay you directly; you mark them paid."
-                    : "What each team pays to hold its spot. Teams pay you directly; you mark them paid."}
+                    ? "What each player pays to sign up. You mark them paid, or Stall 10 does when they pay online."
+                    : "What each team pays to hold its spot. You mark them paid, or Stall 10 does when they pay online."}
               </small>
             </span>
           </label>
@@ -676,6 +677,8 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
                   />
                 </label>
               </div>
+              <FeeBreakdownNote user={user} amountCents={centsOf(f.feeAmount)} currency={f.currency} />
+              {players && f.teamEntry && <FeeBreakdownNote user={user} amountCents={centsOf(f.teamFeeAmount)} currency={f.currency} />}
               <label>
                 How to pay
                 <textarea rows={2} maxLength={tournamentLimits.feeInstructions} placeholder="e.g. Venmo @club-treasurer with your team name" value={f.instructions} onChange={(e) => set({ instructions: e.target.value })} />

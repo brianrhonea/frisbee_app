@@ -7,6 +7,45 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.40.0 — 2026-11-21
+
+With app 0.0.44 and web 0.53.0. Never released before: payments were
+built as 0.29.0 on `feature/payments` and renumbered on merging
+`development`.
+
+Online payments for tournament and league fees (Stripe Connect). Off
+until `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` and
+`PAYMENTS_RETURN_URL` (or `WEB_SITE_URL`) are set (DEPLOY.md,
+"Payments"); without them the routes below say payments aren't set up.
+
+**Added**
+- `GET /v1/teams/:id/payouts` and `POST /v1/teams/:id/payouts/link`: the
+  host's owner connects a Stripe account (made once per team; the host
+  pays Stripe's fees, Stripe covers losses, full Dashboard) and gets a
+  single-use onboarding link back to the website's `/payments/payouts`.
+- `GET /v1/tournaments/:id/pay[?team=]` and `POST
+  /v1/tournaments/:id/checkout`: whether the caller can pay a team's bid
+  or spot fee (the team's admins) or their own entry fee (a signed-up
+  player) online, and a Stripe Checkout session for it: a direct charge
+  on the host's account with Stall 10's fee (`PLATFORM_FEE_BPS`,
+  `PLATFORM_FEE_FIXED_CENTS`, 1% + $1 by default) as the application
+  fee. The amount comes from the tournament, never the request.
+- `POST /v1/payments/stripe/webhook` (Connect endpoint, signed, raw
+  body, each event handled once): a completed payment marks
+  `tournaments/{id}/payments/{payer}` paid with the host's own three
+  fields; a second payment for something already paid is refunded in
+  full; a full refund in the host's Dashboard un-marks it (unless the
+  host has since marked it by hand) and refunds Stall 10's fee; expired
+  sessions, disputes and account updates are recorded.
+- Server-only collections, outside tournaments so deletions keep the
+  money records: `payoutAccounts`, `stripeAccounts`, `charges`,
+  `stripePayments`, `stripeEvents`. No client rules match them.
+- The `stripe` SDK (23.1.0).
+- `GET /v1/payments/fees` (signed in): Stall 10's fee and Stripe's
+  estimated card fee (2.9% + 30¢, `stripeCardFeeEstimate`), so hosts see
+  what reaches them of a fee paid online while they set the price.
+  `feeBreakdown` in `@stall10/shared` does the arithmetic.
+
 ## 0.36.0 — 2026-11-20
 
 With app 0.0.39 and web 0.48.0.

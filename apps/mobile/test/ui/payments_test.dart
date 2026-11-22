@@ -22,7 +22,15 @@ class _FakePayments implements PaymentRepository {
     feeLabel: r'1% + $1',
     paid: false,
   );
+  PaymentFees feeAnswer = const PaymentFees(
+    available: true,
+    platform: PaymentFees.defaultPlatform,
+    card: PaymentFees.defaultCard,
+  );
   final calls = <String>[];
+
+  @override
+  Future<Result<PaymentFees>> fees() async => Result.ok(feeAnswer);
 
   @override
   Future<Result<PayoutAccount>> payouts(String teamId) async {
@@ -159,6 +167,81 @@ void main() {
       );
       await pump(tester, const PayOnlineButton(tournamentId: 't1'));
       expect(find.byType(FilledButton), findsNothing);
+    });
+  });
+
+  group('fee breakdown for hosts', () {
+    test(r'splits $100 into $2, $3.20 and $94.80 (same as the API)', () {
+      const fees = PaymentFees(
+        available: true,
+        platform: PaymentFees.defaultPlatform,
+        card: PaymentFees.defaultCard,
+      );
+      final b = fees.breakdown(10000);
+      expect(b.platformCents, 200);
+      expect(b.stripeCents, 320);
+      expect(b.hostCents, 9480);
+      // packages/shared/test/payments.test.ts uses the same cases.
+      final odd = fees.breakdown(3750);
+      expect(
+        (odd.platformCents, odd.stripeCents, odd.hostCents),
+        (138, 139, 3473),
+      );
+      expect(fees.breakdown(100).hostCents, 0);
+      expect(PaymentFees.defaultCard.label, r'2.9% + $0.30');
+      expect(PaymentFees.defaultPlatform.label, r'1% + $1');
+    });
+
+    testWidgets('the form note says what the host gets', (tester) async {
+      await pump(
+        tester,
+        const FeeBreakdownNote(amountCents: 10000, currency: 'USD'),
+      );
+      expect(
+        find.text(
+          r'Paid online in Stall 10, you get about $94.80 of each $100. '
+          r'Stall 10 keeps $2 (1% + $1) and Stripe about $3.20 '
+          r'(2.9% + $0.30, its usual card fee). Paid your own way, you keep '
+          'it all.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('says why a fee can\'t be paid online', (tester) async {
+      await pump(
+        tester,
+        const FeeBreakdownNote(amountCents: 10000, currency: 'CAD'),
+      );
+      expect(
+        find.text('Online payments are in US dollars only.'),
+        findsOneWidget,
+      );
+      await pump(
+        tester,
+        FeeBreakdownNote(key: UniqueKey(), amountCents: 100, currency: 'USD'),
+      );
+      expect(find.text('This fee is too small to pay online.'), findsOneWidget);
+    });
+
+    testWidgets('says nothing while payments are off', (tester) async {
+      payments.feeAnswer = PaymentFees.unavailable;
+      await pump(
+        tester,
+        const FeeBreakdownNote(amountCents: 10000, currency: 'USD'),
+      );
+      expect(find.byKey(const Key('fee-breakdown')), findsNothing);
+    });
+
+    testWidgets("the payout card uses the event's fee", (tester) async {
+      await pump(tester, const PayoutsCard(teamId: 'host', amountCents: 40000));
+      expect(
+        find.text(
+          r'On a $400 fee you get about $383.10: Stall 10 keeps $5 and '
+          r'Stripe about $11.90.',
+        ),
+        findsOneWidget,
+      );
     });
   });
 

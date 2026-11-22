@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.44  | 2026-11-21 | `feature/payments`                      |                     |
 | 0.0.40  | 2026-11-20 | `feature/redesign`                      |                     |
 | 0.0.39  | 2026-11-20 | `feature/redesign`                      |                     |
 | 0.0.38  | 2026-11-20 | `feature/redesign`                      |                     |
@@ -53,6 +54,29 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.44 — Pay tournament fees online
+
+- Online payments for tournament and league fees through the API
+  (api 0.40.0; Stripe Connect). `PaymentRepository` /
+  `PaymentRepositoryApi` (no API client: off), `PayoutsViewModel`,
+  `PayOnlineViewModel`, `ui/payments/widgets/payment_widgets.dart`.
+- The event page shows the host's owner a "Take payments online" card
+  (`PayoutsCard`, hidden for everyone else and while payments are off),
+  and each of your teams that still owes its bid or spot fee gets a card
+  with the host's instructions and "Pay $400 online"
+  (`PayOnlineButton`). A signed-up player's card gets the same button
+  for their entry fee.
+- Stripe's pages open in the browser (`LaunchMode.externalApplication`);
+  coming back to the app reloads the card and button. The payment record
+  the host marks by hand is the one Stripe marks, so the paid state
+  updates live as before.
+- Hosts see what reaches them of a fee paid online: under the price in
+  the event form (`FeeBreakdownNote`, from `GET /v1/payments/fees`) and on
+  the payout card for the event's own fee (Stall 10's fee plus Stripe's
+  estimated 2.9% + 30¢). The fee section no longer says teams always pay
+  the host directly. Built as 0.0.27 on `feature/payments`, renumbered on
+  merging `development`.
 
 ## 0.0.40 — Schedule: typed times, sharing, calendars on the tab
 
