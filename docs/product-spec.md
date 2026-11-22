@@ -1279,10 +1279,12 @@ Out of scope: payments, meeting recording, USA Ultimate data.
     `test/shared_fixtures/directions_fixtures_test.dart`.
 62. Tournament chats with the organizers: [x] app; [x] website. A hosted
     tournament's Captains' channel (organizers with Manage events and the
-    captains of invited, applied, accepted and waitlisted teams) and each
-    team's private thread with the organizers, in Messages; the server
-    sets who is in them (API on open, `tournaments-chatMembers` on entry
-    changes), and nobody adds, leaves or renames. Not for drafts or
+    captains of applied, accepted and waitlisted teams) and each team's
+    private thread with the organizers, in Messages; the server sets who
+    is in them (the API when opened from the tournament page,
+    `tournaments-chatMembers` on entry changes), and nobody adds, leaves
+    or renames. Someone who stops organizing or leaves a team reads on
+    until the next of those. Not for drafts or
     player-only events. Tests: API `tournament_chats.test.ts`, functions
     `tournaments/chat_members.test.ts` and the rules tests, app
     `hosted_tournaments_test.dart` and `group_messages_test.dart`.

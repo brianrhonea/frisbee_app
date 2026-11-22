@@ -18,6 +18,8 @@ describe("tournament chat members", () => {
     expect(captainsOf({ status: "accepted", captainIds: [] }, bolt)).toEqual(["adm2"]);
     expect(captainsOf({ status: "withdrawn", captainIds: ["cap1"] }, haze)).toEqual([]);
     expect(captainsOf({ status: "declined", captainIds: [] }, bolt)).toEqual([]);
+    // Invited teams join once they apply.
+    expect(captainsOf({ status: "invited", captainIds: ["cap1"] }, haze)).toEqual([]);
   });
 
   it("only status in or out, and captain changes, matter", () => {

@@ -5,9 +5,9 @@
 // (the client group create rule needs kind "group"). Which conversation
 // belongs to which chat is in the server-only pointer
 // tournaments/{t}/chats/{captains | team_<teamId>}, so an id can't be
-// claimed first. Who is in each is worked out from the tournament every
-// time: the host's organizers (manageEvents) and the captains of entries
-// still in it (captainIds and the team's admins). The tournaments-chatMembers
+// claimed first. Who is in each is worked out from the tournament on each
+// open: the host's organizers (manageEvents) and the captains of entries
+// that applied and are still in (captainIds and the team's admins). The tournaments-chatMembers
 // function does the same when an entry changes (chat_members.ts there).
 import {
   captainsChatName,
@@ -115,13 +115,13 @@ export class TournamentChatService {
    */
   async save(tournamentId: string, kind: TournamentChatKind, m: ChatMembers, teamId?: string): Promise<string> {
     const chat = kind === "captains" ? "captains" : `team_${teamId}`;
-    const pointer = await this.store.get(p.pointer(tournamentId, chat));
-    const id =
-      typeof pointer?.conversationId === "string"
-        ? pointer.conversationId
-        : `g-${this.store.newId("conversations").replace(/[^A-Za-z0-9]/g, "") || "x"}`;
-    const existing = await this.store.get(p.conv(id));
+    const pointerPath = p.pointer(tournamentId, chat);
+    // Names from what's there now; the transaction below settles which
+    // conversation it is, so two first opens at once share one.
+    const before = await this.store.get(pointerPath);
+    const existing = typeof before?.conversationId === "string" ? await this.store.get(p.conv(before.conversationId)) : null;
     const known = mapOf(existing?.names);
+    const fresh = `g-${this.store.newId("conversations").replace(/[^A-Za-z0-9]/g, "") || "x"}`;
     const missing = m.participants.filter((u) => typeof known[u] !== "string");
     const profiles = await this.store.getAll(missing.map((u) => p.profile(u)));
     const names: Record<string, unknown> = {};
@@ -133,11 +133,16 @@ export class TournamentChatService {
       const prof = profiles[missing.indexOf(u)];
       names[u] = clip(typeof prof?.name === "string" && prof.name ? prof.name : "Player", 80);
     }
-    await this.store.transact(async (tx) => {
+    return this.store.transact(async (tx) => {
+      const pointer = await tx.get(pointerPath);
+      const id = typeof pointer?.conversationId === "string" ? pointer.conversationId : fresh;
       const now = await tx.get(p.conv(id));
       if (now) {
-        tx.update(p.conv(id), { participants: m.participants, names, name: m.name });
-        return;
+        // Keep the names it has for people already in it.
+        const had = mapOf(now.names);
+        const merged = Object.fromEntries(m.participants.map((u) => [u, typeof had[u] === "string" ? had[u] : names[u]]));
+        tx.update(p.conv(id), { participants: m.participants, names: merged, name: m.name });
+        return id;
       }
       tx.create(p.conv(id), {
         kind: "tournament",
@@ -154,8 +159,8 @@ export class TournamentChatService {
         readAt: {},
         createdAt: serverTime,
       });
-      tx.set(p.pointer(tournamentId, chat), { conversationId: id, kind, ...(teamId && { teamId }), createdAt: serverTime });
+      tx.set(pointerPath, { conversationId: id, kind, ...(teamId && { teamId }), createdAt: serverTime });
+      return id;
     });
-    return id;
   }
 }

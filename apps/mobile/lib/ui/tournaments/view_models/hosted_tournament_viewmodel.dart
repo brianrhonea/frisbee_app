@@ -199,8 +199,9 @@ class HostedTournamentViewModel extends ChangeNotifier {
   }
 
   /// Entries the user is a captain of (an admin of the team, or one of its
-  /// listed captains) that are still in: invited, applied, accepted or
-  /// waitlisted. Their captains are in the chats with the organizers.
+  /// listed captains) that are in: applied, accepted or waitlisted
+  /// (tournamentChatStatuses). Their captains are in the chats with the
+  /// organizers; invited teams aren't until they apply.
   List<TournamentEntry> get myChatEntries => [
     for (final e in _entries)
       if (_chatStatuses.contains(e.status) &&
@@ -211,7 +212,6 @@ class HostedTournamentViewModel extends ChangeNotifier {
   ];
 
   static const _chatStatuses = {
-    EntryStatus.invited,
     EntryStatus.applied,
     EntryStatus.accepted,
     EntryStatus.waitlisted,

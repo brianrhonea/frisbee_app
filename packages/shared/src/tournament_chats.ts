@@ -3,11 +3,17 @@
 // per team (that team's captains and the organizers). Both are
 // conversations of kind "tournament" in the Messages inbox; only the
 // server sets who is in them (no adding, leaving or renaming), from the
-// entries: recomputed whenever someone opens one through the API and when
-// an entry changes (the tournaments-chatMembers function).
+// entries: recomputed when someone opens one from the tournament's page
+// (the open endpoints) and when an entry changes (the
+// tournaments-chatMembers function). Opening it from the inbox doesn't, so
+// someone who stops organizing or leaves a team reads on until the next.
 
-/** Entries whose captains are in the chats; declined and withdrawn teams drop out. */
-export const tournamentChatStatuses = ["invited", "applied", "accepted", "waitlisted"] as const;
+/**
+ * Entries whose captains are in the chats: from applying on. Invited
+ * teams aren't, so an invite can't put a team's admins in a chat past
+ * their message settings; declined and withdrawn teams drop out.
+ */
+export const tournamentChatStatuses = ["applied", "accepted", "waitlisted"] as const;
 
 /** Most people in one tournament chat (organizers first). */
 export const tournamentChatSizeMax = 500;

@@ -397,8 +397,8 @@ run it.
    with the tournament, so its followers see it.
 9. **Talk with captains** (on the overview, once it's published): the
    **Captains' channel** is one chat with you, your other organizers and
-   the captains of every team that's invited, applied, accepted or
-   waitlisted, so you answer a question once for everyone. **Message** on
+   the captains of every team that's applied, accepted or waitlisted,
+   so you answer a question once for everyone. **Message** on
    a team's row (Teams tab) opens a private thread with just that team's
    captains. Both are in Messages; teams that withdraw or are declined
    leave them on their own.

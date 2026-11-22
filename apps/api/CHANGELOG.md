@@ -15,12 +15,14 @@ With app 0.0.45 and web 0.54.0.
   `tournament_chats.ts` in packages/shared):
   `POST /v1/tournaments/:id/chats/captains` opens the Captains' channel
   (the host's organizers with manageEvents and the captains of every
-  invited, applied, accepted or waitlisted entry: its captainIds and the
-  team's admins), and `POST /v1/tournaments/:id/chats/teams/:teamId` a
+  applied, accepted or waitlisted entry: its captainIds and the team's
+  admins; invited teams join once they apply), and `POST /v1/tournaments/:id/chats/teams/:teamId` a
   team's private thread with the organizers. Each is a conversation of
   kind `tournament` (up to 500 people, organizers first) behind the
-  server-only pointer `tournaments/{t}/chats/{captains | team_<id>}`;
-  every open recomputes who is in it, keeping names and read times. The
+  server-only pointer `tournaments/{t}/chats/{captains | team_<id>}`,
+  claimed in the same transaction, so two first opens share one. Each
+  open recomputes who is in it, keeping names and read times (opening it
+  from the inbox doesn't go through here). The
   conversation endpoints refuse adding, removing and renaming for them
   (they check kind `group`). Not while the tournament is a draft.
 - `GET /v1/me/tag-tournaments`: the followed tournaments a post can be

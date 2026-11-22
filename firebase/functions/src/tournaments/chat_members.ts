@@ -7,7 +7,7 @@
 export type Data = Record<string, unknown>;
 
 /** tournamentChatStatuses in packages/shared. */
-export const chatStatuses = ["invited", "applied", "accepted", "waitlisted"];
+export const chatStatuses = ["applied", "accepted", "waitlisted"];
 
 /** tournamentChatSizeMax in packages/shared. */
 export const chatSizeMax = 500;

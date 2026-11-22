@@ -14,7 +14,7 @@ import type { TournamentState } from "./useTournament";
 
 type Entry = TournamentState["entries"][number];
 
-/** Whether an entry's captains are in the chats: still invited, applied, accepted or waitlisted. */
+/** Whether an entry's captains are in the chats: applied, accepted or waitlisted. */
 export const inChats = (e: Entry | undefined) => !!e && (tournamentChatStatuses as readonly string[]).includes(e.status);
 
 /** Entries the member captains (an admin of the team, or one of its listed captains) that are still in. */

@@ -70,6 +70,19 @@ describe("the Captains' channel", () => {
     }
   });
 
+  it("leaves out invited teams until they apply", async () => {
+    store.put("tournaments/t1/entries/gone", { teamName: "Gone", status: "invited", captainIds: ["cap3"] });
+    expect((await captains("cap3")).status).toBe(403);
+    expect((await team("dir", "gone")).status).toBe(403);
+    expect(docOf(`conversations/${(await captains("dir")).json().id}`).participants).not.toContain("cap3");
+  });
+
+  it("two first opens at once share one conversation", async () => {
+    const [a, b] = await Promise.all([captains("cap1"), captains("adm2")]);
+    expect(a.json().id).toBe(b.json().id);
+    expect(docOf("tournaments/t1/chats/captains").conversationId).toBe(a.json().id);
+  });
+
   it("waits while the tournament is a draft", async () => {
     store.put("tournaments/t1", { hostId: "host", name: "Spring Fling", status: "draft" });
     expect((await captains("dir")).status).toBe(403);

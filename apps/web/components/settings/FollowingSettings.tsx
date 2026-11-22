@@ -1,5 +1,4 @@
 "use client";
-import { tournamentTagHref } from "@stall10/shared";
 import { orderBy } from "firebase/firestore";
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -28,11 +27,12 @@ const tabs = [
 function hrefOf(f: Follow): string {
   if (f.type === "user") return `/players/${encodeURIComponent(f.targetId)}`;
   if (f.type === "team") return `/teams/${encodeURIComponent(f.targetId)}`;
-  // Hosted and group tournaments store "{hostId}_{tournamentId}"; the
-  // hosted page falls back to the group's tournament (?host=), as in the app.
-  if (f.type === "tournament") {
-    const href = tournamentTagHref(`tournament_${f.targetId}`);
-    if (href) return href;
+  // Hosted and group tournaments store "{hostId}_{tournamentId}" with the
+  // host beside it; the hosted page falls back to the group's tournament
+  // (?host=), as in the app (Routes.tournament(id, host:)).
+  if (f.type === "tournament" && f.groupId && f.targetId.startsWith(`${f.groupId}_`)) {
+    const id = f.targetId.slice(f.groupId.length + 1);
+    return `/tournaments/${encodeURIComponent(id)}?host=${encodeURIComponent(f.groupId)}`;
   }
   if (f.type === "tournament") return `/tournaments/${encodeURIComponent(f.targetId)}`;
   return "/explore#coming-up";
