@@ -286,11 +286,6 @@ export interface Notice {
    */
   pushId?: string;
   /**
-   * False: push only, with no entry in the Notifications list. Messages
-   * show in Chats (its unread bubbles), so they'd only be there twice.
-   */
-  feed?: boolean;
-  /**
    * Fold by distinct item (a liker, a comment, a request) instead of by
    * event: the entry keeps its items, counts them, and an undo takes one
    * back out (retract in deliver.ts). Worded by [itemText], not [text].
@@ -412,7 +407,6 @@ export function chatNotice(a: {
     route: `/teams/${a.teamId}/chats/${a.roomId}`,
     collapseId: `chat_${a.teamId}_${a.roomId}`,
     pushId: a.messageId,
-    feed: false,
     text: () => ({ title: `${a.roomName} · ${a.teamName}`, body: line }),
   };
 }
@@ -436,7 +430,6 @@ export function directMessageNotice(a: {
     route: `/messages/${a.conversationId}`,
     collapseId: `dm_${a.conversationId}`,
     pushId: a.messageId,
-    feed: false,
     text: () => ({
       title: group ? groupName : String(a.message.authorName ?? "New message"),
       body: line,

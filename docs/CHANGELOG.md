@@ -77,11 +77,10 @@ With web 0.55.0 and API 0.42.0.
   `postPrompts` (`domain/models/post_prompts.dart`, fixtures in
   `packages/shared/fixtures/post_prompts`).
 - The Inbox tab is **Chats**.
-- Messages are push only: `chatNotice` and `directMessageNotice` set
-  `feed: false` (functions `notifications`), so they no longer write a
-  Notifications entry; older entries are hidden
-  (`NotificationCategory.isMessages`) and the bell doesn't count them.
-  Message requests keep their folded entry, hidden the same way.
+- Messages are no longer listed in Notifications or counted on the bell
+  (`NotificationCategory.isMessages`); they're in Chats. Their feed
+  entries are still written (functions unchanged), because the in-app
+  bubble for a new message reads them.
 - Mute hides the bubble: the Chats badge (`ShellViewModel`), the list's
   unread count and dots leave out muted conversations, and
   `TeamChatActivity.muted` / `TeamChatSummary.fromReadable(muted:)` muted
@@ -92,7 +91,6 @@ With web 0.55.0 and API 0.42.0.
 - Profile → Posts: New post, Log a workout and Record are small action
   chips (`RecordWorkoutButton(chip:)`), with space before the posts and
   between them.
-- Functions: `notifications` (push-only messages).
 
 ## 0.0.45 — Captains' channel, tournament tags
 

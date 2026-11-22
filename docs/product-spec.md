@@ -1306,10 +1306,10 @@ Out of scope: payments, meeting recording, USA Ultimate data.
     tools and Send. Hint from `postPrompts`. Tests: app
     `inline_composer_test.dart`, shared `post_prompts_fixtures.test.ts`.
 66. Chats, not Inbox; messages only in Chats: [x] app; [x] website.
-    Messages push but have no Notifications entry (functions `feed:
-    false`); the Chats tab's bubble leaves out muted conversations and
-    rooms, and muted rows show no unread dot. Tests: app `shell_test.dart`,
-    functions `notifications/model.test.ts`, shared
+    Messages push (and pop up in the app) but aren't listed in
+    Notifications or counted on the bell; the Chats tab's bubble leaves
+    out muted conversations and rooms, and muted rows show no unread dot.
+    Tests: app `shell_test.dart`, shared
     `team_chats_fixtures.test.ts`.
 67. Back from a notification goes to its parent page: [x] app; [x]
     website (`openFromNotifications`; `webParent`). Tests: app

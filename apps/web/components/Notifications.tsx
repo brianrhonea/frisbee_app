@@ -225,7 +225,9 @@ function NoticeRow({ n, onOpen, onClear }: { n: Doc<Notice>; onOpen: () => void;
             onOpen();
             if (!parent || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
             e.preventDefault();
-            router.replace(parent);
+            // The list's history entry becomes the parent, then the page
+            // opens over it (Next syncs with the native history calls).
+            window.history.replaceState(window.history.state, "", parent);
             router.push(to);
           }}
         >

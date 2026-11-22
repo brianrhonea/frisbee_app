@@ -129,7 +129,7 @@ describe("messagePreview", () => {
 });
 
 describe("notices", () => {
-  it("pushes each chat message's own text, with no Notifications entry", () => {
+  it("folds chat into one feed entry but pushes each message's own text", () => {
     const n = chatNotice({
       teamId: "t1",
       roomId: "general",
@@ -174,7 +174,6 @@ describe("notices", () => {
     expect(n.route).toBe("/messages/a_b");
     expect(n.conversationId).toBe("a_b");
     expect(n.pushId).toBe("m9");
-    expect(n.feed).toBe(false);
     const g = directMessageNotice({
       conversationId: "g-1",
       message: { authorName: "Sam", text: "yo" },

@@ -197,8 +197,9 @@ back to the list.
 
 You're notified about:
 
-- **Team chat** (push only): new messages in rooms you can read.
-- **Direct messages** (push only): new private messages.
+- **Team chat** (in Chats, not this list): new messages in rooms you can
+  read.
+- **Direct messages** (in Chats, not this list): new private messages.
 - **Event changes**: team events added, moved, changed or cancelled (not
   RSVPs or reactions).
 - **Event reminders**: a reminder about a day before each team or personal

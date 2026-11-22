@@ -42,19 +42,6 @@ export async function deliver(
   );
 }
 
-/** A push-only notice's text: undone and blocked-word checks as in the feed path, and always sent. */
-async function pushOnly(db: Firestore, prefs: Prefs, notice: Notice): Promise<{ text: Text; push: boolean } | null> {
-  if (notice.check) {
-    const data = (await db.doc(notice.check.path).get()).data();
-    if (!data || (notice.check.holds && !notice.check.holds(data))) return null;
-  }
-  const text = notice.text(prefs, 1);
-  const title = filterText(text.title);
-  const body = filterText(text.body);
-  if (title.blocked || body.blocked) return null;
-  return { text: { ...text, title: title.text, body: body.text }, push: true };
-}
-
 async function deliverTo(db: Firestore, messaging: Messaging, uid: string, notice: Notice) {
   const user = db.collection("users").doc(uid);
   const prefs = ((await user.collection("settings").doc("notifications").get()).data() ?? {}) as Prefs;
@@ -62,7 +49,7 @@ async function deliverTo(db: Firestore, messaging: Messaging, uid: string, notic
 
   const feed = user.collection("notifications");
   const entry = notice.collapseId ? feed.doc(notice.collapseId) : feed.doc();
-  const written = notice.feed === false ? await pushOnly(db, prefs, notice) : await db.runTransaction(async (tx) => {
+  const written = await db.runTransaction(async (tx) => {
     const previous = notice.collapseId ? await tx.get(entry) : undefined;
     // An undo that raced this trigger: the like, comment or request is gone.
     if (notice.check) {
