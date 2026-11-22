@@ -72,6 +72,31 @@ void main() {
     );
   });
 
+  test("a tournament's chat is a group the server runs", () {
+    final c = Conversation.fromMap('g-t1', {
+      'kind': 'tournament',
+      'tournamentId': 't1',
+      'name': 'Spring Fling · Captains',
+      'createdBy': '',
+      'participants': ['dir', 'cap'],
+      'names': {'dir': 'Dana', 'cap': 'Cam'},
+    });
+    expect(c.isGroup, isTrue);
+    expect(c.isTournamentChat, isTrue);
+    expect(c.tournamentId, 't1');
+    expect(c.titleFor('cap'), 'Spring Fling · Captains');
+    expect(c.canAddTo('cap'), isFalse);
+    expect(c.canRemove('dir', 'cap'), isFalse);
+    expect(c.canChange('cap'), isFalse);
+    final g = Conversation.fromMap('g-x', {
+      'kind': 'group',
+      'createdBy': 'dir',
+      'participants': ['dir', 'cap'],
+    });
+    expect(g.isTournamentChat, isFalse);
+    expect(g.canChange('cap'), isTrue);
+  });
+
   test('groups take up to 10 people', () async {
     final vm = picker();
     for (var i = 0; i < 12; i++) {

@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.45  | 2026-11-22 | `feature/tournament-fixes`              |                     |
 | 0.0.44  | 2026-11-21 | `feature/payments`                      |                     |
 | 0.0.43  | 2026-11-21 | `feature/report-block`                  |                     |
 | 0.0.42  | 2026-11-20 | `feature/report-block`                  |                     |
@@ -57,6 +58,33 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.45 — Captains' channel, tournament tags
+
+With web 0.54.0 and API 0.41.0.
+
+- Tournament chats with the organizers (`TournamentChatRepository`,
+  `OrganizerChatsCard`, `HostedTournamentViewModel.openChat`,
+  `myChatEntries`, `offersChats`): the Captains' channel and each team's
+  private thread, opened through the API and shown in Messages.
+  Organizers message a team from its row on the Teams tab.
+  `Conversation.tournamentId` / `isTournamentChat` (kind `tournament`):
+  a group with no Add people, Rename or Leave, and an Open tournament
+  item.
+- Functions: `tournaments-chatMembers` keeps the chats' people in step
+  when an entry's status or captains change (`chat_members.ts`, the port
+  of the API's rule); `notifications` title a tournament chat's message
+  with the chat's name, like a group's.
+- Rules: no change in behaviour; kind `tournament` conversations aren't
+  `groupDoc()`, so clients can't add, remove, rename or create them.
+  Tests in firestore.rules.test.ts.
+- "At a tournament" (`UserPostRepository.tagTournaments`, both composer
+  view models): followed tournaments from a week before they start to
+  their last day (`tournamentTagOpen` in follow.dart, fixtures in
+  `packages/shared/fixtures/tournament_tags`); a build without the API
+  offers every follow.
+- The "At …" line on a post opens the tournament
+  (`FollowTarget.parseTournamentKey`, `Routes.tournament(id, host:)`).
 
 ## 0.0.44 — Pay tournament fees online
 

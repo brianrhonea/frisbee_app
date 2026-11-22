@@ -10,6 +10,7 @@ export * from "./profile.js";
 export * from "./me.js";
 export * from "./posts.js";
 export * from "./follows.js";
+export * from "./tournament_chats.js";
 export * from "./roster.js";
 export * from "./personal.js";
 export * from "./messages.js";

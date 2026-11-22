@@ -81,6 +81,7 @@ List<GoRoute> hostedTournamentRoutes() => [
               followRepository: c.read(),
               notificationRepository: c.read(),
               paymentRepository: readOptional(c),
+              chatRepository: readOptional(c),
             ),
             builder: (_, vm) => ViewModelHost(
               key: ValueKey('tournament-signups-$id'),

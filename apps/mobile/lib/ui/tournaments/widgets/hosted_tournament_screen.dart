@@ -716,6 +716,8 @@ class _OverviewTab extends StatelessWidget {
                     ),
                   ),
                 ),
+          // Captains ask the organizers; organizers answer everyone at once.
+          if (vm.offersChats) OrganizerChatsCard(viewModel: vm),
           // Their signup, until they're on a team.
           if (t.takesPlayers &&
               signups != null &&
@@ -1147,6 +1149,12 @@ class _TeamsTabState extends State<_TeamsTab> {
               child: const Text('Accept'),
             ),
           ],
+          if (vm.offersChats && HostedTournamentViewModel.inChats(e))
+            IconButton(
+              tooltip: 'Message ${e.teamName}',
+              icon: const Icon(Icons.chat_bubble_outline),
+              onPressed: () => openTournamentChat(context, vm, e.teamId),
+            ),
           PopupMenuButton<EntryStatus>(
             onSelected: (s) => vm.decide.execute((entry: e, status: s)),
             itemBuilder: (_) => [
@@ -2636,6 +2644,102 @@ class _NewsTab extends StatelessWidget {
                 ],
               ),
             ),
+    );
+  }
+}
+
+/// Opens a chat with the organizers ([teamId]'s thread, or the Captains'
+/// channel for null) in Messages, or says why it can't.
+Future<void> openTournamentChat(
+  BuildContext context,
+  HostedTournamentViewModel vm,
+  String? teamId,
+) async {
+  await vm.openChat.execute(teamId);
+  if (!context.mounted) return;
+  switch (vm.openChat.result) {
+    case Ok<String>(:final value):
+      context.push(Routes.conversation(value));
+    case Error<String>(:final error):
+      showErrorSnackBar(context, error);
+    case null:
+      break;
+  }
+}
+
+/// "Questions?": the Captains' channel (every entered team's captains and
+/// the organizers, so an answer reaches everyone), and for captains their
+/// team's private thread with the organizers. Organizers message a team
+/// from its row on the Teams tab.
+class OrganizerChatsCard extends StatelessWidget {
+  const OrganizerChatsCard({super.key, required this.viewModel});
+
+  final HostedTournamentViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = viewModel;
+    final theme = Theme.of(context);
+    final mine = vm.myChatEntries;
+    return ListenableBuilder(
+      listenable: vm.openChat,
+      builder: (context, _) {
+        final busy = vm.openChat.running;
+        return Card(
+          margin: const EdgeInsets.only(top: 12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  vm.isManager ? 'Talk with captains' : 'Questions?',
+                  style: theme.textTheme.titleSmall,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  vm.isManager
+                      ? 'Answer everyone in the Captains\' channel, or '
+                            'message a team from its row on the Teams tab.'
+                      : 'Ask the organizers in the Captains\' channel, '
+                            'where every team sees the answer, or message '
+                            'them privately about your team.',
+                  style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    FilledButton.tonalIcon(
+                      key: const Key('captains-channel'),
+                      onPressed: busy
+                          ? null
+                          : () => openTournamentChat(context, vm, null),
+                      icon: const Icon(Icons.forum_outlined),
+                      label: const Text("Captains' channel"),
+                    ),
+                    if (!vm.isManager)
+                      for (final e in mine)
+                        OutlinedButton.icon(
+                          key: ValueKey('team-chat-${e.teamId}'),
+                          onPressed: busy
+                              ? null
+                              : () => openTournamentChat(context, vm, e.teamId),
+                          icon: const Icon(Icons.mail_outline),
+                          label: Text(
+                            mine.length == 1
+                                ? 'Message the organizers'
+                                : 'Message the organizers: ${e.teamName}',
+                          ),
+                        ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -4,6 +4,25 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.54.0 — 2026-11-22
+
+Works with API 0.41.0.
+
+- Tournament chats with the organizers (`tournaments/TournamentChats.tsx`):
+  a "Questions?" card on a hosted tournament's overview for captains of
+  entered teams (the Captains' channel, and Message the organizers for
+  each of their teams) and "Talk with captains" for organizers, who also
+  get Message on each team's row (Waiting and the seeded teams). They
+  open in Messages, where a tournament chat lists its people and links
+  to the tournament, with no rename, add, remove or leave.
+- "At a tournament" in the composer lists followed tournaments from a
+  week before they start to their last day
+  (`GET /v1/me/tag-tournaments`), and is hidden when none are.
+- The "At …" tag on a post links to the tournament (`tournamentTagHref`:
+  the hosted page, falling back to the group's tournament).
+- Following: hosted tournaments open their own page; they opened the
+  group-tournament page, which couldn't show them.
+
 ## 0.53.0 — 2026-11-21
 
 Works with API 0.40.0 (online payments; shows nothing until Stripe is set

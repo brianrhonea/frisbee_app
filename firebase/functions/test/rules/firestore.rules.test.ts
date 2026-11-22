@@ -2795,6 +2795,54 @@ describe("direct messages", () => {
     });
   });
 
+  describe("tournament chats with the organizers", () => {
+    const CHAT = "g-tournamentChat1";
+    const chat = (uid: string) => doc(db(uid), "conversations", CHAT);
+    const seedChat = () =>
+      env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "conversations", CHAT), {
+          kind: "tournament", tournamentId: "t1", tournamentChat: "captains", name: "Spring Fling · Captains",
+          createdBy: "", participants: [OWNER, PLAYER], names: { [OWNER]: "O", [PLAYER]: "P" },
+          lastMessage: "", lastMessageAt: null, lastSenderId: "", readAt: {}, createdAt: new Date(),
+        });
+        await setDoc(doc(ctx.firestore(), "tournaments", "t1", "chats", "captains"), { conversationId: CHAT, kind: "captains" });
+        await setDoc(doc(ctx.firestore(), "profiles", COACH), { name: "Cory", keywords: ["cory"], photoUrl: null });
+        await setDoc(doc(ctx.firestore(), "users", COACH, "follows", `user_${PLAYER}`), {
+          key: `user_${PLAYER}`, type: "user", targetId: PLAYER, name: "P", notify: true, createdAt: new Date(),
+        });
+      });
+
+    it("its people read and post; outsiders don't; the pointer is server-only", async () => {
+      await seedChat();
+      await assertSucceeds(getDoc(chat(PLAYER)));
+      await assertSucceeds(setDoc(doc(collection(db(PLAYER), "conversations", CHAT, "messages")), {
+        authorId: PLAYER, authorName: "P", text: "Check-in time?", attachments: [], createdAt: serverTimestamp(),
+      }));
+      await assertSucceeds(updateDoc(chat(PLAYER), {
+        lastMessage: "Check-in time?", lastMessageAt: serverTimestamp(), lastSenderId: PLAYER,
+        [`readAt.${PLAYER}`]: serverTimestamp(),
+      }));
+      await assertFails(getDoc(chat(OUTSIDER)));
+      await assertFails(getDoc(doc(db(OWNER), "tournaments", "t1", "chats", "captains")));
+    });
+
+    it("nobody adds, removes, leaves or renames from the app", async () => {
+      await seedChat();
+      await assertFails(updateDoc(chat(PLAYER), { participants: [OWNER, PLAYER, COACH], [`names.${COACH}`]: "C" }));
+      await assertFails(updateDoc(chat(PLAYER), { participants: [OWNER] }));
+      await assertFails(updateDoc(chat(OWNER), { participants: [PLAYER] }));
+      await assertFails(updateDoc(chat(OWNER), { name: "Renamed" }));
+      await assertFails(updateDoc(chat(OWNER), { kind: "group" }));
+    });
+
+    it("the app can't start one", async () => {
+      await assertFails(setDoc(doc(db(OWNER), "conversations", "g-mine"), {
+        kind: "tournament", name: "Fake · Captains", createdBy: OWNER, participants: [OWNER], names: { [OWNER]: "O" },
+        lastMessage: "", lastMessageAt: null, lastSenderId: "", readAt: {}, createdAt: serverTimestamp(),
+      }));
+    });
+  });
+
   describe("groups", () => {
     const GROUP = "g-abcDEF123";
     const group = (uid: string, id = GROUP) => doc(db(uid), "conversations", id);

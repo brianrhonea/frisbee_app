@@ -23,6 +23,7 @@ import {
   onlyLiveChanged,
   recordUpdate,
 } from "./model";
+import { captainsOf, capMembers, activeEntry, entryChatChange, organizersOf } from "./chat_members";
 
 /**
  * Keeps the team's record of the entry (its Tournaments tab lists them),
@@ -191,3 +192,65 @@ export const leagueGameEvents = onDocumentWritten(
 
 export { createLeagueTeams } from "./callables";
 export { draftControl, draftPick, finishDraft, startDraft } from "./draft";
+
+/**
+ * Keeps a tournament's chats with its organizers (the Captains' channel and
+ * the team's own thread, when they've been opened) to the captains of
+ * entries still in it: a withdrawn or declined team's captains drop out, a
+ * newly applied team's join, and changed captains follow. The API works out
+ * the same people whenever someone opens a chat, which also picks up
+ * organizer and team admin changes.
+ */
+export const chatMembers = onDocumentWritten("tournaments/{tournamentId}/entries/{teamId}", async (event) => {
+  const { tournamentId, teamId } = event.params;
+  const before = event.data?.before.data() as Data | undefined;
+  const after = event.data?.after.data() as Data | undefined;
+  if (!entryChatChange(before, after)) return;
+  const db = getFirestore();
+  const [captainsPtr, teamPtr] = await db.getAll(
+    db.doc(`tournaments/${tournamentId}/chats/captains`),
+    db.doc(`tournaments/${tournamentId}/chats/team_${teamId}`),
+  );
+  if (!captainsPtr.exists && !teamPtr.exists) return;
+  const t = (await db.doc(`tournaments/${tournamentId}`).get()).data();
+  if (!t) return;
+  const host = (await db.doc(`teams/${String(t.hostId ?? "")}`).get()).data();
+  const organizers = organizersOf(host);
+  if (teamPtr.exists) {
+    const team = (await db.doc(`teams/${teamId}`).get()).data();
+    await setMembers(String(teamPtr.data()?.conversationId ?? ""), capMembers([...organizers, ...captainsOf(after, team)]));
+  }
+  if (captainsPtr.exists) {
+    const entries = (await db.collection(`tournaments/${tournamentId}/entries`).limit(500).get()).docs.filter((d) =>
+      activeEntry(d.data()),
+    );
+    const teams = entries.length ? await db.getAll(...entries.map((d) => db.doc(`teams/${d.id}`))) : [];
+    const captains = entries.flatMap((d, i) => captainsOf(d.data(), teams[i].data()));
+    await setMembers(String(captainsPtr.data()?.conversationId ?? ""), capMembers([...organizers, ...captains]));
+  }
+});
+
+/** Sets a chat's people, naming newcomers from their profiles and keeping everyone else's name. */
+async function setMembers(conversationId: string, participants: string[]): Promise<void> {
+  if (!/^g-[A-Za-z0-9]+$/.test(conversationId)) return;
+  const db = getFirestore();
+  const ref = db.doc(`conversations/${conversationId}`);
+  await db.runTransaction(async (tx) => {
+    const conv = (await tx.get(ref)).data();
+    if (!conv || conv.kind !== "tournament") return;
+    const known = (conv.names ?? {}) as Record<string, unknown>;
+    const missing = participants.filter((u) => typeof known[u] !== "string");
+    const profiles = missing.length ? await tx.getAll(...missing.map((u) => db.doc(`profiles/${u}`))) : [];
+    const names: Record<string, string> = {};
+    for (const u of participants) {
+      const was = known[u];
+      if (typeof was === "string") names[u] = was;
+      else {
+        const name = profiles[missing.indexOf(u)]?.data()?.name;
+        names[u] = typeof name === "string" && name ? name.slice(0, 80) : "Player";
+      }
+    }
+    tx.update(ref, { participants, names });
+  });
+  logger.info("tournament chat members", { conversationId, count: participants.length });
+}

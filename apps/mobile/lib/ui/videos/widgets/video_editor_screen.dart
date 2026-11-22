@@ -248,9 +248,7 @@ class _VideoFormState extends State<_VideoForm> {
       if (problem != null)
         Text(
           problem,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: c.highlightInk,
-          ),
+          style: theme.textTheme.bodySmall?.copyWith(color: c.highlightInk),
         ),
       if (progress != null) ...[
         const SizedBox(height: 8),

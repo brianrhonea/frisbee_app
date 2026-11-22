@@ -10,6 +10,23 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.45
+
+**Talk with the organizers**
+- Captains of teams in a tournament now have a **Captains' channel** with
+  the organizers, so a question asked once is answered for everyone. It's
+  in Messages, and on the tournament's overview.
+- **Message the organizers** sends a private message about your own team
+  (payments, rosters, anything just for you).
+- Organizers see **Talk with captains** on the overview, and a message
+  button on each team's row. Teams that withdraw or are declined leave the
+  chats on their own.
+
+**Posting from a tournament**
+- "At a tournament" now lists only tournaments you follow that start
+  within a week or are happening now.
+- Tap "At …" on a post to go straight to that tournament.
+
 ## 0.0.44
 
 **Paying for tournaments**

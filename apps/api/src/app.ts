@@ -8,6 +8,8 @@ import { DiscordService, discordRoutes } from "./discord/service.js";
 import { PlaybookService, playbookRoutes } from "./playbook/service.js";
 import { MeetingService, meetingRoutes } from "./meetings/service.js";
 import { PaymentService, type PaymentsConfig, paymentRoutes } from "./payments/service.js";
+import { tournamentChatRoutes } from "./tournament_chats/routes.js";
+import { TournamentChatService } from "./tournament_chats/service.js";
 import type { LiveKitSigner } from "./meetings/signer.js";
 import { VideoService, videoRoutes } from "./videos/service.js";
 import { VideoExtrasService, videoExtrasRoutes } from "./videos/extras.js";
@@ -236,6 +238,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     groupTournamentRoutes(app, new GroupTournamentService(deps.store, deps.teams, queries), writes);
     tournamentRoutes(app, new TournamentService(deps.store, queries, deps.now), writes);
     paymentRoutes(app, new PaymentService(deps.store, deps.payments, deps.now), deps.writeLimits !== false ? writes : undefined);
+    tournamentChatRoutes(app, new TournamentChatService(deps.store), deps.writeLimits !== false ? writes : undefined);
     const conversations = new ConversationService(deps.store, deps.users, deps.media, deps.now);
     conversationRoutes(app, conversations, writes);
     const setDisabled = deps.users.setDisabled?.bind(deps.users);

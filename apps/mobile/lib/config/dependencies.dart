@@ -81,6 +81,7 @@ import '../data/services/youtube_info_service.dart';
 import '../firebase_options.dart';
 import '../data/repositories/moderation/moderation_repository.dart';
 import '../data/repositories/moderation/moderation_repository_api.dart';
+import '../data/repositories/tournament_chat/tournament_chat_repository.dart';
 
 /// Services and repositories backed by Firebase.
 List<SingleChildWidget> get firebaseProviders => [
@@ -133,6 +134,10 @@ List<SingleChildWidget> get firebaseProviders => [
   ),
   Provider<CalendarRepository>(
     create: (context) => CalendarRepositoryApi(api: context.read<ApiClient?>()),
+  ),
+  Provider<TournamentChatRepository>(
+    create: (context) =>
+        TournamentChatRepositoryApi(api: context.read<ApiClient?>()),
   ),
   Provider<PaymentRepository>(
     create: (context) => PaymentRepositoryApi(api: context.read<ApiClient?>()),

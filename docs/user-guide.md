@@ -395,6 +395,21 @@ run it.
    final places.
 8. **News**: **Post update** puts a public post on your page, tagged
    with the tournament, so its followers see it.
+9. **Talk with captains** (on the overview, once it's published): the
+   **Captains' channel** is one chat with you, your other organizers and
+   the captains of every team that's invited, applied, accepted or
+   waitlisted, so you answer a question once for everyone. **Message** on
+   a team's row (Teams tab) opens a private thread with just that team's
+   captains. Both are in Messages; teams that withdraw or are declined
+   leave them on their own.
+
+**Questions for the organizers**: captains of an entered team see
+**Questions?** on the tournament's overview: the **Captains' channel**,
+and **Message the organizers** for a private thread about their own team.
+
+**Posting from a tournament**: when you write a post, **At a tournament**
+lists the tournaments you follow that start within a week or are on now.
+Tagged posts show **At …**, which opens the tournament.
 
 **Playing in one**: find tournaments in **Events → Find events** (or **Explore → Find a tournament or league**).
 A team's owner or captain taps **Apply with a team**, picks the division

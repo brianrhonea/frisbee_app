@@ -2749,6 +2749,9 @@ service cloud.firestore {
       function groupDoc() {
         return resource.data.get('kind', 'direct') == 'group';
       }
+      // A tournament's chat with its organizers (kind 'tournament'): the
+      // API alone creates it and sets who is in it, so groupDoc() is false
+      // and nobody adds, removes, renames or leaves from the client.
       // One person appended to a group's members, who follows the adder.
       function addsMember() {
         let before = resource.data.participants;

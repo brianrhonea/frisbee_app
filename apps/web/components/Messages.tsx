@@ -26,7 +26,10 @@ import "./member.css";
 
 /** conversations/{id} (Conversation in the app). */
 interface Conversation {
-  kind?: "direct" | "group";
+  /** "tournament": a hosted tournament's chat with its organizers, run by the server (no add, leave or rename). */
+  kind?: "direct" | "group" | "tournament";
+  /** For a tournament chat: the hosted tournament. */
+  tournamentId?: string;
   name?: string;
   createdBy?: string;
   participants?: string[];
@@ -714,6 +717,22 @@ function GroupPeople({
   const [note, setNote] = useState<string | null>(null);
   const people = conv.participants ?? [];
   const creator = conv.createdBy === me;
+  // A tournament's chat follows its entries: only who's in it shows here.
+  if (conv.kind === "tournament") {
+    return (
+      <div className="thread-foot group-people">
+        <p className="muted small">
+          The organizers and the captains of teams in the tournament.{" "}
+          {conv.tournamentId && <Link href={`/tournaments/${encodeURIComponent(conv.tournamentId)}`}>Open the tournament</Link>}
+        </p>
+        <ul className="people-list">
+          {people.map((u) => (
+            <li key={u}>{u === me ? "You" : conv.names?.[u] || "Player"}</li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
   return (
     <div className="thread-foot group-people">
       <form

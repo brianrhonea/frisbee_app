@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/data/repositories/payment/payment_repository.dart';
+import 'package:frisbee_app/data/repositories/tournament_chat/tournament_chat_repository.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/group_tournament.dart';
 import 'package:frisbee_app/domain/models/hosted_tournament.dart';
@@ -71,6 +72,7 @@ void main() {
     String uid,
     String id, {
     PaymentRepository? payments,
+    TournamentChatRepository? chats,
   }) async {
     final vm = HostedTournamentViewModel(
       tournamentId: id,
@@ -79,6 +81,7 @@ void main() {
       authRepository: as(uid),
       postRepository: posts,
       paymentRepository: payments,
+      chatRepository: chats,
       now: () => DateTime(2027, 4, 10),
     );
     await pumpEventQueue();
@@ -222,6 +225,44 @@ void main() {
     expect(dir.entryOf('t2')!.status, EntryStatus.applied);
     dir.dispose();
     cap.dispose();
+  });
+
+  test('chats with the organizers: organizers and entered captains, '
+      'once the tournament is out', () async {
+    final id = await host();
+    final chats = _FakeChats();
+    final cap = await page('cap1', id, chats: chats);
+    await cap.apply.execute((
+      teamId: 't1',
+      divisionId: cap.divisions.single.id,
+      captainIds: ['cap1'],
+    ));
+    await pumpEventQueue();
+    expect(cap.myChatEntries.map((e) => e.teamId), ['t1']);
+    expect(cap.offersChats, isTrue);
+    await cap.openChat.execute('t1');
+    expect(cap.openChat.result, isA<Ok<String>>());
+    expect(chats.opened, ['team $id t1']);
+    await cap.openChat.execute(null);
+    expect(chats.opened.last, 'captains $id');
+    // Someone else's captain sees nothing; without the API, nobody does.
+    final other = await page('cap2', id, chats: chats);
+    expect(other.offersChats, isFalse);
+    final dir = await page('director', id, chats: chats);
+    expect(dir.offersChats, isTrue);
+    final noApi = await page('director', id);
+    expect(noApi.offersChats, isFalse);
+    // Declined, the team's captains are out.
+    await dir.decide.execute((
+      entry: cap.myEntries.single,
+      status: EntryStatus.declined,
+    ));
+    await pumpEventQueue();
+    expect(cap.myChatEntries, isEmpty);
+    expect(cap.offersChats, isFalse);
+    for (final v in [cap, other, dir, noApi]) {
+      v.dispose();
+    }
   });
 
   test('bid fees: paid toggles, overdue and the unpaid count', () async {
@@ -642,4 +683,24 @@ class _MarkingPayments implements PaymentRepository {
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// Records which chats were opened, as the API would answer.
+class _FakeChats implements TournamentChatRepository {
+  final opened = <String>[];
+
+  @override
+  bool get available => true;
+
+  @override
+  Future<Result<String>> openCaptains(String tournamentId) async {
+    opened.add('captains $tournamentId');
+    return const Result.ok('g-captains');
+  }
+
+  @override
+  Future<Result<String>> openTeam(String tournamentId, String teamId) async {
+    opened.add('team $tournamentId $teamId');
+    return const Result.ok('g-team');
+  }
 }
