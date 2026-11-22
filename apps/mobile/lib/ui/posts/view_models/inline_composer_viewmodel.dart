@@ -70,11 +70,10 @@ class InlineComposerViewModel extends ChangeNotifier {
     final uid = _auth.currentUser?.uid;
     if (uid != null) {
       _followSub = followRepository.watchFollows(uid).listen((f) {
-        _tournaments = [
+        _setTournaments([
           for (final x in f)
             if (x.type == FollowType.tournament) x.target,
-        ];
-        notifyListeners();
+        ]);
       }, onError: (Object _) {});
     }
   }
@@ -242,6 +241,19 @@ class InlineComposerViewModel extends ChangeNotifier {
 
   List<FollowTarget> _tournaments = const [];
 
+  /// "At a tournament" offers followed tournaments from a week before they
+  /// start to their last day, asked of the API whenever the follows change;
+  /// a build without it offers them all.
+  Future<void> _setTournaments(List<FollowTarget> followed) async {
+    if (!_userPosts.hasTagTournaments) {
+      _tournaments = followed;
+    } else {
+      final r = await _userPosts.tagTournaments();
+      _tournaments = r is Ok<List<FollowTarget>> ? r.value : const [];
+    }
+    if (!_disposed) notifyListeners();
+  }
+
   /// Tournaments the user follows, to tag the post with (Everyone only).
   List<FollowTarget> get tournaments => team == null ? _tournaments : const [];
 
@@ -408,8 +420,11 @@ class InlineComposerViewModel extends ChangeNotifier {
     if (post.error) post.clearResult();
   }
 
+  bool _disposed = false;
+
   @override
   void dispose() {
+    _disposed = true;
     _followSub?.cancel();
     post
       ..removeListener(notifyListeners)

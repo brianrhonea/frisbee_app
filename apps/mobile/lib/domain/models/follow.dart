@@ -67,6 +67,40 @@ class FollowTarget {
   static String teamKey(String teamId) => keyFor(FollowType.team, teamId);
   static String tournamentKey(String groupId, String tournamentId) =>
       keyFor(FollowType.tournament, '${groupId}_$tournamentId');
+
+  /// A tournament key (also a post's "At a tournament" tag) split into its
+  /// host or group and the tournament; null for anything else. Ids never
+  /// hold "_", so the last one splits them. parseTournamentKey in
+  /// packages/shared.
+  static ({String hostId, String tournamentId})? parseTournamentKey(
+    String? key,
+  ) {
+    const prefix = 'tournament_';
+    if (key == null || !key.startsWith(prefix)) return null;
+    final rest = key.substring(prefix.length);
+    final at = rest.lastIndexOf('_');
+    if (at <= 0 || at == rest.length - 1) return null;
+    return (
+      hostId: rest.substring(0, at),
+      tournamentId: rest.substring(at + 1),
+    );
+  }
+}
+
+/// "At a tournament" lists tournaments from this many days before they
+/// start (tournamentTagDays in packages/shared).
+const tournamentTagDays = 7;
+
+/// Whether a post may be tagged "At" a tournament at [now]: from
+/// [tournamentTagDays] days before [startsOn] to the end of its last day
+/// ([endsOn], else the day it starts). tournamentTagOpen in packages/shared.
+bool tournamentTagOpen(DateTime startsOn, DateTime? endsOn, DateTime now) {
+  final start = startsOn.millisecondsSinceEpoch;
+  final end = endsOn?.millisecondsSinceEpoch;
+  final last = end == null || end < start ? start : end;
+  const day = Duration.millisecondsPerDay;
+  final t = now.millisecondsSinceEpoch;
+  return t >= start - tournamentTagDays * day && t < last + day;
 }
 
 /// A user's follow, stored at `users/{uid}/follows/{key}`. [notify] turns

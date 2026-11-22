@@ -8,6 +8,7 @@ import {
   repostId,
   repostRequestSchema,
 } from "@stall10/shared";
+import type { TagTournaments } from "@stall10/shared";
 import type { Caller, UserLookup } from "../auth.js";
 import { ApiError, fromZod } from "../errors.js";
 import { docIdParam, isDocId } from "../ids.js";
@@ -15,6 +16,7 @@ import { type Data, type DocStore, serverTime, type Tx } from "../store.js";
 import { authorOf, checkNotMuted, nameMax, text, checkSeesPost } from "./author.js";
 import { clip } from "../teams/access.js";
 import { refuseBlocked } from "../moderation/blocks.js";
+import { tagTournaments } from "./tags.js";
 
 const p = {
   post: (id: string) => `posts/${id}`,
@@ -50,6 +52,11 @@ export class PostService {
     private readonly users: UserLookup,
     private readonly now: () => number = Date.now,
   ) {}
+
+  /** `GET /v1/me/tag-tournaments`: what the composer's "At a tournament" offers. */
+  async tagTournaments(caller: Caller): Promise<TagTournaments> {
+    return tagTournaments(this.store, caller.uid, new Date(this.now()));
+  }
 
   /** [id] itself, or its original when it's a repost. */
   private async target(tx: Reader, id: string): Promise<Target> {

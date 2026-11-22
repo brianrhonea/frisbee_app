@@ -5,6 +5,8 @@ import {
   type PublicImage,
   type SavePostResult,
   type SaveTeamPostRequest,
+  type TagTournament,
+  type TagTournaments,
   teamPostImagesMax,
   type WorkoutActivity,
   type WorkoutInput,
@@ -157,19 +159,28 @@ export function Composer({
   const text = useRef<HTMLTextAreaElement>(null);
   const files = useRef<HTMLInputElement>(null);
   const repost = editing?.kind === "repost";
-  // "At a tournament": the tournaments the member follows (the app's tag field).
+  // "At a tournament": followed tournaments from a week before they start to
+  // their last day (GET /v1/me/tag-tournaments, as in the app), asked again
+  // when the follows change. An edited post keeps its own tag on offer.
   const [tag, setTag] = useState<{ key: string; name: string } | null>(editing?.tournament ?? null);
   const followed = useLiveQuery<{ key?: string; name?: string; type?: string }>(
     user && !repost ? `users/${user.uid}/follows` : null,
     [where("type", "==", "tournament")],
     `${user?.uid ?? ""}-tournaments`,
   );
-  const tagOptions = [
-    ...(followed.data ?? []).flatMap((f) => {
-      const key = f.key ?? f.id;
-      return key.startsWith("tournament_") ? [{ key, name: (f.name ?? "Tournament").slice(0, 100) }] : [];
-    }),
-  ].sort((a, b) => a.name.localeCompare(b.name));
+  const followKeys = (followed.data ?? []).map((f) => f.key ?? f.id).sort().join(",");
+  const [taggable, setTaggable] = useState<TagTournament[]>([]);
+  useEffect(() => {
+    if (!user || repost) return;
+    let live = true;
+    callApi<TagTournaments>(user, "/v1/me/tag-tournaments")
+      .then((r) => live && setTaggable(r.tournaments))
+      .catch(() => live && setTaggable([]));
+    return () => {
+      live = false;
+    };
+  }, [user, repost, followKeys]);
+  const tagOptions = taggable.map((t) => ({ key: t.key, name: t.name.slice(0, 100) }));
   if (tag && !tagOptions.some((o) => o.key === tag.key)) tagOptions.push(tag);
 
   // Grow the box with what's written.

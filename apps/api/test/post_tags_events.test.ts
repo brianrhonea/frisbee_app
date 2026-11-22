@@ -227,3 +227,43 @@ describe("calendar event posts (validSharedEvent, the calendar's editors)", () =
     expect((await share("ce1", "c1")).status).toBe(429);
   });
 });
+
+describe("GET /v1/me/tag-tournaments (tournamentTagOpen)", () => {
+  const day = 86_400_000;
+  const get = async (app: ReturnType<typeof buildApp>) => {
+    const res = await app.inject({ method: "GET", url: "/v1/me/tag-tournaments", headers: { authorization: "Bearer token:me" } });
+    return { status: res.statusCode, json: res.json() };
+  };
+  const follow = (key: string, name: string) => store.put(`users/me/follows/${key}`, { type: "tournament", name });
+
+  it("lists followed tournaments from a week before they start to their last day, soonest first", async () => {
+    const app = buildApp({ verifier: new FakeVerifier(), users: new FakeUsers(), teams: new FakeTeamRepository(), store, media: new FakeMediaStorage(), now: () => now });
+    follow("tournament_host_soon", "Old name");
+    store.put("tournaments/soon", { hostId: "host", name: "Spring Fling", status: "registration", startsOn: new Date(now + 6 * day), endsOn: new Date(now + 7 * day) });
+    follow("tournament_host_far", "Far");
+    store.put("tournaments/far", { hostId: "host", name: "Far", status: "registration", startsOn: new Date(now + 9 * day) });
+    follow("tournament_host_draft", "Draft");
+    store.put("tournaments/draft", { hostId: "host", name: "Draft", status: "draft", startsOn: new Date(now + day) });
+    follow("tournament_host_over", "Over");
+    store.put("tournaments/over", { hostId: "host", name: "Over", status: "finished", startsOn: new Date(now - 3 * day), endsOn: new Date(now - 2 * day) });
+    follow("tournament_g1_pickup", "Pickup");
+    store.put("tournamentDirectory/g1_pickup", { groupId: "g1", tournamentId: "pickup", name: "Pickup", startsAt: new Date(now + 2 * 3_600_000), status: "setup" });
+    follow("tournament_g1_gone", "Gone");
+    follow("team_t1", "Haze");
+    store.put("users/me/follows/team_t1", { type: "team", name: "Haze" });
+    const res = await get(app);
+    expect(res.status).toBe(200);
+    expect(res.json.tournaments.map((t: { key: string; name: string }) => [t.key, t.name])).toEqual([
+      ["tournament_g1_pickup", "Pickup"],
+      ["tournament_host_soon", "Spring Fling"],
+    ]);
+  });
+
+  it("reads the group's listing when a hosted tournament of that id belongs to someone else", async () => {
+    const app = buildApp({ verifier: new FakeVerifier(), users: new FakeUsers(), teams: new FakeTeamRepository(), store, media: new FakeMediaStorage(), now: () => now });
+    follow("tournament_g1_x", "Pickup");
+    store.put("tournaments/x", { hostId: "other", name: "Not it", status: "live", startsOn: new Date(now) });
+    store.put("tournamentDirectory/g1_x", { groupId: "g1", tournamentId: "x", name: "Pickup", startsAt: new Date(now + day) });
+    expect((await get(app)).json.tournaments.map((t: { name: string }) => t.name)).toEqual(["Pickup"]);
+  });
+});

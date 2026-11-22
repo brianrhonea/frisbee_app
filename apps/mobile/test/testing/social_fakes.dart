@@ -276,6 +276,16 @@ class FakeUserPostRepository implements UserPostRepository {
   @override
   bool hasCommunityFeed = true;
 
+  /// What [tagTournaments] returns; null: no API, so every follow is offered.
+  List<FollowTarget>? tagAnswer;
+
+  @override
+  bool get hasTagTournaments => tagAnswer != null;
+
+  @override
+  Future<Result<List<FollowTarget>>> tagTournaments() async =>
+      Result.ok(tagAnswer ?? const []);
+
   /// What [fetchCommunityPage] returns, by its `before` cursor (null for
   /// the first page); missing cursors give an empty last page.
   final communityPages = <int?, CommunityFeedPage>{};

@@ -10,6 +10,7 @@ import type { Limit } from "./model.js";
 export const readLimits = {
   roster: { max: 60, windowMs: 60_000 },
   postStates: { max: 120, windowMs: 60_000 },
+  tagTournaments: { max: 60, windowMs: 60_000 },
   calendars: { max: 60, windowMs: 60_000 },
   calendarEvents: { max: 60, windowMs: 60_000 },
 } satisfies Record<string, Limit>;

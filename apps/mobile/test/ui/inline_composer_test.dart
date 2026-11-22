@@ -140,6 +140,31 @@ void main() {
       expect(userPosts.posts.single.tournamentName, 'Lone Star');
     });
 
+    test('with the API, only tournaments within a week are offered', () async {
+      await follows.follow(
+        testUser.uid,
+        const FollowTarget.tournament('h', 'lone', 'Lone Star'),
+      );
+      await follows.follow(
+        testUser.uid,
+        const FollowTarget.tournament('h', 'far', 'Far Away Open'),
+      );
+      // The API's answer: just the one starting this week.
+      userPosts.tagAnswer = [
+        const FollowTarget.tournament('h', 'lone', 'Lone Star'),
+      ];
+      final vm = build();
+      await pumpEventQueue();
+      expect(vm.tournaments.map((t) => t.name), ['Lone Star']);
+      userPosts.tagAnswer = [];
+      await follows.follow(
+        testUser.uid,
+        const FollowTarget.tournament('h', 'new', 'New One'),
+      );
+      await pumpEventQueue();
+      expect(vm.tournaments, isEmpty, reason: 'asked again on a new follow');
+    });
+
     test('a team post: title, place, Public; no workout or tag', () async {
       teams = [flyers];
       await follows.follow(

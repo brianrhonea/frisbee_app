@@ -1,0 +1,104 @@
+{
+  "about": "parseTournamentKey and tournamentTagOpen (follow.dart).",
+  "cases": [
+    {
+      "name": "8 days before",
+      "startsOn": "2026-12-12T09:00:00.000Z",
+      "endsOn": null,
+      "now": "2026-12-04T09:00:00.000Z",
+      "open": false
+    },
+    {
+      "name": "7 days before",
+      "startsOn": "2026-12-12T09:00:00.000Z",
+      "endsOn": null,
+      "now": "2026-12-05T09:00:00.000Z",
+      "open": true
+    },
+    {
+      "name": "the day before",
+      "startsOn": "2026-12-12T09:00:00.000Z",
+      "endsOn": "2026-12-13T00:00:00.000Z",
+      "now": "2026-12-11T09:00:00.000Z",
+      "open": true
+    },
+    {
+      "name": "during",
+      "startsOn": "2026-12-12T09:00:00.000Z",
+      "endsOn": "2026-12-13T00:00:00.000Z",
+      "now": "2026-12-12T12:00:00.000Z",
+      "open": true
+    },
+    {
+      "name": "the last day",
+      "startsOn": "2026-12-12T09:00:00.000Z",
+      "endsOn": "2026-12-13T00:00:00.000Z",
+      "now": "2026-12-13T20:00:00.000Z",
+      "open": true
+    },
+    {
+      "name": "the day after the last",
+      "startsOn": "2026-12-12T09:00:00.000Z",
+      "endsOn": "2026-12-13T00:00:00.000Z",
+      "now": "2026-12-14T01:00:00.000Z",
+      "open": false
+    },
+    {
+      "name": "one day, that evening",
+      "startsOn": "2026-12-12T09:00:00.000Z",
+      "endsOn": null,
+      "now": "2026-12-12T21:00:00.000Z",
+      "open": true
+    },
+    {
+      "name": "one day, the day after",
+      "startsOn": "2026-12-12T09:00:00.000Z",
+      "endsOn": null,
+      "now": "2026-12-13T09:00:00.000Z",
+      "open": false
+    },
+    {
+      "name": "ends before it starts",
+      "startsOn": "2026-12-12T09:00:00.000Z",
+      "endsOn": "2026-12-01T00:00:00.000Z",
+      "now": "2026-12-12T09:00:00.000Z",
+      "open": true
+    },
+    {
+      "name": "key tournament_host1_t1",
+      "key": "tournament_host1_t1",
+      "parsed": {
+        "hostId": "host1",
+        "tournamentId": "t1"
+      }
+    },
+    {
+      "name": "key tournament_group9_abc",
+      "key": "tournament_group9_abc",
+      "parsed": {
+        "hostId": "group9",
+        "tournamentId": "abc"
+      }
+    },
+    {
+      "name": "key tournament_",
+      "key": "tournament_",
+      "parsed": null
+    },
+    {
+      "name": "key tournament_x",
+      "key": "tournament_x",
+      "parsed": null
+    },
+    {
+      "name": "key tournament_x_",
+      "key": "tournament_x_",
+      "parsed": null
+    },
+    {
+      "name": "key team_abc",
+      "key": "team_abc",
+      "parsed": null
+    }
+  ]
+}

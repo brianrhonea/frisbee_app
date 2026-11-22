@@ -4,6 +4,7 @@ import '../../../domain/models/app_user.dart';
 import '../../../domain/models/chat.dart';
 import '../../../domain/models/user_post.dart';
 import '../../../utils/result.dart';
+import '../../../domain/models/follow.dart';
 
 /// Posts people write themselves, at `posts/{id}`; photos in Cloud Storage
 /// under `users/{uid}/posts/{postId}/`. Anyone signed in can read them,
@@ -60,6 +61,15 @@ abstract class UserPostRepository {
 
   /// Whether this build can read the community feed (it needs the API).
   bool get hasCommunityFeed;
+
+  /// Whether [tagTournaments] can ask the API. Without it the composer
+  /// offers every followed tournament, as before.
+  bool get hasTagTournaments;
+
+  /// The followed tournaments a post can be tagged "At" now: from a week
+  /// before each starts to its last day (`GET /v1/me/tag-tournaments`,
+  /// tournamentTagOpen), soonest first.
+  Future<Result<List<FollowTarget>>> tagTournaments();
 
   /// One page of the community feed, the website's Community tab
   /// (`GET /v1/feed`): the newest posts by public profiles, newest first,

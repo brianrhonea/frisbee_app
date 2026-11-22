@@ -9,6 +9,7 @@ import '../../../domain/models/user_post.dart';
 import '../../../domain/models/workout.dart';
 import '../../../domain/models/workout_route.dart';
 import '../../../routing/open_link.dart';
+import '../../../domain/models/follow.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
 import '../../core/themes/theme.dart';
@@ -240,6 +241,55 @@ class UserPostCard extends StatelessWidget {
   }
 }
 
+/// "At a tournament": taps open the tournament's page (the hosted page,
+/// which falls back to the group's tournament), not the post.
+class _TournamentTag extends StatelessWidget {
+  const _TournamentTag({required this.name, required this.tournamentKey});
+
+  final String name;
+  final String? tournamentKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final t = FollowTarget.parseTournamentKey(tournamentKey);
+    final row = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.emoji_events_outlined, size: 16, color: scheme.primary),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            'At $name',
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: scheme.primary,
+              decoration: t == null ? null : TextDecoration.underline,
+              decorationColor: scheme.primary,
+            ),
+          ),
+        ),
+      ],
+    );
+    if (t == null) return row;
+    return Semantics(
+      link: true,
+      label: 'Open $name',
+      excludeSemantics: true,
+      child: InkWell(
+        key: const Key('post-tournament-tag'),
+        borderRadius: BorderRadius.circular(6),
+        onTap: () =>
+            context.push(Routes.tournament(t.tournamentId, host: t.hostId)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: row,
+        ),
+      ),
+    );
+  }
+}
+
 /// A post's text, workout, event, photos and links.
 class _PostContent extends StatelessWidget {
   const _PostContent({required this.post, required this.loadImage});
@@ -264,7 +314,6 @@ class _PostContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     final workout = post.workout;
     final event = post.event;
     return Column(
@@ -272,24 +321,7 @@ class _PostContent extends StatelessWidget {
       children: [
         if (post.tournamentName case final t? when t.isNotEmpty) ...[
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(
-                Icons.emoji_events_outlined,
-                size: 16,
-                color: scheme.primary,
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  'At $t',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: scheme.primary,
-                  ),
-                ),
-              ),
-            ],
-          ),
+          _TournamentTag(name: t, tournamentKey: post.tournamentKey),
         ],
         if (post.body.isNotEmpty) ...[
           const SizedBox(height: 8),
