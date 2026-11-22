@@ -2,6 +2,7 @@
 // §8.1, W2/W3): team posts, team events with RSVPs, reactions and polls,
 // and team chat messages. Ports of the teams/{id}/posts, events, chats and
 // messages rules in firestore.rules; the app still writes these directly.
+import { repeatSchema } from "./recurrence.js";
 import { z } from "zod";
 import { clean } from "./word_filter.js";
 import { isoDateTime } from "./dates.js";
@@ -115,11 +116,15 @@ export const saveTeamEventRequestSchema = z
     poll: eventPollSchema.nullable().default(null),
     public: z.boolean().default(false),
     audience: z.array(z.string().min(1).max(64)).max(20, "Pick at most 20 roles.").optional(),
+    // New events only: write a series, at the same wall-clock time in [timeZone].
+    repeat: repeatSchema.optional(),
+    timeZone: z.string().min(1).max(64).optional(),
   })
   .refine((e) => !e.endsAt || Date.parse(e.endsAt) >= Date.parse(e.startsAt), {
     message: "It can't end before it starts.",
     path: ["endsAt"],
-  });
+  })
+  .refine((e) => !e.repeat || e.timeZone, { message: "Send the time zone with a repeat.", path: ["timeZone"] });
 export type SaveTeamEventRequest = z.input<typeof saveTeamEventRequestSchema>;
 
 export interface SaveTeamEventResult {

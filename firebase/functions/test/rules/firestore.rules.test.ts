@@ -1287,6 +1287,21 @@ describe("events", () => {
     await assertFails(setDoc(doc(db(COACH), "teams", TEAM, "events", "t-bogus"), event(COACH, { type: "bogus" })));
   });
 
+  it("repeating events: valid series only, fixed after create; editors stamp bulk writes", async () => {
+    const series = { id: "s1", index: 1, count: 4, freq: "weekly", until: "2026-11-23" };
+    const s1 = doc(db(COACH), "teams", TEAM, "events", "s1_1");
+    await assertFails(setDoc(doc(db(COACH), "teams", TEAM, "events", "s1_x"), event(COACH, { series: { ...series, freq: "hourly" } })));
+    await assertFails(setDoc(doc(db(COACH), "teams", TEAM, "events", "s1_y"), event(COACH, { series: { ...series, index: 4 } })));
+    await assertFails(setDoc(doc(db(COACH), "teams", TEAM, "events", "s1_z"), event(COACH, { series: { ...series, until: "soon" } })));
+    await assertFails(setDoc(doc(db(COACH), "teams", TEAM, "events", "s1_w"), event(COACH, { series: { ...series, extra: 1 } })));
+    await assertSucceeds(setDoc(s1, event(COACH, { series })));
+    await assertSucceeds(updateDoc(s1, { title: "Later practice", seriesWrite: { id: "w1", lead: false } }));
+    await assertSucceeds(updateDoc(s1, { seriesWrite: { id: "w2", lead: false, delete: true } }));
+    await assertFails(updateDoc(s1, { seriesWrite: { id: "w3", lead: "yes" } }));
+    await assertFails(updateDoc(s1, { "series.index": 2 }));
+    await assertFails(updateDoc(doc(db(PLAYER), "teams", TEAM, "events", "s1_1"), { seriesWrite: { id: "w4", lead: true } }));
+  });
+
   it("rejects events created with pre-filled responses", async () => {
     await assertFails(setDoc(ev(COACH), event(COACH, { rsvps: { [PLAYER]: "going" } })));
   });
@@ -1401,6 +1416,13 @@ describe("personal events", () => {
     await assertFails(updateDoc(ref(OWNER), { title: "Hijack" }));
     await assertFails(deleteDoc(ref(OUTSIDER)));
     await assertSucceeds(deleteDoc(ref(PLAYER)));
+  });
+
+  it("takes a valid series, nothing else repeating", async () => {
+    const series = { id: "s1", index: 0, count: 3, freq: "daily", until: "2026-11-04" };
+    await assertSucceeds(setDoc(ref(PLAYER), mine({ series })));
+    await assertFails(setDoc(ref(PLAYER), mine({ series: { ...series, count: 101 } })));
+    await assertFails(setDoc(ref(PLAYER), mine({ seriesWrite: { id: "w", lead: true } })));
   });
 
   it("validates details and rejects polls and responses", async () => {

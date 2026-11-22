@@ -35,6 +35,7 @@ import 'package:frisbee_app/domain/models/player_profile.dart';
 import 'package:frisbee_app/domain/models/roster_player.dart';
 import 'package:frisbee_app/domain/models/stats.dart';
 import 'package:frisbee_app/domain/models/team_name.dart';
+import 'package:frisbee_app/domain/models/recurrence.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/domain/models/team_event.dart';
 import 'package:frisbee_app/domain/models/team_post.dart';
@@ -1190,6 +1191,42 @@ class FakeEventRepository implements EventRepository {
   final _changes = StreamController<void>.broadcast();
   bool? lastClearVotes;
 
+  /// The repeat and scope of the last save or delete.
+  Repeat? lastRepeat;
+  SeriesScope? lastScope;
+
+  /// [event] saved as [id], or with [repeat] as a series of events.
+  static List<TeamEvent> _series(String id, TeamEvent event, Repeat? repeat) {
+    if (repeat == null) return [event.copyWith(id: id)];
+    final times = seriesTimes(event.startsAt, event.endsAt, repeat);
+    return [
+      for (final (i, (start, end)) in times.indexed)
+        event.copyWith(
+          id: occurrenceId(id, i),
+          startsAt: start,
+          endsAt: () => end,
+          series: () => EventSeries(
+            id: id,
+            index: i,
+            count: times.length,
+            freq: repeat.freq,
+            until: repeat.until,
+          ),
+        ),
+    ];
+  }
+
+  /// [id] and, for [SeriesScope.following], its series' later events.
+  static List<String> _withLater(
+    Map<String, TeamEvent> events,
+    String id,
+    SeriesScope scope,
+  ) => [
+    id,
+    if (scope == SeriesScope.following)
+      ...?events[id]?.series?.laterIds.where(events.containsKey),
+  ];
+
   void emit() => _changes.add(null);
 
   List<TeamEvent> _sorted(String teamId) =>
@@ -1265,17 +1302,35 @@ class FakeEventRepository implements EventRepository {
     TeamEvent event,
     String uid, {
     bool clearVotes = false,
+    Repeat? repeat,
+    SeriesScope scope = SeriesScope.one,
   }) async {
     lastClearVotes = clearVotes;
+    lastRepeat = repeat;
+    lastScope = scope;
     final id = event.isNew ? 'e${events.length + 1}' : event.id;
-    events[id] = event.copyWith(id: id);
+    final saved = event.isNew
+        ? _series(id, event, repeat)
+        : [
+            for (final l in _withLater(events, id, scope))
+              event.copyWith(id: l, series: () => events[l]?.series),
+          ];
+    for (final e in saved) {
+      events[e.id] = e;
+    }
     emit();
-    return Result.ok(id);
+    return Result.ok(saved.first.id);
   }
 
   @override
-  Future<Result<void>> deleteEvent(String teamId, String eventId) async {
-    (byTeam[teamId] ?? events).remove(eventId);
+  Future<Result<void>> deleteEvent(
+    String teamId,
+    String eventId, {
+    SeriesScope scope = SeriesScope.one,
+  }) async {
+    lastScope = scope;
+    final list = byTeam[teamId] ?? events;
+    _withLater(list, eventId, scope).forEach(list.remove);
     emit();
     return const Result.ok(null);
   }
@@ -1401,17 +1456,38 @@ class FakeEventRepository implements EventRepository {
   }
 
   @override
-  Future<Result<String>> saveMyEvent(String uid, TeamEvent event) async {
+  Future<Result<String>> saveMyEvent(
+    String uid,
+    TeamEvent event, {
+    Repeat? repeat,
+    SeriesScope scope = SeriesScope.one,
+  }) async {
+    lastRepeat = repeat;
+    lastScope = scope;
     final events = mine[uid] ??= {};
     final id = event.isNew ? 'm${events.length + 1}' : event.id;
-    events[id] = event.copyWith(id: id);
+    final saved = event.isNew
+        ? _series(id, event, repeat)
+        : [
+            for (final l in _withLater(events, id, scope))
+              event.copyWith(id: l, series: () => events[l]?.series),
+          ];
+    for (final e in saved) {
+      events[e.id] = e;
+    }
     emit();
-    return Result.ok(id);
+    return Result.ok(saved.first.id);
   }
 
   @override
-  Future<Result<void>> deleteMyEvent(String uid, String eventId) async {
-    mine[uid]?.remove(eventId);
+  Future<Result<void>> deleteMyEvent(
+    String uid,
+    String eventId, {
+    SeriesScope scope = SeriesScope.one,
+  }) async {
+    lastScope = scope;
+    final events = mine[uid] ?? {};
+    _withLater(events, eventId, scope).forEach(events.remove);
     emit();
     return const Result.ok(null);
   }
@@ -3309,14 +3385,30 @@ class FakeCalendarRepository implements CalendarRepository {
   }
 
   @override
-  Future<Result<String>> saveEvent(String calendarId, TeamEvent event) async {
+  Future<Result<String>> saveEvent(
+    String calendarId,
+    TeamEvent event, {
+    Repeat? repeat,
+    SeriesScope scope = SeriesScope.one,
+  }) async {
+    lastRepeat = repeat;
+    lastScope = scope;
     final id = event.id.isEmpty ? 'ev${++_ids}' : event.id;
     if (!fail) saved.add((calendarId, event.copyWith(id: id)));
     return _ok('save $calendarId', id);
   }
 
+  /// The repeat and scope of the last save or delete.
+  Repeat? lastRepeat;
+  SeriesScope? lastScope;
+
   @override
-  Future<Result<void>> deleteEvent(String calendarId, String eventId) async {
+  Future<Result<void>> deleteEvent(
+    String calendarId,
+    String eventId, {
+    SeriesScope scope = SeriesScope.one,
+  }) async {
+    lastScope = scope;
     if (!fail) {
       deleted.add((calendarId, eventId));
       eventsBy[calendarId]?.removeWhere((e) => e.id == eventId);

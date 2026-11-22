@@ -110,6 +110,15 @@ export function monthGrid(month: Date): Date[] {
   return out;
 }
 
+/**
+ * The Monday-first week [day] is in, local midnights: its row of the
+ * month grid (the app's weekOf).
+ */
+export function weekOf(day: Date): Date[] {
+  const monday = new Date(day.getFullYear(), day.getMonth(), day.getDate() - ((day.getDay() + 6) % 7));
+  return Array.from({ length: 7 }, (_, i) => new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i));
+}
+
 /** Whether [a] and [b] fall on the same local day. */
 export function sameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();

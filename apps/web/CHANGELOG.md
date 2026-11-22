@@ -4,6 +4,25 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.52.0 — 2026-11-21
+
+With app 0.0.43 and API 0.39.0.
+
+**Added**
+- Repeating events: new events (team, My calendar and shared calendars)
+  have **Repeat**: daily, weekly on the day, every 2 weeks or monthly on
+  the date, until an end date, with how many events that makes. Repeating
+  events show "Repeats weekly until …". Editing or deleting one asks
+  **this event** or **this and following events** (`components/Repeat.tsx`).
+- **Directions** opens a menu: Apple Maps (on Apple devices), Google Maps
+  or Waze (`directionsOptions` in packages/shared, `components/Directions.tsx`).
+
+**Changed**
+- Schedule, Month: the picked day's whole week (Monday to Sunday) is
+  listed under the grid, and its row is tinted.
+- Schedule's Calendars card is compact: the calendars on one line, one
+  **Manage** button and one sentence instead of two links.
+
 ## 0.51.0 — 2026-11-20
 
 With app 0.0.42 and API 0.38.0.

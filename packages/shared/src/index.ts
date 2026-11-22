@@ -34,6 +34,8 @@ export * from "./outbox.js";
 export * from "./meetings.js";
 export * from "./discord.js";
 export * from "./schedule.js";
+export * from "./recurrence.js";
+export * from "./directions.js";
 export * from "./rankings.js";
 export * from "./profile_stats.js";
 export * from "./team_chats.js";

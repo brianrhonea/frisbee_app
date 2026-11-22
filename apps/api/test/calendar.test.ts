@@ -357,6 +357,42 @@ describe("events", () => {
     expect((await s.call("POST", "/v1/calendars/me/events", event, "pat")).statusCode).toBe(404);
   });
 
+  it("writes a repeating series, lists it with its series, and edits or deletes this and following", async () => {
+    const id = await newCalendar();
+    const res = await s.call("POST", `/v1/calendars/${id}/events`, {
+      ...event,
+      repeat: { freq: "daily", until: "2026-11-18" },
+      timeZone: "Europe/London",
+    });
+    expect(res.statusCode).toBe(201);
+    const first = res.json().id as string;
+    const occ = (i: number) => `calendars/${id}/events/${first.replace(/_0$/, `_${i}`)}`;
+    expect([0, 1, 2, 3].map((i) => (s.store.doc(occ(i))!.startsAt as Date).toISOString())).toEqual([
+      "2026-11-15T17:00:00.000Z",
+      "2026-11-16T17:00:00.000Z",
+      "2026-11-17T17:00:00.000Z",
+      "2026-11-18T17:00:00.000Z",
+    ]);
+    const listed = (await s.call("GET", `/v1/me/calendar-events?${week}`)).json().events;
+    expect(listed[1].series).toEqual({ id: first.slice(0, -2), index: 1, count: 4, freq: "daily", until: "2026-11-18" });
+
+    const e2 = first.replace(/_0$/, "_2");
+    await s.call("PATCH", `/v1/calendars/${id}/events/${e2}?scope=following`, {
+      ...event,
+      title: "Moved",
+      startsAt: "2026-11-17T18:30:00.000Z",
+      endsAt: "2026-11-17T19:00:00.000Z",
+      timeZone: "Europe/London",
+    });
+    expect(s.store.doc(occ(1))!.title).toBe("Track session");
+    expect((s.store.doc(occ(3))!.startsAt as Date).toISOString()).toBe("2026-11-18T18:30:00.000Z");
+    expect(s.store.doc(occ(3))!.series).toMatchObject({ index: 3 });
+
+    expect((await s.call("DELETE", `/v1/calendars/${id}/events/${first.replace(/_0$/, "_1")}?scope=following`)).statusCode).toBe(204);
+    expect(s.store.doc(occ(0))).toBeDefined();
+    expect([1, 2, 3].map((i) => s.store.doc(occ(i)))).toEqual([undefined, undefined, undefined]);
+  });
+
   it("lists every calendar's events in a bounded window, soonest first", async () => {
     const id = await newCalendar();
     await s.call("POST", `/v1/calendars/${id}/events`, { ...event, title: "Later", startsAt: "2026-11-16T17:00:00.000Z", endsAt: null });

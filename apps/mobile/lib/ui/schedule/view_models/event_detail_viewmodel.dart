@@ -36,7 +36,9 @@ class EventDetailViewModel extends ChangeNotifier {
     saveNote = Command1<void, String>(_saveNote);
     toggleReaction = Command1<void, Reaction>(_toggleReaction);
     vote = Command1<void, String>(_vote);
-    deleteEvent = Command0<void>(() => _events.deleteEvent(teamId, eventId));
+    deleteEvent = Command1<void, SeriesScope>(
+      (scope) => _events.deleteEvent(teamId, eventId, scope: scope),
+    );
 
     _subs = [
       _events.watchEvent(teamId, eventId).listen((e) {
@@ -73,8 +75,7 @@ class EventDetailViewModel extends ChangeNotifier {
     final repo = _videoRepo;
     final team = _team;
     if (repo == null || team == null || _videosSub != null) return;
-    if (team.roleOf(uid) == null ||
-        !team.hasSection(OptionalSection.videos)) {
+    if (team.roleOf(uid) == null || !team.hasSection(OptionalSection.videos)) {
       return;
     }
     _videosSub = repo.watchEventVideos(teamId, eventId).listen((list) {
@@ -140,7 +141,10 @@ class EventDetailViewModel extends ChangeNotifier {
 
   /// Toggles an option; in single-choice polls it replaces the old vote.
   late final Command1<void, String> vote;
-  late final Command0<void> deleteEvent;
+
+  /// Deletes it, or with [SeriesScope.following] it and its series' later
+  /// events.
+  late final Command1<void, SeriesScope> deleteEvent;
 
   RsvpStatus? get myRsvp => _event?.rsvpOf(uid);
 

@@ -35,6 +35,7 @@ import { checkNotMuted, nameMax, text } from "../posts/author.js";
 import { type Data, type DocStore, serverTime } from "../store.js";
 import type { CalendarRepository } from "./repository.js";
 import { clip } from "../teams/access.js";
+import { laterIds, moveLater, scopeOf, seriesOccurrences, seriesOf } from "../series.js";
 
 const p = {
   profile: (uid: string) => `profiles/${uid}`,
@@ -447,6 +448,7 @@ export class CalendarService {
       endsAt: iso(d.data.endsAt),
       location: text(d.data.location),
       ...(role !== "view" && { notes: typeof d.data.notes === "string" ? d.data.notes : "" }),
+      ...(seriesOf(d.data) && { series: seriesOf(d.data)! }),
     };
   }
 
@@ -489,11 +491,11 @@ export class CalendarService {
   }
 
   /** The event as the app saves it (TeamEvent.toEditableMap, poll null): validMine's fields, nothing more. */
-  private record(body: unknown): Data {
+  private record(body: unknown) {
     const r = calendarEventSchema.safeParse(body ?? {});
     if (!r.success) throw fromZod(r.error);
     const e = r.data;
-    return {
+    const data = {
       title: e.title,
       type: e.type,
       startsAt: new Date(e.startsAt),
@@ -502,6 +504,7 @@ export class CalendarService {
       notes: e.notes,
       poll: null,
     };
+    return { req: e, data };
   }
 
   private async editable(caller: Caller, rawId: unknown): Promise<Cal> {
@@ -510,37 +513,69 @@ export class CalendarService {
     return cal;
   }
 
-  /** `POST /v1/calendars/:id/events` (owner or Can edit). */
+  /**
+   * `POST /v1/calendars/:id/events` (owner or Can edit); with `repeat`, a
+   * series of events (recurrence.ts). Returns the first one's id.
+   */
   async addEvent(caller: Caller, rawId: unknown, body: unknown): Promise<CalendarEventResult> {
-    const data = this.record(body);
+    const { req, data } = this.record(body);
     if (rawId === caller.uid) await this.ensureDefault(caller.uid);
     const cal = await this.editable(caller, rawId);
     await checkNotMuted(this.store, caller.uid, this.now());
     const id = this.store.newId(eventsOf(cal));
+    const occurrences = req.repeat
+      ? seriesOccurrences(id, { ...req, repeat: req.repeat })
+      : [{ id, startsAt: data.startsAt, endsAt: data.endsAt, series: null }];
     await this.store.transact(async (tx) => {
-      tx.create(`${eventsOf(cal)}/${id}`, { ...data, createdAt: serverTime, updatedAt: serverTime });
+      for (const o of occurrences) {
+        tx.create(`${eventsOf(cal)}/${o.id}`, {
+          ...data,
+          startsAt: o.startsAt,
+          endsAt: o.endsAt,
+          ...(o.series && { series: o.series }),
+          createdAt: serverTime,
+          updatedAt: serverTime,
+        });
+      }
     });
-    return { id };
+    return { id: occurrences[0]!.id };
   }
 
-  /** `PATCH /v1/calendars/:id/events/:eventId`: replaces its details. */
-  async updateEvent(caller: Caller, rawId: unknown, rawEventId: unknown, body: unknown): Promise<void> {
+  /**
+   * `PATCH /v1/calendars/:id/events/:eventId`: replaces its details; with
+   * `?scope=following` in a series, also every later event's, each moved
+   * by the same change of date and time.
+   */
+  async updateEvent(caller: Caller, rawId: unknown, rawEventId: unknown, body: unknown, query?: unknown): Promise<void> {
     const eventId = docIdParam(rawEventId);
-    const data = this.record(body);
+    const scope = scopeOf(query);
+    const { req, data } = this.record(body);
     const cal = await this.editable(caller, rawId);
-    const path = `${eventsOf(cal)}/${eventId}`;
+    const path = (id: string) => `${eventsOf(cal)}/${id}`;
+    const current = scope === "following" ? await this.store.get(path(eventId)) : null;
+    const later = current ? laterIds(current) : [];
     await this.store.transact(async (tx) => {
-      if (!(await tx.get(path))) throw noEvent();
-      tx.update(path, { ...data, updatedAt: serverTime });
+      const [event, ...rest] = await Promise.all([eventId, ...later].map((id) => tx.get(path(id))));
+      if (!event) throw noEvent();
+      tx.update(path(eventId), { ...data, updatedAt: serverTime });
+      if (!later.length) return;
+      const move = moveLater(event, data, req.timeZone);
+      rest.forEach((stored, i) => {
+        if (stored) tx.update(path(later[i]!), { ...data, ...move(stored), updatedAt: serverTime });
+      });
     });
   }
 
-  /** `DELETE /v1/calendars/:id/events/:eventId`. Already gone is fine. */
-  async removeEvent(caller: Caller, rawId: unknown, rawEventId: unknown): Promise<void> {
+  /** `DELETE /v1/calendars/:id/events/:eventId`; `?scope=following` also deletes the series' later events. Already gone is fine. */
+  async removeEvent(caller: Caller, rawId: unknown, rawEventId: unknown, query?: unknown): Promise<void> {
     const eventId = docIdParam(rawEventId);
+    const scope = scopeOf(query);
     const cal = await this.editable(caller, rawId);
+    const path = (id: string) => `${eventsOf(cal)}/${id}`;
+    const current = scope === "following" ? await this.store.get(path(eventId)) : null;
+    const ids = [eventId, ...(current ? laterIds(current) : [])];
     await this.store.transact(async (tx) => {
-      tx.delete(`${eventsOf(cal)}/${eventId}`);
+      for (const id of ids) tx.delete(path(id));
     });
   }
 

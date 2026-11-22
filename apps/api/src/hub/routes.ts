@@ -41,10 +41,10 @@ export function hubRoutes(app: FastifyInstance, hub: HubService, limiter: Memory
     reply.code(201).send(await hub.createEvent(caller(req, "write"), req.params.teamId, req.body)),
   );
   app.patch<EventP>("/v1/teams/:teamId/events/:eventId", async (req) =>
-    hub.editEvent(caller(req, "write"), req.params.teamId, req.params.eventId, req.body),
+    hub.editEvent(caller(req, "write"), req.params.teamId, req.params.eventId, req.body, req.query),
   );
   app.delete<EventP>("/v1/teams/:teamId/events/:eventId", async (req, reply) => {
-    await hub.deleteEvent(caller(req, "write"), req.params.teamId, req.params.eventId);
+    await hub.deleteEvent(caller(req, "write"), req.params.teamId, req.params.eventId, req.query);
     return reply.code(204).send();
   });
   app.put<EventP>("/v1/teams/:teamId/events/:eventId/rsvp", async (req, reply) => {

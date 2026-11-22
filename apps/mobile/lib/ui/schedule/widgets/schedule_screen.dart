@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../core/themes/theme.dart';
 import '../../../domain/models/calendar.dart';
 import '../../../domain/models/schedule_entry.dart';
+import '../../../domain/models/team_event.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
 import '../../core/ui/error_message.dart';
@@ -15,7 +16,7 @@ import 'event_editor_screen.dart';
 import 'schedule_widgets.dart';
 
 /// Personal and team events a week at a time, day by day, or a month at
-/// a time with the picked day's events below: the Schedule tab.
+/// a time with the picked day's week below: the Schedule tab.
 class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({
     super.key,
@@ -61,13 +62,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     }
   }
 
-  void _onSwiped(ScheduleEntry entry) {
-    vm.removeWithUndo(entry);
+  void _onSwiped(ScheduleEntry entry, SeriesScope scope) {
+    vm.removeWithUndo(entry, scope: scope);
+    final what = scope == SeriesScope.following
+        ? '"${entry.event.title}" and later ones'
+        : '"${entry.event.title}"';
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text('Deleted "${entry.event.title}"'),
+          content: Text('Deleted $what'),
           duration: ScheduleViewModel.undoWindow,
           persist: false,
           action: SnackBarAction(
@@ -80,6 +84,19 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   void _pickDay(int index) {
     vm.selectDay(vm.days[index]);
+    _scrollToDay(index);
+  }
+
+  /// Picks [day] in the month grid and scrolls its week's list to it.
+  void _pickMonthDay(DateTime day) {
+    vm.selectDay(day);
+    // After the list rebuilds for the (maybe new) week.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _scrollToDay(day.weekday - 1);
+    });
+  }
+
+  void _scrollToDay(int index) {
     final target = _dayKeys[index].currentContext;
     if (target != null) {
       Scrollable.ensureVisible(
@@ -158,7 +175,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   ),
                 ),
                 if (month)
-                  _MonthHeader(viewModel: vm)
+                  _MonthHeader(viewModel: vm, onPickDay: _pickMonthDay)
                 else
                   _WeekHeader(viewModel: vm, onPickDay: _pickDay),
                 Expanded(
@@ -174,20 +191,15 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                         children: [
                           for (final invite in vm.invites)
                             _InviteCard(invite: invite, viewModel: vm),
-                          if (month)
+                          // The week, or in the month the picked day's week.
+                          for (final (i, day)
+                              in (month ? vm.selectedWeek : vm.days).indexed)
                             _DaySection(
-                              day: vm.selectedDay,
+                              key: _dayKeys[i],
+                              day: day,
                               viewModel: vm,
                               onSwiped: _onSwiped,
-                            )
-                          else
-                            for (var i = 0; i < 7; i++)
-                              _DaySection(
-                                key: _dayKeys[i],
-                                day: vm.days[i],
-                                viewModel: vm,
-                                onSwiped: _onSwiped,
-                              ),
+                            ),
                           if (vm.hasCalendars) ...[
                             const SizedBox(height: 16),
                             _CalendarsCard(calendars: vm.calendars),
@@ -291,11 +303,13 @@ class _WeekHeader extends StatelessWidget {
 
 /// The month view's header: the month with its count and arrows, the
 /// grid of days with dots for what's on (team blue, personal magenta,
-/// amber when one needs an answer; today in turf), and the filter.
+/// amber when one needs an answer; today in turf) and the picked day's
+/// week tinted, and the filter.
 class _MonthHeader extends StatelessWidget {
-  const _MonthHeader({required this.viewModel});
+  const _MonthHeader({required this.viewModel, required this.onPickDay});
 
   final ScheduleViewModel viewModel;
+  final ValueChanged<DateTime> onPickDay;
 
   static const _weekdays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
@@ -367,20 +381,35 @@ class _MonthHeader extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   for (var w = 0; w < days.length ~/ 7; w++)
-                    Row(
-                      children: [
-                        for (final day in days.sublist(w * 7, w * 7 + 7))
-                          Expanded(
-                            child: _MonthDayCell(
-                              day: day,
-                              inMonth: day.month == vm.monthStart.month,
-                              isToday: day == vm.today,
-                              selected: day == vm.selectedDay,
-                              marks: vm.marksOn(day),
-                              onTap: () => vm.selectDay(day),
-                            ),
+                    Builder(
+                      builder: (context) {
+                        final week = days.sublist(w * 7, w * 7 + 7);
+                        final picked = week.contains(vm.selectedDay);
+                        return Container(
+                          key: picked ? const ValueKey('picked-week') : null,
+                          decoration: BoxDecoration(
+                            color: picked
+                                ? c.accentSoft.withValues(alpha: 0.45)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                      ],
+                          child: Row(
+                            children: [
+                              for (final day in week)
+                                Expanded(
+                                  child: _MonthDayCell(
+                                    day: day,
+                                    inMonth: day.month == vm.monthStart.month,
+                                    isToday: day == vm.today,
+                                    selected: day == vm.selectedDay,
+                                    marks: vm.marksOn(day),
+                                    onTap: () => onPickDay(day),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
                 ],
               ),
@@ -635,7 +664,7 @@ class _DaySection extends StatelessWidget {
 
   final DateTime day;
   final ScheduleViewModel viewModel;
-  final ValueChanged<ScheduleEntry> onSwiped;
+  final void Function(ScheduleEntry, SeriesScope) onSwiped;
 
   @override
   Widget build(BuildContext context) {
@@ -733,17 +762,30 @@ class _SwipeToDelete extends StatelessWidget {
 
   final ScheduleEntry entry;
   final bool enabled;
-  final ValueChanged<ScheduleEntry> onSwiped;
+  final void Function(ScheduleEntry, SeriesScope) onSwiped;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
     if (!enabled) return child;
     final c = AppColors.of(context);
+    var scope = SeriesScope.one;
     return Dismissible(
       key: ValueKey(entry.key),
       direction: DismissDirection.startToEnd,
-      onDismissed: (_) => onSwiped(entry),
+      // A repeating event asks whether the later ones go too.
+      confirmDismiss: entry.event.series == null
+          ? null
+          : (_) async {
+              final picked = await askSeriesScope(
+                context,
+                title: 'Delete "${entry.event.title}"?',
+                action: 'Delete',
+              );
+              if (picked != null) scope = picked;
+              return picked != null;
+            },
+      onDismissed: (_) => onSwiped(entry, scope),
       // Neutral, not red: red is only for live games.
       background: Container(
         alignment: Alignment.centerLeft,
@@ -842,9 +884,9 @@ class _InviteCardState extends State<_InviteCard> {
   }
 }
 
-/// The user's calendars under the schedule, as the website's: each with
-/// who owns it, and the way to share one, start a shared one or see the
-/// schedule in Outlook, Apple or Google Calendar (all on Calendars).
+/// The user's calendars under the schedule, as the website's: a compact
+/// card naming them, with one button to Calendars (sharing, new shared
+/// calendars and Outlook, Apple or Google subscriptions).
 class _CalendarsCard extends StatelessWidget {
   const _CalendarsCard({required this.calendars});
 
@@ -853,67 +895,56 @@ class _CalendarsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    void open() => context.push(Routes.settingsCalendar);
     return Card(
       margin: EdgeInsets.zero,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 8, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.fromLTRB(16, 10, 10, 12),
+        child: Row(
           children: [
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
                     'Calendars',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                   ),
-                ),
-                TextButton(onPressed: open, child: const Text('Manage')),
-              ],
-            ),
-            for (final cal in calendars)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  children: [
-                    TeamDot(color: cal.color.color, size: 10),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text.rich(
-                        TextSpan(
-                          text: cal.name,
-                          children: [
-                            if (!cal.isMine)
-                              TextSpan(
-                                text:
-                                    '  ·  ${cal.owner.name}  ·  '
-                                    '${cal.role.label}',
-                                style: TextStyle(color: c.muted, fontSize: 13),
+                  if (calendars.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 2,
+                      children: [
+                        for (final cal in calendars)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              TeamDot(color: cal.color.color, size: 8),
+                              const SizedBox(width: 5),
+                              Text(
+                                cal.isMine
+                                    ? cal.name
+                                    : '${cal.name} · ${cal.owner.name}',
+                                style: TextStyle(fontSize: 13, color: c.ink2),
                               ),
-                          ],
-                        ),
-                      ),
+                            ],
+                          ),
+                      ],
                     ),
                   ],
-                ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Share them or see them in Outlook, Apple or Google '
+                    'Calendar.',
+                    style: TextStyle(fontSize: 12, color: c.muted),
+                  ),
+                ],
               ),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                OutlinedButton.icon(
-                  onPressed: open,
-                  icon: const Icon(Icons.person_add_alt_outlined, size: 18),
-                  label: const Text('Share a calendar'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: open,
-                  icon: const Icon(Icons.link, size: 18),
-                  label: const Text('Outlook, Apple or Google'),
-                ),
-              ],
+            ),
+            const SizedBox(width: 8),
+            FilledButton.tonal(
+              onPressed: () => context.push(Routes.settingsCalendar),
+              child: const Text('Manage'),
             ),
           ],
         ),

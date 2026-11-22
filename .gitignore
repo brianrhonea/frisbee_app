@@ -84,3 +84,7 @@ firebase/functions/lib/
 # flutterfire configure writes this when run from apps/mobile; the real
 # Firebase project config is firebase/firebase.json.
 apps/mobile/firebase.json
+
+# Claude Code local files
+/.claude/worktrees/
+/.claude/launch.json

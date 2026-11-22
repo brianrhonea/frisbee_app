@@ -27,7 +27,7 @@ enum ScheduleFilter {
 }
 
 /// How the Schedule tab shows its days: a week strip with every day
-/// listed, or a month grid with the picked day's events below.
+/// listed, or a month grid with the picked day's week listed below.
 enum ScheduleView {
   week('Week'),
   month('Month');
@@ -59,6 +59,16 @@ List<DateTime> monthGrid(DateTime month) {
       d = DateTime(d.year, d.month, d.day + 1)
     )
       d,
+  ];
+}
+
+/// The Monday-first week [day] is in: its row of the month grid
+/// (`weekOf` in packages/shared, which the website uses).
+List<DateTime> weekOf(DateTime day) {
+  final monday = DateTime(day.year, day.month, day.day - (day.weekday - 1));
+  return [
+    for (var i = 0; i < 7; i++)
+      DateTime(monday.year, monday.month, monday.day + i),
   ];
 }
 
@@ -139,6 +149,9 @@ class ScheduleViewModel extends ChangeNotifier {
   /// The month's grid, Monday first ([monthGrid]).
   List<DateTime> get monthDays => monthGrid(_monthStart);
 
+  /// The week (grid row) the picked day is in, listed under the month.
+  List<DateTime> get selectedWeek => weekOf(_selectedDay);
+
   bool get isCurrentMonth =>
       _monthStart.year == today.year && _monthStart.month == today.month;
 
@@ -193,6 +206,26 @@ class ScheduleViewModel extends ChangeNotifier {
   /// Swiped-away events waiting out [undoWindow], hidden from the schedule.
   final Map<String, Timer> _pendingDeletes = {};
 
+  /// Swiped-away series events whose later ones go too (pending key → the
+  /// entry), so those are hidden for the undo window as well.
+  final Map<String, ScheduleEntry> _pendingFollowing = {};
+
+  /// Hidden while its delete (or an earlier one's "this and following")
+  /// waits out the undo window.
+  bool _isPending(ScheduleEntry e) {
+    if (_pendingDeletes.containsKey(_keyOf(e))) return true;
+    final s = e.event.series;
+    if (s == null) return false;
+    return _pendingFollowing.values.any((p) {
+      final ps = p.event.series;
+      return ps != null &&
+          ps.id == s.id &&
+          ps.index < s.index &&
+          p.team?.id == e.team?.id &&
+          p.calendar?.id == e.calendar?.id;
+    });
+  }
+
   static String _keyOf(ScheduleEntry e) => e.key;
 
   /// Personal events are always the user's to delete; team events need an
@@ -219,11 +252,18 @@ class ScheduleViewModel extends ChangeNotifier {
     }
     final team = entry.team;
     final cal = entry.calendar;
+    final scope = _pendingFollowing.containsKey(_keyOf(entry))
+        ? SeriesScope.following
+        : SeriesScope.one;
+    final id = entry.event.id;
     final result = switch ((team, cal)) {
-      (final t?, _) => await _events.deleteEvent(t.id, entry.event.id),
-      (_, final c?) => await _calendarRepo!.deleteEvent(c.id, entry.event.id),
-      _ => await _events.deleteMyEvent(uid, entry.event.id),
+      (final t?, _) => await _events.deleteEvent(t.id, id, scope: scope),
+      (_, final c?) => await _calendarRepo!.deleteEvent(c.id, id, scope: scope),
+      _ => await _events.deleteMyEvent(uid, id, scope: scope),
     };
+    if (result is Ok && !_disposed) {
+      _pendingFollowing.remove(_keyOf(entry));
+    }
     if (cal != null && result is Ok && !_disposed) {
       // Not live: reload so it stays gone after the undo window.
       await refreshCalendars();
@@ -231,23 +271,34 @@ class ScheduleViewModel extends ChangeNotifier {
     if (result is Error && !_disposed) {
       // Show it again so the failed delete isn't silent.
       _pendingDeletes.remove(_keyOf(entry));
+      _pendingFollowing.remove(_keyOf(entry));
       notifyListeners();
     }
     return result;
   }
 
   /// Hides [entry] now and deletes it after [undoWindow] unless [undoRemove]
-  /// is called first.
-  void removeWithUndo(ScheduleEntry entry) {
+  /// is called first. [SeriesScope.following] also hides and deletes the
+  /// later events of its series.
+  void removeWithUndo(
+    ScheduleEntry entry, {
+    SeriesScope scope = SeriesScope.one,
+  }) {
     if (!canDelete(entry)) return;
     final key = _keyOf(entry);
     _pendingDeletes[key]?.cancel();
+    if (scope == SeriesScope.following && entry.event.series != null) {
+      _pendingFollowing[key] = entry;
+    } else {
+      _pendingFollowing.remove(key);
+    }
     _pendingDeletes[key] = Timer(undoWindow, () => deleteEvent.execute(entry));
     notifyListeners();
   }
 
   void undoRemove(ScheduleEntry entry) {
     _pendingDeletes.remove(_keyOf(entry))?.cancel();
+    _pendingFollowing.remove(_keyOf(entry));
     notifyListeners();
   }
 
@@ -379,7 +430,7 @@ class ScheduleViewModel extends ChangeNotifier {
       DateTime(day.year, day.month, day.day),
       DateTime(day.year, day.month, day.day + 1),
     ))
-      if (_matches(e) && !_pendingDeletes.containsKey(_keyOf(e))) e,
+      if (_matches(e) && !_isPending(e)) e,
   ];
 
   /// Number of events this week that pass the filter.

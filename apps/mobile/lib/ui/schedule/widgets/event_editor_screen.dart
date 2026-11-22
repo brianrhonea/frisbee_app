@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../domain/models/chat.dart';
+import '../../../domain/models/recurrence.dart';
 import '../../../domain/models/team_event.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
@@ -23,6 +24,7 @@ import '../view_models/event_editor_viewmodel.dart';
 import '../../core/ui/time_picker.dart';
 import '../../../data/repositories/profile/profile_repository.dart';
 import 'new_shared_calendar_sheet.dart';
+import 'schedule_widgets.dart' show RepeatNote, askSeriesScope;
 
 /// Opens the event editor over the current page, like the post composer:
 /// a card on wide screens, a bottom sheet on phones. Adds an event to
@@ -227,8 +229,22 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
               ? _SchedulePicker(viewModel: vm)
               : null,
           allowShare: vm.canShare,
-          onSubmit: (event, share) {
+          allowRepeat: vm.isNew,
+          onSubmit: (event, share, repeat) async {
+            var scope = SeriesScope.one;
+            if (vm.isSeries) {
+              // One of a repeating series: this one, or it and later ones.
+              final picked = await askSeriesScope(
+                context,
+                title: 'Save changes to "${event.title}"?',
+                action: 'Save',
+              );
+              if (picked == null) return;
+              scope = picked;
+            }
             vm.shareWith(share);
+            vm.repeatWith(repeat);
+            vm.saveScope(scope);
             vm.save.execute(event);
           },
           shrinkWrap: fit,
@@ -285,12 +301,16 @@ class _EventForm extends StatefulWidget {
     this.audienceChoices = const {},
     this.schedulePicker,
     this.allowShare = false,
+    this.allowRepeat = false,
     this.shrinkWrap = false,
     this.onChanged,
   });
 
   /// Offer to post the new event for the user's followers.
   final bool allowShare;
+
+  /// Offer Repeat (new events only; a series can't change how it repeats).
+  final bool allowRepeat;
 
   /// Only as tall as the fields (in the wide-screen panel).
   final bool shrinkWrap;
@@ -308,8 +328,9 @@ class _EventForm extends StatefulWidget {
   final bool saving;
   final String submitLabel;
 
-  /// The event, and the message to share it with (null not to).
-  final void Function(TeamEvent event, String? share) onSubmit;
+  /// The event, the message to share it with (null not to), and how it
+  /// repeats (null for a one-off).
+  final void Function(TeamEvent event, String? share, Repeat? repeat) onSubmit;
 
   /// Polls, and showing the event on the public team page, are for team
   /// events only.
@@ -347,6 +368,18 @@ class _EventFormState extends State<_EventForm> {
   late TimeOfDay? _end = widget.initial.endsAt == null
       ? null
       : TimeOfDay.fromDateTime(widget.initial.endsAt!);
+
+  /// How a new event repeats; null for a one-off.
+  RepeatFrequency? _freq;
+  DateTime? _until;
+
+  /// The last day a repeat can fall on: picked, or 7 weeks after the
+  /// first (8 weekly events).
+  DateTime get _repeatUntil =>
+      _until ?? DateTime(_day.year, _day.month, _day.day + 49);
+
+  Repeat? get _repeat =>
+      _freq == null ? null : Repeat(freq: _freq!, until: _repeatUntil);
 
   late bool _public = widget.initial.isPublic;
   late Set<String> _audience = widget.initial.audience.isEmpty
@@ -424,11 +457,24 @@ class _EventFormState extends State<_EventForm> {
     if (picked != null) setState(() => _end = picked);
   }
 
+  Future<void> _pickUntil() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _repeatUntil.isBefore(_day) ? _day : _repeatUntil,
+      firstDate: _day,
+      lastDate: DateTime(_day.year + 1, _day.month, _day.day),
+      helpText: 'Repeat until',
+    );
+    if (picked != null) setState(() => _until = picked);
+  }
+
   DateTime _at(TimeOfDay t) =>
       DateTime(_day.year, _day.month, _day.day, t.hour, t.minute);
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
+    final repeat = widget.allowRepeat ? _repeat : null;
+    if (repeat != null && repeatProblem(_day, repeat) != null) return;
     final startsAt = _at(_start);
     var endsAt = _end == null ? null : _at(_end!);
     // An end time before the start means the event runs past midnight.
@@ -459,6 +505,7 @@ class _EventFormState extends State<_EventForm> {
             : null,
       ),
       _share && widget.allowShare ? _shareMessage.text.trim() : null,
+      repeat,
     );
   }
 
@@ -549,6 +596,19 @@ class _EventFormState extends State<_EventForm> {
               );
             },
           ),
+          if (widget.allowRepeat) ...[
+            const SizedBox(height: 12),
+            _RepeatFields(
+              day: _day,
+              freq: _freq,
+              until: _repeatUntil,
+              onFreq: (f) => setState(() => _freq = f),
+              onPickUntil: _pickUntil,
+            ),
+          ] else if (widget.initial.series case final series?) ...[
+            const SizedBox(height: 12),
+            RepeatNote(series: series),
+          ],
           const SizedBox(height: 16),
           TextFormField(
             controller: _location,
@@ -941,4 +1001,83 @@ class SettingsCard extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// Repeat for a new event: does not repeat, daily, weekly on its weekday,
+/// every 2 weeks or monthly on its day, until an end date, with how many
+/// events that makes (or why it can't be saved).
+class _RepeatFields extends StatelessWidget {
+  const _RepeatFields({
+    required this.day,
+    required this.freq,
+    required this.until,
+    required this.onFreq,
+    required this.onPickUntil,
+  });
+
+  final DateTime day;
+  final RepeatFrequency? freq;
+  final DateTime until;
+  final ValueChanged<RepeatFrequency?> onFreq;
+  final VoidCallback onPickUntil;
+
+  String _label(RepeatFrequency? f) {
+    final weekday = DateFormat.EEEE().format(day);
+    return switch (f) {
+      null => 'Does not repeat',
+      RepeatFrequency.daily => 'Daily',
+      RepeatFrequency.weekly => 'Weekly on $weekday',
+      RepeatFrequency.biweekly => 'Every 2 weeks on $weekday',
+      RepeatFrequency.monthly => 'Monthly on day ${day.day}',
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final repeat = freq == null ? null : Repeat(freq: freq!, until: until);
+    final problem = repeat == null ? null : repeatProblem(day, repeat);
+    final count = repeat == null ? 0 : repeatDates(day, repeat).length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DropdownButtonFormField<RepeatFrequency?>(
+          key: const ValueKey('repeat'),
+          initialValue: freq,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            labelText: 'Repeat',
+            prefixIcon: Icon(Icons.repeat),
+          ),
+          items: [
+            for (final f in <RepeatFrequency?>[null, ...RepeatFrequency.values])
+              DropdownMenuItem(
+                value: f,
+                child: Text(_label(f), overflow: TextOverflow.ellipsis),
+              ),
+          ],
+          onChanged: onFreq,
+        ),
+        if (repeat != null) ...[
+          const SizedBox(height: 12),
+          PickerField(
+            label: 'Ends on',
+            icon: Icons.event_outlined,
+            value: DateFormat.yMMMEd().format(until),
+            onTap: onPickUntil,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            problem ?? 'Creates $count events',
+            style: TextStyle(
+              fontSize: 13,
+              color: problem == null
+                  ? c.muted
+                  : Theme.of(context).colorScheme.error,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
 }

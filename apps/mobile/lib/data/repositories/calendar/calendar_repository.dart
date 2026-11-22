@@ -54,10 +54,22 @@ abstract class CalendarRepository {
   /// One event, for editing.
   Future<Result<TeamEvent>> event(String calendarId, String eventId);
 
-  /// Adds [event] (empty id) or replaces it; returns its id.
-  Future<Result<String>> saveEvent(String calendarId, TeamEvent event);
+  /// Adds [event] (empty id) or replaces it; returns its id. A new event
+  /// with [repeat] is written as a series (returns the first one's id);
+  /// [SeriesScope.following] also changes the series' later events.
+  Future<Result<String>> saveEvent(
+    String calendarId,
+    TeamEvent event, {
+    Repeat? repeat,
+    SeriesScope scope = SeriesScope.one,
+  });
 
-  Future<Result<void>> deleteEvent(String calendarId, String eventId);
+  /// Deletes the event; [SeriesScope.following] also the series' later ones.
+  Future<Result<void>> deleteEvent(
+    String calendarId,
+    String eventId, {
+    SeriesScope scope = SeriesScope.one,
+  });
 
   /// The user's subscription link.
   Future<Result<CalendarFeed>> feed();

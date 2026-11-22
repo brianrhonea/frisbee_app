@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../domain/models/team.dart';
+import '../../core/ui/directions_sheet.dart';
 
 /// OpenStreetMap tiles. Their tile policy asks apps to identify themselves,
 /// which flutter_map does with [_packageName] in the User-Agent.
@@ -97,14 +97,6 @@ class GroupMapCard extends StatelessWidget {
 
   final GroupLocation location;
 
-  Future<void> _openInMaps() => launchUrl(
-    Uri.https('www.google.com', '/maps/search/', {
-      'api': '1',
-      'query': '${location.latitude},${location.longitude}',
-    }),
-    mode: LaunchMode.externalApplication,
-  );
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -128,7 +120,10 @@ class GroupMapCard extends StatelessWidget {
               style: theme.textTheme.bodyMedium,
             ),
             trailing: TextButton.icon(
-              onPressed: _openInMaps,
+              onPressed: () => showDirectionsSheet(
+                context,
+                point: (location.latitude, location.longitude),
+              ),
               icon: const Icon(Icons.directions_outlined),
               label: const Text('Directions'),
             ),

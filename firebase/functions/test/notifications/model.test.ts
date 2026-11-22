@@ -8,6 +8,7 @@ import {
   eventChange,
   eventViewers,
   eventChangeNotice,
+  isQuietSeriesWrite,
   formatWhen,
   messagePreview,
   joinApprovedNotice,
@@ -228,6 +229,32 @@ describe("notices", () => {
     const cancelled = eventChangeNotice({ change: "deleted", teamId: "t1", eventId: "e1", teamName: "Hawks", before: event });
     expect(cancelled.text(denver, 1).title).toBe("Hawks: Hat league cancelled");
     expect(cancelled.route).toBe("/teams/t1/events");
+  });
+
+  it("notifies once for a repeating series and for each bulk edit or delete", () => {
+    const series = { id: "s", index: 0, count: 4, freq: "weekly", until: "2026-11-22" };
+    const event = { title: "Hat league", type: "game", startsAt: ts(start), location: "Riverside", series };
+    // Created: the first event only, saying how it repeats.
+    expect(isQuietSeriesWrite(undefined, event)).toBe(false);
+    expect(isQuietSeriesWrite(undefined, { ...event, series: { ...series, index: 1 } })).toBe(true);
+    expect(isQuietSeriesWrite(undefined, { title: "One-off" })).toBe(false);
+    const created = eventChangeNotice({ change: "created", teamId: "t1", eventId: "s_0", teamName: "Hawks", after: event });
+    expect(created.text(denver, 1).body).toBe("Hat league · Sun, Nov 1 at 6:00 PM · Riverside · repeats weekly until Nov 22");
+    // "This and following": the edited one notifies, the rest stay quiet.
+    const lead = { ...event, title: "New", seriesWrite: { id: "w1", lead: true } };
+    const rest = { ...event, title: "New", seriesWrite: { id: "w1", lead: false } };
+    expect(isQuietSeriesWrite(event, lead)).toBe(false);
+    expect(isQuietSeriesWrite(event, rest)).toBe(true);
+    // A later single edit of a stamped event notifies again.
+    expect(isQuietSeriesWrite(rest, { ...rest, title: "Newer" })).toBe(false);
+    // Deleting this and following: marked first (quiet), then one cancellation.
+    const marked = { ...event, seriesWrite: { id: "w2", lead: true, delete: true } };
+    expect(isQuietSeriesWrite(event, marked)).toBe(true);
+    expect(isQuietSeriesWrite(marked, undefined)).toBe(false);
+    expect(isQuietSeriesWrite({ ...event, seriesWrite: { id: "w2", lead: false, delete: true } }, undefined)).toBe(true);
+    expect(isQuietSeriesWrite(event, undefined)).toBe(false);
+    const cancelled = eventChangeNotice({ change: "deleted", teamId: "t1", eventId: "s_0", teamName: "Hawks", before: marked });
+    expect(cancelled.text(denver, 1).title).toBe("Hawks: Hat league cancelled from now on");
   });
 
   it("reminds everyone who hasn't said they can't go", () => {

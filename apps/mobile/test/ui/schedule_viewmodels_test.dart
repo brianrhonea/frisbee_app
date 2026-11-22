@@ -196,6 +196,57 @@ void main() {
       initialDay: day,
     );
 
+    test(
+      'a repeating event is written as a series; edits reach later ones',
+      () async {
+        final vm = editor(null, day: DateTime(2026, 11, 20));
+        await pumpEventQueue();
+        vm.repeatWith(
+          Repeat(freq: RepeatFrequency.weekly, until: DateTime(2026, 12, 11)),
+        );
+        final draft = vm.initial.copyWith(title: 'Practice');
+        await vm.save.execute(draft);
+        expect(vm.save.completed, isTrue);
+        Iterable<TeamEvent> all() => [
+          ...events.events.values,
+          ...?events.mine['u1']?.values,
+        ].where((e) => e.series != null);
+        final series = all();
+        expect(series.map((e) => e.startsAt), [
+          DateTime(2026, 11, 20, 18),
+          DateTime(2026, 11, 27, 18),
+          DateTime(2026, 12, 4, 18),
+          DateTime(2026, 12, 11, 18),
+        ]);
+        expect(series.first.series!.count, 4);
+
+        // A repeat that's too long isn't saved.
+        final long = editor(null, day: DateTime(2026, 11, 20));
+        await pumpEventQueue();
+        long.repeatWith(
+          Repeat(freq: RepeatFrequency.daily, until: DateTime(2027, 6, 1)),
+        );
+        await long.save.execute(long.initial.copyWith(title: 'Daily'));
+        expect(long.save.error, isTrue);
+
+        // Editing the second: "this and following" changes it and later ones.
+        final second = series.elementAt(1);
+        final edit = editor(
+          second.id,
+          teamId: events.events.containsKey(second.id) ? 't1' : null,
+        );
+        await pumpEventQueue();
+        expect(edit.isSeries, isTrue);
+        edit.saveScope(SeriesScope.following);
+        await edit.save.execute(edit.initial.copyWith(title: 'Late practice'));
+        expect(events.lastScope, SeriesScope.following);
+        expect(
+          [for (final e in all()) e.title],
+          ['Practice', 'Late practice', 'Late practice', 'Late practice'],
+        );
+      },
+    );
+
     test('a new event can be shared with followers', () async {
       teams.teams['t2'] = teamWith({
         'owner': TeamRole.owner,
@@ -381,7 +432,7 @@ void main() {
     await pumpEventQueue();
     expect(vm.loaded, isTrue);
     expect(vm.event?.title, 'Run');
-    await vm.deleteEvent.execute();
+    await vm.deleteEvent.execute(SeriesScope.one);
     await pumpEventQueue();
     expect(vm.deleteEvent.completed, isTrue);
     expect(vm.event, isNull);

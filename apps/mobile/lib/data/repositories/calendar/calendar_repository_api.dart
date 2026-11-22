@@ -2,14 +2,23 @@ import '../../../domain/models/calendar.dart';
 import '../../../domain/models/team_event.dart';
 import '../../../utils/result.dart';
 import '../../services/api_client.dart';
+import '../../services/time_zone.dart';
 import 'calendar_repository.dart';
 
 /// [CalendarRepository] through the API (`/v1/me/calendars`,
 /// `/v1/calendars/*` and `/v1/me/calendar-*`).
 class CalendarRepositoryApi implements CalendarRepository {
-  CalendarRepositoryApi({required ApiClient? api}) : _api = api;
+  CalendarRepositoryApi({
+    required ApiClient? api,
+    Future<String> Function() timeZone = localTimeZone,
+  }) : _api = api,
+       _timeZone = timeZone;
 
   final ApiClient? _api;
+
+  /// The device's time zone, sent with repeats and "this and following"
+  /// edits so times stay put across clock changes.
+  final Future<String> Function() _timeZone;
 
   static const _noApi =
       "Shared calendars aren't available in this version of the app. "
@@ -155,21 +164,41 @@ class CalendarRepositoryApi implements CalendarRepository {
     'notes': e.notes,
   };
 
-  @override
-  Future<Result<String>> saveEvent(String calendarId, TeamEvent event) =>
-      guard(() async {
-        final base = '${_cal(calendarId)}/events';
-        if (event.id.isEmpty) {
-          final json = await _client.post(base, _body(event));
-          return json['id'] as String? ?? '';
-        }
-        await _client.patch('$base/${_id(event.id)}', _body(event));
-        return event.id;
-      });
+  static String _scope(SeriesScope scope) =>
+      scope == SeriesScope.following ? '?scope=following' : '';
 
   @override
-  Future<Result<void>> deleteEvent(String calendarId, String eventId) =>
-      guard(() => _client.delete('${_cal(calendarId)}/events/${_id(eventId)}'));
+  Future<Result<String>> saveEvent(
+    String calendarId,
+    TeamEvent event, {
+    Repeat? repeat,
+    SeriesScope scope = SeriesScope.one,
+  }) => guard(() async {
+    final base = '${_cal(calendarId)}/events';
+    final zoned = repeat != null || scope == SeriesScope.following;
+    final body = {
+      ..._body(event),
+      if (event.id.isEmpty && repeat != null) 'repeat': repeat.toJson(),
+      if (zoned) 'timeZone': await _timeZone(),
+    };
+    if (event.id.isEmpty) {
+      final json = await _client.post(base, body);
+      return json['id'] as String? ?? '';
+    }
+    await _client.patch('$base/${_id(event.id)}${_scope(scope)}', body);
+    return event.id;
+  });
+
+  @override
+  Future<Result<void>> deleteEvent(
+    String calendarId,
+    String eventId, {
+    SeriesScope scope = SeriesScope.one,
+  }) => guard(
+    () => _client.delete(
+      '${_cal(calendarId)}/events/${_id(eventId)}${_scope(scope)}',
+    ),
+  );
 
   @override
   Future<Result<CalendarFeed>> feed() => guard(

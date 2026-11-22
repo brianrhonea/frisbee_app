@@ -7,6 +7,28 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.39.0 — 2026-11-21
+
+With app 0.0.43 and web 0.52.0. Needs the Firestore rules and the
+`notifications` functions from the same commit.
+
+**Added**
+- Repeating events (`packages/shared` `recurrence.ts`): `POST
+  /v1/teams/:teamId/events` and `POST /v1/calendars/:id/events` take
+  `repeat` (`{ freq: daily | weekly | biweekly | monthly, until:
+  YYYY-MM-DD }`) and `timeZone` (IANA). The series is written as one event
+  per occurrence, ids `${seriesId}_${index}`, each with `series` (`id`,
+  `index`, `count`, `freq`, `until`), at the same wall-clock time in that
+  zone across clock changes. At most 100 events and a year; refused with
+  400 otherwise. Returns the first event's id.
+- `?scope=following` on `PATCH` and `DELETE` of a team or calendar event:
+  it and every later event in its series. An edit applies the same
+  details and the same change of date and time to each one, keeping each
+  one's RSVPs. Team bulk writes stamp `seriesWrite` so the change
+  notification goes out once.
+- `series` on `CalendarEvent` (`GET /v1/me/calendar-events` and
+  `GET /v1/calendars/:id/events/:eventId`).
+
 ## 0.38.0 — 2026-11-20
 
 With app 0.0.42 and web 0.51.0. Needs the Vision API on in the project

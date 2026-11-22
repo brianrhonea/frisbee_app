@@ -65,7 +65,27 @@ void main() {
     expect(feb, hasLength(28));
   });
 
+  test('weekOf is the day\'s Monday-to-Sunday row of the grid', () {
+    final week = weekOf(DateTime(2026, 11, 18, 15));
+    expect(week.first, DateTime(2026, 11, 16));
+    expect(week.last, DateTime(2026, 11, 22));
+    // A Sunday stays in the week that started the Monday before.
+    expect(weekOf(DateTime(2026, 11)).first, DateTime(2026, 10, 26));
+  });
+
   group('ScheduleViewModel month view', () {
+    test('lists the picked day\'s whole week', () async {
+      final vm = schedule();
+      addTearDown(vm.dispose);
+      await pumpEventQueue();
+      vm.setView(ScheduleView.month);
+      expect(vm.selectedWeek.first, DateTime(2026, 11, 16));
+      vm.selectDay(DateTime(2026, 12, 2));
+      expect(vm.selectedWeek, [
+        for (var d = 30; d <= 36; d++) DateTime(2026, 11, d),
+      ]);
+    });
+
     test('marks days, counts the month and moves between months', () async {
       final vm = schedule();
       addTearDown(vm.dispose);
@@ -124,7 +144,7 @@ void main() {
     });
   });
 
-  testWidgets('Month shows the grid and the picked day\'s events', (
+  testWidgets('Month shows the grid and the picked day\'s week', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(390, 1100);
@@ -149,10 +169,20 @@ void main() {
     expect(find.text('Tempo run'), findsOneWidget);
     expect(find.text('Snowmelt Hat'), findsNothing);
 
+    // The whole week is listed, Monday to Sunday, with its row tinted.
+    expect(find.text('MONDAY, NOV 16'), findsOneWidget);
+    expect(find.text('SUNDAY, NOV 22'), findsOneWidget);
+    expect(find.byKey(const ValueKey('picked-week')), findsOneWidget);
+    // Another day in the same week keeps the week's events.
+    await tester.tap(find.bySemanticsLabel('Friday, November 20'));
+    await tester.pumpAndSettle();
+    expect(find.text('Thursday practice'), findsOneWidget);
+
     await tester.tap(find.bySemanticsLabel('Saturday, November 28'));
     await tester.pumpAndSettle();
     expect(find.text('Snowmelt Hat'), findsOneWidget);
     expect(find.text('Thursday practice'), findsNothing);
+    expect(find.text('MONDAY, NOV 23'), findsOneWidget);
     expect(find.text('Needs RSVP'), findsOneWidget);
     // Another day picked: Today brings it back.
     await tester.tap(find.text('Today'));

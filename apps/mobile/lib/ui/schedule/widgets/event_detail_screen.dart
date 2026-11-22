@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../calendar/widgets/add_to_calendar.dart';
 import '../../../data/repositories/video/video_repository.dart';
 import '../../../domain/models/team_event.dart';
+import '../../core/ui/directions_sheet.dart';
+import 'schedule_widgets.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
 import '../../core/ui/back_or.dart';
@@ -134,6 +135,16 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   }
 
   Future<void> _delete(TeamEvent e) async {
+    if (e.series != null) {
+      // A repeating event: this one, or it and every later one.
+      final scope = await askSeriesScope(
+        context,
+        title: 'Delete "${e.title}"?',
+        action: 'Delete',
+      );
+      if (scope != null) vm.deleteEvent.execute(scope);
+      return;
+    }
     if (await confirmDialog(
       context,
       title: 'Delete "${e.title}"?',
@@ -141,7 +152,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       confirmLabel: 'Delete',
       destructive: true,
     )) {
-      vm.deleteEvent.execute();
+      vm.deleteEvent.execute(SeriesScope.one);
     }
   }
 
@@ -357,13 +368,6 @@ class EventHeader extends StatelessWidget {
   /// "Add to calendar", under the details.
   final Widget? calendarButton;
 
-  Future<void> _openMap() => launchUrl(
-    Uri.https('www.google.com', '/maps/search/', {
-      'api': '1',
-      'query': event.location,
-    }),
-  );
-
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
@@ -415,10 +419,14 @@ class EventHeader extends StatelessWidget {
               ),
             ],
           ),
+          if (e.series case final series?) ...[
+            const SizedBox(height: 8),
+            RepeatNote(series: series),
+          ],
           if (e.location.isNotEmpty) ...[
             const SizedBox(height: 12),
             InkWell(
-              onTap: _openMap,
+              onTap: () => showDirectionsSheet(context, place: e.location),
               borderRadius: BorderRadius.circular(controlRadius),
               child: Row(
                 children: [

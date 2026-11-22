@@ -9,6 +9,7 @@ import '../../../data/repositories/user_post/user_post_repository.dart';
 import '../../../domain/models/calendar.dart';
 import '../../../domain/models/chat.dart';
 import '../../../domain/models/player_profile.dart';
+import '../../../domain/models/recurrence.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/team_event.dart';
 import '../../../domain/models/user_post.dart';
@@ -131,6 +132,21 @@ class EventEditorViewModel extends ChangeNotifier {
   /// Whether the next [save] also posts the event, with [message] (which may
   /// be empty), for the user's followers to see. Null doesn't post it.
   void shareWith(String? message) => _shareMessage = message;
+
+  Repeat? _repeat;
+
+  /// Whether the next [save] of a new event writes a series ([repeat]),
+  /// one event per occurrence. Null saves one event.
+  void repeatWith(Repeat? repeat) => _repeat = isNew ? repeat : null;
+
+  SeriesScope _scope = SeriesScope.one;
+
+  /// Whether the next [save] of an event in a series changes it alone or
+  /// it and every later one.
+  void saveScope(SeriesScope scope) => _scope = scope;
+
+  /// The event being edited is one of a repeating series.
+  bool get isSeries => _original?.series != null;
 
   bool _shared = false;
 
@@ -332,18 +348,34 @@ class EventEditorViewModel extends ChangeNotifier {
     final teamId = _teamId;
     final calendarId = _calendarId;
     final calendars = _calendarRepo;
+    final repeat = isNew ? _repeat : null;
+    if (repeat != null) {
+      if (repeatProblem(event.startsAt, repeat) case final problem?) {
+        return Result.error(Exception(problem));
+      }
+    }
+    final scope = isSeries ? _scope : SeriesScope.one;
     final saved = calendarId != null && calendars != null
         ? await calendars.saveEvent(
             calendarId,
             event.copyWith(poll: () => null),
+            repeat: repeat,
+            scope: scope,
           )
         : teamId == null
-        ? await _events.saveMyEvent(_uid, event.copyWith(poll: () => null))
+        ? await _events.saveMyEvent(
+            _uid,
+            event.copyWith(poll: () => null),
+            repeat: repeat,
+            scope: scope,
+          )
         : await _events.saveEvent(
             teamId,
             event,
             _uid,
             clearVotes: _pollChanged(_original?.poll, event.poll),
+            repeat: repeat,
+            scope: scope,
           );
     if (saved case Ok(:final value) when canShare && _shareMessage != null) {
       await _share(event.copyWith(id: value), _shareMessage!);

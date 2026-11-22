@@ -1,0 +1,263 @@
+{
+  "about": "directionsOptions (directions.dart) for each place and platform.",
+  "cases": [
+    {
+      "name": "an address on ios",
+      "place": "1200 Riverside Dr, Denver, CO",
+      "point": null,
+      "platform": "ios",
+      "options": [
+        {
+          "app": "apple",
+          "label": "Apple Maps",
+          "url": "https://maps.apple.com/?daddr=1200%20Riverside%20Dr%2C%20Denver%2C%20CO"
+        },
+        {
+          "app": "google",
+          "label": "Google Maps",
+          "url": "https://www.google.com/maps/dir/?api=1&destination=1200%20Riverside%20Dr%2C%20Denver%2C%20CO"
+        },
+        {
+          "app": "waze",
+          "label": "Waze",
+          "url": "https://waze.com/ul?q=1200%20Riverside%20Dr%2C%20Denver%2C%20CO&navigate=yes"
+        }
+      ]
+    },
+    {
+      "name": "an address on macos",
+      "place": "1200 Riverside Dr, Denver, CO",
+      "point": null,
+      "platform": "macos",
+      "options": [
+        {
+          "app": "apple",
+          "label": "Apple Maps",
+          "url": "https://maps.apple.com/?daddr=1200%20Riverside%20Dr%2C%20Denver%2C%20CO"
+        },
+        {
+          "app": "google",
+          "label": "Google Maps",
+          "url": "https://www.google.com/maps/dir/?api=1&destination=1200%20Riverside%20Dr%2C%20Denver%2C%20CO"
+        },
+        {
+          "app": "waze",
+          "label": "Waze",
+          "url": "https://waze.com/ul?q=1200%20Riverside%20Dr%2C%20Denver%2C%20CO&navigate=yes"
+        }
+      ]
+    },
+    {
+      "name": "an address on android",
+      "place": "1200 Riverside Dr, Denver, CO",
+      "point": null,
+      "platform": "android",
+      "options": [
+        {
+          "app": "google",
+          "label": "Google Maps",
+          "url": "https://www.google.com/maps/dir/?api=1&destination=1200%20Riverside%20Dr%2C%20Denver%2C%20CO"
+        },
+        {
+          "app": "waze",
+          "label": "Waze",
+          "url": "https://waze.com/ul?q=1200%20Riverside%20Dr%2C%20Denver%2C%20CO&navigate=yes"
+        }
+      ]
+    },
+    {
+      "name": "an address on other",
+      "place": "1200 Riverside Dr, Denver, CO",
+      "point": null,
+      "platform": "other",
+      "options": [
+        {
+          "app": "google",
+          "label": "Google Maps",
+          "url": "https://www.google.com/maps/dir/?api=1&destination=1200%20Riverside%20Dr%2C%20Denver%2C%20CO"
+        },
+        {
+          "app": "waze",
+          "label": "Waze",
+          "url": "https://waze.com/ul?q=1200%20Riverside%20Dr%2C%20Denver%2C%20CO&navigate=yes"
+        }
+      ]
+    },
+    {
+      "name": "a park with symbols on ios",
+      "place": " Wash Park & Field #3 ",
+      "point": null,
+      "platform": "ios",
+      "options": [
+        {
+          "app": "apple",
+          "label": "Apple Maps",
+          "url": "https://maps.apple.com/?daddr=Wash%20Park%20%26%20Field%20%233"
+        },
+        {
+          "app": "google",
+          "label": "Google Maps",
+          "url": "https://www.google.com/maps/dir/?api=1&destination=Wash%20Park%20%26%20Field%20%233"
+        },
+        {
+          "app": "waze",
+          "label": "Waze",
+          "url": "https://waze.com/ul?q=Wash%20Park%20%26%20Field%20%233&navigate=yes"
+        }
+      ]
+    },
+    {
+      "name": "a park with symbols on macos",
+      "place": " Wash Park & Field #3 ",
+      "point": null,
+      "platform": "macos",
+      "options": [
+        {
+          "app": "apple",
+          "label": "Apple Maps",
+          "url": "https://maps.apple.com/?daddr=Wash%20Park%20%26%20Field%20%233"
+        },
+        {
+          "app": "google",
+          "label": "Google Maps",
+          "url": "https://www.google.com/maps/dir/?api=1&destination=Wash%20Park%20%26%20Field%20%233"
+        },
+        {
+          "app": "waze",
+          "label": "Waze",
+          "url": "https://waze.com/ul?q=Wash%20Park%20%26%20Field%20%233&navigate=yes"
+        }
+      ]
+    },
+    {
+      "name": "a park with symbols on android",
+      "place": " Wash Park & Field #3 ",
+      "point": null,
+      "platform": "android",
+      "options": [
+        {
+          "app": "google",
+          "label": "Google Maps",
+          "url": "https://www.google.com/maps/dir/?api=1&destination=Wash%20Park%20%26%20Field%20%233"
+        },
+        {
+          "app": "waze",
+          "label": "Waze",
+          "url": "https://waze.com/ul?q=Wash%20Park%20%26%20Field%20%233&navigate=yes"
+        }
+      ]
+    },
+    {
+      "name": "a park with symbols on other",
+      "place": " Wash Park & Field #3 ",
+      "point": null,
+      "platform": "other",
+      "options": [
+        {
+          "app": "google",
+          "label": "Google Maps",
+          "url": "https://www.google.com/maps/dir/?api=1&destination=Wash%20Park%20%26%20Field%20%233"
+        },
+        {
+          "app": "waze",
+          "label": "Waze",
+          "url": "https://waze.com/ul?q=Wash%20Park%20%26%20Field%20%233&navigate=yes"
+        }
+      ]
+    },
+    {
+      "name": "a point on ios",
+      "place": null,
+      "point": [
+        39.7,
+        -104.97
+      ],
+      "platform": "ios",
+      "options": [
+        {
+          "app": "apple",
+          "label": "Apple Maps",
+          "url": "https://maps.apple.com/?daddr=39.7%2C-104.97"
+        },
+        {
+          "app": "google",
+          "label": "Google Maps",
+          "url": "https://www.google.com/maps/dir/?api=1&destination=39.7%2C-104.97"
+        },
+        {
+          "app": "waze",
+          "label": "Waze",
+          "url": "https://waze.com/ul?ll=39.7%2C-104.97&navigate=yes"
+        }
+      ]
+    },
+    {
+      "name": "a point on macos",
+      "place": null,
+      "point": [
+        39.7,
+        -104.97
+      ],
+      "platform": "macos",
+      "options": [
+        {
+          "app": "apple",
+          "label": "Apple Maps",
+          "url": "https://maps.apple.com/?daddr=39.7%2C-104.97"
+        },
+        {
+          "app": "google",
+          "label": "Google Maps",
+          "url": "https://www.google.com/maps/dir/?api=1&destination=39.7%2C-104.97"
+        },
+        {
+          "app": "waze",
+          "label": "Waze",
+          "url": "https://waze.com/ul?ll=39.7%2C-104.97&navigate=yes"
+        }
+      ]
+    },
+    {
+      "name": "a point on android",
+      "place": null,
+      "point": [
+        39.7,
+        -104.97
+      ],
+      "platform": "android",
+      "options": [
+        {
+          "app": "google",
+          "label": "Google Maps",
+          "url": "https://www.google.com/maps/dir/?api=1&destination=39.7%2C-104.97"
+        },
+        {
+          "app": "waze",
+          "label": "Waze",
+          "url": "https://waze.com/ul?ll=39.7%2C-104.97&navigate=yes"
+        }
+      ]
+    },
+    {
+      "name": "a point on other",
+      "place": null,
+      "point": [
+        39.7,
+        -104.97
+      ],
+      "platform": "other",
+      "options": [
+        {
+          "app": "google",
+          "label": "Google Maps",
+          "url": "https://www.google.com/maps/dir/?api=1&destination=39.7%2C-104.97"
+        },
+        {
+          "app": "waze",
+          "label": "Waze",
+          "url": "https://waze.com/ul?ll=39.7%2C-104.97&navigate=yes"
+        }
+      ]
+    }
+  ]
+}

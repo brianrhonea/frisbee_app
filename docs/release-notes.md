@@ -10,6 +10,20 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.43
+
+**Schedule**
+- Repeating events: when you add an event, pick **Repeat** (daily, weekly,
+  every 2 weeks or monthly) and an end date. Works for team events, your
+  own calendar and shared calendars.
+- Changing or deleting one asks whether it's just this event or this and
+  every later one. RSVPs stay put.
+- Month view now lists the whole week of the day you tap.
+- The Calendars box under the schedule is smaller, with one Manage button.
+
+**Directions**
+- Tap Directions and pick Apple Maps, Google Maps or Waze.
+
 ## 0.0.42
 
 **Safety**

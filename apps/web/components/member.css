@@ -167,6 +167,11 @@
   border: 0; border-radius: 10px; background: none; color: var(--ink); font: inherit; cursor: pointer;
 }
 .schedule-page .sched-month-day:hover { background: var(--field); }
+/* The picked day's week, listed below the grid. */
+.schedule-page .sched-month-day.wk { background: color-mix(in srgb, var(--accent-soft) 55%, transparent); border-radius: 0; }
+.schedule-page .sched-month-day.wk:nth-child(7n + 1) { border-radius: 10px 0 0 10px; }
+.schedule-page .sched-month-day.wk:nth-child(7n) { border-radius: 0 10px 10px 0; }
+.schedule-page .sched-day.picked .sched-day-head { color: var(--accent-ink); }
 .schedule-page .sched-month-day b {
   display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%;
   font-size: 0.9rem; font-weight: 600; border: 1.5px solid transparent;
@@ -331,3 +336,6 @@
 .dash .team-list a { border-radius: var(--radius-control); }
 @media (max-width: 480px) { .dash .tiles { grid-template-columns: repeat(2, 1fr); } }
 /* ==== end Member pages =================================================== */
+/* The compact Calendars card under the schedule: names on one wrapped line. */
+.schedule-page .cal-list { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-bottom: 6px; }
+.schedule-page .cal-list + p { margin: 0; }

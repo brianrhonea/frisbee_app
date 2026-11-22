@@ -16,7 +16,7 @@ class MyEventDetailViewModel extends ChangeNotifier {
     required AuthRepository authRepository,
   }) : _events = eventRepository,
        _uid = authRepository.currentUser?.uid ?? '' {
-    deleteEvent = Command0<void>(_delete);
+    deleteEvent = Command1<void, SeriesScope>(_delete);
     _sub = _events
         .watchMyEvent(_uid, eventId)
         .listen(
@@ -47,9 +47,12 @@ class MyEventDetailViewModel extends ChangeNotifier {
   Object? _error;
   Object? get error => _error;
 
-  late final Command0<void> deleteEvent;
+  /// Deletes it, or with [SeriesScope.following] it and its series' later
+  /// events.
+  late final Command1<void, SeriesScope> deleteEvent;
 
-  Future<Result<void>> _delete() => _events.deleteMyEvent(_uid, eventId);
+  Future<Result<void>> _delete(SeriesScope scope) =>
+      _events.deleteMyEvent(_uid, eventId, scope: scope);
 
   @override
   void dispose() {

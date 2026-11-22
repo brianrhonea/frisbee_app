@@ -7,6 +7,7 @@
 // shared reads and writes go through the API, which checks the calendar's
 // members on every request. A private subscription link (ICS) keeps
 // Outlook, Apple and Google Calendar in step.
+import { repeatSchema, type Series } from "./recurrence.js";
 import { z } from "zod";
 
 /** Event types a calendar event may have (validEventDetails; not meetings). */
@@ -135,11 +136,15 @@ export const calendarEventSchema = z
     endsAt: isoDate.nullable().default(null),
     location: z.string().trim().max(200, "Keep the place under 200 characters.").default(""),
     notes: z.string().max(5000, "Keep notes under 5,000 characters.").default(""),
+    // New events only: write a series, at the same wall-clock time in [timeZone].
+    repeat: repeatSchema.optional(),
+    timeZone: z.string().min(1).max(64).optional(),
   })
   .refine((e) => e.endsAt === null || Date.parse(e.endsAt) >= Date.parse(e.startsAt), {
     message: "It can't end before it starts.",
     path: ["endsAt"],
-  });
+  })
+  .refine((e) => !e.repeat || e.timeZone, { message: "Send the time zone with a repeat.", path: ["timeZone"] });
 
 /** After `POST /v1/calendars/:id/events`. */
 export interface CalendarEventResult {
@@ -156,6 +161,8 @@ export interface CalendarEvent {
   endsAt: string | null;
   location: string;
   notes?: string;
+  /** Set on each event of a repeating series (recurrence.ts). */
+  series?: Series;
 }
 
 /** `GET /v1/me/calendar-events?from=&to=`: events starting in [from, to) on every calendar the caller is on. */

@@ -1,5 +1,7 @@
 "use client";
-import type { PublicEvent, PublicTeamPost } from "@stall10/shared";
+import type { PublicEvent, PublicTeamPost, Series } from "@stall10/shared";
+import { Directions } from "../Directions";
+import { RepeatNote, scopeQuery, useSeriesScope } from "../Repeat";
 import { limit, orderBy, type QueryConstraint, Timestamp, where } from "firebase/firestore";
 import { eventReactions, scheduleEntryOver } from "@stall10/shared";
 import Link from "next/link";
@@ -33,6 +35,8 @@ export interface TeamEventDoc extends PublicEvent {
   public?: boolean;
   audience?: string[];
   tournamentId?: string;
+  /** Its place in a repeating series (recurrence.ts in packages/shared). */
+  series?: Series;
 }
 
 export const typeLabels: Record<string, string> = {
@@ -349,6 +353,7 @@ function EventDetail({ event, onEdit }: { event: Doc<TeamEventDoc>; onEdit?: () 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const base = `/v1/teams/${encodeURIComponent(teamId)}/events/${encodeURIComponent(event.id)}`;
+  const scope = useSeriesScope();
   async function send(path: string, method: "PUT" | "DELETE", body?: unknown) {
     if (!user) return;
     setBusy(true);
@@ -385,6 +390,7 @@ function EventDetail({ event, onEdit }: { event: Doc<TeamEventDoc>; onEdit?: () 
 
   return (
     <article className="card event-detail">
+      {scope.dialog}
       <div className="event-detail-head">
         <p className="pill type-chip">
           <span className="type-dot" aria-hidden="true" />
@@ -402,7 +408,10 @@ function EventDetail({ event, onEdit }: { event: Doc<TeamEventDoc>; onEdit?: () 
               className="btn btn-small btn-quiet"
               disabled={busy}
               onClick={() => {
-                if (window.confirm("Delete this event for everyone?")) void send("", "DELETE");
+                // A repeating event: this one, or it and every later one.
+                if (event.series) {
+                  void scope.ask(`Delete "${event.title || "Event"}"?`, "Delete").then((which) => which && void send(scopeQuery(which), "DELETE"));
+                } else if (window.confirm("Delete this event for everyone?")) void send("", "DELETE");
               }}
             >
               Delete
@@ -423,9 +432,7 @@ function EventDetail({ event, onEdit }: { event: Doc<TeamEventDoc>; onEdit?: () 
       {event.location && (
         <p className="event-place">
           <span>{event.location}</span>
-          <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location)}`} target="_blank" rel="noopener">
-            Directions
-          </a>
+          <Directions to={event.location} />
         </p>
       )}
       {event.notes && (

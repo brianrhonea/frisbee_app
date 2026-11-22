@@ -86,11 +86,11 @@ export function calendarRoutes(app: FastifyInstance, calendar: CalendarService, 
     reply.header("cache-control", noStore).send(await calendar.event(requireCaller(req), req.params.id, req.params.eventId)),
   );
   app.patch<IdEvent>("/v1/calendars/:id/events/:eventId", async (req, reply) => {
-    await calendar.updateEvent(requireCaller(req), req.params.id, req.params.eventId, req.body);
+    await calendar.updateEvent(requireCaller(req), req.params.id, req.params.eventId, req.body, req.query);
     return reply.status(204).send();
   });
   app.delete<IdEvent>("/v1/calendars/:id/events/:eventId", async (req, reply) => {
-    await calendar.removeEvent(requireCaller(req), req.params.id, req.params.eventId);
+    await calendar.removeEvent(requireCaller(req), req.params.id, req.params.eventId, req.query);
     return reply.status(204).send();
   });
 

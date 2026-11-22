@@ -188,6 +188,7 @@ class CalendarEntry {
         endsAt: parseDate(map['endsAt'])?.toLocal(),
         location: map['location'] as String? ?? '',
         notes: map['notes'] as String? ?? '',
+        series: EventSeries.fromMap(map['series']),
       ),
     );
   }

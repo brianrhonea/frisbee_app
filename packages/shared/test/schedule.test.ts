@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 import {
   monthGrid,
+  weekOf,
   sameDay,
   scheduleEntryOver,
   scheduleFilterMatches,
@@ -86,6 +87,16 @@ describe("scheduleTeamLabel", () => {
 });
 
 describe("month view", () => {
+  it("weekOf is the picked day's Monday-to-Sunday row", () => {
+    // Wednesday 2026-11-18.
+    const week = weekOf(new Date(2026, 10, 18, 15));
+    expect(week[0]).toEqual(new Date(2026, 10, 16));
+    expect(week[6]).toEqual(new Date(2026, 10, 22));
+    // A Sunday stays in the week that started the Monday before, across a month.
+    expect(weekOf(new Date(2026, 10, 1))[0]).toEqual(new Date(2026, 9, 26));
+    expect(weekOf(new Date(2026, 10, 1))).toHaveLength(7);
+  });
+
   it("monthGrid runs Monday to Sunday around the month", () => {
     const nov = monthGrid(new Date(2026, 10, 1));
     expect(nov[0]).toEqual(new Date(2026, 9, 26));

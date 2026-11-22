@@ -30,6 +30,7 @@ import {
   eventChange,
   eventChangeNotice,
   eventViewers,
+  isQuietSeriesWrite,
   joinApprovedNotice,
   joinRequestNotice,
   joinRequestRecipients,
@@ -140,6 +141,8 @@ export const teamEvent = onDocumentWrittenWithAuthContext(
     if (!change) return;
     // A league's games go on schedules in bulk; no notice for each.
     if (isLeagueGameEvent(after ?? before)) return;
+    // Nor for each event of a repeating series: one per series or bulk edit.
+    if (isQuietSeriesWrite(before, after)) return;
     const start = millis((after ?? before)?.startsAt);
     if (start === undefined || start < Date.now()) return;
     const { teamId, eventId } = event.params;

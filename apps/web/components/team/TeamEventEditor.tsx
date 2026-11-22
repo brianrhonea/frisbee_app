@@ -8,6 +8,8 @@ import { useAuth } from "../AuthProvider";
 import { rolesInOrder, useTeamHub } from "./TeamContext";
 import type { TeamEventDoc } from "./TeamSchedule";
 import { fromLocalInput, toLocalInput } from "@/lib/dates";
+import type { Repeat as RepeatRule } from "@stall10/shared";
+import { browserTimeZone, RepeatField, RepeatNote, repeatFormProblem, scopeQuery, useSeriesScope } from "../Repeat";
 
 
 /**
@@ -43,6 +45,9 @@ export function TeamEventEditor({
   const [poll, setPoll] = useState(event?.poll?.options?.length ? event.poll : null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // A new event may repeat; an event of a series asks "this or following" on save.
+  const [repeat, setRepeat] = useState<RepeatRule | null>(null);
+  const scope = useSeriesScope();
 
   const options = poll?.options ?? [];
   function setOption(i: number, text: string) {
@@ -54,6 +59,11 @@ export function TeamEventEditor({
     if (!user) return;
     const start = fromLocalInput(startsAt);
     if (!start) return setError("Give a date and time.");
+    const rule = event ? null : repeat;
+    const bad = repeatFormProblem(startsAt, rule);
+    if (bad) return setError(bad);
+    const which = event?.series ? await scope.ask(`Save changes to "${title.trim()}"?`, "Save") : "one";
+    if (!which) return;
     setBusy(true);
     setError(null);
     const body: SaveTeamEventRequest = {
@@ -72,11 +82,16 @@ export function TeamEventEditor({
           }
         : null,
       ...(org && { audience: audience.length ? audience : ["everyone"] }),
+      ...(rule && { repeat: rule }),
+      ...((rule || which === "following") && { timeZone: browserTimeZone() }),
     };
     const base = `/v1/teams/${encodeURIComponent(teamId)}/events`;
     try {
       const res = event
-        ? await callApi<{ id: string }>(user, `${base}/${encodeURIComponent(event.id)}`, { method: "PATCH", body })
+        ? await callApi<{ id: string }>(user, `${base}/${encodeURIComponent(event.id)}${scopeQuery(which)}`, {
+            method: "PATCH",
+            body,
+          })
         : await callApi<{ id: string }>(user, base, { method: "POST", body });
       if (canShare && share.on && !(await shareEvent(user, teamId, res.id, share.message))) {
         window.alert("Event created, but it couldn't be shared. Try posting it.");
@@ -90,6 +105,7 @@ export function TeamEventEditor({
 
   return (
     <form className="card settings-form event-editor" onSubmit={(e) => void save(e)}>
+      {scope.dialog}
       <h2>{event ? "Edit event" : "New event"}</h2>
       <label>
         Title
@@ -115,6 +131,7 @@ export function TeamEventEditor({
           <input type="datetime-local" value={endsAt} min={startsAt} onChange={(e) => setEndsAt(e.target.value)} />
         </label>
       </div>
+      {event ? event.series && <RepeatNote series={event.series} /> : <RepeatField startsAt={startsAt} value={repeat} onChange={setRepeat} />}
       <label>
         Where <small className="muted">(optional)</small>
         <input value={location} maxLength={200} onChange={(e) => setLocation(e.target.value)} />

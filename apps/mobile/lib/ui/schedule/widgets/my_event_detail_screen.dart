@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../calendar/widgets/add_to_calendar.dart';
 import '../../../domain/models/team_event.dart';
+import 'schedule_widgets.dart';
 import '../../../routing/routes.dart';
 import '../../core/ui/back_or.dart';
 import '../../core/ui/confirm_dialog.dart';
@@ -49,6 +50,16 @@ class _MyEventDetailScreenState extends State<MyEventDetailScreen> {
   }
 
   Future<void> _delete(TeamEvent e) async {
+    if (e.series != null) {
+      // A repeating event: this one, or it and every later one.
+      final scope = await askSeriesScope(
+        context,
+        title: 'Delete "${e.title}"?',
+        action: 'Delete',
+      );
+      if (scope != null) vm.deleteEvent.execute(scope);
+      return;
+    }
     if (await confirmDialog(
       context,
       title: 'Delete "${e.title}"?',
@@ -56,7 +67,7 @@ class _MyEventDetailScreenState extends State<MyEventDetailScreen> {
       confirmLabel: 'Delete',
       destructive: true,
     )) {
-      vm.deleteEvent.execute();
+      vm.deleteEvent.execute(SeriesScope.one);
     }
   }
 

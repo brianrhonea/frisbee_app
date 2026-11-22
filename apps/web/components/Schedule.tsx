@@ -22,7 +22,9 @@ import {
   type ShareRole,
   shareRoleLabels,
   shareRoles,
+  type Repeat,
   upcomingSchedule,
+  weekOf,
 } from "@stall10/shared";
 import Link from "next/link";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
@@ -37,6 +39,7 @@ import { useAuth } from "./AuthProvider";
 import { type ShareChoice, ShareEventField, shareEvent } from "./team/ShareEvent";
 import { fromLocalInput, startOfToday, toLocalInput } from "@/lib/dates";
 import { useMyTeams } from "./useMyTeams";
+import { browserTimeZone, RepeatField, RepeatNote, repeatFormProblem, scopeQuery, useSeriesScope } from "./Repeat";
 import { type PickedPerson, PersonPicker } from "./PersonPicker";
 import { ColorPicker } from "./settings/CalendarSettings";
 import { meetingAnswer, needsRsvp, RsvpPill } from "./RsvpPill";
@@ -139,6 +142,8 @@ export function Schedule() {
   const [view, setView] = useState<ScheduleView>("list");
   const [month, setMonth] = useState(() => firstOfMonth(new Date()));
   const [picked, setPicked] = useState(() => startOfToday());
+  // "This event or this and following" for deleting a repeating event.
+  const scope = useSeriesScope();
   useEffect(() => setView(loadView()), []);
   const monthView = view === "month";
   const grid = monthGrid(month);
@@ -225,9 +230,10 @@ export function Schedule() {
   // Team entries stop where the calendars' window does, so the list has one horizon.
   const windowEnd = startOfToday().getTime() - dayMs + (calendarWindowDays - 1) * dayMs;
   const upcoming = upcomingSchedule(rows, { now: Date.now(), until: windowEnd, filter, hiddenCalendars: hidden });
-  // The month view: each day's entries (the app's eventsOn), the picked day's listed below the grid.
+  // The month view: each day's entries (the app's eventsOn), the picked day's week listed below the grid.
   const onDay = (d: Date) => scheduleOnDay(rows, d, { filter, hiddenCalendars: hidden });
-  const dayRows = onDay(picked);
+  const pickedWeek = weekOf(picked);
+  const inPickedWeek = (d: Date) => pickedWeek.some((w) => sameDay(w, d));
   const monthCount = grid.filter((d) => d.getMonth() === month.getMonth()).reduce((n, d) => n + onDay(d).length, 0);
   /** The dots on a day: team, personal, and one still to answer (DayMarks in the app). */
   function marksOn(d: Date) {
@@ -356,10 +362,12 @@ export function Schedule() {
   }
   /** Team events can be deleted from here by the team's event managers, as the app's swipe does. */
   async function removeTeamEvent(team: Doc<TeamDoc>, e: Doc<TeamEventDoc>) {
-    if (!window.confirm("Delete this event for everyone?")) return;
+    // A repeating event: this one, or it and every later one.
+    const which = e.series ? await scope.ask(`Delete "${e.title || "Event"}"?`, "Delete") : window.confirm("Delete this event for everyone?") ? "one" : null;
+    if (!which) return;
     try {
       // The listener drops it once it's gone.
-      await callApi(me, `/v1/teams/${encodeURIComponent(team.id)}/events/${encodeURIComponent(e.id)}`, {
+      await callApi(me, `/v1/teams/${encodeURIComponent(team.id)}/events/${encodeURIComponent(e.id)}${scopeQuery(which)}`, {
         method: "DELETE",
       });
     } catch (err) {
@@ -368,9 +376,10 @@ export function Schedule() {
   }
 
   async function remove(e: CalendarEvent) {
-    if (!window.confirm("Delete this event?")) return;
+    const which = e.series ? await scope.ask(`Delete "${e.title}"?`, "Delete") : window.confirm("Delete this event?") ? "one" : null;
+    if (!which) return;
     try {
-      await callApi(me, `/v1/calendars/${encodeURIComponent(e.calendarId)}/events/${encodeURIComponent(e.id)}`, {
+      await callApi(me, `/v1/calendars/${encodeURIComponent(e.calendarId)}/events/${encodeURIComponent(e.id)}${scopeQuery(which)}`, {
         method: "DELETE",
       });
       await load();
@@ -381,6 +390,7 @@ export function Schedule() {
 
   return (
     <div className="stack schedule-page">
+      {scope.dialog}
       {teams.map((t) => (
         <TeamFeed key={t.id} team={t} uid={me.uid} lookBack={feedLookBack} onData={onFeed} />
       ))}
@@ -470,7 +480,7 @@ export function Schedule() {
                     role="gridcell"
                     aria-selected={on}
                     aria-label={d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
-                    className={`sched-month-day${d.getMonth() === month.getMonth() ? "" : " out"}${today ? " today" : ""}${on ? " on" : ""}`}
+                    className={`sched-month-day${d.getMonth() === month.getMonth() ? "" : " out"}${today ? " today" : ""}${on ? " on" : ""}${inPickedWeek(d) ? " wk" : ""}`}
                     onClick={() => pickDay(d)}
                   >
                     <b>{d.getDate()}</b>
@@ -483,10 +493,15 @@ export function Schedule() {
                 );
               })}
             </div>
-            <section className="sched-day" aria-label={dayLabelOf(picked)}>
-              <h3 className="sched-day-head">{dayLabelOf(picked)}</h3>
-              {dayRows.length === 0 ? <p className="muted small">Nothing scheduled</p> : <ul className="sched-list">{dayRows.map(renderRow)}</ul>}
-            </section>
+            {pickedWeek.map((d) => {
+              const items = onDay(d);
+              return (
+                <section key={d.getTime()} className={`sched-day${sameDay(d, picked) ? " picked" : ""}`} aria-label={dayLabelOf(d)}>
+                  <h3 className="sched-day-head">{dayLabelOf(d)}</h3>
+                  {items.length === 0 ? <p className="muted small">Nothing scheduled</p> : <ul className="sched-list">{items.map(renderRow)}</ul>}
+                </section>
+              );
+            })}
           </>
         ) : !data && !error ? (
           <p className="muted">Loading…</p>
@@ -543,10 +558,7 @@ export function Schedule() {
               </li>
             ))}
           </ul>
-          <p className="muted small">
-            <Link href="/settings/calendar">Share a calendar</Link> with friends, a coach or family, or{" "}
-            <Link href="/settings/calendar#subscribe">see it in Outlook, Apple or Google Calendar</Link>.
-          </p>
+          <p className="muted small">Share them or see them in Outlook, Apple or Google Calendar.</p>
         </div>
       )}
     </div>
@@ -722,6 +734,9 @@ function EventEditor({
   // calendars the member can edit.
   const canShare = !event.id;
   const [share, setShare] = useState<ShareChoice>({ on: false, message: "" });
+  // A new event may repeat; an event of a series asks "this or following" on save.
+  const [repeat, setRepeat] = useState<Repeat | null>(null);
+  const scope = useSeriesScope();
   if (!user) return null;
   const me = user;
   const all = [...calendars, ...made.filter((m) => !calendars.some((c) => c.id === m.id))];
@@ -734,13 +749,27 @@ function EventEditor({
     const end = fromLocalInput(endsAt);
     if (end && Date.parse(end) < Date.parse(start)) return setError("It can't end before it starts.");
     if (!calendarId) return setError("Pick a calendar.");
+    const rule = event.id ? null : repeat;
+    const bad = repeatFormProblem(startsAt, rule);
+    if (bad) return setError(bad);
+    const which = event.series ? await scope.ask(`Save changes to "${title.trim()}"?`, "Save") : "one";
+    if (!which) return;
     setBusy(true);
     setError(null);
-    const body = { title, type, startsAt: start, endsAt: end, location, notes };
+    const body = {
+      title,
+      type,
+      startsAt: start,
+      endsAt: end,
+      location,
+      notes,
+      ...(rule && { repeat: rule }),
+      ...((rule || which === "following") && { timeZone: browserTimeZone() }),
+    };
     const base = `/v1/calendars/${encodeURIComponent(calendarId)}/events`;
     try {
       if (event.id) {
-        await callApi(me, `${base}/${encodeURIComponent(event.id)}`, { method: "PATCH", body });
+        await callApi(me, `${base}/${encodeURIComponent(event.id)}${scopeQuery(which)}`, { method: "PATCH", body });
       } else {
         const res = await callApi<CalendarEventResult>(me, base, { method: "POST", body });
         // The event is saved either way, as in the app and TeamEventEditor.
@@ -758,6 +787,7 @@ function EventEditor({
   const shared = calendar ? calendar.role !== "owner" || (calendar.members?.length ?? 1) > 1 : false;
   return (
     <form className="settings-form event-editor" onSubmit={(e) => void save(e)}>
+      {scope.dialog}
       <label>
         Calendar
         <select
@@ -808,6 +838,7 @@ function EventEditor({
           <input type="datetime-local" value={endsAt} min={startsAt} onChange={(e) => setEndsAt(e.target.value)} />
         </label>
       </div>
+      {event.id ? event.series && <RepeatNote series={event.series} /> : <RepeatField startsAt={startsAt} value={repeat} onChange={setRepeat} />}
       <label>
         Where <small className="muted">(optional)</small>
         <input value={location} maxLength={200} onChange={(e) => setLocation(e.target.value)} />

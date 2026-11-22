@@ -667,10 +667,12 @@ everything the app does on the website alone, styled like the website
     personal magenta, amber when something on it still needs an RSVP;
     today in turf, the picked day outlined. Arrows move a month (today
     picked in this month, else the 1st), Today comes back, and a day
-    from the next or previous month opens it. The picked day's entries
-    are listed below with the usual rows, through the All / Team /
-    Personal filter (`scheduleOnDay` in `@stall10/shared`, the app's
-    `eventsOn`). The month reads its own range (calendars for the grid;
+    from the next or previous month opens it. The picked day's whole
+    week (its grid row, `weekOf` on both) is listed below with the usual
+    rows, scrolled to that day, and the row is tinted, through the All /
+    Team / Personal filter (`scheduleOnDay` in `@stall10/shared`, the
+    app's `eventsOn`). The Calendars card under the schedule is compact:
+    the calendars on one line and one Manage button. The month reads its own range (calendars for the grid;
     on the website team events from the grid's first day). No data
     changes. Tests: app `test/ui/schedule_month_test.dart`; shared
     `schedule.test.ts`.
@@ -1216,6 +1218,26 @@ Out of scope: payments, meeting recording, USA Ultimate data.
     the device's calendar apps (`subscribeOptions`, shared and Dart).
     Tests: shared `subscribe_options.test.ts`, app
     `test/domain/subscribe_options_test.dart` and `calendars_test.dart`.
+60. Repeating events: [x] app; [x] website. A new team, My calendar or
+    shared-calendar event can repeat daily, weekly, every 2 weeks or
+    monthly until an end date (at most 100 events, a year), written as
+    one event per occurrence with `series` (`recurrence.ts`, the app's
+    `recurrence.dart`, tested against `packages/shared/fixtures/recurrence/`).
+    Edits and deletes ask "this event" or "this and following events"
+    (`?scope=following` on the API). The website and shared calendars go
+    through the API with the device's time zone; the app writes team and
+    My calendar series to Firestore (`validSeries` in the rules). One
+    notification per series or bulk change. Tests: shared
+    `recurrence.test.ts`, API `hub.test.ts` and `calendar.test.ts`, app
+    `test/domain/recurrence_test.dart`, `schedule_viewmodels_test.dart`
+    and `event_editor_screen_test.dart`, rules and functions
+    `notifications/model.test.ts`.
+61. Directions: [x] app; [x] website. Directions to an event's place
+    (and a group's map in the app) asks for the app: Apple Maps on Apple
+    devices, Google Maps, Waze (`directionsOptions`, shared and Dart;
+    web links that open the app when installed). Tests: shared
+    `directions_fixtures.test.ts`, app
+    `test/shared_fixtures/directions_fixtures_test.dart`.
 
 Libraries the website may add (none today): a small data cache for API
 reads and mutations, the Firestore web SDK for listeners, and LiveKit's

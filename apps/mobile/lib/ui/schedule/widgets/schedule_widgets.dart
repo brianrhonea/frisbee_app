@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../domain/models/recurrence.dart';
 import '../../../domain/models/schedule_entry.dart';
 import '../../../domain/models/team_event.dart';
 import '../../../routing/routes.dart';
@@ -124,15 +125,36 @@ class ScheduleEventRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      e.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: large ? 15 : 14,
-                        color: c.ink,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            e.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: large ? 15 : 14,
+                              color: c.ink,
+                            ),
+                          ),
+                        ),
+                        if (e.series case final series?) ...[
+                          const SizedBox(width: 5),
+                          Tooltip(
+                            message: repeatSummary(series.freq, series.until),
+                            child: Icon(
+                              Icons.repeat,
+                              size: 14,
+                              color: c.muted,
+                              semanticLabel: repeatSummary(
+                                series.freq,
+                                series.until,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 3),
                     // Whose it is gets most of the line; the place what's
@@ -318,6 +340,10 @@ Future<void> showCalendarEventSheet(
                 '${e.type.label} · $when$until',
                 style: TextStyle(color: c.muted),
               ),
+              if (e.series case final series?) ...[
+                const SizedBox(height: 4),
+                RepeatNote(series: series),
+              ],
               if (e.location.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Row(
@@ -379,4 +405,76 @@ Future<void> showCalendarEventSheet(
       );
     },
   );
+}
+
+/// Asks whether a change to an event in a repeating series is for it
+/// alone or for it and every later one; null when cancelled. [action]
+/// is the verb on the buttons ("Delete", "Save").
+Future<SeriesScope?> askSeriesScope(
+  BuildContext context, {
+  required String title,
+  required String action,
+}) => showModalBottomSheet<SeriesScope>(
+  context: context,
+  showDragHandle: true,
+  builder: (context) => SafeArea(
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'This is a repeating event.',
+            style: TextStyle(color: AppColors.of(context).muted),
+          ),
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, SeriesScope.one),
+            child: Text('$action this event'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton(
+            onPressed: () => Navigator.pop(context, SeriesScope.following),
+            child: Text('$action this and following events'),
+          ),
+          const SizedBox(height: 4),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    ),
+  ),
+);
+
+/// "Repeats weekly until Mar 3, 2027", with the repeat icon, on a
+/// repeating event's details.
+class RepeatNote extends StatelessWidget {
+  const RepeatNote({super.key, required this.series});
+
+  final EventSeries series;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Row(
+      children: [
+        Icon(Icons.repeat, size: 16, color: c.muted),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            repeatSummary(series.freq, series.until),
+            style: TextStyle(fontSize: 13, color: c.muted),
+          ),
+        ),
+      ],
+    );
+  }
 }

@@ -21,10 +21,11 @@ import { ApiError, parseBody } from "../errors.js";
 import { docIdParam } from "../ids.js";
 import type { MediaStorage } from "../media/storage.js";
 import { authorOf, checkNotMuted } from "../posts/author.js";
-import { type Data, type DocStore, serverTime } from "../store.js";
+import { type Data, type DocStore, serverTime, type Tx } from "../store.js";
 import { can, clip, isMember, isOrg, isOwner, mapOf, strings } from "../teams/access.js";
 import { canReadRoom, canWriteRoom, seesEvent } from "./access.js";
 import { deleteFilesUnder, filesOf, uploadedFiles } from "./uploads.js";
+import { laterIds, moveLater, scopeOf, seriesOccurrences } from "../series.js";
 
 const p = {
   team: (t: string) => `teams/${t}`,
@@ -206,71 +207,128 @@ export class HubService {
     if (poll && new Set(poll.options.map((o) => o.id)).size !== poll.options.length) {
       throw new ApiError("invalid_argument", "Each poll option needs its own id.");
     }
-    return { details, poll, isPublic: req.public, audience };
+    return { req, details, poll, isPublic: req.public, audience };
   }
 
+  /**
+   * A new event, or with `repeat` a series: one event per occurrence
+   * (`series` on each; recurrence.ts). Returns the first one's id.
+   */
   async createEvent(caller: Caller, rawTeam: unknown, body: unknown): Promise<SaveTeamEventResult> {
     const teamId = docIdParam(rawTeam);
     const team = await this.team(teamId);
     if (!can(team, caller.uid, "manageEvents")) throw denied("You can't add events to this team.");
     await checkNotMuted(this.store, caller.uid, this.now());
-    const { details, poll, isPublic, audience } = this.eventFields(team, body);
+    const { req, details, poll, isPublic, audience } = this.eventFields(team, body);
     const id = this.store.newId(`teams/${teamId}/events`);
+    const occurrences = req.repeat
+      ? seriesOccurrences(id, { ...req, repeat: req.repeat })
+      : [{ id, startsAt: details.startsAt, endsAt: details.endsAt, series: null }];
     await this.store.transact(async (tx) => {
       const t = await tx.get(p.team(teamId));
       if (!t || !can(t, caller.uid, "manageEvents")) throw denied("You can't add events to this team.");
-      tx.create(p.event(teamId, id), {
-        ...details,
-        poll,
-        ...(audience && { audience }),
-        public: isPublic,
-        rsvps: {},
-        reactions: {},
-        votes: {},
-        createdBy: caller.uid,
-        createdAt: serverTime,
-        updatedAt: serverTime,
-      });
-      if (isPublic) tx.set(p.publicEvent(teamId, id), { ...details, updatedAt: serverTime });
+      for (const o of occurrences) {
+        const fields = { ...details, startsAt: o.startsAt, endsAt: o.endsAt };
+        tx.create(p.event(teamId, o.id), {
+          ...fields,
+          ...(o.series && { series: o.series }),
+          poll,
+          ...(audience && { audience }),
+          public: isPublic,
+          rsvps: {},
+          reactions: {},
+          votes: {},
+          createdBy: caller.uid,
+          createdAt: serverTime,
+          updatedAt: serverTime,
+        });
+        if (isPublic) tx.set(p.publicEvent(teamId, o.id), { ...fields, updatedAt: serverTime });
+      }
     });
-    return { id };
+    return { id: occurrences[0]!.id };
   }
 
-  async editEvent(caller: Caller, rawTeam: unknown, rawEvent: unknown, body: unknown): Promise<SaveTeamEventResult> {
+  /**
+   * Edits an event; with `?scope=following` in a series, it and every
+   * later one: the same details, each moved by the same change of date
+   * and time (RSVPs kept). Later events already deleted are skipped.
+   */
+  async editEvent(
+    caller: Caller,
+    rawTeam: unknown,
+    rawEvent: unknown,
+    body: unknown,
+    query?: unknown,
+  ): Promise<SaveTeamEventResult> {
     const teamId = docIdParam(rawTeam);
     const id = docIdParam(rawEvent);
+    const scope = scopeOf(query);
     const team = await this.team(teamId);
     if (!can(team, caller.uid, "manageEvents")) throw denied("You can't edit this team's events.");
-    const { details, poll, isPublic, audience } = this.eventFields(team, body, true);
+    const { req, details, poll, isPublic, audience } = this.eventFields(team, body, true);
+    const current = scope === "following" ? await this.store.get(p.event(teamId, id)) : null;
+    const later = current ? laterIds(current) : [];
+    const writeId = later.length ? this.store.newId(`teams/${teamId}/events`) : null;
     await this.store.transact(async (tx) => {
-      const [t, event] = await Promise.all([tx.get(p.team(teamId)), tx.get(p.event(teamId, id))]);
+      const [t, event, ...rest] = await Promise.all([
+        tx.get(p.team(teamId)),
+        tx.get(p.event(teamId, id)),
+        ...later.map((l) => tx.get(p.event(teamId, l))),
+      ]);
       if (!t || !can(t, caller.uid, "manageEvents")) throw denied("You can't edit this team's events.");
       if (!event) throw noEvent();
-      // A changed poll starts its votes over (editors may only reset them).
-      const pollChanged = JSON.stringify(event.poll ?? null) !== JSON.stringify(poll);
-      tx.update(p.event(teamId, id), {
-        ...details,
-        poll,
-        ...(audience && { audience }),
-        public: isPublic,
-        ...(pollChanged && { votes: {} }),
-        updatedAt: serverTime,
+      const move = later.length ? moveLater(event, details, req.timeZone) : null;
+      const write = (eventId: string, stored: Data, fields: typeof details, lead: boolean) => {
+        // A changed poll starts its votes over (editors may only reset them).
+        const pollChanged = JSON.stringify(stored.poll ?? null) !== JSON.stringify(poll);
+        tx.update(p.event(teamId, eventId), {
+          ...fields,
+          poll,
+          ...(audience && { audience }),
+          public: isPublic,
+          ...(pollChanged && { votes: {} }),
+          ...(writeId && { seriesWrite: { id: writeId, lead } }),
+          updatedAt: serverTime,
+        });
+        if (isPublic) tx.set(p.publicEvent(teamId, eventId), { ...fields, updatedAt: serverTime });
+        else tx.delete(p.publicEvent(teamId, eventId));
+      };
+      write(id, event, details, true);
+      rest.forEach((stored, i) => {
+        if (stored && move) write(later[i]!, stored, { ...details, ...move(stored) }, false);
       });
-      if (isPublic) tx.set(p.publicEvent(teamId, id), { ...details, updatedAt: serverTime });
-      else tx.delete(p.publicEvent(teamId, id));
     });
     return { id };
   }
 
-  async deleteEvent(caller: Caller, rawTeam: unknown, rawEvent: unknown): Promise<void> {
+  /** Deletes an event; with `?scope=following` in a series, it and every later one. */
+  async deleteEvent(caller: Caller, rawTeam: unknown, rawEvent: unknown, query?: unknown): Promise<void> {
     const teamId = docIdParam(rawTeam);
     const id = docIdParam(rawEvent);
-    await this.store.transact(async (tx) => {
+    const scope = scopeOf(query);
+    const current = scope === "following" ? await this.store.get(p.event(teamId, id)) : null;
+    const later = current ? laterIds(current) : [];
+    const writeId = later.length ? this.store.newId(`teams/${teamId}/events`) : null;
+    const authorize = async (tx: Tx) => {
       const team = await tx.get(p.team(teamId));
       if (!team) throw noTeam();
       if (!can(team, caller.uid, "manageEvents")) throw denied("You can't delete this team's events.");
-      tx.delete(p.event(teamId, id));
-      tx.delete(p.publicEvent(teamId, id));
+    };
+    if (writeId) {
+      // Marked first, so the cancellation notice goes out once (teamEvent in functions).
+      await this.store.transact(async (tx) => {
+        const [, ...events] = await Promise.all([authorize(tx), ...[id, ...later].map((e) => tx.get(p.event(teamId, e)))]);
+        [id, ...later].forEach((e, i) => {
+          if (events[i]) tx.update(p.event(teamId, e), { seriesWrite: { id: writeId, lead: e === id, delete: true } });
+        });
+      });
+    }
+    await this.store.transact(async (tx) => {
+      await authorize(tx);
+      for (const e of [id, ...later]) {
+        tx.delete(p.event(teamId, e));
+        tx.delete(p.publicEvent(teamId, e));
+      }
     });
   }
 

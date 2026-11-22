@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../domain/models/recurrence.dart';
 import '../../../domain/models/team_event.dart';
 import '../../../utils/result.dart';
 import '../../services/firestore_utils.dart';
@@ -111,6 +112,8 @@ class EventRepositoryFirebase implements EventRepository {
     TeamEvent event,
     String uid, {
     bool clearVotes = false,
+    Repeat? repeat,
+    SeriesScope scope = SeriesScope.one,
   }) => guard(() async {
     event = event.copyWith(
       title: cleanText(event.title),
@@ -118,49 +121,167 @@ class EventRepositoryFirebase implements EventRepository {
       notes: cleanText(event.notes),
     );
     final col = _events(teamId);
-    final ref = event.isNew ? col.doc() : col.doc(event.id);
-    final publicRef = _publicEvents(teamId).doc(ref.id);
     final batch = _db.batch();
-    if (event.isNew) {
-      batch.set(ref, {
-        ...event.toEditableMap(),
-        'public': event.isPublic,
-        'rsvps': <String, Object>{},
-        'reactions': <String, Object>{},
-        'votes': <String, Object>{},
-        'createdBy': uid,
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-    } else {
-      batch.update(ref, {
-        ...event.toEditableMap(),
-        'public': event.isPublic,
-        if (clearVotes) 'votes': <String, Object>{},
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+    void public(String id, TeamEvent e, {required bool isNew}) {
+      final ref = _publicEvents(teamId).doc(id);
+      if (e.isPublic) {
+        batch.set(ref, {
+          ...e.toPublicMap(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } else if (!isNew) {
+        // Deleting a missing doc is fine, so no need to check it was public.
+        batch.delete(ref);
+      }
     }
-    if (event.isPublic) {
-      batch.set(publicRef, {
-        ...event.toPublicMap(),
+
+    if (event.isNew) {
+      final events = _occurrences(col.doc().id, event, repeat);
+      for (final e in events) {
+        batch.set(col.doc(e.id), {
+          ...e.toEditableMap(),
+          if (e.series case final series?) 'series': series.toMap(),
+          'public': e.isPublic,
+          'rsvps': <String, Object>{},
+          'reactions': <String, Object>{},
+          'votes': <String, Object>{},
+          'createdBy': uid,
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+        public(e.id, e, isNew: true);
+      }
+      await batch.commit();
+      return events.first.id;
+    }
+    final later = scope == SeriesScope.following
+        ? await _later(col, event.id, event)
+        : const <TeamEvent>[];
+    // One id per bulk write, so the change notice goes out once.
+    final writeId = later.isEmpty ? null : col.doc().id;
+    void update(TeamEvent e, {required bool lead}) {
+      batch.update(col.doc(e.id), {
+        ...e.toEditableMap(),
+        'public': e.isPublic,
+        if (clearVotes) 'votes': <String, Object>{},
+        if (writeId != null) 'seriesWrite': {'id': writeId, 'lead': lead},
         'updatedAt': FieldValue.serverTimestamp(),
       });
-    } else if (!event.isNew) {
-      // Deleting a missing doc is fine, so no need to check it was public.
-      batch.delete(publicRef);
+      public(e.id, e, isNew: false);
+    }
+
+    update(event, lead: true);
+    for (final e in later) {
+      update(e, lead: false);
     }
     await batch.commit();
-    return ref.id;
+    return event.id;
   });
 
+  /// [event] as one event, or with [repeat] as a series in [seriesId]:
+  /// one per occurrence, ids `${seriesId}_${index}`.
+  static List<TeamEvent> _occurrences(
+    String seriesId,
+    TeamEvent event,
+    Repeat? repeat,
+  ) {
+    if (repeat == null) return [event.copyWith(id: seriesId)];
+    final problem = repeatProblem(event.startsAt, repeat);
+    if (problem != null) throw ArgumentError(problem);
+    final times = seriesTimes(event.startsAt, event.endsAt, repeat);
+    return [
+      for (final (i, (start, end)) in times.indexed)
+        event.copyWith(
+          id: occurrenceId(seriesId, i),
+          startsAt: start,
+          endsAt: () => end,
+          series: () => EventSeries(
+            id: seriesId,
+            index: i,
+            count: times.length,
+            freq: repeat.freq,
+            until: repeat.until,
+          ),
+        ),
+    ];
+  }
+
+  /// The events after [id] in its series, as [edited] (its new details)
+  /// moved by the same change of date and time; ones already deleted are
+  /// skipped. Empty when it isn't in a series.
+  static Future<List<TeamEvent>> _later(
+    CollectionReference<Map<String, dynamic>> col,
+    String id,
+    TeamEvent edited,
+  ) async {
+    final current = _parseOne(await col.doc(id).get());
+    final series = current?.series;
+    if (current == null || series == null) return const [];
+    final move = moveLater(current.startsAt, edited.startsAt, edited.endsAt);
+    final docs = await Future.wait(
+      series.laterIds.map((l) => col.doc(l).get()),
+    );
+    return [
+      for (final d in docs)
+        if (_parseOne(d) case final stored?)
+          () {
+            final (start, end) = move(stored.startsAt);
+            return edited.copyWith(
+              id: stored.id,
+              startsAt: start,
+              endsAt: () => end,
+            );
+          }(),
+    ];
+  }
+
+  /// The ids of [id] and, for [SeriesScope.following], its series' later
+  /// events that still exist.
+  static Future<List<String>> _withLater(
+    CollectionReference<Map<String, dynamic>> col,
+    String id,
+    SeriesScope scope,
+  ) async {
+    if (scope == SeriesScope.one) return [id];
+    final series = _parseOne(await col.doc(id).get())?.series;
+    if (series == null) return [id];
+    final docs = await Future.wait(
+      series.laterIds.map((l) => col.doc(l).get()),
+    );
+    return [
+      id,
+      for (final d in docs)
+        if (d.exists) d.id,
+    ];
+  }
+
   @override
-  Future<Result<void>> deleteEvent(String teamId, String eventId) => guard(
-    () =>
-        (_db.batch()
-              ..delete(_events(teamId).doc(eventId))
-              ..delete(_publicEvents(teamId).doc(eventId)))
-            .commit(),
-  );
+  Future<Result<void>> deleteEvent(
+    String teamId,
+    String eventId, {
+    SeriesScope scope = SeriesScope.one,
+  }) => guard(() async {
+    final col = _events(teamId);
+    final ids = await _withLater(col, eventId, scope);
+    if (ids.length > 1) {
+      // Marked first, so the cancellation notice goes out once.
+      final writeId = col.doc().id;
+      final mark = _db.batch();
+      for (final id in ids) {
+        mark.update(col.doc(id), {
+          'seriesWrite': {'id': writeId, 'lead': id == eventId, 'delete': true},
+        });
+      }
+      await mark.commit();
+    }
+    final batch = _db.batch();
+    for (final id in ids) {
+      batch
+        ..delete(col.doc(id))
+        ..delete(_publicEvents(teamId).doc(id));
+    }
+    await batch.commit();
+  });
 
   // Responses use field-path updates so concurrent members never clobber
   // each other's entries.
@@ -241,27 +362,55 @@ class EventRepositoryFirebase implements EventRepository {
       _myEvents(uid).doc(eventId).snapshots().map(_parseOne);
 
   @override
-  Future<Result<String>> saveMyEvent(String uid, TeamEvent event) =>
-      guard(() async {
-        final col = _myEvents(uid);
-        final data = {...event.toEditableMap(), 'poll': null};
-        if (event.isNew) {
-          final ref = col.doc();
-          await ref.set({
-            ...data,
-            'createdAt': FieldValue.serverTimestamp(),
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-          return ref.id;
-        }
-        await col.doc(event.id).update({
-          ...data,
+  Future<Result<String>> saveMyEvent(
+    String uid,
+    TeamEvent event, {
+    Repeat? repeat,
+    SeriesScope scope = SeriesScope.one,
+  }) => guard(() async {
+    final col = _myEvents(uid);
+    Map<String, dynamic> data(TeamEvent e) => {
+      ...e.toEditableMap(),
+      'poll': null,
+    };
+    final batch = _db.batch();
+    if (event.isNew) {
+      final events = _occurrences(col.doc().id, event, repeat);
+      for (final e in events) {
+        batch.set(col.doc(e.id), {
+          ...data(e),
+          if (e.series case final series?) 'series': series.toMap(),
+          'createdAt': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
         });
-        return event.id;
+      }
+      await batch.commit();
+      return events.first.id;
+    }
+    final later = scope == SeriesScope.following
+        ? await _later(col, event.id, event)
+        : const <TeamEvent>[];
+    for (final e in [event, ...later]) {
+      batch.update(col.doc(e.id), {
+        ...data(e),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
+    }
+    await batch.commit();
+    return event.id;
+  });
 
   @override
-  Future<Result<void>> deleteMyEvent(String uid, String eventId) =>
-      guard(() => _myEvents(uid).doc(eventId).delete());
+  Future<Result<void>> deleteMyEvent(
+    String uid,
+    String eventId, {
+    SeriesScope scope = SeriesScope.one,
+  }) => guard(() async {
+    final col = _myEvents(uid);
+    final batch = _db.batch();
+    for (final id in await _withLater(col, eventId, scope)) {
+      batch.delete(col.doc(id));
+    }
+    await batch.commit();
+  });
 }

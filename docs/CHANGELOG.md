@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.43  | 2026-11-21 | `feature/report-block`                  |                     |
 | 0.0.42  | 2026-11-20 | `feature/report-block`                  |                     |
 | 0.0.41  | 2026-11-20 | `feature/report-block`                  |                     |
 | 0.0.40  | 2026-11-20 | `feature/redesign`                      |                     |
@@ -55,6 +56,37 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.43 — Repeating events, month week, Directions apps
+
+With web 0.52.0 and API 0.39.0 (product-spec §8.1 items 30, 60–61).
+
+- Repeating events (`domain/models/recurrence.dart`, the port of
+  packages/shared's `recurrence.ts`, tested against
+  `packages/shared/fixtures/recurrence/`): a new event has **Repeat**
+  (daily, weekly on its day, every 2 weeks, monthly on its date) until an
+  end date, at most 100 events and a year, with a live "Creates N events".
+  Each occurrence is its own event (ids `${seriesId}_${index}`, `series`
+  on each), so RSVPs, reminders and calendar feeds work as before. Team
+  and My calendar series are written in one Firestore batch; shared
+  calendars through the API with the device's time zone
+  (`flutter_timezone`, `data/services/time_zone.dart`).
+- Editing or deleting an event in a series (editor, event pages, the
+  schedule's swipe) asks **this event** or **this and following events**
+  (`askSeriesScope`); "following" moves later ones by the same change of
+  date and time and keeps their RSVPs. Rows show a repeat mark; details
+  say "Repeats weekly until …".
+- Rules: `series` on team and personal events, `seriesWrite` on team
+  event edits (`validSeries`, `validSeriesWrite`). `teamEvent`
+  notifications: one per new series ("repeats weekly until …") and one
+  per "this and following" edit or delete (`isQuietSeriesWrite`).
+- Schedule, Month: the picked day's whole week is listed below the grid,
+  scrolled to that day, with its row tinted (`weekOf`).
+- Schedule's Calendars card: compact, one **Manage** button.
+- **Directions** (event pages, a group's map) asks which app: Apple Maps
+  on iPhone, Google Maps or Waze (`domain/models/directions.dart`, tested
+  against `packages/shared/fixtures/directions/`). Each link opens the app
+  when installed, the browser otherwise.
 
 ## 0.0.42 — Word filter and photo checks
 

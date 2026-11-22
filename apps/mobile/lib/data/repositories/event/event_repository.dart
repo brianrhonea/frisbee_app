@@ -27,14 +27,26 @@ abstract class EventRepository {
   /// editable fields, leaving responses intact. Keeps the public copy in
   /// step with [TeamEvent.isPublic]. [clearVotes] wipes poll
   /// votes, e.g. when the poll is removed. Returns the saved event id.
+  ///
+  /// A new event with [repeat] is written as a series, one event per
+  /// occurrence (returns the first one's id). Editing with
+  /// [SeriesScope.following] also changes every later event in its
+  /// series: the same details, moved by the same change of date and time.
   Future<Result<String>> saveEvent(
     String teamId,
     TeamEvent event,
     String uid, {
     bool clearVotes = false,
+    Repeat? repeat,
+    SeriesScope scope = SeriesScope.one,
   });
 
-  Future<Result<void>> deleteEvent(String teamId, String eventId);
+  /// Deletes the event; [SeriesScope.following] also its series' later ones.
+  Future<Result<void>> deleteEvent(
+    String teamId,
+    String eventId, {
+    SeriesScope scope = SeriesScope.one,
+  });
 
   /// Sets [uid]'s RSVP, or clears it (and its note) when [status] is null.
   /// Anything but [RsvpStatus.going] also removes [uid]'s reactions and
@@ -82,8 +94,17 @@ abstract class EventRepository {
   Stream<TeamEvent?> watchMyEvent(String uid, String eventId);
 
   /// Creates the event when [TeamEvent.isNew], otherwise updates it.
-  /// Returns the saved event id.
-  Future<Result<String>> saveMyEvent(String uid, TeamEvent event);
+  /// Returns the saved event id. [repeat] and [scope] as in [saveEvent].
+  Future<Result<String>> saveMyEvent(
+    String uid,
+    TeamEvent event, {
+    Repeat? repeat,
+    SeriesScope scope = SeriesScope.one,
+  });
 
-  Future<Result<void>> deleteMyEvent(String uid, String eventId);
+  Future<Result<void>> deleteMyEvent(
+    String uid,
+    String eventId, {
+    SeriesScope scope = SeriesScope.one,
+  });
 }

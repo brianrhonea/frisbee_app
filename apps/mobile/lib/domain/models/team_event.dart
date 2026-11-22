@@ -1,4 +1,7 @@
 import 'model_utils.dart';
+import 'recurrence.dart';
+
+export 'recurrence.dart' show EventSeries, Repeat, RepeatFrequency, SeriesScope;
 
 enum EventType {
   practice('Practice'),
@@ -158,7 +161,12 @@ class TeamEvent {
     this.isPublic = false,
     this.audience = const {},
     this.tournamentId,
+    this.series,
   });
+
+  /// Its place in a repeating series, or null for a one-off. Each
+  /// occurrence is its own event (recurrence.dart); fixed once created.
+  final EventSeries? series;
 
   /// The hosted tournament this is, for a team the host accepted: the
   /// server puts it on the schedule and keeps it in step (functions/src/
@@ -241,6 +249,7 @@ class TeamEvent {
     EventPoll? Function()? poll,
     bool? isPublic,
     Set<String>? audience,
+    EventSeries? Function()? series,
   }) => TeamEvent(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -258,6 +267,7 @@ class TeamEvent {
     isPublic: isPublic ?? this.isPublic,
     audience: audience ?? this.audience,
     tournamentId: tournamentId,
+    series: series != null ? series() : this.series,
   );
 
   factory TeamEvent.fromMap(String id, Map<String, dynamic> map) {
@@ -301,6 +311,7 @@ class TeamEvent {
       isPublic: map['public'] as bool? ?? false,
       audience: {for (final a in (map['audience'] as List?) ?? const []) '$a'},
       tournamentId: map['tournamentId'] as String?,
+      series: EventSeries.fromMap(map['series']),
     );
   }
 

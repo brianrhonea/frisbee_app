@@ -14,6 +14,7 @@ import {
   subscribeOptions,
   shareRoles,
 } from "@stall10/shared";
+import { devicePlatform } from "@/lib/device";
 import Link from "next/link";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { colorOf } from "@/lib/calendar";
@@ -329,15 +330,6 @@ function NewCalendar({ busy, run }: { busy: boolean; run: Call }) {
       </div>
     </form>
   );
-}
-
-/** The device, for which subscribe options to offer first (browsers can't see installed apps). */
-function devicePlatform(): SubscribePlatform {
-  const ua = typeof navigator === "undefined" ? "" : navigator.userAgent;
-  if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return "ios";
-  if (/Macintosh/.test(ua)) return "macos";
-  if (/Android/.test(ua)) return "android";
-  return "other";
 }
 
 /** The private subscription link (every calendar the member is on, as iCalendar). */

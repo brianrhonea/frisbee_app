@@ -442,10 +442,21 @@ with a men's team and a women's team. Start one from Teams → **New** →
 
 - Use the arrows to move between weeks, and **Today** to come back.
 - Tap a day in the strip to jump to it.
+- **Month** shows the month as a grid. Tap a day and that day's whole
+  week (Monday to Sunday) is listed below, starting at the day you
+  tapped.
 - Filter with **All**, **Team** or **Personal** (your calendars).
 - **New event** adds an event on the selected day. Under **Add to**, pick
   **My calendar**, another calendar you own or can edit, or (owners,
   coaches and captains) a team's schedule.
+- **Repeating events**: when adding an event, set **Repeat** to Daily,
+  Weekly, Every 2 weeks or Monthly and pick **Ends on**. You'll see how
+  many events it makes (at most 100, and up to a year). Each one is its
+  own event with its own RSVPs. To change or delete one, choose **This
+  event** or **This and following events**. "Following" moves the later
+  ones by the same change of time and keeps their RSVPs.
+- **Directions** on an event (or a group's map) asks which app to use:
+  Apple Maps (iPhone), Google Maps or Waze.
 - **Swipe an event right to delete it.** Tap **Undo** within 4 seconds to
   keep it. You can always swipe your own events; events on someone
   else's calendar if you **Can edit** it; team events only if you're an

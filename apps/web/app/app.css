@@ -1666,3 +1666,12 @@ dialog.dialog:has(.invite-dialog) { width: min(100% - 32px, 560px); }
 
 /* "Stall 10 staff" under a staff member's name (ProfileCard). */
 .staff-badge { display: inline-flex; align-items: center; gap: 4px; margin: 4px 0; padding: 2px 10px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: 12px; font-weight: 700; }
+
+/* Repeating events (components/Repeat.tsx): the editor's Repeat row, the series note, "this or following". */
+.repeat-field { display: grid; gap: 4px; }
+.repeat-note { display: block; }
+dialog.dialog:has(.scope-dialog) { width: min(100% - 32px, 420px); }
+.scope-dialog { display: grid; gap: 10px; }
+.scope-dialog > * { margin: 0; }
+.scope-actions { display: grid; gap: 8px; }
+.scope-actions .text-btn { justify-self: center; }

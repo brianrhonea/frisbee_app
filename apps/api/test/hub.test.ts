@@ -134,6 +134,96 @@ describe("team events", () => {
     expect((await s.call("DELETE", `/v1/teams/t1/events/${id}`)).statusCode).toBe(204);
   });
 
+  describe("repeating", () => {
+    const weekly = { ...event, endsAt: "2026-11-20T20:00:00Z", repeat: { freq: "weekly", until: "2026-12-11" }, timeZone: "America/New_York" };
+    const ids = (first: string) => [0, 1, 2, 3].map((i) => first.replace(/_0$/, `_${i}`));
+
+    it("writes one event per week, each with the series, at the same local time", async () => {
+      const res = await s.call("POST", "/v1/teams/t1/events", { ...weekly, public: true });
+      expect(res.statusCode).toBe(201);
+      const first = res.json().id as string;
+      expect(first).toMatch(/_0$/);
+      const all = ids(first).map((id) => s.store.doc(`teams/t1/events/${id}`)!);
+      expect(all.map((e) => (e.startsAt as Date).toISOString())).toEqual([
+        "2026-11-20T18:00:00.000Z",
+        "2026-11-27T18:00:00.000Z",
+        "2026-12-04T18:00:00.000Z",
+        "2026-12-11T18:00:00.000Z",
+      ]);
+      expect(all.map((e) => (e.endsAt as Date).toISOString())[3]).toBe("2026-12-11T20:00:00.000Z");
+      expect(all[2]!.series).toEqual({ id: first.slice(0, -2), index: 2, count: 4, freq: "weekly", until: "2026-12-11" });
+      // The public copy has the details only (the publicEvents rule).
+      expect(s.store.doc(`teams/t1/publicEvents/${ids(first)[3]}`)?.title).toBe("Practice");
+      expect(s.store.doc(`teams/t1/publicEvents/${ids(first)[3]}`)?.series).toBeUndefined();
+      expect(s.store.doc(`teams/t1/events/${first.replace(/_0$/, "_4")}`)).toBeUndefined();
+    });
+
+    it("keeps the wall-clock time across a clock change", async () => {
+      // 6 pm in New York on Oct 30 (EDT) and Nov 6 (EST).
+      const res = await s.call("POST", "/v1/teams/t1/events", {
+        ...event,
+        startsAt: "2026-10-30T22:00:00Z",
+        repeat: { freq: "weekly", until: "2026-11-06" },
+        timeZone: "America/New_York",
+      });
+      const second = s.store.doc(`teams/t1/events/${(res.json().id as string).replace(/_0$/, "_1")}`)!;
+      expect((second.startsAt as Date).toISOString()).toBe("2026-11-06T23:00:00.000Z");
+    });
+
+    it("refuses repeats that are too long, end too soon, or have no time zone", async () => {
+      const post = (repeat: object, timeZone: string | undefined = "UTC") =>
+        s.call("POST", "/v1/teams/t1/events", { ...event, repeat, ...(timeZone && { timeZone }) });
+      expect((await post({ freq: "daily", until: "2027-11-30" })).statusCode).toBe(400);
+      expect((await post({ freq: "daily", until: "2027-03-30" })).statusCode).toBe(400); // over 100
+      expect((await post({ freq: "weekly", until: "2026-11-19" })).statusCode).toBe(400);
+      expect((await post({ freq: "weekly", until: "2026-12-11" }, "")).statusCode).toBe(400);
+      expect((await post({ freq: "weekly", until: "2026-12-11" }, "Mars/Olympus")).statusCode).toBe(400);
+      expect((await post({ freq: "hourly", until: "2026-12-11" })).statusCode).toBe(400);
+    });
+
+    it("edits this and following: same change of time, RSVPs kept, earlier ones untouched", async () => {
+      const first = (await s.call("POST", "/v1/teams/t1/events", weekly)).json().id as string;
+      const [e0, e1, e2, e3] = ids(first);
+      s.store.put(`teams/t1/events/${e2}`, { ...s.store.doc(`teams/t1/events/${e2}`), rsvps: { player: "going" } });
+      // Move the second one from 1 pm to 2 pm local and rename it.
+      const res = await s.call(
+        "PATCH",
+        `/v1/teams/t1/events/${e1}?scope=following`,
+        { ...event, title: "Late practice", startsAt: "2026-11-27T19:00:00Z", endsAt: "2026-11-27T20:30:00Z", timeZone: "America/New_York" },
+      );
+      expect(res.statusCode).toBe(200);
+      expect(s.store.doc(`teams/t1/events/${e0}`)?.title).toBe("Practice");
+      const later = [e1, e2, e3].map((id) => s.store.doc(`teams/t1/events/${id}`)!);
+      expect(later.map((e) => e.title)).toEqual(["Late practice", "Late practice", "Late practice"]);
+      expect(later.map((e) => (e.startsAt as Date).toISOString())).toEqual([
+        "2026-11-27T19:00:00.000Z",
+        "2026-12-04T19:00:00.000Z",
+        "2026-12-11T19:00:00.000Z",
+      ]);
+      expect((later[2]!.endsAt as Date).toISOString()).toBe("2026-12-11T20:30:00.000Z");
+      expect(later[1]!.rsvps).toEqual({ player: "going" });
+      expect(later.map((e) => (e.seriesWrite as { lead: boolean }).lead)).toEqual([true, false, false]);
+      expect(later[0]!.series).toMatchObject({ index: 1 });
+      // Just this one leaves the others alone.
+      await s.call("PATCH", `/v1/teams/t1/events/${e3}`, { ...event, title: "Last one", startsAt: "2026-12-11T19:00:00Z" });
+      expect(s.store.doc(`teams/t1/events/${e2}`)?.title).toBe("Late practice");
+    });
+
+    it("deletes this and following, or just this one", async () => {
+      const first = (await s.call("POST", "/v1/teams/t1/events", { ...weekly, public: true })).json().id as string;
+      const [e0, e1, e2, e3] = ids(first);
+      expect((await s.call("DELETE", `/v1/teams/t1/events/${e3}`)).statusCode).toBe(204);
+      expect((await s.call("DELETE", `/v1/teams/t1/events/${e1}?scope=following`, undefined, "player")).statusCode).toBe(403);
+      expect((await s.call("DELETE", `/v1/teams/t1/events/${e1}?scope=following`)).statusCode).toBe(204);
+      expect(s.store.doc(`teams/t1/events/${e0}`)).toBeDefined();
+      for (const id of [e1, e2, e3]) {
+        expect(s.store.doc(`teams/t1/events/${id}`)).toBeUndefined();
+        expect(s.store.doc(`teams/t1/publicEvents/${id}`)).toBeUndefined();
+      }
+      expect((await s.call("DELETE", `/v1/teams/t1/events/${e0}?scope=sometimes`)).statusCode).toBe(400);
+    });
+  });
+
   describe("responses", () => {
     beforeEach(() => {
       s.store.put("teams/t1/events/e1", {

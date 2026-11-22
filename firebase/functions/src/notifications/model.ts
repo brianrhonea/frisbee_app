@@ -135,6 +135,47 @@ export function eventChange(before?: Data, after?: Data): EventChange | null {
   return null;
 }
 
+/**
+ * Whether a team event's write is one of many from a repeating series
+ * (recurrence.ts in packages/shared) that shouldn't notify on its own:
+ * a series notifies once when created (its first event), and a "this and
+ * following" edit or delete once, for the event the person changed
+ * (seriesWrite.lead). Anything else notifies as usual.
+ */
+export function isQuietSeriesWrite(before?: Data, after?: Data): boolean {
+  if (!before && after) {
+    const index = (after.series as Data | undefined)?.index;
+    return typeof index === "number" && index > 0;
+  }
+  if (before && !after) {
+    const w = before.seriesWrite as Data | undefined;
+    return w?.delete === true && w.lead !== true;
+  }
+  const b = before?.seriesWrite as Data | undefined;
+  const a = after?.seriesWrite as Data | undefined;
+  return !!a && a.id !== b?.id && (a.lead !== true || a.delete === true);
+}
+
+const repeatWords: Record<string, string> = {
+  daily: "daily",
+  weekly: "weekly",
+  biweekly: "every 2 weeks",
+  monthly: "monthly",
+};
+
+/** "repeats weekly until Dec 11" for a series' first event, or "". */
+function repeatNote(event: Data): string {
+  const s = event.series as Data | undefined;
+  const how = typeof s?.freq === "string" ? repeatWords[s.freq] : undefined;
+  if (!how || typeof s?.until !== "string") return "";
+  const until = new Date(`${s.until}T12:00:00Z`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+  return ` · repeats ${how} until ${until}`;
+}
+
 export function changedFields(before: Data, after: Data): string[] {
   return editableEventFields.filter((f) => !same(before[f], after[f]));
 }
@@ -470,9 +511,17 @@ export function eventChangeNotice(a: {
       const where = whenAndWhere(event, prefs);
       switch (a.change) {
         case "created":
-          return { title: `${a.teamName}: new ${typeLabel(event).toLowerCase()}`, body: `${name} · ${where}` };
-        case "deleted":
-          return { title: `${a.teamName}: ${name} cancelled`, body: `Was ${where}` };
+          return {
+            title: `${a.teamName}: new ${typeLabel(event).toLowerCase()}`,
+            body: `${name} · ${where}${repeatNote(event)}`,
+          };
+        case "deleted": {
+          const following = (event.seriesWrite as Data | undefined)?.delete === true;
+          return {
+            title: `${a.teamName}: ${name} cancelled${following ? " from now on" : ""}`,
+            body: following ? `From ${where}` : `Was ${where}`,
+          };
+        }
         case "updated":
           return {
             title: `${a.teamName}: ${name} updated`,
