@@ -39,7 +39,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
-import { FeeBreakdownNote } from "@/components/payments/Payments";
+import { FeeBreakdownNote, usePaymentFees } from "@/components/payments/Payments";
 import type { TeamDoc } from "@/components/team/TeamContext";
 import { type Doc, useLiveDoc, useLiveQuery } from "@/lib/live";
 import { tournamentHref } from "./TournamentLists";
@@ -82,6 +82,8 @@ interface FormState {
   currency: string;
   instructions: string;
   feeDue: Date | null;
+  /** Paid online, payers also pay the processing fees. */
+  payerCoversFees: boolean;
   kind: HostedKind;
   entryType: TournamentEntryType;
   draftMode: DraftMode;
@@ -108,6 +110,7 @@ function blank(type: HostedType | null): FormState {
     currency: "USD",
     instructions: "",
     feeDue: null,
+    payerCoversFees: false,
     kind,
     entryType: type === "hat" ? "players" : "teams",
     draftMode: "balanced",
@@ -141,6 +144,7 @@ function filled(t: TournamentDoc, divisions: Array<Doc<DivisionDoc>>): FormState
     currency: t.bidFee?.currency ?? "USD",
     instructions: t.bidFee?.instructions ?? "",
     feeDue: t.bidFee?.dueAt ? new Date(t.bidFee.dueAt) : null,
+    payerCoversFees: t.bidFee?.payerCoversFees === true,
     kind,
     entryType: t.entryType,
     draftMode: t.draftMode ?? "balanced",
@@ -172,7 +176,7 @@ function requestOf(f: FormState) {
   const teamEntry = players && f.teamEntry;
   const season = f.kind === "league" ? f.season : null;
   const fee = f.hasFee
-    ? { amountCents: centsOf(f.feeAmount) ?? 0, currency: f.currency, instructions: f.instructions.trim(), dueAt: f.feeDue?.toISOString() ?? null }
+    ? { amountCents: centsOf(f.feeAmount) ?? 0, currency: f.currency, instructions: f.instructions.trim(), dueAt: f.feeDue?.toISOString() ?? null, payerCoversFees: f.payerCoversFees }
     : null;
   return {
     name: f.name.trim(),
@@ -197,6 +201,7 @@ export const publicDetailsHint = "The location and About are public: anyone can 
 
 export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string; tournamentId?: string; type?: HostedType | null }) {
   const { user } = useAuth();
+  const paymentFees = usePaymentFees(user);
   const router = useRouter();
   const isNew = !tournamentId;
   const existing = useLiveDoc<TournamentDoc>(user && tournamentId ? `tournaments/${tournamentId}` : null);
@@ -677,8 +682,17 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
                   />
                 </label>
               </div>
-              <FeeBreakdownNote user={user} amountCents={centsOf(f.feeAmount)} currency={f.currency} />
-              {players && f.teamEntry && <FeeBreakdownNote user={user} amountCents={centsOf(f.teamFeeAmount)} currency={f.currency} />}
+              <FeeBreakdownNote user={user} amountCents={centsOf(f.feeAmount)} currency={f.currency} payerCovers={f.payerCoversFees} />
+              {players && f.teamEntry && <FeeBreakdownNote user={user} amountCents={centsOf(f.teamFeeAmount)} currency={f.currency} payerCovers={f.payerCoversFees} />}
+              {paymentFees?.available && (
+              <label className="check-row">
+                <input type="checkbox" checked={f.payerCoversFees} onChange={(e) => set({ payerCoversFees: e.target.checked })} />
+                <span>
+                  {players ? "Payers cover the processing fee" : "Teams cover the processing fee"}
+                  <small className="muted">When they pay online, they also pay Stripe&apos;s and Stall 10&apos;s fees, so you get the whole fee.</small>
+                </span>
+              </label>
+              )}
               <label>
                 How to pay
                 <textarea rows={2} maxLength={tournamentLimits.feeInstructions} placeholder="e.g. Venmo @club-treasurer with your team name" value={f.instructions} onChange={(e) => set({ instructions: e.target.value })} />

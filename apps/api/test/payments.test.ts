@@ -2,10 +2,10 @@
 // payouts, payers' Checkout sessions (amount from the tournament, never
 // the body), and the webhook marking fees paid, refunding duplicates and
 // following the host's refunds.
-import { centsLabel, onlinePaymentProblem, paidOnlineNote, platformFeeCents, platformFeeLabel, refundedOnlineNote } from "@stall10/shared";
+import { centsLabel, chargeCoveringFees, onlineCharge, onlinePaymentProblem, processingPaymentNote, paidOnlineNote, platformFeeCents, platformFeeLabel, refundedOnlineNote } from "@stall10/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
-import type { CheckoutInput, GatewayEvent, PaymentGateway } from "../src/payments/gateway.js";
+import type { CheckoutInput, GatewayCheckout, GatewayEvent, PaymentGateway } from "../src/payments/gateway.js";
 import { platformFeeFromEnv } from "../src/payments/service.js";
 import { stripeFromEnv } from "../src/payments/stripe.js";
 import Stripe from "stripe";
@@ -22,6 +22,11 @@ class FakeGateway implements PaymentGateway {
   refunds: Array<{ account: string; paymentIntent: string; idempotencyKey: string }> = [];
   feeRefunds: string[] = [];
   failFeeRefund = false;
+  /** Each session as Stripe would report it now. */
+  sessions = new Map<string, GatewayCheckout>();
+  expired: string[] = [];
+  /** Stripe not answering status checks. */
+  down = false;
 
   async createAccount(input: { name: string; idempotencyKey: string }) {
     this.created.push(input);
@@ -39,7 +44,22 @@ class FakeGateway implements PaymentGateway {
   async createCheckout(input: CheckoutInput) {
     this.checkouts.push(input);
     const id = `cs_${this.checkouts.length}`;
+    this.sessions.set(id, { status: "open", paymentStatus: "unpaid", paymentIntent: null, paymentFailed: false });
     return { id, url: `https://checkout.test/${id}` };
+  }
+  async checkout(_account: string, id: string) {
+    if (this.down) throw new Error("stripe down");
+    return this.sessions.get(id) ?? { status: "open" as const, paymentStatus: "unpaid" as const, paymentIntent: null, paymentFailed: false };
+  }
+  async expireCheckout(_account: string, id: string) {
+    const now = this.sessions.get(id);
+    if (now?.status !== "open") throw new Error("not open");
+    this.sessions.set(id, { ...now, status: "expired" });
+    this.expired.push(id);
+  }
+  /** The payer finished on Stripe's page (a card, or a bank payment still clearing). */
+  pay(id: string, pi: string, paymentStatus: "paid" | "unpaid" = "paid", paymentFailed = false) {
+    this.sessions.set(id, { status: "complete", paymentStatus, paymentIntent: pi, paymentFailed });
   }
   async refund(account: string, paymentIntent: string, idempotencyKey: string) {
     this.refunds.push({ account, paymentIntent, idempotencyKey });
@@ -193,7 +213,7 @@ describe("payouts", () => {
 describe("paying", () => {
   it("shows the fee, and why it can't be paid online until the host connects", async () => {
     const r = await s.call("GET", "/v1/tournaments/t1/pay?team=haze", undefined, "captain");
-    expect(r.json()).toMatchObject({ online: false, amountCents: 40000, feeCents: 500, paid: false });
+    expect(r.json()).toMatchObject({ online: false, amountCents: 40000, chargeCents: 40000, processingCents: 0, feeCents: 500, paid: false, pending: null });
     expect(r.json().reason).toMatch(/instructions/);
     ready();
     expect((await s.call("GET", "/v1/tournaments/t1/pay?team=haze", undefined, "captain")).json()).toMatchObject({ online: true, reason: null });
@@ -209,7 +229,7 @@ describe("paying", () => {
       amountCents: 40000,
       currency: "USD",
       feeCents: 500,
-      name: "Bid fee: Spring Fling (Haze)",
+      items: [{ name: "Bid fee: Spring Fling (Haze)", amountCents: 40000 }],
       successUrl: `${site}/payments/done?tournament=t1`,
       cancelUrl: `${site}/tournaments/t1`,
       email: "captain@x.test",
@@ -223,7 +243,7 @@ describe("paying", () => {
     ready();
     const r = await s.call("POST", "/v1/tournaments/hat/checkout", { payer: "player" }, "player");
     expect(r.status).toBe(200);
-    expect(s.gateway.checkouts[0]).toMatchObject({ amountCents: 6000, feeCents: 160, name: "Entry fee: Hat" });
+    expect(s.gateway.checkouts[0]).toMatchObject({ amountCents: 6000, feeCents: 160, items: [{ name: "Entry fee: Hat", amountCents: 6000 }] });
     expect(s.gateway.checkouts[0].metadata.payerId).toBe("player");
   });
 
@@ -293,6 +313,8 @@ describe("the webhook", () => {
 
   it("refunds a second payment for the same fee in full", async () => {
     const md = await checkout();
+    // Two requests racing: each made its own session before either was stored.
+    s.store.put("payerCharges/t1~haze", {});
     await s.call("POST", "/v1/tournaments/t1/checkout", { payer: "team", teamId: "haze" }, "captain");
     await s.hook("checkout.session.completed", completed(md));
     await s.hook("checkout.session.completed", completed({ ...md, chargeId: "other" }, "cs_2", "pi_2"));
@@ -369,6 +391,145 @@ describe("the webhook", () => {
     await s.hook("checkout.session.completed", completed(md));
     await s.hook("charge.dispute.created", { id: "dp_1", payment_intent: "pi_1" });
     expect(s.store.doc("charges/cs_1")?.status).toBe("disputed");
+  });
+});
+
+describe("payers passing the fees on", () => {
+  it("charges enough that the host gets the whole fee", () => {
+    const fee = { percentBps: 100, fixedCents: 100 };
+    expect(chargeCoveringFees(10_000, fee)).toBe(10_541);
+    for (const amount of [50, 999, 2_500, 10_000, 40_000, 123_457]) {
+      const charge = chargeCoveringFees(amount, fee);
+      const host = (c: number) => c - (Math.round(c / 100) + 100) - (Math.round((c * 290) / 10_000) + 30);
+      expect(host(charge)).toBeGreaterThanOrEqual(amount);
+      expect(host(charge - 1)).toBeLessThan(amount);
+    }
+    expect(onlineCharge({ amountCents: 10_000 }, fee)).toEqual({ chargeCents: 10_000, processingCents: 0, platformCents: 200 });
+    expect(onlineCharge({ amountCents: 10_000, payerCoversFees: true }, fee)).toEqual({ chargeCents: 10_541, processingCents: 541, platformCents: 205 });
+  });
+
+  it("shows the payer the processing fee and puts it on its own Checkout line", async () => {
+    ready();
+    s.store.put("tournaments/t1", { ...s.store.doc("tournaments/t1"), bidFee: { ...fee(40_000), payerCoversFees: true } });
+    const o = (await s.call("GET", "/v1/tournaments/t1/pay?team=haze", undefined, "captain")).json();
+    expect(o).toMatchObject({ online: true, amountCents: 40_000, chargeCents: 41_759, processingCents: 1_759, feeCents: 518 });
+    await s.call("POST", "/v1/tournaments/t1/checkout", { payer: "team", teamId: "haze" }, "captain");
+    expect(s.gateway.checkouts[0]).toMatchObject({
+      amountCents: 41_759,
+      feeCents: 518,
+      items: [
+        { name: "Bid fee: Spring Fling (Haze)", amountCents: 40_000 },
+        { name: "Processing fee", amountCents: 1_759 },
+      ],
+    });
+    expect(s.store.doc("charges/cs_1")).toMatchObject({ amountCents: 41_759, baseCents: 40_000, processingCents: 1_759 });
+  });
+});
+
+describe("a payer who lost their connection", () => {
+  const team = { payer: "team", teamId: "haze" };
+  const pay = () => s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
+  const options = async () => (await s.call("GET", "/v1/tournaments/t1/pay?team=haze", undefined, "captain")).json();
+
+  it("gets the same checkout back when they tap Pay again", async () => {
+    ready();
+    const first = (await pay()).json();
+    const again = (await pay()).json();
+    expect(again).toEqual(first);
+    expect(s.gateway.checkouts).toHaveLength(1);
+  });
+
+  it("gets a fresh checkout when the old one is nearly out or the fee changed, and the old one is closed", async () => {
+    ready();
+    await pay();
+    s.store.put("tournaments/t1", { ...s.store.doc("tournaments/t1"), bidFee: fee(45_000) });
+    expect((await pay()).json()).toEqual({ url: "https://checkout.test/cs_2" });
+    expect(s.gateway.expired).toEqual(["cs_1"]);
+    expect(s.store.doc("charges/cs_1")?.status).toBe("expired");
+    expect(s.gateway.checkouts[1].amountCents).toBe(45_000);
+  });
+
+  it("sees it paid on coming back, before the webhook arrives", async () => {
+    ready();
+    await pay();
+    s.gateway.pay("cs_1", "pi_1");
+    expect(await options()).toMatchObject({ paid: true, online: false, pending: null });
+    expect(s.store.doc("tournaments/t1/payments/haze")).toEqual({ paid: true, paidAt: new Date(now), note: paidOnlineNote });
+    // The webhook then lands: nothing more happens.
+    await s.hook("checkout.session.completed", { id: "cs_1", payment_status: "paid", payment_intent: "pi_1", metadata: {} });
+    expect(s.gateway.refunds).toHaveLength(0);
+    expect((await pay()).message()).toBe("That's already paid.");
+  });
+
+  it("won't open a second checkout over one that was just paid", async () => {
+    ready();
+    await pay();
+    s.store.put("tournaments/t1", { ...s.store.doc("tournaments/t1"), bidFee: fee(45_000) });
+    s.gateway.pay("cs_1", "pi_1");
+    expect((await pay()).message()).toBe("That's already paid.");
+    expect(s.gateway.checkouts).toHaveLength(1);
+  });
+
+  it("falls back to what's stored when Stripe doesn't answer", async () => {
+    ready();
+    await pay();
+    s.gateway.down = true;
+    expect(await options()).toMatchObject({ paid: false, online: true });
+    expect((await pay()).json()).toEqual({ url: "https://checkout.test/cs_1" });
+  });
+});
+
+describe("bank payments", () => {
+  const team = { payer: "team", teamId: "haze" };
+  const options = async () => (await s.call("GET", "/v1/tournaments/t1/pay?team=haze", undefined, "captain")).json();
+  const session = (pi = "pi_1") => ({ id: "cs_1", payment_status: "unpaid", payment_intent: pi, metadata: {} });
+
+  it("shows processing while the bank payment clears, and takes no second payment", async () => {
+    ready();
+    await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
+    await s.hook("checkout.session.completed", session());
+    s.gateway.pay("cs_1", "pi_1", "unpaid");
+    expect(s.store.doc("charges/cs_1")?.status).toBe("processing");
+    expect(await options()).toMatchObject({ online: false, paid: false, pending: "processing", reason: processingPaymentNote });
+    expect((await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain")).message()).toBe(processingPaymentNote);
+    await s.hook("checkout.session.async_payment_succeeded", { ...session(), payment_status: "paid" });
+    expect(s.store.doc("tournaments/t1/payments/haze")?.paid).toBe(true);
+  });
+
+  it("sees processing on coming back even before the webhook", async () => {
+    ready();
+    await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
+    s.gateway.pay("cs_1", "pi_1", "unpaid");
+    expect((await options()).pending).toBe("processing");
+  });
+
+  it("lets them pay again when the bank payment fails", async () => {
+    ready();
+    await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
+    await s.hook("checkout.session.completed", session());
+    s.gateway.pay("cs_1", "pi_1", "unpaid");
+    await s.hook("checkout.session.async_payment_failed", session());
+    expect(s.store.doc("charges/cs_1")?.status).toBe("failed");
+    expect(await options()).toMatchObject({ online: true, pending: null, paid: false });
+    expect((await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain")).json()).toEqual({ url: "https://checkout.test/cs_2" });
+  });
+
+  it("sees a failed bank payment even if the webhook never came", async () => {
+    ready();
+    await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
+    s.gateway.pay("cs_1", "pi_1", "unpaid");
+    expect((await options()).pending).toBe("processing");
+    s.gateway.pay("cs_1", "pi_1", "unpaid", true);
+    expect(await options()).toMatchObject({ online: true, pending: null });
+    expect(s.store.doc("charges/cs_1")?.status).toBe("failed");
+  });
+
+  it("ignores a failure from another account", async () => {
+    ready();
+    await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
+    await s.hook("checkout.session.completed", session());
+    await s.hook("checkout.session.async_payment_failed", session(), "acct_other");
+    expect(s.store.doc("charges/cs_1")?.status).toBe("processing");
   });
 });
 

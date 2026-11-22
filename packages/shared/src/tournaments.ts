@@ -120,6 +120,8 @@ const feeSchema = z.strictObject({
   currency: z.string().regex(/^[A-Z]{3}$/, "Pick a currency."),
   instructions: z.string().trim().max(tournamentLimits.feeInstructions).default(""),
   dueAt: isoDate.nullable().default(null),
+  /** Paid online, the payer also pays Stripe's and Stall 10's fees, so the host gets the full amount. */
+  payerCoversFees: z.boolean().default(false),
 });
 
 export const seasonSchema = z
@@ -335,6 +337,8 @@ export interface FeeDoc {
   currency: string;
   instructions: string;
   dueAt: string | null;
+  /** Paid online, the payer also pays the fees (missing on older events: false). */
+  payerCoversFees?: boolean;
 }
 export interface SeasonDoc {
   weeks: number;

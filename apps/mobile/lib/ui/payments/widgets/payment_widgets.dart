@@ -65,6 +65,7 @@ class PayoutsCard extends StatelessWidget {
     super.key,
     required this.teamId,
     this.amountCents,
+    this.payerCovers = false,
     this.open,
   });
 
@@ -72,6 +73,9 @@ class PayoutsCard extends StatelessWidget {
 
   /// The event's fee, for the "you get about..." line ($100 without one).
   final int? amountCents;
+
+  /// The event passes the fees on to payers.
+  final bool payerCovers;
 
   /// Opens Stripe's page; tests pass a fake.
   final OpenPage? open;
@@ -149,6 +153,7 @@ class PayoutsCard extends StatelessWidget {
               amountCents: amountCents ?? 10000,
               currency: 'USD',
               compact: true,
+              payerCovers: payerCovers,
             ),
             if (action != null) ...[
               const SizedBox(height: 12),
@@ -203,6 +208,53 @@ class PayOnlineButton extends StatelessWidget {
           listenable: Listenable.merge([vm, vm.pay]),
           builder: (context, _) {
             final o = vm.options;
+            final small = Theme.of(context).textTheme.bodySmall;
+            if (vm.checking) {
+              return Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(
+                  children: [
+                    const SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    const SizedBox(width: 8),
+                    Text('Checking your payment…', style: small),
+                  ],
+                ),
+              );
+            }
+            if (vm.returnFailed) {
+              return Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        "Couldn't check your payment. If you paid, it shows "
+                        'here once Stripe confirms it.',
+                        style: small,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: vm.load.execute,
+                      child: const Text('Check again'),
+                    ),
+                  ],
+                ),
+              );
+            }
+            if (o != null && o.processing && !o.paid) {
+              return Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  o.reason ??
+                      'Your bank payment is processing. It can take up to 4 '
+                          'business days.',
+                  style: small,
+                ),
+              );
+            }
             if (o == null || !vm.canPay) return const SizedBox.shrink();
             return Padding(
               padding: const EdgeInsets.only(top: 8),
@@ -219,13 +271,22 @@ class PayOnlineButton extends StatelessWidget {
                             }
                           },
                     icon: const Icon(Icons.lock_outline),
-                    label: Text('Pay ${centsLabel(o.amountCents)} online'),
+                    label: Text(
+                      vm.pay.running
+                          ? 'Opening checkout…'
+                          : 'Pay ${centsLabel(o.chargeCents)} online',
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Secure checkout by Stripe. It shows as paid here once '
-                    'Stripe confirms it.',
-                    style: Theme.of(context).textTheme.bodySmall,
+                    [
+                      if (o.processingCents > 0)
+                        'Includes a ${centsLabel(o.processingCents)} '
+                            'processing fee.',
+                      'Secure checkout by Stripe. It shows as paid here once '
+                          'Stripe confirms it.',
+                    ].join(' '),
+                    style: small,
                   ),
                 ],
               ),
@@ -245,10 +306,26 @@ String? feeNote(
   int amountCents,
   String currency, {
   bool compact = false,
+  bool payerCovers = false,
 }) {
   if (!fees.available || amountCents <= 0) return null;
-  final problem = fees.problem(amountCents, currency);
+  final charge = payerCovers
+      ? fees.chargeCoveringFees(amountCents)
+      : amountCents;
+  final problem = fees.problem(charge, currency);
   if (problem != null) return compact ? null : problem;
+  if (payerCovers && compact) {
+    return 'On a ${centsLabel(amountCents)} fee, payers pay '
+        '${centsLabel(charge)} online and you get the whole '
+        '${centsLabel(amountCents)}.';
+  }
+  if (payerCovers) {
+    return 'Paid online, they pay ${centsLabel(charge)} '
+        '(${centsLabel(amountCents)} plus a '
+        '${centsLabel(charge - amountCents)} processing fee) and you get the '
+        'whole ${centsLabel(amountCents)}. Paid your own way, they pay '
+        '${centsLabel(amountCents)}.';
+  }
   final b = fees.breakdown(amountCents);
   final amount = centsLabel(b.amountCents);
   final host = centsLabel(b.hostCents);
@@ -272,11 +349,15 @@ class FeeBreakdownNote extends StatelessWidget {
     required this.amountCents,
     required this.currency,
     this.compact = false,
+    this.payerCovers = false,
   });
 
   final int? amountCents;
   final String currency;
   final bool compact;
+
+  /// The host passes the fees on to payers.
+  final bool payerCovers;
 
   @override
   Widget build(BuildContext context) {
@@ -288,7 +369,13 @@ class FeeBreakdownNote extends StatelessWidget {
       builder: (context, vm) => ListenableBuilder(
         listenable: vm,
         builder: (context, _) {
-          final note = feeNote(vm.fees, amount, currency, compact: compact);
+          final note = feeNote(
+            vm.fees,
+            amount,
+            currency,
+            compact: compact,
+            payerCovers: payerCovers,
+          );
           if (note == null) return const SizedBox.shrink();
           final theme = Theme.of(context);
           return Padding(
@@ -302,6 +389,53 @@ class FeeBreakdownNote extends StatelessWidget {
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
             ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// The host form's "Teams cover the processing fee" switch: shown only when
+/// the server takes payments online.
+class PayerCoversFeesSwitch extends StatelessWidget {
+  const PayerCoversFeesSwitch({
+    super.key,
+    required this.value,
+    required this.onChanged,
+    required this.players,
+  });
+
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  /// Players pay (a player-entry event), not teams.
+  final bool players;
+
+  @override
+  Widget build(BuildContext context) {
+    final payments = _payments(context);
+    if (payments == null) return const SizedBox.shrink();
+    return ViewModelHost<PaymentFeesViewModel>(
+      create: (c) => PaymentFeesViewModel(payments: payments),
+      builder: (context, vm) => ListenableBuilder(
+        listenable: vm,
+        builder: (context, _) {
+          if (!vm.fees.available) return const SizedBox.shrink();
+          return SwitchListTile(
+            key: const Key('payer-covers-fees'),
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              players
+                  ? 'Payers cover the processing fee'
+                  : 'Teams cover the processing fee',
+            ),
+            subtitle: const Text(
+              "When they pay online, they also pay Stripe's and Stall 10's "
+              'fees, so you get the whole fee.',
+            ),
+            value: value,
+            onChanged: onChanged,
           );
         },
       ),

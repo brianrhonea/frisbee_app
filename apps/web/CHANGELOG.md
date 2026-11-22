@@ -21,6 +21,14 @@ up on the API).
   the event form ("Paid online in Stall 10, you get about $94.80 of each
   $100…", `FeeBreakdownNote`) and on the payout card for the event's own
   fee. The fee section no longer says teams always pay the host directly.
+- "Teams cover the processing fee" in the event form: paid online, the
+  payer pays e.g. $105.41 for a $100 fee and the host gets $100; the Pay
+  button shows the total and the processing fee.
+- After paying: "Checking your payment…" until the API has asked Stripe
+  (no second Pay button meanwhile), and "Your bank payment is
+  processing…" while a bank payment clears.
+- Marking a player's entry fee paid ticks at once and undoes itself if
+  the save fails.
 
 ## 0.49.0 — 2026-11-20
 

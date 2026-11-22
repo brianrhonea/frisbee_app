@@ -52,15 +52,29 @@ class PayOptions {
   const PayOptions({
     required this.online,
     required this.amountCents,
+    int? chargeCents,
+    this.processingCents = 0,
     required this.feeCents,
     required this.feeLabel,
     required this.paid,
     this.reason,
-  });
+    this.processing = false,
+  }) : chargeCents = chargeCents ?? amountCents;
 
   /// The host takes payments through Stall 10 and this fee can be paid online.
   final bool online;
+
+  /// The fee the host set.
   final int amountCents;
+
+  /// What paying online costs: [amountCents] plus [processingCents].
+  final int chargeCents;
+
+  /// The processing fee added when the host passes the fees on (else 0).
+  final int processingCents;
+
+  /// A bank payment is clearing (days): no Pay button until it settles.
+  final bool processing;
 
   /// Stall 10's part of the amount (included, not added).
   final int feeCents;
@@ -73,10 +87,13 @@ class PayOptions {
   factory PayOptions.fromMap(Map<String, Object?> m) => PayOptions(
     online: m['online'] == true,
     amountCents: (m['amountCents'] as num?)?.toInt() ?? 0,
+    chargeCents: (m['chargeCents'] as num?)?.toInt(),
+    processingCents: (m['processingCents'] as num?)?.toInt() ?? 0,
     feeCents: (m['feeCents'] as num?)?.toInt() ?? 0,
     feeLabel: m['feeLabel'] as String? ?? '',
     paid: m['paid'] == true,
     reason: m['reason'] as String?,
+    processing: m['pending'] == 'processing',
   );
 }
 
@@ -172,6 +189,22 @@ class PaymentFees {
       stripeCents: stripeCents,
       hostCents: host < 0 ? 0 : host,
     );
+  }
+
+  /// What to charge so [amountCents] reaches the host after both fees
+  /// (chargeCoveringFees in packages/shared).
+  int chargeCoveringFees(int amountCents) {
+    if (amountCents <= 0) return amountCents;
+    final rate = (platform.percentBps + card.percentBps) / 10000;
+    var charge =
+        ((amountCents + platform.fixedCents + card.fixedCents) / (1 - rate))
+            .floor() -
+        2;
+    if (charge < amountCents) charge = amountCents;
+    while (breakdown(charge).hostCents < amountCents) {
+      charge++;
+    }
+    return charge;
   }
 
   /// Why [amountCents] can't be paid online, or null (onlinePaymentProblem).

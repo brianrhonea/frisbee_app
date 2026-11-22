@@ -81,15 +81,31 @@ class PayOnlineViewModel extends ChangeNotifier {
   PayOptions? _options;
   PayOptions? get options => _options;
 
+  /// Sent to Stripe and not yet back with an answer: on returning, the
+  /// button gives way to "Checking your payment…" until [load] finishes,
+  /// so nobody pays twice while Stripe confirms.
+  bool _awaitingReturn = false;
+
+  /// Showing "Checking your payment…".
+  bool get checking => _awaitingReturn && load.running;
+
+  /// Back from Stripe but the check failed (no connection): Pay stays
+  /// hidden, with a way to check again, rather than offering stale options.
+  bool get returnFailed => _awaitingReturn && !load.running && load.error;
+
   /// Whether to show the Pay button.
-  bool get canPay => _options?.online == true;
+  bool get canPay => _options?.online == true && !checking && !returnFailed;
 
   Future<Result<void>> _load() async {
+    if (_awaitingReturn) notifyListeners();
     final r = await _payments.payOptions(tournamentId, teamId: teamId);
     if (r case Ok(:final value)) {
       _options = value;
-      notifyListeners();
+      // Paid or still clearing: done waiting. Otherwise they may still be
+      // on Stripe's page (another tab, or cancelled): keep the button.
+      _awaitingReturn = false;
     }
+    notifyListeners();
     return r;
   }
 
@@ -102,6 +118,7 @@ class PayOnlineViewModel extends ChangeNotifier {
         if (!await _open(value)) {
           return Result.error(Exception("Couldn't open the payment page."));
         }
+        _awaitingReturn = true;
         return const Result.ok(null);
       case Error(:final error):
         return Result.error(error);

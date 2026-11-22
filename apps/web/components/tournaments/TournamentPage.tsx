@@ -308,7 +308,7 @@ function Overview({ s }: { s: TournamentState }) {
     <div className="stack">
       {s.manager && <HostChecklist s={s} />}
       {/* The host's owner connects Stripe here (hidden for others). */}
-      {s.manager && s.user && (fee || (t.entryType === "players" && t.bidFee)) && <PayoutsCard user={s.user} teamId={t.hostId} amountCents={(fee ?? t.bidFee)?.amountCents} />}
+      {s.manager && s.user && (fee || (t.entryType === "players" && t.bidFee)) && <PayoutsCard user={s.user} teamId={t.hostId} amountCents={(fee ?? t.bidFee)?.amountCents} payerCovers={(fee ?? t.bidFee)?.payerCoversFees === true} />}
       {!s.manager && !s.visitor && takesTeams(t) && <YourTeams s={s} />}
       {t.description && (
         <section className="card">

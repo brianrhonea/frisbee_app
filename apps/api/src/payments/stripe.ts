@@ -4,7 +4,7 @@
 // them; on Cloud Run they come from Secret Manager (apps/api/DEPLOY.md,
 // "Payments"). Without both, online payments are off.
 import Stripe from "stripe";
-import type { GatewayEvent, PaymentGateway } from "./gateway.js";
+import type { GatewayCheckout, GatewayEvent, PaymentGateway } from "./gateway.js";
 
 const id = (v: unknown): string => (typeof v === "string" ? v : ((v as { id?: string } | null)?.id ?? ""));
 
@@ -28,7 +28,9 @@ export function stripeFromEnv(env: NodeJS.ProcessEnv = process.env): PaymentGate
             losses: { payments: "stripe" },
             stripe_dashboard: { type: "full" },
           },
-          capabilities: { card_payments: { requested: true }, transfers: { requested: true } },
+          // Bank payments (ACH Direct Debit) show in Checkout once this is
+          // active and the host has them on in their payment methods.
+          capabilities: { card_payments: { requested: true }, transfers: { requested: true }, us_bank_account_ach_payments: { requested: true } },
         },
         { idempotencyKey },
       );
@@ -46,12 +48,10 @@ export function stripeFromEnv(env: NodeJS.ProcessEnv = process.env): PaymentGate
       const session = await stripe.checkout.sessions.create(
         {
           mode: "payment",
-          line_items: [
-            {
-              quantity: 1,
-              price_data: { currency: input.currency.toLowerCase(), unit_amount: input.amountCents, product_data: { name: input.name } },
-            },
-          ],
+          line_items: input.items.map((item) => ({
+            quantity: 1,
+            price_data: { currency: input.currency.toLowerCase(), unit_amount: item.amountCents, product_data: { name: item.name } },
+          })),
           payment_intent_data: { application_fee_amount: input.feeCents, metadata: input.metadata },
           metadata: input.metadata,
           ...(input.email && { customer_email: input.email }),
@@ -63,6 +63,19 @@ export function stripeFromEnv(env: NodeJS.ProcessEnv = process.env): PaymentGate
       );
       if (!session.url) throw new Error("Stripe returned no Checkout URL.");
       return { id: session.id, url: session.url };
+    },
+    async checkout(account, sessionId) {
+      // Asked while the payer waits: short, no retries; the caller falls
+      // back to what's stored and the webhook catches up.
+      const s = await stripe.checkout.sessions.retrieve(sessionId, { expand: ["payment_intent"] }, { stripeAccount: account, timeout: 5_000, maxNetworkRetries: 0 });
+      const pi = typeof s.payment_intent === "object" && s.payment_intent ? s.payment_intent : null;
+      const status: GatewayCheckout["status"] = s.status === "complete" ? "complete" : s.status === "expired" ? "expired" : "open";
+      const paymentStatus: GatewayCheckout["paymentStatus"] = s.payment_status === "paid" ? "paid" : s.payment_status === "no_payment_required" ? "no_payment_required" : "unpaid";
+      const paymentFailed = pi !== null && (pi.status === "requires_payment_method" || pi.status === "canceled") && s.status === "complete";
+      return { status, paymentStatus, paymentIntent: id(s.payment_intent) || null, paymentFailed };
+    },
+    async expireCheckout(account, sessionId) {
+      await stripe.checkout.sessions.expire(sessionId, {}, { stripeAccount: account });
     },
     async refund(account, paymentIntent, idempotencyKey) {
       await stripe.refunds.create({ payment_intent: paymentIntent, refund_application_fee: true }, { stripeAccount: account, idempotencyKey });

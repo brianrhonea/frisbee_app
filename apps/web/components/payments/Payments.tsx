@@ -6,6 +6,7 @@
 // and send people back to /payments/*.
 import {
   centsLabel,
+  chargeCoveringFees,
   type CheckoutResult,
   feeBreakdown,
   onlinePaymentProblem,
@@ -29,6 +30,23 @@ function useOnVisible(load: () => void) {
   }, [load]);
 }
 
+/** A per-tab note that Pay was pressed (sessionStorage, which survives Stripe's redirect); off when storage is blocked. */
+function readFlag(key: string): boolean {
+  try {
+    return sessionStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+function setFlag(key: string, on: boolean) {
+  try {
+    if (on) sessionStorage.setItem(key, "1");
+    else sessionStorage.removeItem(key);
+  } catch {
+    // Storage blocked: the page just doesn't wait for the check.
+  }
+}
+
 /** Opens a Stripe link for [path] in this tab. */
 export async function goToStripe(user: User, path: string, body: unknown): Promise<void> {
   const { url } = await callApi<CheckoutResult | PayoutLinkResult>(user, path, { method: "POST", body });
@@ -37,7 +55,7 @@ export async function goToStripe(user: User, path: string, body: unknown): Promi
 }
 
 /** The host owner's "Take payments online" card; [amountCents] is the event's fee, for the "you get about…" line ($100 without one). */
-export function PayoutsCard({ user, teamId, amountCents }: { user: User; teamId: string; amountCents?: number }) {
+export function PayoutsCard({ user, teamId, amountCents, payerCovers = false }: { user: User; teamId: string; amountCents?: number; payerCovers?: boolean }) {
   const [account, setAccount] = useState<PayoutAccountView | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -74,7 +92,7 @@ export function PayoutsCard({ user, teamId, amountCents }: { user: User; teamId:
     <section className="card payouts-card">
       <h2 className="card-title">{copy.title}</h2>
       <p>{copy.body}</p>
-      <FeeBreakdownNote user={user} amountCents={amountCents ?? 10_000} currency="USD" compact />
+      <FeeBreakdownNote user={user} amountCents={amountCents ?? 10_000} currency="USD" compact payerCovers={payerCovers} />
       {error && <p className="form-error">{error}</p>}
       {copy.action && (
         <button type="button" className="btn btn-primary btn-small" disabled={busy} onClick={connect}>
@@ -93,19 +111,51 @@ export function PayoutsCard({ user, teamId, amountCents }: { user: User; teamId:
  */
 export function PayOnline({ user, tournamentId, teamId, withStatus = false }: { user: User; tournamentId: string; teamId?: string; withStatus?: boolean }) {
   const [options, setOptions] = useState<PayOptions | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [checkFailed, setCheckFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const payingKey = `stall10.paying.${tournamentId}.${teamId ?? "me"}`;
+  // Each load asks Stripe about the last checkout, so coming back shows it
+  // paid without waiting for the webhook. Back from paying (marked when Pay
+  // was pressed), the button waits for that answer.
   const load = useCallback(() => {
     const q = teamId ? `?team=${encodeURIComponent(teamId)}` : "";
-    callApi<PayOptions>(user, `${paymentPaths.payOptions(encodeURIComponent(tournamentId))}${q}`).then(setOptions, () => setOptions(null));
-  }, [user, tournamentId, teamId]);
+    const returning = readFlag(payingKey);
+    setChecking(returning);
+    callApi<PayOptions>(user, `${paymentPaths.payOptions(encodeURIComponent(tournamentId))}${q}`)
+      .then(
+        (o) => {
+          setOptions(o);
+          setCheckFailed(false);
+          setFlag(payingKey, false);
+        },
+        () => {
+          if (returning) setCheckFailed(true);
+          else setOptions(null);
+        },
+      )
+      .finally(() => setChecking(false));
+  }, [user, tournamentId, teamId, payingKey]);
   useEffect(load, [load]);
   useOnVisible(load);
+  if (checking && !options) return <small className="muted" aria-busy="true">Checking your payment…</small>;
+  if (checkFailed) {
+    return (
+      <div className="pay-online">
+        <small className="muted">Couldn&apos;t check your payment. If you paid, it shows here once Stripe confirms it.</small>
+        <button type="button" className="btn btn-small" onClick={load}>
+          Check again
+        </button>
+      </div>
+    );
+  }
   if (!options || options.amountCents <= 0) return null;
   const pay = async () => {
     setBusy(true);
     setError("");
     try {
+      setFlag(payingKey, true);
       await goToStripe(user, paymentPaths.checkout(encodeURIComponent(tournamentId)), teamId ? { payer: "team", teamId } : { payer: "player" });
     } catch (e) {
       setError(problem(e));
@@ -115,13 +165,24 @@ export function PayOnline({ user, tournamentId, teamId, withStatus = false }: { 
   return (
     <div className="pay-online">
       {withStatus && <small className="muted">{options.paid ? `Fee ${centsLabel(options.amountCents)} paid.` : `Fee ${centsLabel(options.amountCents)} to pay.`}</small>}
-      {options.online && (
-        <>
-          <button type="button" className="btn btn-primary btn-small" disabled={busy} onClick={pay}>
-            {busy ? "Opening checkout…" : `Pay ${centsLabel(options.amountCents)} online`}
-          </button>
-          <small className="muted">Secure checkout by Stripe. It shows as paid here once Stripe confirms it.</small>
-        </>
+      {checking ? (
+        <small className="muted" aria-busy="true">
+          Checking your payment…
+        </small>
+      ) : options.pending === "processing" && !options.paid ? (
+        <small className="muted">{options.reason}</small>
+      ) : (
+        options.online && (
+          <>
+            <button type="button" className="btn btn-primary btn-small" disabled={busy} onClick={pay}>
+              {busy ? "Opening checkout…" : `Pay ${centsLabel(options.chargeCents)} online`}
+            </button>
+            <small className="muted">
+              {options.processingCents > 0 ? `Includes a ${centsLabel(options.processingCents)} processing fee. ` : ""}
+              Secure checkout by Stripe. It shows as paid here once Stripe confirms it.
+            </small>
+          </>
+        )
       )}
       {error && <p className="form-error">{error}</p>}
     </div>
@@ -133,10 +194,16 @@ export function PayOnline({ user, tournamentId, teamId, withStatus = false }: { 
  * under the price, and (with [compact]) the payout card's example. Mirrors
  * feeNote in apps/mobile/lib/ui/payments/widgets/payment_widgets.dart.
  */
-export function feeNote(fees: PaymentFees, amountCents: number, currency: string, compact = false): string | null {
+export function feeNote(fees: PaymentFees, amountCents: number, currency: string, compact = false, payerCovers = false): string | null {
   if (!fees.available || amountCents <= 0) return null;
-  const why = onlinePaymentProblem(amountCents, currency, fees.platform);
+  const charge = payerCovers ? chargeCoveringFees(amountCents, fees.platform, fees.card) : amountCents;
+  const why = onlinePaymentProblem(charge, currency, fees.platform);
   if (why) return compact ? null : why;
+  if (payerCovers && compact) return `On a ${centsLabel(amountCents)} fee, payers pay ${centsLabel(charge)} online and you get the whole ${centsLabel(amountCents)}.`;
+  if (payerCovers) {
+    const [total, fee, extra] = [charge, amountCents, charge - amountCents].map(centsLabel);
+    return `Paid online, they pay ${total} (${fee} plus a ${extra} processing fee) and you get the whole ${fee}. Paid your own way, they pay ${fee}.`;
+  }
   const b = feeBreakdown(amountCents, fees.platform, fees.card);
   const [amount, host, ours, stripe] = [b.amountCents, b.hostCents, b.platformCents, b.stripeCents].map(centsLabel);
   if (compact) return `On a ${amount} fee you get about ${host}: Stall 10 keeps ${ours} and Stripe about ${stripe}.`;
@@ -165,9 +232,21 @@ export function usePaymentFees(user: User | null | undefined): PaymentFees | nul
 }
 
 /** [feeNote] for a price a host is setting; nothing while online payments are off. */
-export function FeeBreakdownNote({ user, amountCents, currency, compact = false }: { user: User | null | undefined; amountCents: number | null; currency: string; compact?: boolean }) {
+export function FeeBreakdownNote({
+  user,
+  amountCents,
+  currency,
+  compact = false,
+  payerCovers = false,
+}: {
+  user: User | null | undefined;
+  amountCents: number | null;
+  currency: string;
+  compact?: boolean;
+  payerCovers?: boolean;
+}) {
   const fees = usePaymentFees(user);
-  const note = fees && amountCents != null ? feeNote(fees, amountCents, currency, compact) : null;
+  const note = fees && amountCents != null ? feeNote(fees, amountCents, currency, compact, payerCovers) : null;
   if (!note) return null;
   return compact ? <p className="fee-note">{note}</p> : <small className="muted fee-note">{note}</small>;
 }

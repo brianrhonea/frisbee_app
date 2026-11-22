@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultPlatformFee, feeBreakdown, platformFeeLabel, stripeCardFeeEstimate } from "../src/index.js";
+import { chargeCoveringFees, defaultPlatformFee, feeBreakdown, onlineCharge, platformFeeLabel, stripeCardFeeEstimate } from "../src/index.js";
 
 describe("feeBreakdown: where a fee paid online goes", () => {
   it("splits $100 into Stall 10's $2, Stripe's $3.20 and the host's $94.80", () => {
@@ -17,5 +17,16 @@ describe("feeBreakdown: where a fee paid online goes", () => {
 
   it("reads Stripe's rate as people say it", () => {
     expect(platformFeeLabel(stripeCardFeeEstimate)).toBe("2.9% + $0.30");
+  });
+});
+
+describe("chargeCoveringFees: the host gets the whole fee", () => {
+  it("adds just enough for Stall 10's and Stripe's fees", () => {
+    // Same cases as apps/mobile/test/ui/payments_test.dart.
+    expect(chargeCoveringFees(10_000, defaultPlatformFee)).toBe(10_541);
+    expect(chargeCoveringFees(40_000, defaultPlatformFee)).toBe(41_759);
+    expect(feeBreakdown(10_541, defaultPlatformFee).hostCents).toBe(10_000);
+    expect(onlineCharge({ amountCents: 10_000, payerCoversFees: true }, defaultPlatformFee)).toEqual({ chargeCents: 10_541, processingCents: 541, platformCents: 205 });
+    expect(onlineCharge({ amountCents: 10_000 }, defaultPlatformFee).processingCents).toBe(0);
   });
 });

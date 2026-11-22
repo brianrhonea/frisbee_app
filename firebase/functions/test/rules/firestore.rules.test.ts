@@ -4221,6 +4221,11 @@ describe("hosted tournaments", () => {
       updateDoc(tRef(DIRECTOR), { bidFee: { amountCents: -5, currency: "USD", instructions: "", dueAt: null } }),
     );
     await assertSucceeds(updateDoc(tRef(DIRECTOR), { bidFee: null }));
+    // The host can pass the online fees on to payers; only as a yes or no.
+    const covered = { amountCents: 10000, currency: "USD", instructions: "", dueAt: null, payerCoversFees: true };
+    await assertSucceeds(updateDoc(tRef(DIRECTOR), { bidFee: covered }));
+    await assertFails(updateDoc(tRef(DIRECTOR), { bidFee: { ...covered, payerCoversFees: "yes" } }));
+    await assertFails(updateDoc(tRef(DIRECTOR), { bidFee: { ...covered, surcharge: 5 } }));
   });
 
   it("only an official host badges its events, and the app can't make a host official", async () => {

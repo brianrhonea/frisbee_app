@@ -412,7 +412,12 @@ Stall 10. The money goes to your Stripe account: Stripe keeps its card
 fee and Stall 10 keeps 1% + $1 of each payment. When you set a fee, the
 form shows what you'd get of it paid online: on $100, about $94.80 after
 Stall 10's $2 and Stripe's card fee of about $3.20 (Stripe's usual 2.9% +
-30¢; some cards cost more). Refunds, disputes and
+30¢; some cards cost more). Switch on **Teams cover the processing
+fee** (or **Payers cover…**) and they pay the fees instead: $105.41 for a
+$100 fee, shown as a separate processing fee, and you get the whole $100.
+Payers can pay by card, or from a bank account if you switch it on in your
+Stripe Dashboard (bank payments take up to 4 business days and show as
+processing until then). Refunds, disputes and
 payouts are in your Stripe Dashboard; a full refund marks the fee unpaid
 again. You can still mark anyone paid by hand. (Online payments aren't
 switched on in test builds yet.)

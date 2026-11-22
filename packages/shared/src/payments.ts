@@ -76,6 +76,27 @@ export function feeBreakdown(amountCents: number, platform: PlatformFee, card: P
   return { amountCents, platformCents, stripeCents, hostCents: Math.max(0, amountCents - platformCents - stripeCents) };
 }
 
+/**
+ * What to charge so that [amountCents] reaches the host after Stall 10's
+ * fee and Stripe's card fee: the smallest charge whose breakdown leaves the
+ * host at least [amountCents]. The payer sees the difference as a
+ * processing fee. The same for every payment method (a cheaper bank
+ * payment leaves the host a little more), so it's never a card surcharge.
+ */
+export function chargeCoveringFees(amountCents: number, platform: PlatformFee, card: PlatformFee = stripeCardFeeEstimate): number {
+  if (amountCents <= 0) return amountCents;
+  const rate = (platform.percentBps + card.percentBps) / 10_000;
+  let charge = Math.max(amountCents, Math.floor((amountCents + platform.fixedCents + card.fixedCents) / (1 - rate)) - 2);
+  while (feeBreakdown(charge, platform, card).hostCents < amountCents) charge++;
+  return charge;
+}
+
+/** What a payer is charged online for [fee]: the fee, plus the fees when the host passes them on. */
+export function onlineCharge(fee: { amountCents: number; payerCoversFees?: boolean }, platform: PlatformFee, card: PlatformFee = stripeCardFeeEstimate): { chargeCents: number; processingCents: number; platformCents: number } {
+  const chargeCents = fee.payerCoversFees === true ? chargeCoveringFees(fee.amountCents, platform, card) : fee.amountCents;
+  return { chargeCents, processingCents: chargeCents - fee.amountCents, platformCents: chargeCents > 0 ? platformFeeCents(chargeCents, platform) : 0 };
+}
+
 /** "$1", "$1.50". */
 export function centsLabel(cents: number): string {
   const whole = Math.floor(cents / 100);
@@ -122,16 +143,29 @@ export type PayerKind = (typeof payerKinds)[number];
 export interface PayOptions {
   /** The host takes payments through Stall 10 and this fee can be paid online. */
   online: boolean;
+  /** The fee the host set. */
   amountCents: number;
+  /** What paying online costs: [amountCents], plus [processingCents] when the host passes the fees on. */
+  chargeCents: number;
+  /** The processing fee added for the payer (0 unless the host passes the fees on). */
+  processingCents: number;
   currency: string;
-  /** Stall 10's part of it (included in the amount, not added). */
+  /** Stall 10's part of the charge (included, not added). */
   feeCents: number;
   feeLabel: string;
   /** Already paid (online or marked by the host). */
   paid: boolean;
   /** Why it can't be paid online, when [online] is false and it isn't paid. */
   reason: string | null;
+  /**
+   * "processing": a bank payment is on its way (days); no new checkout
+   * until it succeeds or fails. null otherwise.
+   */
+  pending: "processing" | null;
 }
+
+/** Shown while a bank payment clears. */
+export const processingPaymentNote = "Your bank payment is processing. It can take up to 4 business days.";
 
 /** POST /v1/tournaments/:id/checkout */
 export const checkoutRequestSchema = z

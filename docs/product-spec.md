@@ -153,6 +153,16 @@ and events; everything else in the hub is for members. A private group
   in the event form and on the payout card, the fee less Stall 10's fee
   and Stripe's usual card fee (2.9% + 30¢, an estimate; `GET
   /v1/payments/fees`, `feeBreakdown`). $100 → about $94.80.
+- Hosts can have payers cover the fees (`payerCoversFees`): the charge
+  is grossed up so the host gets the whole fee ($100 → $105.41), shown as
+  a "Processing fee" line, the same for card and bank. Check card-network
+  and state rules on passing fees on before production.
+- Bank payments (ACH) where the host switches them on in Stripe; they
+  show as processing until they clear, and a failed one can be paid
+  again.
+- A payer who loses their connection: Pay again reuses the open
+  checkout, and coming back asks Stripe directly (as well as the
+  webhook), so nobody is shown a second Pay button for a fee they paid.
 - Paying marks the same payment record hosts mark by hand, so their
   instructions and the paid switch still work beside it. A second
   payment for something already paid is refunded in full.

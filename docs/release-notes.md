@@ -22,7 +22,12 @@ Firebase project; App Store builds come from `main` and use production.
   (Not switched on in test builds yet.)
 - Setting a fee, hosts see what they'd get when it's paid online: on a
   $100 fee, about $94.80 after Stall 10's $2 and Stripe's card fee of
-  about $3.20.
+  about $3.20. Or switch on "Teams cover the processing fee": they pay
+  $105.41 online and you get the whole $100.
+- Pay by card or, where the host allows it, from a bank account (takes a
+  few days to clear; it shows as processing meanwhile).
+- Coming back from paying, the app checks with Stripe straight away, so
+  the fee shows as paid without a second Pay button.
 
 ## 0.0.40
 

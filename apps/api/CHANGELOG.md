@@ -45,6 +45,23 @@ until `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` and
   estimated card fee (2.9% + 30¢, `stripeCardFeeEstimate`), so hosts see
   what reaches them of a fee paid online while they set the price.
   `feeBreakdown` in `@stall10/shared` does the arithmetic.
+- Payers covering the fees: a fee's `payerCoversFees` (tournament save
+  and the Firestore rule) charges the payer enough that the host gets the
+  whole fee (`chargeCoveringFees`, Stripe's card rate), as a separate
+  "Processing fee" line on Checkout, the same for every payment method.
+  `PayOptions` gains `chargeCents`, `processingCents` and `pending`.
+- Bank payments: new host accounts request
+  `us_bank_account_ach_payments`; a bank payment's charge is `processing`
+  until `checkout.session.async_payment_succeeded` or `_failed` (now
+  handled: the payer can pay again). Add `async_payment_failed` to the
+  webhook's events (DEPLOY.md).
+- Lost connections: `payerCharges/{tournament}~{payer}` keeps the payer's
+  latest session. Pay again reuses an open one (a fresh one, after
+  expiring the old, when the fee changed or it has under 10 minutes
+  left); `GET .../pay` asks Stripe about it first, so a payer back from
+  Stripe sees it paid (or processing) before the webhook arrives. The
+  webhook and that check share one idempotent settle path; if Stripe
+  doesn't answer, the stored state stands.
 
 ## 0.36.0 — 2026-11-20
 

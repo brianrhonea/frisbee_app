@@ -432,7 +432,7 @@ say payments aren't set up and the app and website hide them.
    ("Events on Connected accounts") at
    `https://<api host>/v1/payments/stripe/webhook`, with the events
    `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
-   `checkout.session.expired`, `charge.refunded`,
+   `checkout.session.async_payment_failed`, `checkout.session.expired`, `charge.refunded`,
    `charge.dispute.created` and `account.updated`. Its signing secret
    (`whsec_...`) is `STRIPE_WEBHOOK_SECRET`.
 3. Store both in Secret Manager and let `api-runtime` read them:
@@ -452,6 +452,17 @@ done
    `WEB_SITE_URL` is already there for the return address. The fee
    defaults to 1% + $1; set `PLATFORM_FEE_BPS` / `PLATFORM_FEE_FIXED_CENTS`
    there to change it (new payments only).
+
+Bank payments (ACH Direct Debit): the API requests the
+`us_bank_account_ach_payments` capability on each host's account. Checkout
+shows bank payment once it's active and the host has it switched on in
+their own Stripe Dashboard (Settings → Payment methods); they clear in up
+to 4 business days (`checkout.session.async_payment_succeeded` or
+`_failed`). Hosts can also have teams cover the fees (`payerCoversFees` on
+the fee): the charge is grossed up with Stripe's card rate
+(`chargeCoveringFees`) and shown as a "Processing fee" line, the same for
+every payment method. Check card-network and state rules on passing fees
+to payers before switching payments on in production.
 
 Locally, put test-mode values in the gitignored `apps/api/.env` and
 forward events with the Stripe CLI:

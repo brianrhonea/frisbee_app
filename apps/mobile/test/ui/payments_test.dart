@@ -1,6 +1,8 @@
 // Online payments: the host owner's payout card and the Pay button, with a
 // fake PaymentRepository (the API's own tests cover Stripe and the
 // webhook: apps/api/test/payments.test.ts).
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/data/repositories/payment/payment_repository.dart';
@@ -29,6 +31,9 @@ class _FakePayments implements PaymentRepository {
   );
   final calls = <String>[];
 
+  /// When set, payOptions waits for it (a slow answer from Stripe).
+  Completer<Result<PayOptions>>? pending;
+
   @override
   Future<Result<PaymentFees>> fees() async => Result.ok(feeAnswer);
 
@@ -50,6 +55,11 @@ class _FakePayments implements PaymentRepository {
     String? teamId,
   }) async {
     calls.add('options $tournamentId ${teamId ?? 'me'}');
+    final wait = pending;
+    if (wait != null) {
+      pending = null;
+      return wait.future;
+    }
     return Result.ok(options);
   }
 
@@ -244,6 +254,196 @@ void main() {
       );
     });
   });
+
+  group('payers covering the fees', () {
+    const fees = PaymentFees(
+      available: true,
+      platform: PaymentFees.defaultPlatform,
+      card: PaymentFees.defaultCard,
+    );
+
+    test('charge leaves the host the whole fee (same as the API)', () {
+      // packages/shared/test/payments.test.ts uses the same cases.
+      expect(fees.chargeCoveringFees(10000), 10541);
+      expect(fees.chargeCoveringFees(40000), 41759);
+      expect(fees.breakdown(10541).hostCents, 10000);
+    });
+
+    testWidgets('the form note says what payers pay', (tester) async {
+      await pump(
+        tester,
+        const FeeBreakdownNote(
+          amountCents: 10000,
+          currency: 'USD',
+          payerCovers: true,
+        ),
+      );
+      expect(
+        find.text(
+          r'Paid online, they pay $105.41 ($100 plus a $5.41 processing fee) '
+          r'and you get the whole $100. Paid your own way, they pay $100.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('the Pay button shows the total and the processing fee', (
+      tester,
+    ) async {
+      payments.options = const PayOptions(
+        online: true,
+        amountCents: 10000,
+        chargeCents: 10541,
+        processingCents: 541,
+        feeCents: 205,
+        feeLabel: r'1% + $1',
+        paid: false,
+      );
+      await pump(tester, PayOnlineButton(tournamentId: 't1', open: open));
+      expect(find.text(r'Pay $105.41 online'), findsOneWidget);
+      expect(
+        find.textContaining(r'Includes a $5.41 processing fee.'),
+        findsOneWidget,
+      );
+    });
+  });
+
+  group('payers covering the fees, for the host', () {
+    testWidgets('the payout card says payers pay and the host gets it all', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        const PayoutsCard(
+          teamId: 'host',
+          amountCents: 10000,
+          payerCovers: true,
+        ),
+      );
+      expect(
+        find.text(
+          r'On a $100 fee, payers pay $105.41 online and you get the whole $100.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('the switch shows only while payments are on', (tester) async {
+      await pump(
+        tester,
+        PayerCoversFeesSwitch(value: false, onChanged: (_) {}, players: false),
+      );
+      expect(find.text('Teams cover the processing fee'), findsOneWidget);
+      payments.feeAnswer = PaymentFees.unavailable;
+      await pump(
+        tester,
+        PayerCoversFeesSwitch(
+          key: UniqueKey(),
+          value: false,
+          onChanged: (_) {},
+          players: false,
+        ),
+      );
+      expect(find.byType(SwitchListTile), findsNothing);
+    });
+  });
+
+  group('after paying', () {
+    testWidgets('a bank payment shows as processing, with no Pay button', (
+      tester,
+    ) async {
+      payments.options = const PayOptions(
+        online: false,
+        amountCents: 40000,
+        feeCents: 500,
+        feeLabel: r'1% + $1',
+        paid: false,
+        processing: true,
+        reason:
+            'Your bank payment is processing. It can take up to 4 business '
+            'days.',
+      );
+      await pump(tester, const PayOnlineButton(tournamentId: 't1'));
+      expect(find.byType(FilledButton), findsNothing);
+      expect(
+        find.textContaining('Your bank payment is processing'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('coming back checks the payment instead of offering Pay', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        PayOnlineButton(tournamentId: 't1', teamId: 'haze', open: open),
+      );
+      await tester.tap(find.text(r'Pay $400 online'));
+      await tester.pumpAndSettle();
+      // Back from Stripe: the reload hangs until Stripe answers.
+      final answer = Completer<Result<PayOptions>>();
+      payments.pending = answer;
+      payments.options = const PayOptions(
+        online: false,
+        amountCents: 40000,
+        feeCents: 500,
+        feeLabel: r'1% + $1',
+        paid: true,
+      );
+      for (final state in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+      await tester.pump();
+      expect(find.text('Checking your payment…'), findsOneWidget);
+      expect(find.byType(FilledButton), findsNothing);
+      answer.complete(Result.ok(payments.options));
+      await tester.pumpAndSettle();
+      expect(find.text('Checking your payment…'), findsNothing);
+      expect(find.byType(FilledButton), findsNothing);
+    });
+  });
+
+  testWidgets(
+    'a failed check after paying hides Pay and offers to check again',
+    (tester) async {
+      await pump(
+        tester,
+        PayOnlineButton(tournamentId: 't1', teamId: 'haze', open: open),
+      );
+      await tester.tap(find.text(r'Pay $400 online'));
+      await tester.pumpAndSettle();
+      final answer = Completer<Result<PayOptions>>();
+      payments.pending = answer;
+      for (final state in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+      await tester.pump();
+      answer.complete(Result.error(Exception('offline')));
+      await tester.pumpAndSettle();
+      expect(find.byType(FilledButton), findsNothing);
+      expect(
+        find.textContaining("Couldn't check your payment"),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Check again'));
+      await tester.pumpAndSettle();
+      expect(find.text(r'Pay $400 online'), findsOneWidget);
+    },
+  );
 
   test('amounts read as dollars', () {
     expect(centsLabel(40000), r'$400');

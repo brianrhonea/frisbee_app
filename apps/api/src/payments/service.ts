@@ -12,14 +12,23 @@
 // Server-only collections (no client rules match them, so clients can't
 // read or write them): payoutAccounts/{teamId}, stripeAccounts/{acct}
 // (account → team), charges/{checkoutSessionId}, stripePayments/{pi}
-// (payment intent → charge), stripeEvents/{eventId} (handled once). They
-// sit outside tournaments so deleting a tournament or a team keeps the
-// money records.
+// (payment intent → charge), stripeEvents/{eventId} (handled once), and
+// payerCharges/{tournamentId}~{payerId} (the payer's latest session, so a
+// retried Pay reuses it and a returning payer's status is asked of Stripe
+// without waiting for the webhook). They sit outside tournaments so
+// deleting a tournament or a team keeps the money records.
+//
+// A charge goes open → paid, or open → processing (a bank payment
+// clearing) → paid | failed, or open → expired; then paid → refunded |
+// disputed, and a second payment for something already paid goes
+// duplicate → refunded. Both the webhook and the payer's own status check
+// settle a charge through the same idempotent path.
 import {
   type CheckoutResult,
   checkoutRequestSchema,
   defaultPlatformFee,
   type FeeDoc,
+  onlineCharge,
   onlinePaymentProblem,
   paidOnlineNote,
   type PayerKind,
@@ -31,8 +40,8 @@ import {
   paymentLimits,
   paymentPaths,
   type PlatformFee,
-  platformFeeCents,
   platformFeeLabel,
+  processingPaymentNote,
   refundedOnlineNote,
   spotFee,
   stripeCardFeeEstimate,
@@ -46,7 +55,7 @@ import { limited, type MemoryRateLimiter } from "../limits/memory.js";
 import type { Limit } from "../limits/model.js";
 import { type Data, type DocStore, serverTime, type Tx } from "../store.js";
 import { can, isOwner } from "../teams/access.js";
-import type { GatewayEvent, PaymentGateway } from "./gateway.js";
+import type { CheckoutItem, GatewayEvent, PaymentGateway } from "./gateway.js";
 
 const minute = 60_000;
 
@@ -87,7 +96,14 @@ const p = {
   charge: (session: string) => `charges/${session}`,
   intent: (pi: string) => `stripePayments/${pi}`,
   event: (id: string) => `stripeEvents/${id}`,
+  latest: (t: string, payer: string) => `payerCharges/${t}~${payer}`,
 };
+
+/** A reused Checkout link must have this long left, or the payer gets a fresh one. */
+const reuseMarginMs = 10 * 60_000;
+
+/** Where the payer's latest session stands, after asking Stripe. */
+type Latest = { state: "none" } | { state: "paid" } | { state: "processing" } | { state: "open"; session: string; url: string; chargeCents: number; expiresAt: number };
 
 const noEvent = () => new ApiError("not_found", "That event doesn't exist.");
 const ownersOnly = () => new ApiError("permission_denied", "Only the owner can set up payments.");
@@ -200,18 +216,35 @@ export class PaymentService {
     if (!t || t.status === "draft") throw noEvent();
     const payer = await this.payer(this.store, caller, id, t, kind, rawTeam);
     const host = storedId(t.hostId);
-    const [payment, payout] = await Promise.all([this.store.get(p.payment(id, payer.id)), host ? this.store.get(p.payout(host)) : null]);
+    const payout = host ? await this.store.get(p.payout(host)) : null;
+    // Ask Stripe about the payer's last checkout first: someone back from
+    // paying sees it paid even if the webhook hasn't landed yet.
+    const latest = this.config ? await this.latest(id, payer.id) : ({ state: "none" } as Latest);
+    const payment = await this.store.get(p.payment(id, payer.id));
     const amountCents = payer.fee?.amountCents ?? 0;
     const currency = payer.fee?.currency ?? "USD";
+    const { chargeCents, processingCents, platformCents } = payer.fee && amountCents > 0 ? onlineCharge(payer.fee, this.fee) : { chargeCents: 0, processingCents: 0, platformCents: 0 };
     const paid = payment?.paid === true;
+    const pending = !paid && latest.state === "processing" ? "processing" : null;
     let reason: string | null = null;
     if (!this.config) reason = "Online payments aren't set up here yet.";
     else if (!payer.fee || amountCents <= 0) reason = "There's no fee to pay.";
     else if (statusOf(payout?.status) !== "ready") reason = "The host doesn't take payments through Stall 10. Follow their instructions.";
-    else reason = onlinePaymentProblem(amountCents, currency, this.fee);
-    const feeCents = payer.fee && amountCents > 0 ? platformFeeCents(amountCents, this.fee) : 0;
-    const options: PayOptions = { online: reason === null && !paid, amountCents, currency, feeCents, feeLabel: platformFeeLabel(this.fee), paid, reason: paid ? null : reason };
-    return { t, payer, options, account: str(payout?.account) };
+    else if (pending) reason = processingPaymentNote;
+    else reason = onlinePaymentProblem(chargeCents, currency, this.fee);
+    const options: PayOptions = {
+      online: reason === null && !paid,
+      amountCents,
+      chargeCents,
+      processingCents,
+      currency,
+      feeCents: platformCents,
+      feeLabel: platformFeeLabel(this.fee),
+      paid,
+      reason: paid ? null : reason,
+      pending,
+    };
+    return { t, payer, options, account: str(payout?.account), latest };
   }
 
   async payOptions(caller: Caller, rawId: unknown, query: { team?: unknown }): Promise<PayOptions> {
@@ -220,43 +253,113 @@ export class PaymentService {
     return (await this.options(caller, id, kind, query.team)).options;
   }
 
-  /** A Checkout page for the caller's fee: the amount from the tournament, never the request. */
+  /**
+   * A Checkout page for the caller's fee: the amount from the tournament,
+   * never the request. A retry (a lost answer, a second tap) gets the same
+   * open page back, so one fee has one live checkout at a time.
+   */
   async checkout(caller: Caller, rawId: unknown, body: unknown): Promise<CheckoutResult> {
     const id = docIdParam(rawId);
     const r = parseBody(checkoutRequestSchema, body);
     if (!this.config) throw notSetUp();
-    const { t, payer, options, account } = await this.options(caller, id, r.payer, r.teamId);
+    const { t, payer, options, account, latest } = await this.options(caller, id, r.payer, r.teamId);
     if (options.paid) throw new ApiError("failed_precondition", "That's already paid.");
     if (!options.online || !account) throw new ApiError("failed_precondition", options.reason ?? "This fee can't be paid online.");
+    if (latest.state === "open") {
+      if (latest.chargeCents === options.chargeCents && latest.expiresAt - this.now() > reuseMarginMs) return { url: latest.url };
+      // The fee changed or the link is nearly out: close it before making another.
+      if (!(await this.closeSession(id, payer.id, latest.session))) {
+        throw new ApiError("failed_precondition", "Your last payment is still going through. Check back in a minute.");
+      }
+    }
     const chargeId = this.store.newId("charges");
     const metadata = { chargeId, tournamentId: id, payerKind: payer.kind, payerId: payer.id, hostId: str(t.hostId) };
     const back = `${this.config.returnUrl}/tournaments/${encodeURIComponent(id)}`;
+    const expiresAtSec = Math.floor(this.now() / 1000) + paymentLimits.checkoutMinutes * 60;
+    const items: CheckoutItem[] = [{ name: payer.name, amountCents: options.amountCents }];
+    if (options.processingCents > 0) items.push({ name: "Processing fee", amountCents: options.processingCents });
     const session = await this.config.gateway.createCheckout({
       account,
-      amountCents: options.amountCents,
+      amountCents: options.chargeCents,
       currency: options.currency,
       feeCents: options.feeCents,
-      name: payer.name,
+      items,
       successUrl: `${this.config.returnUrl}/payments/done?tournament=${encodeURIComponent(id)}`,
       cancelUrl: back,
       email: caller.email,
-      expiresAt: Math.floor(this.now() / 1000) + paymentLimits.checkoutMinutes * 60,
+      expiresAt: expiresAtSec,
       metadata,
       idempotencyKey: `checkout:${chargeId}`,
     });
-    await this.store.transact(async (tx) =>
+    await this.store.transact(async (tx) => {
       tx.set(p.charge(session.id), {
         ...metadata,
         account,
-        amountCents: options.amountCents,
+        amountCents: options.chargeCents,
+        baseCents: options.amountCents,
+        processingCents: options.processingCents,
         currency: options.currency,
         feeCents: options.feeCents,
         status: "open",
         createdBy: caller.uid,
         createdAt: serverTime,
-      }),
-    );
+      });
+      tx.set(p.latest(id, payer.id), { session: session.id, url: session.url, chargeCents: options.chargeCents, expiresAt: expiresAtSec * 1000, createdAt: serverTime });
+    });
     return { url: session.url };
+  }
+
+  /**
+   * The payer's latest session, brought up to date from Stripe while it's
+   * open or clearing. Stripe being unreachable leaves the stored state.
+   */
+  private async latest(tournamentId: string, payerId: string): Promise<Latest> {
+    const pointer = await this.store.get(p.latest(tournamentId, payerId));
+    const session = storedId(pointer?.session);
+    if (!session) return { state: "none" };
+    const charge = await this.store.get(p.charge(session));
+    const account = str(charge?.account);
+    if (!charge || !account) return { state: "none" };
+    let status = str(charge.status);
+    if (status === "open" || status === "processing") {
+      try {
+        const now = await this.config!.gateway.checkout(account, session);
+        if (now.status === "complete" && now.paymentStatus !== "unpaid" && now.paymentIntent) {
+          await this.settle(session, now.paymentIntent, account);
+        } else if (now.status === "complete" && now.paymentFailed) {
+          await this.setChargeStatus(session, "failed", ["open", "processing"]);
+        } else if (now.status === "complete") {
+          await this.setChargeStatus(session, "processing", ["open"]);
+        } else if (now.status === "expired") {
+          await this.setChargeStatus(session, "expired", ["open"]);
+        }
+        status = str((await this.store.get(p.charge(session)))?.status);
+      } catch {
+        // Stripe didn't answer: go by what's stored; the webhook catches up.
+      }
+    }
+    if (status === "paid") return { state: "paid" };
+    if (status === "processing") return { state: "processing" };
+    if (status === "open") {
+      return { state: "open", session, url: str(pointer?.url), chargeCents: Number(pointer?.chargeCents) || 0, expiresAt: Number(pointer?.expiresAt) || 0 };
+    }
+    return { state: "none" };
+  }
+
+  /** Expires [session] before a new one replaces it; false when it turned out paid or clearing. */
+  private async closeSession(tournamentId: string, payerId: string, session: string): Promise<boolean> {
+    const charge = await this.store.get(p.charge(session));
+    const account = str(charge?.account);
+    if (!account) return true;
+    try {
+      await this.config!.gateway.expireCheckout(account, session);
+      await this.setChargeStatus(session, "expired", ["open"]);
+      return true;
+    } catch {
+      // Not open any more: it may have just been paid. Look again.
+      const now = await this.latest(tournamentId, payerId);
+      return now.state === "none";
+    }
   }
 
   // ---- Stripe's webhook -------------------------------------------------------
@@ -281,7 +384,12 @@ export class PaymentService {
     switch (event.type) {
       case "checkout.session.completed":
       case "checkout.session.async_payment_succeeded":
-        if (event.type === "checkout.session.async_payment_succeeded" || event.object.payment_status === "paid") await this.paid(event);
+        if (event.type === "checkout.session.async_payment_succeeded" || event.object.payment_status !== "unpaid") await this.paid(event);
+        // A bank payment: it clears in a few days (async_payment_succeeded or _failed).
+        else if (event.account) await this.setChargeStatus(str(event.object.id), "processing", ["open"], event.account);
+        break;
+      case "checkout.session.async_payment_failed":
+        if (event.account) await this.setChargeStatus(str(event.object.id), "failed", ["open", "processing"], event.account);
         break;
       case "checkout.session.expired":
         if (event.account) await this.setChargeStatus(str(event.object.id), "expired", ["open"], event.account);
@@ -322,37 +430,44 @@ export class PaymentService {
     if (charge?.account === account) await fn(session);
   }
 
-  /** Marks the fee paid, or refunds a second payment for something already paid. */
   private async paid(event: GatewayEvent) {
     const session = storedId(event.object.id);
     const pi = storedId(typeof event.object.payment_intent === "string" ? event.object.payment_intent : "");
-    if (!session || !pi) return;
+    if (session && pi && event.account) await this.settle(session, pi, event.account);
+  }
+
+  /**
+   * Marks the fee paid, or refunds a second payment for something already
+   * paid. The webhook and the payer's status check both come here; it
+   * decides from the stored charge, so running it twice does nothing more.
+   */
+  private async settle(session: string, pi: string, account: string) {
+    if (!storedId(session) || !storedId(pi)) return;
     const outcome = await this.store.transact(async (tx) => {
       // Only a session this API made, on the account it made it on: the
       // event's own metadata is the host's to write, so it's never trusted.
       const charge = await tx.get(p.charge(session));
-      if (!charge || !event.account || charge.account !== event.account) return null;
+      if (!charge || charge.account !== account) return null;
       const tournamentId = storedId(charge.tournamentId);
       const payerId = storedId(charge.payerId);
-      const account = event.account;
       if (!tournamentId || !payerId) return null;
       const status = str(charge.status);
       if (status === "paid" || status === "refunded" || status === "disputed") return null;
-      if (status === "duplicate") return { account, refund: true };
+      if (status === "duplicate") return { refund: true };
       const [t, payment] = await Promise.all([tx.get(p.tournament(tournamentId)), tx.get(p.payment(tournamentId, payerId))]);
       tx.set(p.intent(pi), { charge: session });
       const base = { paymentIntent: pi, updatedAt: serverTime };
       // Paid already (two tabs, or the host marked it by hand), or the event is gone: give it back.
       if (!t || payment?.paid === true) {
         tx.merge(p.charge(session), { ...base, status: "duplicate" });
-        return { account, refund: true };
+        return { refund: true };
       }
       tx.merge(p.charge(session), { ...base, status: "paid", paidAt: serverTime });
       tx.set(p.payment(tournamentId, payerId), { paid: true, paidAt: serverTime, note: paidOnlineNote });
-      return { account, refund: false };
+      return { refund: false };
     });
     if (outcome?.refund) {
-      await this.config!.gateway.refund(outcome.account, pi, `duplicate:${session}`);
+      await this.config!.gateway.refund(account, pi, `duplicate:${session}`);
       await this.setChargeStatus(session, "refunded", ["duplicate"]);
     }
   }

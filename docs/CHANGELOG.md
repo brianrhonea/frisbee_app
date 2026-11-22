@@ -77,6 +77,14 @@ Plain-language notes for testers are in
   estimated 2.9% + 30¢). The fee section no longer says teams always pay
   the host directly. Built as 0.0.27 on `feature/payments`, renumbered on
   merging `development`.
+- "Teams cover the processing fee" switch in the fee step
+  (`BidFee.payerCoversFees`, allowed by `validBidFee` in the rules); the
+  note shows what payers pay. `PayOptions` gains `chargeCents`,
+  `processingCents` and `processing`; the Pay button shows the total and
+  the processing fee.
+- `PayOnlineViewModel.checking`: back from Stripe, the button gives way to
+  "Checking your payment…" until the reload (which asks Stripe) answers.
+  A clearing bank payment shows "Your bank payment is processing…".
 
 ## 0.0.40 — Schedule: typed times, sharing, calendars on the tab
 

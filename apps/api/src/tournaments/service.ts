@@ -80,8 +80,8 @@ const statusOf = (t: Data): HostedStatus =>
 const entryStatusOf = (e: Data | null): EntryStatus | null => (e ? ((e.status as EntryStatus) ?? "applied") : null);
 
 /** The fee as stored (BidFee.toMap). */
-const feeDoc = (f: { amountCents: number; currency: string; instructions: string; dueAt: Date | null } | null) =>
-  f ? { amountCents: f.amountCents, currency: f.currency, instructions: f.instructions, dueAt: f.dueAt } : null;
+const feeDoc = (f: { amountCents: number; currency: string; instructions: string; dueAt: Date | null; payerCoversFees: boolean } | null) =>
+  f ? { amountCents: f.amountCents, currency: f.currency, instructions: f.instructions, dueAt: f.dueAt, payerCoversFees: f.payerCoversFees } : null;
 
 type FormatInput = SaveTournamentInput["format"];
 
