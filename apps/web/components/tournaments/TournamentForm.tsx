@@ -34,6 +34,10 @@ import {
   type CompetitionLevel,
   type EngineSeason,
   type TournamentFormat,
+  entryChoiceLabels,
+  entryChoiceOf,
+  entryChoicesFor,
+  entryFields,
 } from "@stall10/shared";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -247,6 +251,7 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
   const set = (patch: Partial<FormState>) => setForm({ ...f, ...patch });
   const league = f.kind === "league";
   const players = f.entryType === "players";
+  const choice = entryChoiceOf(f);
   const s = f.format.settings;
   const editable = statusIndex(existing.data?.status ?? "draft") < statusIndex("scheduled");
   const setSettings = (patch: Partial<FormFormat["settings"]>) => set({ format: { ...f.format, settings: { ...s, ...patch } } });
@@ -332,7 +337,7 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
             </div>
           ) : (
             <p>
-              <span className="pill">{league ? "League" : "Tournament"}</span> <span className="pill">{players ? "Players sign up" : "Teams apply"}</span>
+              <span className="pill">{league ? "League" : "Tournament"}</span> <span className="pill">{entryChoiceLabels[choice]}</span>
             </p>
           )}
           <label>
@@ -450,15 +455,17 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
           {isNew && (
             <>
               <div className="segmented" role="group" aria-label="Who enters">
-                {(["teams", "players"] as TournamentEntryType[]).map((k) => (
-                  <button key={k} type="button" className={f.entryType === k ? "on" : ""} onClick={() => set({ entryType: k })}>
-                    {k === "teams" ? "Teams apply" : "Players sign up"}
+                {entryChoicesFor(f.kind).map((k) => (
+                  <button key={k} type="button" className={choice === k ? "on" : ""} onClick={() => set(entryFields(k))}>
+                    {entryChoiceLabels[k]}
                   </button>
                 ))}
               </div>
               <p className="muted small">
                 {league
-                  ? players
+                  ? choice === "both"
+                    ? "A weekly league: a captain can pay the team fee and bring their own team, or players sign up on their own and are drafted onto the other teams."
+                    : players
                     ? "A weekly league: players sign up on their own and are drafted onto teams, which become real teams with chat and a roster."
                     : "A weekly league for teams that apply, with a minimum roster."
                   : players
@@ -469,6 +476,8 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
           )}
           {players && (
             <>
+              {/* A league picks this as its third choice above; a tournament keeps the switch. */}
+              {!league && (
               <label className="switch-row">
                 <input type="checkbox" checked={f.teamEntry} onChange={(e) => set({ teamEntry: e.target.checked })} />
                 <span>
@@ -480,6 +489,7 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
                   </small>
                 </span>
               </label>
+              )}
               <fieldset>
                 <legend>How teams are made</legend>
                 <div className="segmented" role="group">
@@ -792,7 +802,7 @@ function Review({ f, onEdit }: { f: FormState; onEdit: (step: number) => void })
     [
       2,
       "Who can play",
-      [players ? "Players sign up" : "Teams apply", players && f.teamEntry ? "teams can reserve a spot" : "", visibilityLabels[f.visibility].label]
+      [entryChoiceLabels[entryChoiceOf(f)], players && f.teamEntry && f.kind !== "league" ? "teams can reserve a spot" : "", visibilityLabels[f.visibility].label]
         .filter(Boolean)
         .join(" · "),
     ],

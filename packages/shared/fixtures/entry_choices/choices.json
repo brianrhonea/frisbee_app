@@ -1,0 +1,92 @@
+{
+  "about": "Who can enter: the choice an event's kind, entryType and teamEntry make, the choices each kind offers, their labels and the fields each choice stores.",
+  "cases": [
+    {
+      "kind": "tournament",
+      "entryType": "teams",
+      "teamEntry": false,
+      "choice": "teams"
+    },
+    {
+      "kind": "tournament",
+      "entryType": "teams",
+      "teamEntry": true,
+      "choice": "teams"
+    },
+    {
+      "kind": "tournament",
+      "entryType": "players",
+      "teamEntry": false,
+      "choice": "players"
+    },
+    {
+      "kind": "tournament",
+      "entryType": "players",
+      "teamEntry": true,
+      "choice": "players"
+    },
+    {
+      "kind": "league",
+      "entryType": "teams",
+      "teamEntry": false,
+      "choice": "teams"
+    },
+    {
+      "kind": "league",
+      "entryType": "teams",
+      "teamEntry": true,
+      "choice": "teams"
+    },
+    {
+      "kind": "league",
+      "entryType": "players",
+      "teamEntry": false,
+      "choice": "players"
+    },
+    {
+      "kind": "league",
+      "entryType": "players",
+      "teamEntry": true,
+      "choice": "both"
+    },
+    {
+      "kind": "tournament",
+      "offers": [
+        "teams",
+        "players"
+      ]
+    },
+    {
+      "kind": "league",
+      "offers": [
+        "teams",
+        "players",
+        "both"
+      ]
+    },
+    {
+      "choice": "teams",
+      "label": "Teams apply",
+      "stores": {
+        "entryType": "teams",
+        "teamEntry": false
+      }
+    },
+    {
+      "choice": "players",
+      "label": "Players sign up",
+      "stores": {
+        "entryType": "players",
+        "teamEntry": false
+      }
+    },
+    {
+      "choice": "both",
+      "label": "Teams and players",
+      "stores": {
+        "entryType": "players",
+        "teamEntry": true
+      }
+    }
+  ]
+}

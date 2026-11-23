@@ -538,6 +538,32 @@ export const takesPlayers = (t: Pick<TournamentDoc, "entryType">) => t.entryType
 /** Teams can enter: team-entry events, and player events that let teams reserve spots. */
 export const takesTeams = (t: Pick<TournamentDoc, "entryType" | "teamEntry">) => t.entryType !== "players" || t.teamEntry === true;
 export const mixedEntry = (t: Pick<TournamentDoc, "entryType" | "teamEntry">) => t.entryType === "players" && t.teamEntry === true;
+/**
+ * Who can enter, as the host picks it (EntryChoice in hosted_tournament.dart):
+ * teams apply; players sign up and are drafted; or, for a league, both:
+ * a captain pays the team fee and brings their own players, and everyone
+ * else signs up on their own and is drafted onto the remaining teams. A
+ * tournament still offers that third way as a switch under "Players sign up".
+ */
+export const entryChoices = ["teams", "players", "both"] as const;
+export type EntryChoice = (typeof entryChoices)[number];
+export const entryChoiceLabels: Record<EntryChoice, string> = {
+  teams: "Teams apply",
+  players: "Players sign up",
+  both: "Teams and players",
+};
+/** The choices a [kind] offers: all three for a league. */
+export const entryChoicesFor = (kind: HostedKind): readonly EntryChoice[] =>
+  kind === "league" ? entryChoices : ["teams", "players"];
+/** The choice an event's fields make (a tournament's switch reads as "players"). */
+export function entryChoiceOf(t: { kind?: HostedKind | string; entryType: TournamentEntryType; teamEntry?: boolean }): EntryChoice {
+  if (t.entryType !== "players") return "teams";
+  return t.kind === "league" && t.teamEntry === true ? "both" : "players";
+}
+/** The fields a choice stores. */
+export const entryFields = (c: EntryChoice): { entryType: TournamentEntryType; teamEntry: boolean } =>
+  c === "teams" ? { entryType: "teams", teamEntry: false } : { entryType: "players", teamEntry: c === "both" };
+
 /** What a team pays to enter (bid fee or spot fee), if anything. */
 export function spotFee(t: Pick<TournamentDoc, "entryType" | "teamEntry" | "bidFee" | "teamFee">): FeeDoc | null {
   return t.entryType === "players" ? (t.teamEntry ? (t.teamFee ?? null) : null) : t.bidFee;

@@ -330,8 +330,10 @@ void main() {
       addTearDown(tester.view.reset);
       teams.teams['club'] = team('club', TeamKind.organization, 'me');
       final f = newLeague();
-      f.setEntryType(TournamentEntryType.players);
-      f.setTeamEntry(true);
+      // A league's third choice: teams and players.
+      f.setEntryChoice(EntryChoice.both);
+      expect(f.entryType, TournamentEntryType.players);
+      expect(f.teamEntry, isTrue);
       f.setHasFee(true);
       await tester.pumpWidget(
         MaterialApp(
@@ -345,7 +347,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('form-next')));
       await tester.pumpAndSettle();
-      expect(find.text('Teams can also reserve a spot'), findsOneWidget);
+      // Three choices fit at phone width; a league has no separate switch.
+      expect(find.text('Teams and players'), findsOneWidget);
+      expect(find.text('Teams can also reserve a spot'), findsNothing);
       await tester.tap(find.byKey(const Key('form-next')));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(

@@ -390,6 +390,17 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Who can enter (a league's third choice is teams and players).
+  EntryChoice get entryChoice => EntryChoice.of(_kind, _entryType, _teamEntry);
+  List<EntryChoice> get entryChoices => EntryChoice.forKind(_kind);
+
+  void setEntryChoice(EntryChoice c) {
+    if (!isNew) return;
+    _entryType = c.entryType;
+    _teamEntry = c.teamEntry;
+    notifyListeners();
+  }
+
   void setDraftMode(DraftMode m) {
     draftMode = m;
     notifyListeners();
