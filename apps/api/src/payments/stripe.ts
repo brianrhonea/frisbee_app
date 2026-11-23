@@ -1,4 +1,4 @@
-// The real PaymentGateway: the stripe SDK with STRIPE_SECRET_KEY (the
+// The real PaymentGateway (Accounts v2 for hosts): the stripe SDK with STRIPE_SECRET_KEY (the
 // platform's secret key, sk_test_… on dev) and STRIPE_WEBHOOK_SECRET (the
 // signing secret of the Connect webhook endpoint, whsec_…). Never commit
 // them; on Cloud Run they come from Secret Manager (apps/api/DEPLOY.md,
@@ -15,34 +15,39 @@ export function stripeFromEnv(env: NodeJS.ProcessEnv = process.env): PaymentGate
   const stripe = new Stripe(key, { maxNetworkRetries: 2, timeout: 20_000 });
   return {
     async createAccount({ email, name, idempotencyKey }) {
-      const account = await stripe.accounts.create(
+      // Accounts v2 (POST /v2/core/accounts), a merchant the charges are
+      // made on (direct charges): the host pays Stripe's fees, Stripe
+      // covers negative balances, and the host has the full Dashboard
+      // (refunds, disputes and payouts happen there). Bank payments (ACH
+      // Direct Debit) show in Checkout once that capability is active.
+      const account = await stripe.v2.core.accounts.create(
         {
-          country: "US",
-          ...(email && { email }),
-          business_profile: { name },
-          // A Standard-style account: the host pays Stripe's fees, Stripe
-          // covers negative balances, and the host has the full Dashboard
-          // (refunds, disputes, payouts happen there).
-          controller: {
-            fees: { payer: "account" },
-            losses: { payments: "stripe" },
-            stripe_dashboard: { type: "full" },
+          ...(email && { contact_email: email }),
+          display_name: name,
+          dashboard: "full",
+          identity: { country: "us" },
+          defaults: { currency: "usd", responsibilities: { fees_collector: "stripe", losses_collector: "stripe" } },
+          configuration: {
+            merchant: { capabilities: { card_payments: { requested: true }, ach_debit_payments: { requested: true } } },
           },
-          // Bank payments (ACH Direct Debit) show in Checkout once this is
-          // active and the host has them on in their payment methods.
-          capabilities: { card_payments: { requested: true }, transfers: { requested: true }, us_bank_account_ach_payments: { requested: true } },
         },
         { idempotencyKey },
       );
       return account.id;
     },
     async onboardingLink(account, refreshUrl, returnUrl) {
-      const link = await stripe.accountLinks.create({ account, refresh_url: refreshUrl, return_url: returnUrl, type: "account_onboarding" });
+      const link = await stripe.v2.core.accountLinks.create({
+        account,
+        use_case: { type: "account_onboarding", account_onboarding: { refresh_url: refreshUrl, return_url: returnUrl } },
+      });
       return link.url;
     },
     async account(account) {
-      const a = await stripe.accounts.retrieve(account);
-      return { chargesEnabled: a.charges_enabled === true, detailsSubmitted: a.details_submitted === true };
+      // v2's capability status, not v1's charges_enabled.
+      const a = await stripe.v2.core.accounts.retrieve(account, { include: ["configuration.merchant", "requirements"] });
+      const cards = a.configuration?.merchant?.capabilities?.card_payments?.status;
+      const owed = (a.requirements?.entries ?? []).some((e) => e.awaiting_action_from === "user");
+      return { chargesEnabled: cards === "active", detailsSubmitted: !owed };
     },
     async createCheckout(input) {
       const session = await stripe.checkout.sessions.create(

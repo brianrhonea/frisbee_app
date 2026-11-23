@@ -126,6 +126,7 @@ beforeEach(() => {
 function ready() {
   s.store.put("payoutAccounts/host", { account: "acct_1", status: "ready" });
   s.store.put("stripeAccounts/acct_1", { teamId: "host" });
+  s.gateway.accounts.set("acct_1", { chargesEnabled: true, detailsSubmitted: true });
 }
 
 describe("the fee", () => {
@@ -190,7 +191,7 @@ describe("payouts", () => {
     const r = await s.call("POST", "/v1/teams/host/payouts/link");
     expect(r.json()).toEqual({ url: "https://connect.test/acct_1" });
     await s.call("POST", "/v1/teams/host/payouts/link");
-    expect(s.gateway.created).toEqual([{ email: "owner@x.test", name: "Fling Crew", idempotencyKey: "account:host" }]);
+    expect(s.gateway.created).toEqual([{ email: "owner@x.test", name: "Fling Crew", idempotencyKey: "account-v2:host" }]);
     expect(s.gateway.links[1]).toEqual({
       account: "acct_1",
       returnUrl: `${site}/payments/payouts?team=host`,
@@ -217,6 +218,25 @@ describe("paying", () => {
     expect(r.json().reason).toMatch(/instructions/);
     ready();
     expect((await s.call("GET", "/v1/tournaments/t1/pay?team=haze", undefined, "captain")).json()).toMatchObject({ online: true, reason: null });
+  });
+
+  it("asks Stripe before Checkout, and stops if the host can't take cards any more", async () => {
+    ready();
+    s.gateway.accounts.set("acct_1", { chargesEnabled: false, detailsSubmitted: false });
+    const r = await s.call("POST", "/v1/tournaments/t1/checkout", { payer: "team", teamId: "haze" }, "captain");
+    expect(r.status).toBe(412);
+    expect(r.json().error.message).toContain("can't take payments online right now");
+    expect(s.gateway.checkouts).toHaveLength(0);
+    expect(s.store.doc("payoutAccounts/host")?.status).toBe("pending");
+  });
+
+  it("still pays when Stripe's account check doesn't answer", async () => {
+    ready();
+    s.gateway.account = async () => {
+      throw new Error("stripe down");
+    };
+    const r = await s.call("POST", "/v1/tournaments/t1/checkout", { payer: "team", teamId: "haze" }, "captain");
+    expect(r.json()).toEqual({ url: "https://checkout.test/cs_1" });
   });
 
   it("makes a direct charge on the host's account with Stall 10's fee", async () => {

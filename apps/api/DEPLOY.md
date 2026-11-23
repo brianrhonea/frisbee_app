@@ -425,16 +425,21 @@ address (`PAYMENTS_RETURN_URL`, else `WEB_SITE_URL`), the payment routes
 say payments aren't set up and the app and website hide them.
 
 1. In the Stripe Dashboard (test mode for dev): Connect → get started as
-   a platform. Hosts' accounts are made by the API with the host paying
-   Stripe's fees, Stripe covering losses and the full Dashboard, so pick
-   those when asked. Fill in the platform profile and branding.
+   a platform, with the **Merchant** configuration. Hosts' accounts are
+   made by the API with Accounts v2 (`POST /v2/core/accounts`,
+   `src/payments/stripe.ts`): the host paying Stripe's fees, Stripe
+   covering losses and the full Dashboard, so pick those when asked. Fill
+   in the platform profile and branding.
 2. Developers → Webhooks → add an endpoint **on connected accounts**
    ("Events on Connected accounts") at
    `https://<api host>/v1/payments/stripe/webhook`, with the events
    `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
    `checkout.session.async_payment_failed`, `checkout.session.expired`, `charge.refunded`,
    `charge.dispute.created` and `account.updated`. Its signing secret
-   (`whsec_...`) is `STRIPE_WEBHOOK_SECRET`.
+   (`whsec_...`) is `STRIPE_WEBHOOK_SECRET`. A host's readiness doesn't
+   depend on `account.updated`: the payouts page asks Stripe (v2
+   `configuration.merchant.capabilities.card_payments.status`) until it's
+   `active`, and every checkout asks again first.
 3. Store both in Secret Manager and let `api-runtime` read them:
 
 ```sh
@@ -453,8 +458,8 @@ done
    defaults to 1% + $1; set `PLATFORM_FEE_BPS` / `PLATFORM_FEE_FIXED_CENTS`
    there to change it (new payments only).
 
-Bank payments (ACH Direct Debit): the API requests the
-`us_bank_account_ach_payments` capability on each host's account. Checkout
+Bank payments (ACH Direct Debit): the API requests the merchant
+`ach_debit_payments` capability on each host's account. Checkout
 shows bank payment once it's active and the host has it switched on in
 their own Stripe Dashboard (Settings → Payment methods); they clear in up
 to 4 business days (`checkout.session.async_payment_succeeded` or

@@ -7,6 +7,17 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.44.0 — 2026-11-22
+
+- Hosts' Stripe accounts are made with Accounts v2 (`/v2/core/accounts`,
+  merchant configuration with card and ACH Direct Debit payments; the
+  host pays Stripe's fees, Stripe covers losses, full Dashboard), and
+  onboarding links with v2 account links. Readiness is v2's
+  `card_payments` capability status, not v1's `charges_enabled`.
+- Checkout asks Stripe whether the host can still take cards first; if
+  not, the host's payouts show as pending and the payer is told to pay
+  another way (a Stripe outage doesn't block payments).
+
 ## 0.43.1 — 2026-11-22
 
 - Names stored on teams, invites and join requests never fall back to

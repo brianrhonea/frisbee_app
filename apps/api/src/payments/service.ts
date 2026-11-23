@@ -184,6 +184,27 @@ export class PaymentService {
     return { available: true, status, feeLabel };
   }
 
+  /**
+   * Asks Stripe whether the host can still take cards before a payer is
+   * sent to Checkout (Stripe can restrict an account after onboarding).
+   * Not ready: stored as pending, so the host sees it, and the payer is
+   * told to pay another way. Stripe not answering doesn't stop payments.
+   */
+  private async stillReady(hostId: string, account: string): Promise<void> {
+    let ready: boolean;
+    try {
+      ready = payoutStatus(await this.config!.gateway.account(account)) === "ready";
+    } catch {
+      return;
+    }
+    if (ready) return;
+    await this.store.transact(async (tx) => {
+      const record = await tx.get(p.payout(hostId));
+      if (record?.account === account) tx.update(p.payout(hostId), { status: "pending", updatedAt: serverTime });
+    });
+    throw new ApiError("failed_precondition", "The host can't take payments online right now. Follow their instructions to pay another way.");
+  }
+
   /** A Stripe onboarding link, making the host's account the first time. */
   async payoutLink(caller: Caller, rawTeam: unknown): Promise<PayoutLinkResult> {
     const teamId = docIdParam(rawTeam);
@@ -193,7 +214,7 @@ export class PaymentService {
     let account = str((await this.store.get(p.payout(teamId)))?.account);
     if (!account) {
       // Keyed by team: two owners' clicks (or a retry) make one account.
-      const made = await gateway.createAccount({ email: caller.email, name: str(team.name).slice(0, 100) || "Stall 10 host", idempotencyKey: `account:${teamId}` });
+      const made = await gateway.createAccount({ email: caller.email, name: str(team.name).slice(0, 100) || "Stall 10 host", idempotencyKey: `account-v2:${teamId}` });
       account = await this.store.transact(async (tx) => {
         const existing = str((await tx.get(p.payout(teamId)))?.account);
         if (existing) return existing;
@@ -281,6 +302,7 @@ export class PaymentService {
     const { t, payer, options, account, latest } = await this.options(caller, id, r.payer, r.teamId);
     if (options.paid) throw new ApiError("failed_precondition", "That's already paid.");
     if (!options.online || !account) throw new ApiError("failed_precondition", options.reason ?? "This fee can't be paid online.");
+    await this.stillReady(str(t.hostId), account);
     if (latest.state === "open") {
       if (latest.chargeCents === options.chargeCents && latest.expiresAt - this.now() > reuseMarginMs) return { url: latest.url };
       // The fee changed or the link is nearly out: close it before making another.
