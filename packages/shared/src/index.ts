@@ -53,3 +53,4 @@ export * from "./team_posts.js";
 export * from "./moderation.js";
 export * from "./word_filter.js";
 export * from "./safe_search.js";
+export * from "./team_share.js";

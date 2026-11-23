@@ -26,6 +26,7 @@ import { useTeamEvents, useYouthOutsiderPublic, youthVisitorNote } from "./TeamS
 import { TournamentDayCard } from "../tournaments/TournamentDayCard";
 import { useTournamentDays } from "../tournaments/useTournamentDays";
 import { ReportButton } from "../Report";
+import { TeamShare } from "./TeamShare";
 
 const postLimit = 30;
 const leads = new Set(["owner", "coach", "captain"]);
@@ -160,6 +161,7 @@ export function TeamFeed({ publicPosts, publicEvents }: { publicPosts: PublicTea
           </div>
         )}
         <MemberPreview />
+        <TeamShare />
       </aside>
     </div>
   );

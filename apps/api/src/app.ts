@@ -78,6 +78,7 @@ import { membershipRoutes } from "./teams/membership_routes.js";
 import type { TeamRepository } from "./teams/repository.js";
 import { RosterService } from "./teams/roster.js";
 import { rosterRoutes, teamRoutes } from "./teams/routes.js";
+import { TeamShareService, teamShareRoutes } from "./teams/share.js";
 import { TeamService } from "./teams/service.js";
 import { apiVersion, versionHeader } from "./version.js";
 import { noRevalidate, type Revalidate } from "./web/revalidate.js";
@@ -217,6 +218,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     if (deps.exports) exportRoutes(app, new ExportService(deps.exports, deps.store, deps.users, personal, deps.now));
     const reads = deps.writeLimits !== false ? writes : undefined;
     rosterRoutes(app, new RosterService(deps.store, deps.browse?.photoBuckets ?? []), reads);
+    teamShareRoutes(app, new TeamShareService(deps.store));
     postRoutes(app, new PostService(deps.store, deps.users, deps.now), revalidate, reads);
     const editor = new PostEditor(deps.store, deps.users, deps.media, deps.now);
     postEditorRoutes(app, editor, revalidate);

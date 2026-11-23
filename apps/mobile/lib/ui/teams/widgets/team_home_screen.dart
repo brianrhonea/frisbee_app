@@ -33,6 +33,7 @@ import 'community_sections.dart';
 import 'invite_members_dialog.dart';
 import 'join_team_dialog.dart';
 import 'team_form.dart';
+import 'team_share_card.dart';
 import 'team_initials.dart';
 import 'team_post_comments_sheet.dart';
 import 'team_post_widgets.dart';
@@ -746,12 +747,14 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                   _about(summary),
                   _leagueCard(team),
                   _MembersCard(team: team),
+                  TeamShareCard(team: team),
                 ],
                 side: [_details(summary)],
                 narrow: [
                   _about(summary),
                   _leagueCard(team),
                   _MembersCard(team: team),
+                  TeamShareCard(team: team),
                   _details(summary),
                 ],
               )
@@ -770,6 +773,8 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                       ),
                     ),
                   if (team != null) _MembersCard(team: team),
+                  if (team != null && !team.isCommunity)
+                    TeamShareCard(team: team),
                   ..._posts(context),
                 ],
                 side: [
@@ -787,6 +792,8 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                   ..._events(context),
                   ..._tournaments(context),
                   if (team != null) _MembersCard(team: team),
+                  if (team != null && !team.isCommunity)
+                    TeamShareCard(team: team),
                   ..._posts(context),
                   _details(summary),
                 ],
