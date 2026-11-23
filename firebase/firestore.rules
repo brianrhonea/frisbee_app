@@ -2600,7 +2600,20 @@ service cloud.firestore {
           && p.get('teamStats', {}) is map
           && p.get('teamStats', {}).size() <= 50
           && p.get('games', []) is list
-          && p.get('games', []).size() <= 5;
+          && p.get('games', []).size() <= 5
+          && publicWhenPrivate(p);
+      }
+      // A private profile's doc is its card only (name, photo, header,
+      // username, search keywords): anyone signed in reads it, so its
+      // details, summary and tags must live in private/details, for the
+      // player and their accepted followers. Refused here whatever writes it.
+      function publicWhenPrivate(p) {
+        return p.get('private', false) == false
+          || (!p.keys().hasAny([
+                'bio', 'pronouns', 'hometown', 'school', 'throwingHand',
+                'playingSince', 'visibility', 'teams', 'stats', 'teamStats',
+                'games', 'summaryUpdatedAt'])
+              && p.get('tags', []).size() == 0);
       }
 
       // A username is set once, together with its usernames/{name} claim.

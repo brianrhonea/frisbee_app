@@ -2527,6 +2527,58 @@ describe("direct messages", () => {
     await assertFails(setDoc(doc(db(PLAYER), "profiles", PLAYER), profile("")));
   });
 
+  it("a private profile's doc is its card only: details, summary and tags go in private/details", async () => {
+    const ref = doc(db(PLAYER), "profiles", PLAYER);
+    const card = { ...profile(), private: true, tags: [] };
+    await assertSucceeds(setDoc(ref, card));
+    for (const leak of [
+      { bio: "Handler" },
+      { hometown: "Denver" },
+      { school: "State" },
+      { playingSince: 2015 },
+      { visibility: { stats: true } },
+      { teams: [] },
+      { stats: {} },
+      { teamStats: {} },
+      { games: [] },
+      { tags: ["denver"] },
+    ]) {
+      await assertFails(setDoc(ref, { ...card, ...leak }));
+    }
+    // Public again, they may come back.
+    await assertSucceeds(setDoc(ref, { ...profile(), private: false, bio: "Handler", tags: ["denver"] }));
+    // Going private with details still on the doc is refused (the API moves them first).
+    await assertFails(updateDoc(ref, { private: true }));
+  });
+
+  it("a private profile's details: the player and accepted followers only", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const fs = ctx.firestore();
+      await setDoc(doc(fs, "profiles", PLAYER), { name: "Pat Player", keywords: ["pat"], photoUrl: null, private: true });
+      await setDoc(doc(fs, "profiles", PLAYER, "private", "details"), { bio: "Handler", stats: {} });
+      await setDoc(doc(fs, "users", OWNER, "follows", `user_${PLAYER}`), { key: `user_${PLAYER}`, type: "user", targetId: PLAYER });
+    });
+    const details = (uid: string) => doc(db(uid), "profiles", PLAYER, "private", "details");
+    await assertSucceeds(getDoc(details(PLAYER)));
+    await assertSucceeds(getDoc(details(OWNER)));
+    await assertFails(getDoc(details(OUTSIDER)));
+    await assertFails(getDocs(collection(db(OUTSIDER), "profiles", PLAYER, "private")));
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "profiles", PLAYER, "private", "details")));
+    // Nobody can make themselves a follower of a private profile.
+    await assertFails(
+      setDoc(doc(db(OUTSIDER), "users", OUTSIDER, "follows", `user_${PLAYER}`), {
+        key: `user_${PLAYER}`, type: "user", targetId: PLAYER, name: "Pat", notify: false, createdAt: serverTimestamp(),
+      }),
+    );
+    await assertFails(
+      setDoc(doc(db(OUTSIDER), "users", OUTSIDER, "follows", `user_${PLAYER}`), {
+        key: `user_${PLAYER}`, type: "user", targetId: PLAYER, name: "Pat", notify: false, approved: true, createdAt: serverTimestamp(),
+      }),
+    );
+    // Nor read someone else's follows.
+    await assertFails(getDocs(collection(db(OUTSIDER), "users", OWNER, "follows")));
+  });
+
   it("profiles may carry a header photo URL", async () => {
     const ref = doc(db(PLAYER), "profiles", PLAYER);
     await assertSucceeds(setDoc(ref, { ...profile(), headerUrl: "https://example.test/h.jpg" }));
