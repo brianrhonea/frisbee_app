@@ -14,6 +14,7 @@ import '../view_models/chat_list_viewmodel.dart';
 import '../view_models/chat_room_viewmodel.dart';
 import '../view_models/voice_channel_viewmodel.dart';
 import 'chat_extras.dart';
+import 'pinned_messages_screen.dart';
 import 'chat_polls.dart';
 import 'chat_layout.dart';
 import 'chat_tab.dart';
@@ -152,10 +153,23 @@ class ChatRoomView extends StatelessWidget {
                   vm.muted ? Icons.notifications_off_outlined : Icons.more_vert,
                 ),
                 onSelected: (a) => switch (a) {
+                  _RoomAction.pinned => openPinnedMessages(context, vm),
                   _RoomAction.mute => vm.toggleMuted.execute(),
                   _RoomAction.settings => openSettings(),
                 },
                 itemBuilder: (_) => [
+                  if (readable && !room.isVoice)
+                    PopupMenuItem(
+                      key: const Key('room-pinned'),
+                      value: _RoomAction.pinned,
+                      child: ListTile(
+                        leading: const Icon(Icons.push_pin_outlined),
+                        title: const Text('Pinned messages'),
+                        trailing: vm.pins.isEmpty
+                            ? null
+                            : Text('${vm.pins.length}'),
+                      ),
+                    ),
                   if (readable && !room.isVoice)
                     PopupMenuItem(
                       value: _RoomAction.mute,
@@ -237,11 +251,12 @@ class ChatRoomView extends StatelessWidget {
   }
 }
 
-enum _RoomAction { mute, settings }
+enum _RoomAction { pinned, mute, settings }
 
 /// A text room's thread, with its pins (redesign F2), event cards (F3) and
-/// polls (F33): the pinned strip on top, Pin in each message's long-press
-/// sheet for chat managers, and Share an event and Poll in the attach menu.
+/// polls (F33): Pin in each message's long-press sheet for chat managers
+/// (the pins are their own page, from the room's ⋯: openPinnedMessages),
+/// and Share an event and Poll in the attach menu.
 class _RoomThread extends StatefulWidget {
   const _RoomThread({required this.viewModel, required this.handle});
 
@@ -296,7 +311,6 @@ class _RoomThreadState extends State<_RoomThread> {
     emptyMessage: 'Say hello to the team.',
     readOnlyNotice: 'You can read this room but not post in it.',
     hintText: 'Message #${widget.handle}',
-    header: PinnedStrip(viewModel: vm),
     isPinned: vm.isPinned,
     eventCard: (_, ChatEventRef e) => ChatEventCard(teamId: vm.teamId, ref: e),
     pollCard: (m, _) => ChatPollCard(room: vm, message: m),

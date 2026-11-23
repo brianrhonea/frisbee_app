@@ -23,91 +23,6 @@ String _when(TeamEvent e) => [
   if (e.location.trim().isNotEmpty) e.location.trim(),
 ].join(' · ');
 
-String _pinLine(ChatMessage m) {
-  final name = m.authorName.isEmpty ? 'Member' : m.authorName;
-  return '$name: ${m.preview}';
-}
-
-/// The strip under a room's header: the newest pin; tap for all of them.
-class PinnedStrip extends StatelessWidget {
-  const PinnedStrip({super.key, required this.viewModel});
-
-  final ChatRoomViewModel viewModel;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    final pin = viewModel.latestPin;
-    if (pin == null) return const SizedBox.shrink();
-    final count = viewModel.pins.length;
-    return Material(
-      color: c.card,
-      child: InkWell(
-        onTap: () => showPinsSheet(context, viewModel),
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border(bottom: BorderSide(color: c.border)),
-          ),
-          padding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
-          child: Row(
-            children: [
-              Icon(Icons.push_pin_outlined, size: 18, color: c.accent),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      count > 1 ? 'PINNED · $count' : 'PINNED',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.5,
-                        color: c.accent,
-                      ),
-                    ),
-                    Text(
-                      _pinLine(pin),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 13, color: c.ink2),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right, size: 18, color: c.muted),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Every pin in the room, newest first, each with its full text; chat
-/// managers unpin from here.
-Future<void> showPinsSheet(BuildContext context, ChatRoomViewModel vm) =>
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (context) => ListenableBuilder(
-        listenable: vm,
-        builder: (context, _) => _PinList(
-          title: 'Pinned messages',
-          pins: vm.pins,
-          trailing: vm.canPin
-              ? (m) => TextButton(
-                  onPressed: vm.togglePin.running
-                      ? null
-                      : () => vm.togglePin.execute(m),
-                  child: const Text('Unpin'),
-                )
-              : null,
-        ),
-      ),
-    );
-
 /// The room has [chatPinsMax] pins: pick one to take down so [message]
 /// can be pinned instead.
 Future<void> showReplacePinSheet(
@@ -134,14 +49,12 @@ class _PinList extends StatelessWidget {
     required this.title,
     required this.pins,
     this.subtitle,
-    this.trailing,
     this.onTap,
   });
 
   final String title;
   final String? subtitle;
   final List<ChatMessage> pins;
-  final Widget Function(ChatMessage)? trailing;
   final ValueChanged<ChatMessage>? onTap;
 
   @override
@@ -227,7 +140,6 @@ class _PinList extends StatelessWidget {
                                   ],
                                 ),
                               ),
-                              ?trailing?.call(m),
                             ],
                           ),
                         ),

@@ -6,6 +6,10 @@ here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
 ## 0.56.1 — 2026-11-22
 
+- Pinned messages are their own view, from a room's ⋯: a card for each
+  pin (author, date, text and files). Click one to jump to it in the
+  chat, loading older messages as needed; it's tinted for a moment. The
+  pinned strip is gone.
 - Learn to play and the rules of ultimate are one page (`/learn`, the
   rules at `#rules`, each opening in place; `/rules` redirects there).
   On phones the lessons index is a compact list and the spacing is

@@ -301,6 +301,12 @@ members, with a count of waiting join requests) and the ⋮ menu.
   **Mute** a room: press and hold it in the room list (on the website,
   its ⋯ or a right-click) → **Mute notifications**. A muted room shows a
   crossed-out bell and no unread dot.
+  **Pinned messages**: the room's ⋯ at the top → **Pinned messages**
+  shows each pin as a card (who, when, the text and any files). Tap one
+  to jump to it in the chat, however far back; it's highlighted for a
+  moment. Owners, coaches, captains and chat managers pin a message from
+  its press-and-hold menu (on the website, **Pin** in its actions) and
+  unpin from the pinned page; a room holds 10.
   **@mentions**: type **@** and pick a teammate. Owners, coaches,
   captains and chat managers can also pick a role or **@everyone**.
   Mentioned people get a notification, even in a room they muted (except

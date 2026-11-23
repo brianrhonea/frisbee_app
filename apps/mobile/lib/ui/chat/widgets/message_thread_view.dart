@@ -111,6 +111,10 @@ class _MessageThreadViewState extends State<MessageThreadView>
   final _undo = UndoHistoryController();
   final _scroll = ScrollController();
 
+  /// On the row of [MessageThreadViewModel.jumpTarget], to find it.
+  final _jumpKey = GlobalKey();
+  String? _scrollingTo;
+
   late final List<Command<Object?>> _commands = [
     vm.send,
     vm.pickFiles,
@@ -293,9 +297,58 @@ class _MessageThreadViewState extends State<MessageThreadView>
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: vm,
-    builder: (context, _) =>
-        _MentionScope(viewModel: vm, child: _body(context)),
+    builder: (context, _) {
+      final target = vm.jumpTarget;
+      if (target != null &&
+          target != _scrollingTo &&
+          vm.messages.any((m) => m.id == target)) {
+        _scrollingTo = target;
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollTo(target));
+      }
+      return _MentionScope(viewModel: vm, child: _body(context));
+    },
   );
+
+  /// Scrolls up a screen at a time until the row of [id] is built (the
+  /// list only builds what's near the screen), then centres it.
+  Future<void> _scrollTo(String id) async {
+    try {
+      for (var i = 0; i < 400 && mounted; i++) {
+        final row = _jumpKey.currentContext;
+        if (row != null && row.mounted) {
+          await Scrollable.ensureVisible(
+            row,
+            alignment: 0.5,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+          if (mounted) vm.jumpFinished(id);
+          return;
+        }
+        if (!_scroll.hasClients) return;
+        final at = _scroll.position;
+        if (at.pixels >= at.maxScrollExtent) {
+          // The top so far: wait for the list to grow, once.
+          await WidgetsBinding.instance.endOfFrame;
+          if (!_scroll.hasClients ||
+              _scroll.position.pixels >= _scroll.position.maxScrollExtent) {
+            if (_jumpKey.currentContext == null) return;
+          }
+          continue;
+        }
+        // Up is a bigger offset in a reversed list.
+        _scroll.jumpTo(
+          (at.pixels + at.viewportDimension * 0.8).clamp(
+            0.0,
+            at.maxScrollExtent,
+          ),
+        );
+        await WidgetsBinding.instance.endOfFrame;
+      }
+    } finally {
+      _scrollingTo = null;
+    }
+  }
 
   Widget _body(BuildContext context) => Builder(
     builder: (context) => ConstrainedContent(
@@ -312,6 +365,7 @@ class _MessageThreadViewState extends State<MessageThreadView>
                 child: _MessageList(
                   viewModel: vm,
                   controller: _scroll,
+                  jumpKey: _jumpKey,
                   emptyMessage: widget.emptyMessage,
                   videoPlayer: widget.videoPlayer,
                   hideAuthor: widget.hideAuthor,
@@ -624,6 +678,7 @@ class _MessageList extends StatelessWidget {
   const _MessageList({
     required this.viewModel,
     required this.controller,
+    required this.jumpKey,
     required this.emptyMessage,
     required this.videoPlayer,
     required this.actions,
@@ -632,6 +687,9 @@ class _MessageList extends StatelessWidget {
 
   final MessageThreadViewModel viewModel;
   final ScrollController controller;
+
+  /// Put on the row being jumped to ([MessageThreadViewModel.jumpTarget]).
+  final GlobalKey jumpKey;
   final String emptyMessage;
   final FileVideoPlayerBuilder videoPlayer;
   final _RowActions actions;
@@ -710,7 +768,7 @@ class _MessageList extends StatelessWidget {
         final color = vm.nameColorOf(m.authorId);
         final onDelete = vm.canDelete(m) ? () => actions.onDelete(m) : null;
         final canSwipeReply = vm.canWrite && vm.canReact && m.createdAt != null;
-        return Column(
+        final row = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (newDay && m.createdAt != null)
@@ -761,6 +819,17 @@ class _MessageList extends StatelessWidget {
                 ),
               ),
           ],
+        );
+        // A message jumped to (a pin): found by its key, then tinted.
+        return KeyedSubtree(
+          key: m.id == vm.jumpTarget ? jumpKey : null,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 400),
+            color: m.id == vm.highlightedId
+                ? AppColors.of(context).accentSoft
+                : Colors.transparent,
+            child: row,
+          ),
         );
       },
     );

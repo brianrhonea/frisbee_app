@@ -731,10 +731,13 @@ everything the app does on the website alone, styled like the website
 32. Pinned messages and event cards in team rooms (F2, F3): [x] app;
     [x] website. **Pins:** the owner and chat managers who can read a
     room pin and unpin a message (app: its long-press sheet; website:
-    Pin / Unpin in its actions). A "Pinned" strip under the room's header
-    shows the newest pin; a tap or click lists every pin with its whole
-    text (opening it in context isn't cheap in a paged thread), with
-    Unpin for those who pin. At most 10 a room: pinning an 11th asks
+    Pin / Unpin in its actions). The pins are their own view, from the
+    room's ⋯ menu (**Pinned messages**, as in Discord): a card each with
+    the author, date, whole text and files, Unpin for those who pin.
+    Tapping a card goes back to the chat and jumps to that message,
+    loading older pages as needed (up to 40 pages), and tints it for a
+    moment (app `MessageThreadViewModel.jumpTo`, website
+    `useJumpToMessage`). Tests: app `chat_extras_test.dart`. At most 10 a room: pinning an 11th asks
     which pin to take down and swaps them in one write. A deleted
     message's pin goes with it (clients list pins with a query on the
     messages, `orderBy pinnedAt`; the room's `pins` ids, kept for the

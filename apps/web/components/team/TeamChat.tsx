@@ -3,7 +3,7 @@ import { MuteButton } from "../MuteButton";
 import { where } from "firebase/firestore";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 import { type ChatPoll, type InboxRoom, mutedRoomKey, roomUnread } from "@stall10/shared";
 import { callApi } from "@/lib/client";
 import { useAuth } from "../AuthProvider";
@@ -18,7 +18,7 @@ import { PendingMessages } from "../PendingMessages";
 import { type Doc, useLiveDoc, useLiveQueries, useLiveQuery } from "@/lib/live";
 import { usePagedMessages, useThreadScroll } from "@/lib/messages";
 import { ChatManager, type ManagedFolder, type ManagedRoom } from "./ChatManager";
-import { ChatEventCard, ChatPollCard, CreatePollDialog, PinnedStrip, ShareEventDialog, usePinActions, useRoomPins } from "./ChatExtras";
+import { ChatEventCard, ChatPollCard, CreatePollDialog, PinnedView, ReplacePinDialog, ShareEventDialog, usePinActions, useRoomPins } from "./ChatExtras";
 import { type TeamViewer, useTeamHub } from "./TeamContext";
 import { MembersOnlySection } from "./TeamNav";
 import { VoiceRoom } from "./meetings/VoiceRoom";
@@ -287,16 +287,58 @@ function Thread({
   const list = messages.list ?? [];
   // Newest at the bottom, in view, without scrolling the page; older pages keep the reader's place.
   useThreadScroll(body, list[0]?.id, list[list.length - 1]?.id);
+  // The pins as their own view (the ⋯ menu), and jumping from one to its message.
+  const [view, setView] = useState<"chat" | "pins">("chat");
+  const [menu, setMenu] = useState(false);
+  const jump = useJumpToMessage(body, list, messages, view === "chat");
   return (
-    <div className="card thread">
+    <div className="card thread team-thread">
       <header className="thread-head">
         <h2># {name}</h2>
         <span className="post-admin">
           <MuteButton target={{ teamId, roomId }} />
+          <span className="thread-menu-wrap">
+            <button
+              type="button"
+              className="icon-btn thread-more"
+              aria-label="Room options"
+              aria-expanded={menu}
+              onClick={() => setMenu((o) => !o)}
+            >
+              ⋯
+            </button>
+            {menu && (
+              <span className="thread-menu" role="menu">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenu(false);
+                    setView("pins");
+                  }}
+                >
+                  📌 Pinned messages{(pins.data?.length ?? 0) > 0 ? ` · ${pins.data!.length}` : ""}
+                </button>
+              </span>
+            )}
+          </span>
         </span>
       </header>
-      <PinnedStrip pins={pins.data ?? []} canPin={canPin} actions={pinActions} />
-      <div className="thread-body" aria-live="polite" ref={body} onScroll={loadAtTop(messages)}>
+      <ReplacePinDialog pins={pins.data ?? []} actions={pinActions} />
+      {view === "pins" && (
+        <PinnedView
+          pins={pins.data ?? []}
+          canPin={canPin}
+          actions={pinActions}
+          onBack={() => setView("chat")}
+          onOpen={(id) => {
+            setView("chat");
+            jump.to(id);
+          }}
+        />
+      )}
+      {jump.note && <p className="form-error pinned-error">{jump.note}</p>}
+      <div className="thread-body" aria-live="polite" ref={body} onScroll={loadAtTop(messages)} hidden={view === "pins"}>
         <OlderMessages paged={messages} />
         {messages.error ? (
           <p className="form-error">{messages.error}</p>
@@ -312,7 +354,11 @@ function Thread({
               Object.values(m.reactions ?? {}).reduce<Record<string, number>>((acc, e) => ({ ...acc, [e]: (acc[e] ?? 0) + 1 }), {}),
             );
             return (
-              <div key={m.id} className={`message${grouped ? " grouped" : ""}${m.authorId === me ? " mine" : ""}`} onDoubleClick={m.createdAt ? () => setReacting(m.id) : undefined}>
+              <div
+                key={m.id}
+                data-mid={m.id}
+                className={`message${grouped ? " grouped" : ""}${m.authorId === me ? " mine" : ""}${jump.lit === m.id ? " jumped" : ""}`}
+                onDoubleClick={m.createdAt ? () => setReacting(m.id) : undefined}>
                 {grouped && (
                   <span className="message-time">
                     <LocalTime iso={m.createdAt} style="time" />
@@ -394,7 +440,7 @@ function Thread({
         )}
         <PendingMessages kind="teamChat" target={`${teamId}/${roomId}`} shown={list} />
       </div>
-      {canWrite ? (
+      {view === "pins" ? null : canWrite ? (
         <ChatComposer
           path={base}
           upload={{ targetId: `teams/${teamId}/chats/${roomId}` }}
@@ -414,4 +460,59 @@ function Thread({
       {polling && <CreatePollDialog teamId={teamId} roomId={roomId} onClose={() => setPolling(false)} />}
     </div>
   );
+}
+
+/** How far back a jump to a pin pages, at most (MessageThreadViewModel.maxJumpPages). */
+const maxJumpPages = 40;
+
+/**
+ * Jumping to a message (a pin), as in Discord: loads older pages until it's
+ * in [list], scrolls it to the middle of [body] and tints it for a moment
+ * ([lit]). [note] says when it's too far back. The app's
+ * MessageThreadViewModel.jumpTo.
+ */
+function useJumpToMessage(
+  body: RefObject<HTMLDivElement | null>,
+  list: Array<{ id: string }>,
+  paged: { hasMore: boolean; loadingMore: boolean; loadOlder: () => Promise<void> },
+  shown: boolean,
+) {
+  const [target, setTarget] = useState<{ id: string; pages: number } | null>(null);
+  const [lit, setLit] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  useEffect(() => {
+    if (!target || !shown) return;
+    if (list.some((m) => m.id === target.id)) {
+      const id = target.id;
+      setTarget(null);
+      // After the thread's own scroll keeping (useThreadScroll) has run.
+      requestAnimationFrame(() => {
+        body.current?.querySelector(`[data-mid="${CSS.escape(id)}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+        setLit(id);
+      });
+      return;
+    }
+    if (!paged.hasMore || target.pages >= maxJumpPages) {
+      setTarget(null);
+      setNote("That message is too far back to show. It's still pinned.");
+      return;
+    }
+    if (!paged.loadingMore) {
+      setTarget({ ...target, pages: target.pages + 1 });
+      void paged.loadOlder();
+    }
+  }, [target, shown, list, paged, body]);
+  useEffect(() => {
+    if (!lit) return;
+    const t = setTimeout(() => setLit(null), 1800);
+    return () => clearTimeout(t);
+  }, [lit]);
+  return {
+    lit,
+    note,
+    to: (id: string) => {
+      setNote(null);
+      setTarget({ id, pages: 0 });
+    },
+  };
 }

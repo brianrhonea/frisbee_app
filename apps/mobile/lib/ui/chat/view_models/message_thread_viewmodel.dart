@@ -586,6 +586,74 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
     }
   }
 
+  // Jumping to a message (a pin) --------------------------------------------
+
+  /// How far back [jumpTo] pages, at most ([pageSize] messages a page).
+  static const maxJumpPages = 40;
+
+  /// How long a message jumped to stays highlighted.
+  static const highlightFor = Duration(milliseconds: 1800);
+
+  String? _jumpTarget;
+  String? _highlighted;
+  Timer? _highlightTimer;
+
+  /// The message the thread is scrolling to; the view keys its row so it
+  /// can find it, then calls [jumpFinished].
+  String? get jumpTarget => _jumpTarget;
+
+  /// The message just jumped to, tinted for [highlightFor].
+  String? get highlightedId => _highlighted;
+
+  /// Shows the message [id], as tapping a pin in Discord does: loads older
+  /// pages until it's loaded (at most [maxJumpPages]), then the view
+  /// scrolls to it. False when it couldn't be found (deleted, or further
+  /// back than that).
+  Future<bool> jumpTo(String id) async {
+    _jumpTarget = id;
+    notifyListeners();
+    bool loaded() => messages.any((m) => m.id == id);
+    for (var i = 0; i < maxJumpPages && !loaded() && hasMore; i++) {
+      final before = messages.length;
+      await loadMore();
+      if (_disposed) return false;
+      // Paging failed: a bigger live page is on its way instead.
+      if (messages.length == before) await _nextChange();
+      if (_disposed) return false;
+    }
+    if (loaded()) return true;
+    if (_jumpTarget == id) {
+      _jumpTarget = null;
+      notifyListeners();
+    }
+    return false;
+  }
+
+  /// The view has the message on screen: highlight it for a moment.
+  void jumpFinished(String id) {
+    if (_jumpTarget == id) _jumpTarget = null;
+    _highlighted = id;
+    _highlightTimer?.cancel();
+    _highlightTimer = Timer(highlightFor, () {
+      _highlighted = null;
+      if (!_disposed) notifyListeners();
+    });
+    notifyListeners();
+  }
+
+  /// The next notifyListeners, or a few seconds, whichever comes first.
+  Future<void> _nextChange() {
+    final done = Completer<void>();
+    void listener() {
+      if (!done.isCompleted) done.complete();
+    }
+
+    addListener(listener);
+    return done.future
+        .timeout(const Duration(seconds: 5), onTimeout: () {})
+        .whenComplete(() => removeListener(listener));
+  }
+
   void removeDraft(NewAttachment a) {
     _drafts.remove(a);
     notifyListeners();
@@ -733,6 +801,7 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
   void dispose() {
     _outbox?.removeListener(_onOutbox);
     _disposed = true;
+    _highlightTimer?.cancel();
     takePhoto.dispose();
     recordVideo.dispose();
     react.dispose();

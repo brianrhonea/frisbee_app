@@ -68,6 +68,10 @@ With web 0.56.1 and API 0.44.0. Firestore and Storage rules changed.
 
 - Chats: the reactions bubble opens under a message near the top of the
   screen, so the title bar never covers it.
+- Pinned messages are their own page, from a room's ⋯ (as in Discord):
+  a card for each pin with its author, date, text and files. Tap one to
+  jump to it in the chat, loading older messages as needed; it's tinted
+  for a moment. The pinned strip at the top of the room is gone.
 - Learn to play and the rules of ultimate are one page: the lessons (now
   in one card, divided), then the rules, each opening in place, with the
   official rule books. Settings and Help have one "Learn to play";
