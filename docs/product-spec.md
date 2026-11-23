@@ -175,9 +175,12 @@ and events; everything else in the hub is for members. A private group
   instructions and the paid switch still work beside it. A second
   payment for something already paid is refunded in full.
 - Refunds and disputes are handled in the host's Stripe Dashboard. A full
-  refund un-marks the fee and Stall 10 gives its fee back.
-- The app opens Stripe's pages in the browser: entry fees are for
-  real-world events, which store rules allow outside in-app purchase.
+  refund un-marks the fee and Stall 10 gives its fee back. Withdrawing
+  doesn't refund anything (a known problem, §9).
+- The app takes payment in Stripe's payment sheet and the website in
+  embedded Checkout (Stripe's pages without a publishable key): entry
+  fees are for real-world events, which store rules allow outside
+  in-app purchase.
 - Not yet: team dues (a dues amount a team sets; today only a paid
   checkbox), refunding from inside Stall 10, memberships, tax.
 
@@ -1377,3 +1380,24 @@ web SDK in W7. Components stay hand-written CSS on the site's tokens.
   youth safeguarding for School / youth)?
 - What happens to existing groups and schools/clubs: migrate each to a
   community type automatically, or ask their admins to pick one?
+
+**Known problem: refunds when a team withdraws** (noted 2026-11-23, to
+tackle later). A team or player that paid online and then withdraws
+gets nothing back automatically: the entry becomes withdrawn, the fee
+stays marked paid, and the money stays with the host unless they
+refund it in their Stripe Dashboard. The Withdraw confirmation ("Withdraw
+Haze?", app and web) says nothing about the payment, so a payer may
+expect a refund. When the host refunds in full, Stall 10 returns its 3%
+but Stripe keeps its card fee, so the host is out about 3% of the
+charge (≈ $12.61 of $424.61); a partial refund leaves the fee marked
+paid and Stall 10 keeps its fee. Options discussed:
+1. Warn on Withdraw when the payer has paid ("Your $424.61 payment isn't
+   refunded automatically; ask the organizers").
+2. A refund policy the host sets on the event (No refunds / Full refund
+   until a date / Refund less fees until a date), shown before paying
+   and on Withdraw.
+3. A Refund button for hosts in Stall 10 (full or part), possibly
+   automatic under the policy when a team withdraws before the date.
+
+Still to decide: whether Stall 10 keeps or returns its 3% on a full
+refund, and whether the payer or host bears Stripe's kept fee.
