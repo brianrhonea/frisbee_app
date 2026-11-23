@@ -16,6 +16,8 @@ const config: NextConfig = {
     return [
       { source: "/events", destination: "/explore#coming-up", permanent: false },
       { source: "/discover", destination: "/explore", permanent: false },
+      // The rules are part of Learn to play (the app's Routes.rules does the same).
+      { source: "/rules", destination: "/learn#rules", permanent: false },
       // The app's old "Find events" link (Routes.findEvents) opens Discover there too.
       { source: "/schedule", has: [{ type: "query", key: "view", value: "find" }], destination: "/explore", permanent: false },
     ];

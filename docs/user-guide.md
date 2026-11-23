@@ -675,10 +675,12 @@ from the right (on a computer, as a panel; click outside to close it).
 - **Help**: answers to common questions about Stall 10 (joining a team,
   notifications, chats, events, tournaments, fees, safety, offline use,
   your account), with **Contact support** (support@stall10.app).
-- **Rules of ultimate**: a plain-language guide to how the game is played
-  (Spirit of the Game, the pull, stall count, scoring, fouls, picks,
-  timeouts), with links to the official USA Ultimate and WFDF rules. On
-  the website it's at /rules, open to everyone.
+- **Learn to play**: the basics in short lessons (with a tick on each one
+  you've read), then **the rules of ultimate** on the same page: a
+  plain-language guide (Spirit of the Game, the pull, stall count,
+  scoring, fouls, picks, timeouts), each rule opening in place, with links
+  to the official USA Ultimate and WFDF rules. On the website it's at
+  /learn (old /rules links open the rules part), open to everyone.
 - **Account**: change your **display name**; see your **@username** and
   **email**; **Change password** (or "Forgot it?" for a reset link); **Delete account** (it asks you to type DELETE and confirm
   your password, or sign in with Google or Apple again). It works the

@@ -91,8 +91,11 @@ abstract final class Routes {
   /// Learn to play: the rules for beginners, over the page (`context.push`).
   static const learn = '/learn';
 
-  /// The rules of ultimate (our guide, linking the official rules).
+  /// The rules of ultimate: an old link, sent to [learnRules].
   static const rules = '/rules';
+
+  /// Learn to play, opened at the rules of ultimate.
+  static const learnRules = '/learn?part=rules';
 
   /// A post's page; [comment] puts the cursor in the comment box.
   static String post(String id, {bool comment = false}) =>

@@ -6,6 +6,11 @@ here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
 ## 0.56.1 — 2026-11-22
 
+- Learn to play and the rules of ultimate are one page (`/learn`, the
+  rules at `#rules`, each opening in place; `/rules` redirects there).
+  On phones the lessons index is a compact list and the spacing is
+  tighter. Settings and Help link Learn to play once.
+
 - Chats: the reactions bubble on the first message (no room above it in
   the message list) opens under the message instead of behind the chat
   header, so its emoji can be picked.

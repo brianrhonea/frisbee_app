@@ -15,7 +15,7 @@ const sections = [
   ["/settings/blocked", "Blocked accounts"],
   ["/settings/account", "Account"],
   ["/settings/help", "Help"],
-  ["/rules", "Rules of ultimate"],
+  ["/learn", "Learn to play"],
   ["/learn", "Learn to play"],
 ] as const;
 

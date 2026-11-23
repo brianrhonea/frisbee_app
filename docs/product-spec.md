@@ -1335,8 +1335,10 @@ Out of scope: payments, meeting recording, USA Ultimate data.
     `mention_fixtures.test.ts` and `team_chats_fixtures.test.ts`, app
     `mention_fixtures_test.dart` and `chat_test.dart`, functions
     `notifications/mentions.test.ts`.
-74. Help in Settings and the Rules of ultimate page: [x] app; [x] website
-    (`/settings/help`, `/rules`), the same words from `guides.ts` /
+74. Help in Settings, and the rules of ultimate as the second part of
+    Learn to play (each rule opening in place; `/rules` redirects there):
+    [x] app; [x] website (`/settings/help`, `/learn#rules`), the same
+    words from `guides.ts` /
     `guides.dart`. Tests: shared `guide_fixtures.test.ts`, app
     `guide_fixtures_test.dart` and `guides_test.dart`.
 

@@ -91,13 +91,13 @@ Widget chooseUsernamePage() => ViewModelHost(
 );
 
 /// Learn to play, with its reading progress (kept on this device).
-Widget learnPage() => ViewModelHost(
+Widget learnPage({bool openRules = false}) => ViewModelHost(
   create: (c) => LearnViewModel(
     // Tests that don't provide one keep progress in memory.
     repository:
         c.read<LearnProgressRepository?>() ?? LearnProgressRepositoryMemory(),
   ),
-  builder: (_, vm) => LearnScreen(viewModel: vm),
+  builder: (_, vm) => LearnScreen(viewModel: vm, openRules: openRules),
 );
 
 /// Discover, with its search and filter from `?q=` and `?only=`: search,

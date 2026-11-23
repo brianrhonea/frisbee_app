@@ -68,6 +68,10 @@ With web 0.56.1 and API 0.44.0. Firestore and Storage rules changed.
 
 - Chats: the reactions bubble opens under a message near the top of the
   screen, so the title bar never covers it.
+- Learn to play and the rules of ultimate are one page: the lessons (now
+  in one card, divided), then the rules, each opening in place, with the
+  official rule books. Settings and Help have one "Learn to play";
+  `/rules` opens the rules part.
 - Your email is never shown as your name: someone without a name
   appears as "Player" on teams, chats, posts and follows (pentest P6).
 - Rules: private profiles' posts can't be listed by people who don't

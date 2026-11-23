@@ -19,56 +19,62 @@ Future<void> _open(BuildContext context, Uri uri) async {
   }
 }
 
-/// The rules of ultimate in our own words ([rulesGuide]), with links to the
-/// official rule books ([officialRules]). From Settings, Help and Learn.
-class RulesScreen extends StatelessWidget {
-  const RulesScreen({super.key});
+/// Above the rules on Learn to play.
+const rulesIntro =
+    'A plain-language guide to how ultimate is played. For anything it '
+    'leaves out, or if a call is in doubt, the official rules decide.';
+
+/// Under the rules on Learn to play.
+const rulesDisclaimer =
+    "This guide is Stall 10's summary, not an official rule book. Events "
+    'can change things like game length and timeouts.';
+
+/// The official rule books ([officialRules]), each opening in the browser.
+class OfficialRuleLinks extends StatelessWidget {
+  const OfficialRuleLinks({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Rules of ultimate')),
-      body: PageScroll(
-        children: [
-          const PageHeader(
-            eyebrow: 'Rules',
-            title: 'The rules of ultimate',
-            subtitle:
-                'A plain-language guide to how ultimate is played. For '
-                'anything it leaves out, or if a call is in doubt, the '
-                'official rules decide.',
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      for (final l in officialRules)
+        ListTile(
+          key: Key('official-${l.url}'),
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          leading: const Icon(Icons.open_in_new, size: 20),
+          title: Text(
+            l.label,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
           ),
-          SectionCard(
-            title: 'Official rules',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final l in officialRules)
-                  ListTile(
-                    key: Key('official-${l.url}'),
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.open_in_new),
-                    title: Text(l.label),
-                    subtitle: Text(l.note),
-                    onTap: () => _open(context, Uri.parse(l.url)),
-                  ),
-              ],
-            ),
-          ),
-          for (final s in rulesGuide) _GuideCard(section: s),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 4, 4, 16),
-            child: Text(
-              "This guide is Stall 10's summary, not an official rule book. "
-              'Events can change things like game length and timeouts.',
-              style: TextStyle(fontSize: 12.5, color: c.muted),
-            ),
-          ),
-        ],
+          subtitle: Text(l.note),
+          onTap: () => _open(context, Uri.parse(l.url)),
+        ),
+    ],
+  );
+}
+
+/// One rule ([rulesGuide]) or help topic, opening in place to its points.
+class GuideTile extends StatelessWidget {
+  const GuideTile({super.key, required this.section});
+
+  final GuideSection section;
+
+  @override
+  Widget build(BuildContext context) => Theme(
+    // No lines above and below an opened section.
+    data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+    child: ExpansionTile(
+      tilePadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 2),
+      title: Text(
+        section.title,
+        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
       ),
-    );
-  }
+      childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
+      expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [GuidePoints(section: section)],
+    ),
+  );
 }
 
 /// Help in Settings: common questions about the app ([helpTopics]), each
@@ -94,22 +100,7 @@ class HelpScreen extends StatelessWidget {
               children: [
                 for (final (i, s) in helpTopics.indexed) ...[
                   if (i > 0) Divider(height: 1, color: c.border),
-                  Theme(
-                    // No lines above and below an opened topic.
-                    data: Theme.of(
-                      context,
-                    ).copyWith(dividerColor: Colors.transparent),
-                    child: ExpansionTile(
-                      key: Key('help-${s.id}'),
-                      title: Text(
-                        s.title,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                      expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [_Points(section: s)],
-                    ),
-                  ),
+                  GuideTile(key: Key('help-${s.id}'), section: s),
                 ],
               ],
             ),
@@ -120,17 +111,11 @@ class HelpScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.sports),
-                  title: const Text('Rules of ultimate'),
-                  subtitle: const Text('How the game is played'),
-                  onTap: () => context.push(Routes.rules),
-                ),
-                ListTile(
+                  key: const Key('help-learn'),
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.menu_book_outlined),
                   title: const Text('Learn to play'),
-                  subtitle: const Text('Ultimate in five minutes'),
+                  subtitle: const Text('The basics and the rules of ultimate'),
                   onTap: () => context.push(Routes.learn),
                 ),
                 ListTile(
@@ -151,22 +136,9 @@ class HelpScreen extends StatelessWidget {
   }
 }
 
-class _GuideCard extends StatelessWidget {
-  const _GuideCard({required this.section});
-
-  final GuideSection section;
-
-  @override
-  Widget build(BuildContext context) => SectionCard(
-    key: Key('rules-${section.id}'),
-    title: section.title,
-    child: _Points(section: section),
-  );
-}
-
 /// A section's intro and its points as a bulleted list.
-class _Points extends StatelessWidget {
-  const _Points({required this.section});
+class GuidePoints extends StatelessWidget {
+  const GuidePoints({super.key, required this.section});
 
   final GuideSection section;
 
