@@ -96,6 +96,7 @@ class HostedTournamentViewModel extends ChangeNotifier {
       _reserveSpot,
     );
     invite = Command1<void, ({TeamListing team, String divisionId})>(_invite);
+    inviteAgain = Command1<void, TournamentEntry>(_inviteAgain);
     decide = Command1<void, EntryDecision>(_decide);
     updateCaptains =
         Command1<void, ({TournamentEntry entry, List<String> captainIds})>(
@@ -241,6 +242,9 @@ class HostedTournamentViewModel extends ChangeNotifier {
   /// players and teams). Returns the new team's id, for inviting players.
   late final Command1<String, ({String name, String divisionId})> reserveSpot;
   late final Command1<void, ({TeamListing team, String divisionId})> invite;
+
+  /// Invites a team again once its invite expired, with a new reply-by time.
+  late final Command1<void, TournamentEntry> inviteAgain;
   late final Command1<void, EntryDecision> decide;
   late final Command1<void, ({TournamentEntry entry, List<String> captainIds})>
   updateCaptains;
@@ -701,6 +705,10 @@ class HostedTournamentViewModel extends ChangeNotifier {
       final problem = leagueFitProblem(team, _divisions[a.divisionId]);
       if (problem != null) return Result.error(Exception(problem));
     }
+    // Past its reply-by time an invite can't be taken up.
+    if (entryOf(team.id)?.isExpired(_now()) ?? false) {
+      return Result.error(Exception(TournamentEntry.expiredMessage));
+    }
     // Applying and accepting an invite both register the team.
     final int players;
     try {
@@ -774,7 +782,9 @@ class HostedTournamentViewModel extends ChangeNotifier {
 
   Future<Result<void>> _invite(({TeamListing team, String divisionId}) i) {
     final existing = entryOf(i.team.id);
-    if (existing != null && existing.status != EntryStatus.withdrawn) {
+    if (existing != null &&
+        existing.status != EntryStatus.withdrawn &&
+        !existing.isExpired(_now())) {
       return Future.value(
         Result.error(
           Exception(
@@ -790,6 +800,25 @@ class HostedTournamentViewModel extends ChangeNotifier {
         teamName: i.team.name,
         divisionId: i.divisionId,
         status: EntryStatus.invited,
+        replyBy: _tournament?.inviteReplyBy(_now()),
+      ),
+    );
+  }
+
+  Future<Result<void>> _inviteAgain(TournamentEntry e) {
+    if (!e.isExpired(_now()) && e.status != EntryStatus.withdrawn) {
+      return Future.value(
+        Result.error(Exception('${e.teamName} is already invited.')),
+      );
+    }
+    return _repo.saveEntry(
+      tournamentId,
+      TournamentEntry(
+        teamId: e.teamId,
+        teamName: e.teamName,
+        divisionId: e.divisionId,
+        status: EntryStatus.invited,
+        replyBy: _tournament?.inviteReplyBy(_now()),
       ),
     );
   }

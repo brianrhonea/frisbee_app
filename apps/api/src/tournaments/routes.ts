@@ -99,6 +99,9 @@ export function tournamentRoutes(app: FastifyInstance, svc: TournamentService, l
     await svc.invite(caller(req), req.params.id, req.params.teamId, req.body);
     return reply.code(204).send();
   });
+  app.get<{ Params: { teamId: string } }>("/v1/teams/:teamId/tournament-invites", async (req) => ({
+    invites: await svc.teamInvites(caller(req), req.params.teamId),
+  }));
   app.put<E>(`${base}/entries/:teamId/status`, async (req, reply) => {
     await svc.setEntryStatus(caller(req), req.params.id, req.params.teamId, req.body);
     return reply.code(204).send();

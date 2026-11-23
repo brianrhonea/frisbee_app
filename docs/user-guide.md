@@ -419,7 +419,12 @@ run it.
 3. **Publish and open registration**. The page, schedule, results and
    news are public either way.
 4. **Teams** tab: accept, waitlist or decline applications; **Invite**
-   searches for teams. Accepted teams show the bid fee **Paid** switch;
+   searches for teams. **Invited teams answer by** (in the form; 2
+   weeks before it starts unless you change it) is when an invite
+   expires: after it the team can't accept, the invite shows
+   **Expired**, and **Invite again** gives them a fresh deadline. A
+   team's admins see its invites at the top of the team page, with
+   **Accept** and **Decline**. Accepted teams show the bid fee **Paid** switch;
    **Unpaid only** filters, and unpaid teams past the due date show
    **Overdue**.
 5. **Close registration**, then drag teams into seed order (1 is the
@@ -465,19 +470,20 @@ and up to 4 captains (they report scores), or **Accept invite** if
 invited. The Overview tab shows your status and whether your bid fee is
 marked paid. When the host takes payments online, it also has **Pay
 online** for your team's fee (and on your signup, for your own entry
-fee): a secure Stripe checkout, after which the fee shows as paid.
+fee): Stripe's secure checkout opens right there (in the app over the
+event page; on the website inside the page), and the fee shows as paid
+once Stripe confirms it. Card, Apple Pay or Google Pay where set up, or
+a US bank account, which takes a few days to clear.
 
 **Taking payments online**: the owner of the hosting team or community
 sees **Take payments online** on the event's Overview and connects a
 Stripe account (**Set up with Stripe**; **Continue with Stripe** if
 Stripe needs more). After that, teams and players can pay their fees in
-Stall 10. The money goes to your Stripe account: Stripe keeps its card
-fee and Stall 10 keeps 1% + $1 of each payment. When you set a fee, the
-form shows what you'd get of it paid online: on $100, about $94.80 after
-Stall 10's $2 and Stripe's card fee of about $3.20 (Stripe's usual 2.9% +
-30¢; some cards cost more). Switch on **Teams cover the processing
-fee** (or **Payers cover…**) and they pay the fees instead: $105.41 for a
-$100 fee, shown as a separate processing fee, and you get the whole $100.
+Stall 10. The money goes to your Stripe account, and you get the whole
+fee: whoever pays also pays Stall 10's 3% and Stripe's card fee (about
+2.9% + 30¢), shown to them as "service and processing fees". On a $100
+fee they pay $106.39 by card and you get $100. The event form shows this
+under each fee.
 Payers can pay by card, or from a bank account if you switch it on in your
 Stripe Dashboard (bank payments take up to 4 business days and show as
 processing until then). Teams and players who pay by check, purchase

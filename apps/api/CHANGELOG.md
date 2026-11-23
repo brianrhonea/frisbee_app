@@ -7,6 +7,31 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.45.0 — 2026-11-22
+
+- Tournaments store `inviteReplyDays` (null or 3/7/14/21/30). An invite's
+  entry stores `replyBy` and `teamId`; accepting an invite past
+  `replyBy` is refused (`failed_precondition`), and inviting a team
+  whose invite expired invites it again.
+- `GET /v1/teams/:teamId/tournament-invites` (team admins): the team's
+  open invites, soonest first, with reply-by and expiry.
+- `POST /v1/tournaments/:id/pay/intent`: the app's payment sheet, a
+  direct-charge PaymentIntent on the host's account (automatic payment
+  methods, Stall 10's application fee) for the amount from the
+  tournament; reused while open, and it closes an open Checkout session
+  first (and Checkout closes it), so a fee has one live payment. Charges
+  gain `mode` (hosted, embedded, intent). The webhook handles
+  `payment_intent.succeeded`, `.processing`, `.payment_failed` and
+  `.canceled` for sheet charges on their own account only; the payer's
+  status check asks Stripe about the intent too.
+- Fees: the default platform fee is 3% (was 1% + $1), taken on the fee
+  itself, and every online charge adds it and Stripe's card fee on top
+  (`onlineCharge`), whatever `payerCoversFees` says, so the host gets the
+  whole fee. Checkout's extra line is "Service and processing fees".
+- `POST /v1/tournaments/:id/checkout` takes `ui: "embedded"` (Checkout
+  inside the website, `ui_mode: embedded_page`) and returns
+  `{url, clientSecret, account}`.
+
 ## 0.44.0 — 2026-11-22
 
 - Hosts' Stripe accounts are made with Accounts v2 (`/v2/core/accounts`,

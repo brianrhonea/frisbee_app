@@ -35,7 +35,32 @@ export interface CheckoutInput {
   metadata: Record<string, string>;
   /** Stripe's idempotency key, so a retried request makes one session. */
   idempotencyKey: string;
+  /**
+   * Shown inside the website's page (ui_mode embedded_page) instead of on
+   * Stripe's: [successUrl] is where it returns to, [cancelUrl] unused.
+   */
+  embedded?: boolean;
 }
+
+/** A PaymentIntent for the app's own payment sheet (PaymentSheet), as a direct charge. */
+export interface IntentInput {
+  account: string;
+  amountCents: number;
+  currency: string;
+  feeCents: number;
+  /** On the payer's receipt and the host's Dashboard, e.g. "Bid fee: Spring Fling (Haze)". */
+  description: string;
+  email?: string;
+  metadata: Record<string, string>;
+  idempotencyKey: string;
+}
+
+/**
+ * A PaymentIntent as Stripe reports it now: still to pay ("open": no
+ * payment yet, or a card declined and the sheet can try again), a bank
+ * payment clearing, paid, or cancelled.
+ */
+export type GatewayIntentStatus = "open" | "processing" | "succeeded" | "canceled";
 
 /** A Checkout session as Stripe reports it now (asked when the payer comes back, besides the webhook). */
 export interface GatewayCheckout {
@@ -63,7 +88,14 @@ export interface PaymentGateway {
   /** A single-use onboarding link for [account]. */
   onboardingLink(account: string, refreshUrl: string, returnUrl: string): Promise<string>;
   account(account: string): Promise<GatewayAccount>;
-  createCheckout(input: CheckoutInput): Promise<{ id: string; url: string }>;
+  /** A Checkout session: [url] for a hosted one, [clientSecret] for an embedded one. */
+  createCheckout(input: CheckoutInput): Promise<{ id: string; url: string | null; clientSecret: string | null }>;
+  /** A PaymentIntent on [IntentInput.account], with its client secret for the payment sheet. */
+  createIntent(input: IntentInput): Promise<{ id: string; clientSecret: string }>;
+  /** The PaymentIntent [id] on [account], as it stands now. */
+  intent(account: string, id: string): Promise<{ status: GatewayIntentStatus; clientSecret: string }>;
+  /** Cancels a PaymentIntent nobody paid; throws if it can't be (paid, or clearing). */
+  cancelIntent(account: string, id: string): Promise<void>;
   /** The session [id] on [account], as it stands now. */
   checkout(account: string, id: string): Promise<GatewayCheckout>;
   /** Stops an open session taking payment; throws if it isn't open any more. */

@@ -2,13 +2,15 @@
 // Online payments for tournament fees (packages/shared/src/payments.ts):
 // the host owner's payout card, and the Pay button for a team's bid or
 // spot fee or a player's own entry fee. Both show nothing until the API
-// says online payments are available. Stripe's pages open in this tab
-// and send people back to /payments/*.
+// says online payments are available. With a publishable key
+// (NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY), Checkout opens inside this page
+// (Stripe's embedded Checkout, on the host's account); without one, and
+// for payout onboarding, Stripe's pages open in this tab. Either way they
+// send people back to /payments/*.
 import {
   centsLabel,
-  chargeCoveringFees,
   type CheckoutResult,
-  feeBreakdown,
+  onlineCharge,
   onlinePaymentProblem,
   type PaymentFees,
   type PayOptions,
@@ -18,8 +20,9 @@ import {
   paymentPaths,
   platformFeeLabel,
 } from "@stall10/shared";
+import type { StripeEmbeddedCheckout } from "@stripe/stripe-js";
 import type { User } from "firebase/auth";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { PaymentDoc } from "@/components/drafts/data";
 import { callApi, problem } from "@/lib/client";
 
@@ -52,12 +55,57 @@ function setFlag(key: string, on: boolean) {
 /** Opens a Stripe link for [path] in this tab. */
 export async function goToStripe(user: User, path: string, body: unknown): Promise<void> {
   const { url } = await callApi<CheckoutResult | PayoutLinkResult>(user, path, { method: "POST", body });
-  if (!url.startsWith("https://")) throw new Error("Stripe sent back no page.");
+  if (!url?.startsWith("https://")) throw new Error("Stripe sent back no page.");
   window.location.assign(url);
 }
 
-/** The host owner's "Take payments online" card; [amountCents] is the event's fee, for the "you get about…" line ($100 without one). */
-export function PayoutsCard({ user, teamId, amountCents, payerCovers = false }: { user: User; teamId: string; amountCents?: number; payerCovers?: boolean }) {
+/** Stripe's publishable key: Checkout in this page with one, Stripe's page without. */
+const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "";
+
+/**
+ * Stripe's Checkout inside this page, for the session [clientSecret] on the
+ * host's [account]. Paying sends the payer on to /payments/done, as
+ * Stripe's own page does; [onClose] puts the Pay button back.
+ */
+function EmbeddedPay({ clientSecret, account, onClose }: { clientSecret: string; account: string; onClose: () => void }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let live = true;
+    let checkout: StripeEmbeddedCheckout | null = null;
+    (async () => {
+      try {
+        const { loadStripe } = await import("@stripe/stripe-js");
+        const stripe = await loadStripe(publishableKey, { stripeAccount: account });
+        if (!stripe) throw new Error("Stripe didn't load.");
+        const made = await stripe.createEmbeddedCheckoutPage({ clientSecret });
+        if (!live) return made.destroy();
+        checkout = made;
+        if (box.current) made.mount(box.current);
+      } catch {
+        if (live) setError("Couldn't open the checkout. Check your connection and try again.");
+      }
+    })();
+    return () => {
+      live = false;
+      checkout?.destroy();
+    };
+  }, [clientSecret, account]);
+  return (
+    <div className="embedded-pay">
+      <div className="embedded-pay-head">
+        <strong>Pay securely with Stripe</strong>
+        <button type="button" className="text-btn" onClick={onClose}>
+          Cancel
+        </button>
+      </div>
+      {error ? <p className="form-error">{error}</p> : <div ref={box} className="embedded-pay-frame" aria-busy="true" />}
+    </div>
+  );
+}
+
+/** The host owner's "Take payments online" card; [amountCents] is the event's fee, for the "payers pay…" line ($100 without one). */
+export function PayoutsCard({ user, teamId, amountCents }: { user: User; teamId: string; amountCents?: number }) {
   const [account, setAccount] = useState<PayoutAccountView | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -80,13 +128,13 @@ export function PayoutsCard({ user, teamId, amountCents, payerCovers = false }: 
   const copy = {
     none: {
       title: "Take payments online",
-      body: `Let teams and players pay their fees in Stall 10 instead of collecting them yourself. Payments go to your own Stripe account. Stripe keeps its card fee and Stall 10 keeps ${account.feeLabel} of each payment.`,
+      body: `Let teams and players pay their fees in Stall 10 instead of collecting them yourself. Payments go to your own Stripe account, and you get the whole fee: payers also pay Stall 10's ${account.feeLabel} and Stripe's card fee.`,
       action: "Set up with Stripe",
     },
     pending: { title: "Finish setting up payments", body: "Stripe still needs a few details before you can take payments.", action: "Continue with Stripe" },
     ready: {
       title: "Online payments are on",
-      body: `Teams and players can pay their fees in Stall 10. Refunds and payouts are in your Stripe Dashboard. Stall 10 keeps ${account.feeLabel} of each payment.`,
+      body: `Teams and players can pay their fees in Stall 10. Refunds and payouts are in your Stripe Dashboard. You get the whole fee: payers also pay Stall 10's ${account.feeLabel} and Stripe's card fee.`,
       action: null,
     },
   }[account.status];
@@ -94,7 +142,7 @@ export function PayoutsCard({ user, teamId, amountCents, payerCovers = false }: 
     <section className="card payouts-card">
       <h2 className="card-title">{copy.title}</h2>
       <p>{copy.body}</p>
-      <FeeBreakdownNote user={user} amountCents={amountCents ?? 10_000} currency="USD" compact payerCovers={payerCovers} />
+      <FeeBreakdownNote user={user} amountCents={amountCents ?? 10_000} currency="USD" compact />
       {error && <p className="form-error">{error}</p>}
       {copy.action && (
         <button type="button" className="btn btn-primary btn-small" disabled={busy} onClick={connect}>
@@ -117,6 +165,8 @@ export function PayOnline({ user, tournamentId, teamId, withStatus = false }: { 
   const [checkFailed, setCheckFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  /** The embedded Checkout open in this page. */
+  const [embedded, setEmbedded] = useState<{ clientSecret: string; account: string } | null>(null);
   const payingKey = `stall10.paying.${tournamentId}.${teamId ?? "me"}`;
   // Each load asks Stripe about the last checkout, so coming back shows it
   // paid without waiting for the webhook. Back from paying (marked when Pay
@@ -189,12 +239,36 @@ export function PayOnline({ user, tournamentId, teamId, withStatus = false }: { 
     setError("");
     try {
       setFlag(payingKey, true);
-      await goToStripe(user, paymentPaths.checkout(encodeURIComponent(tournamentId)), body);
+      const path = paymentPaths.checkout(encodeURIComponent(tournamentId));
+      if (!publishableKey) {
+        await goToStripe(user, path, body);
+        return;
+      }
+      const r = await callApi<CheckoutResult>(user, path, { method: "POST", body: { ...body, ui: "embedded" } });
+      if (!r.clientSecret || !r.account) throw new Error("Stripe sent back no checkout.");
+      setEmbedded({ clientSecret: r.clientSecret, account: r.account });
+      setBusy(false);
     } catch (e) {
+      setFlag(payingKey, false);
       setError(problem(e));
       setBusy(false);
     }
   };
+  if (embedded) {
+    return (
+      <div className="pay-online">
+        <EmbeddedPay
+          clientSecret={embedded.clientSecret}
+          account={embedded.account}
+          onClose={() => {
+            setEmbedded(null);
+            setFlag(payingKey, false);
+            load();
+          }}
+        />
+      </div>
+    );
+  }
   return (
     <div className="pay-online">
       {withStatus && <small className="muted">{options.paid ? `Fee ${centsLabel(options.amountCents)} paid.` : `Fee ${centsLabel(options.amountCents)} to pay.`}</small>}
@@ -211,7 +285,7 @@ export function PayOnline({ user, tournamentId, teamId, withStatus = false }: { 
               {busy ? "Opening checkout…" : `Pay ${centsLabel(options.chargeCents)} online`}
             </button>
             <small className="muted">
-              {options.processingCents > 0 ? `Includes a ${centsLabel(options.processingCents)} processing fee. ` : ""}
+              {options.processingCents > 0 ? `Includes ${centsLabel(options.processingCents)} in service and processing fees. ` : ""}
               Secure checkout by Stripe. It shows as paid here once Stripe confirms it.
             </small>
           </>
@@ -228,23 +302,16 @@ export function PayOnline({ user, tournamentId, teamId, withStatus = false }: { 
  * under the price, and (with [compact]) the payout card's example. Mirrors
  * feeNote in apps/mobile/lib/ui/payments/widgets/payment_widgets.dart.
  */
-export function feeNote(fees: PaymentFees, amountCents: number, currency: string, compact = false, payerCovers = false): string | null {
+export function feeNote(fees: PaymentFees, amountCents: number, currency: string, compact = false): string | null {
   if (!fees.available || amountCents <= 0) return null;
-  const charge = payerCovers ? chargeCoveringFees(amountCents, fees.platform, fees.card) : amountCents;
-  const why = onlinePaymentProblem(charge, currency, fees.platform);
+  const c = onlineCharge({ amountCents }, fees.platform, fees.card);
+  const why = onlinePaymentProblem(c.chargeCents, currency, fees.platform);
   if (why) return compact ? null : why;
-  if (payerCovers && compact) return `On a ${centsLabel(amountCents)} fee, payers pay ${centsLabel(charge)} online and you get the whole ${centsLabel(amountCents)}.`;
-  if (payerCovers) {
-    const [total, fee, extra] = [charge, amountCents, charge - amountCents].map(centsLabel);
-    return `Paid online, they pay ${total} (${fee} plus a ${extra} processing fee) and you get the whole ${fee}. Paid your own way, they pay ${fee}.`;
-  }
-  const b = feeBreakdown(amountCents, fees.platform, fees.card);
-  const [amount, host, ours, stripe] = [b.amountCents, b.hostCents, b.platformCents, b.stripeCents].map(centsLabel);
-  if (compact) return `On a ${amount} fee you get about ${host}: Stall 10 keeps ${ours} and Stripe about ${stripe}.`;
+  const [total, amount, ours, stripe] = [c.chargeCents, amountCents, c.platformCents, c.processingCents - c.platformCents].map(centsLabel);
+  if (compact) return `On a ${amount} fee, payers pay ${total} online and you get the whole ${amount}.`;
   return (
-    `Paid online in Stall 10, you get about ${host} of each ${amount}. ` +
-    `Stall 10 keeps ${ours} (${platformFeeLabel(fees.platform)}) and Stripe about ${stripe} (${platformFeeLabel(fees.card)}, its usual card fee). ` +
-    "Paid your own way, you keep it all."
+    `Paid online, they pay ${total}: ${amount}, plus ${ours} for Stall 10 (${platformFeeLabel(fees.platform)}) and about ${stripe} for Stripe's card fee. ` +
+    `You get the whole ${amount}. Paid your own way, they pay ${amount}.`
   );
 }
 
@@ -271,16 +338,14 @@ export function FeeBreakdownNote({
   amountCents,
   currency,
   compact = false,
-  payerCovers = false,
 }: {
   user: User | null | undefined;
   amountCents: number | null;
   currency: string;
   compact?: boolean;
-  payerCovers?: boolean;
 }) {
   const fees = usePaymentFees(user);
-  const note = fees && amountCents != null ? feeNote(fees, amountCents, currency, compact, payerCovers) : null;
+  const note = fees && amountCents != null ? feeNote(fees, amountCents, currency, compact) : null;
   if (!note) return null;
   return compact ? <p className="fee-note">{note}</p> : <small className="muted fee-note">{note}</small>;
 }

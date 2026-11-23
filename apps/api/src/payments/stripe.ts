@@ -50,6 +50,11 @@ export function stripeFromEnv(env: NodeJS.ProcessEnv = process.env): PaymentGate
       return { chargesEnabled: cards === "active", detailsSubmitted: !owed };
     },
     async createCheckout(input) {
+      // Embedded: shown in the website's own page; it comes back to
+      // [successUrl] with the session's id when a payment needs a redirect.
+      const where = input.embedded
+        ? { ui_mode: "embedded_page" as const, return_url: `${input.successUrl}&session_id={CHECKOUT_SESSION_ID}` }
+        : { success_url: input.successUrl, cancel_url: input.cancelUrl };
       const session = await stripe.checkout.sessions.create(
         {
           mode: "payment",
@@ -60,14 +65,45 @@ export function stripeFromEnv(env: NodeJS.ProcessEnv = process.env): PaymentGate
           payment_intent_data: { application_fee_amount: input.feeCents, metadata: input.metadata },
           metadata: input.metadata,
           ...(input.email && { customer_email: input.email }),
-          success_url: input.successUrl,
-          cancel_url: input.cancelUrl,
+          ...where,
           expires_at: input.expiresAt,
         },
         { stripeAccount: input.account, idempotencyKey: input.idempotencyKey },
       );
+      if (input.embedded) {
+        if (!session.client_secret) throw new Error("Stripe returned no Checkout client secret.");
+        return { id: session.id, url: null, clientSecret: session.client_secret };
+      }
       if (!session.url) throw new Error("Stripe returned no Checkout URL.");
-      return { id: session.id, url: session.url };
+      return { id: session.id, url: session.url, clientSecret: null };
+    },
+    async createIntent(input) {
+      // A direct charge on the host's account, as Checkout's are: the
+      // payment methods the host has on (cards, wallets, bank payments)
+      // come from its settings, never a list here.
+      const pi = await stripe.paymentIntents.create(
+        {
+          amount: input.amountCents,
+          currency: input.currency.toLowerCase(),
+          automatic_payment_methods: { enabled: true },
+          application_fee_amount: input.feeCents,
+          description: input.description,
+          metadata: input.metadata,
+          ...(input.email && { receipt_email: input.email }),
+        },
+        { stripeAccount: input.account, idempotencyKey: input.idempotencyKey },
+      );
+      if (!pi.client_secret) throw new Error("Stripe returned no PaymentIntent client secret.");
+      return { id: pi.id, clientSecret: pi.client_secret };
+    },
+    async intent(account, intentId) {
+      // Asked while the payer waits, as checkout() is.
+      const pi = await stripe.paymentIntents.retrieve(intentId, {}, { stripeAccount: account, timeout: 5_000, maxNetworkRetries: 0 });
+      const status = pi.status === "succeeded" ? "succeeded" : pi.status === "processing" ? "processing" : pi.status === "canceled" ? "canceled" : "open";
+      return { status, clientSecret: pi.client_secret ?? "" };
+    },
+    async cancelIntent(account, intentId) {
+      await stripe.paymentIntents.cancel(intentId, {}, { stripeAccount: account });
     },
     async checkout(account, sessionId) {
       // Asked while the payer waits: short, no retries; the caller falls

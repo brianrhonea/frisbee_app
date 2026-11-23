@@ -343,6 +343,73 @@ void main() {
       expect(scroll.offset, scroll.position.maxScrollExtent);
     });
 
+    group('tournament invites', () {
+      late FakeHostedTournamentRepository hosted;
+      setUp(() {
+        hosted = FakeHostedTournamentRepository()
+          ..invites['t1'] = [
+            TeamTournamentInvite(
+              tournamentId: 'spring',
+              name: 'Spring Fling',
+              hostName: 'Denver Ultimate',
+              startsOn: now.add(const Duration(days: 30)),
+              divisionLabel: 'Club Mixed',
+              replyBy: now.add(const Duration(days: 16)),
+            ),
+            TeamTournamentInvite(
+              tournamentId: 'late',
+              name: 'Late Bloomer',
+              startsOn: now.add(const Duration(days: 10)),
+              replyBy: now.subtract(const Duration(days: 1)),
+              expired: true,
+            ),
+          ];
+      });
+      TeamHomeViewModel invitesVm() => TeamHomeViewModel(
+        teamId: 't1',
+        teamRepository: teams,
+        eventRepository: events,
+        teamPostRepository: posts,
+        authRepository: auth,
+        filePicker: picker,
+        tournamentRepository: hosted,
+        clock: () => now,
+      );
+
+      testWidgets('admins see them with Accept and Decline, and decline one', (
+        tester,
+      ) async {
+        addTeam({testUser.uid: TeamRole.owner});
+        final vm = invitesVm();
+        await pump(tester, vm);
+        expect(find.byKey(const ValueKey('tournament-invites')), findsOneWidget);
+        expect(find.text('Tournament invites · 2'), findsOneWidget);
+        expect(find.text('Spring Fling'), findsOneWidget);
+        expect(find.textContaining('Reply by'), findsOneWidget);
+        expect(find.byKey(const ValueKey('accept-invite-spring')), findsOneWidget);
+        // An expired one says so, with nothing to press.
+        expect(find.textContaining('Expired.'), findsOneWidget);
+        expect(find.byKey(const ValueKey('accept-invite-late')), findsNothing);
+
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('decline-invite-spring')),
+        );
+        await tester.tap(find.byKey(const ValueKey('decline-invite-spring')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(FilledButton, 'Decline'));
+        await tester.pumpAndSettle();
+        expect(hosted.declined, [('spring', 't1')]);
+        expect(find.text('Spring Fling'), findsNothing);
+        expect(find.text('Tournament invite'), findsOneWidget);
+      });
+
+      testWidgets("players don't see them", (tester) async {
+        addTeam({testUser.uid: TeamRole.player, 'owner': TeamRole.owner});
+        await pump(tester, invitesVm());
+        expect(find.byKey(const ValueKey('tournament-invites')), findsNothing);
+      });
+    });
+
     testWidgets('members get section links, events and posts', (tester) async {
       addTeam({testUser.uid: TeamRole.coach, 'owner': TeamRole.owner});
       await pump(tester, homeVm());

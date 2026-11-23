@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../../tournaments/widgets/tournament_day_card.dart';
 import '../../../data/repositories/meeting/meeting_repository.dart';
+import '../../../domain/models/hosted_tournament.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/team_event.dart';
 import '../../../domain/models/team_page.dart';
@@ -115,6 +116,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
     vm.pinPost,
     vm.unpinPost,
     vm.joinGroup,
+    vm.declineInvite,
     vm.cancelJoinRequest,
     vm.setNextRsvp,
   ];
@@ -762,6 +764,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
               SideColumnLayout(
                 main: [
                   ?pickup,
+                  ..._invites(context),
                   _about(summary),
                   if (showJoinCard) _joinCard(summary),
                   if (vm.youthRosterPrivate) const YouthRosterNote(),
@@ -785,6 +788,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                 ],
                 narrow: [
                   ?pickup,
+                  ..._invites(context),
                   _about(summary),
                   if (showJoinCard) _joinCard(summary),
                   if (vm.youthRosterPrivate) const YouthRosterNote(),
@@ -1139,6 +1143,114 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
 
   /// A group's tournaments, which anyone can open and follow. Members
   /// have the full list in the Tournaments tab.
+  /// Tournament and league invites waiting on the team, for its admins:
+  /// Accept opens the event (its "Your teams" card picks the captains),
+  /// Decline turns it down here. Nothing when there are none.
+  List<Widget> _invites(BuildContext context) {
+    final invites = vm.tournamentInvites;
+    if (invites.isEmpty) return const [];
+    final c = AppColors.of(context);
+    final day = DateFormat('EEE, MMM d');
+    return [
+      SectionCard(
+        key: const ValueKey('tournament-invites'),
+        title: invites.length == 1
+            ? 'Tournament invite'
+            : 'Tournament invites · ${invites.length}',
+        icon: Icons.mark_email_unread_outlined,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final i in invites)
+              Padding(
+                key: ValueKey('tournament-invite-${i.tournamentId}'),
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      i.name,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: c.ink,
+                      ),
+                    ),
+                    Text(
+                      [
+                        day.format(i.startsOn.toLocal()),
+                        if (i.hostName.isNotEmpty) 'from ${i.hostName}',
+                        if (i.divisionLabel.isNotEmpty) i.divisionLabel,
+                      ].join(' · '),
+                      style: TextStyle(fontSize: 12.5, color: c.muted),
+                    ),
+                    if (i.expired)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          'Expired. ${TournamentEntry.expiredMessage}',
+                          style: TextStyle(fontSize: 12.5, color: c.ink2),
+                        ),
+                      )
+                    else ...[
+                      if (i.replyBy case final by?)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            'Reply by ${day.format(by.toLocal())}',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: c.highlightInk,
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          FilledButton(
+                            key: ValueKey('accept-invite-${i.tournamentId}'),
+                            onPressed: () async {
+                              await context.push(
+                                Routes.tournament(i.tournamentId),
+                              );
+                              vm.refreshInvites();
+                            },
+                            child: const Text('Accept'),
+                          ),
+                          OutlinedButton(
+                            key: ValueKey('decline-invite-${i.tournamentId}'),
+                            onPressed: vm.declineInvite.running
+                                ? null
+                                : () async {
+                                    if (await confirmDialog(
+                                      context,
+                                      title: 'Decline the invite?',
+                                      message:
+                                          "Your team won't play in ${i.name}. "
+                                          'The organizers can invite you '
+                                          'again.',
+                                      confirmLabel: 'Decline',
+                                      destructive: true,
+                                    )) {
+                                      vm.declineInvite.execute(i.tournamentId);
+                                    }
+                                  },
+                            child: const Text('Decline'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    ];
+  }
+
   List<Widget> _tournaments(BuildContext context) {
     final listings = vm.tournamentListings;
     if (listings.isEmpty || vm.isMember) return const [];

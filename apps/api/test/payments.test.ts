@@ -5,7 +5,7 @@
 import { centsLabel, chargeCoveringFees, onlineCharge, onlinePaymentProblem, processingPaymentNote, paidOnlineNote, platformFeeCents, platformFeeLabel, refundedOnlineNote } from "@stall10/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
-import type { CheckoutInput, GatewayCheckout, GatewayEvent, PaymentGateway } from "../src/payments/gateway.js";
+import type { CheckoutInput, GatewayCheckout, GatewayEvent, GatewayIntentStatus, IntentInput, PaymentGateway } from "../src/payments/gateway.js";
 import { platformFeeFromEnv } from "../src/payments/service.js";
 import { stripeFromEnv } from "../src/payments/stripe.js";
 import Stripe from "stripe";
@@ -45,7 +45,26 @@ class FakeGateway implements PaymentGateway {
     this.checkouts.push(input);
     const id = `cs_${this.checkouts.length}`;
     this.sessions.set(id, { status: "open", paymentStatus: "unpaid", paymentIntent: null, paymentFailed: false });
-    return { id, url: `https://checkout.test/${id}` };
+    return input.embedded ? { id, url: null, clientSecret: `${id}_secret` } : { id, url: `https://checkout.test/${id}`, clientSecret: null };
+  }
+  intentsMade: IntentInput[] = [];
+  /** Each PaymentIntent as Stripe would report it now. */
+  intents = new Map<string, GatewayIntentStatus>();
+  cancelled: string[] = [];
+  async createIntent(input: IntentInput) {
+    this.intentsMade.push(input);
+    const id = `pi_sheet_${this.intentsMade.length}`;
+    this.intents.set(id, "open");
+    return { id, clientSecret: `${id}_secret` };
+  }
+  async intent(_account: string, id: string) {
+    if (this.down) throw new Error("stripe down");
+    return { status: this.intents.get(id) ?? ("open" as const), clientSecret: `${id}_secret` };
+  }
+  async cancelIntent(_account: string, id: string) {
+    if (this.intents.get(id) !== "open") throw new Error("can't cancel");
+    this.intents.set(id, "canceled");
+    this.cancelled.push(id);
   }
   async checkout(_account: string, id: string) {
     if (this.down) throw new Error("stripe down");
@@ -85,7 +104,7 @@ function setup(gateway: FakeGateway | null = new FakeGateway()) {
     teams,
     store,
     now: () => now,
-    payments: gateway ? { gateway, fee: { percentBps: 100, fixedCents: 100 }, returnUrl: site } : undefined,
+    payments: gateway ? { gateway, fee: { percentBps: 300, fixedCents: 0 }, returnUrl: site } : undefined,
   });
   const call = async (method: "GET" | "POST" | "PUT", url: string, body?: object, uid: string | null = "owner") => {
     const res = await app.inject({ method, url, ...(body && { payload: body }), headers: uid ? { authorization: `Bearer token:${uid}` } : {} });
@@ -130,8 +149,8 @@ function ready() {
 }
 
 describe("the fee", () => {
-  it("is 1% + $1 by default, rounded to the cent", () => {
-    expect(platformFeeFromEnv({})).toEqual({ percentBps: 100, fixedCents: 100 });
+  it("is 3% by default, rounded to the cent", () => {
+    expect(platformFeeFromEnv({})).toEqual({ percentBps: 300, fixedCents: 0 });
     expect(platformFeeCents(40000, { percentBps: 100, fixedCents: 100 })).toBe(500);
     expect(platformFeeCents(6000, { percentBps: 100, fixedCents: 100 })).toBe(160);
     expect(platformFeeCents(2050, { percentBps: 250, fixedCents: 0 })).toBe(51);
@@ -161,7 +180,7 @@ describe("fees for hosts", () => {
     const { call } = setup();
     const res = await call("GET", "/v1/payments/fees");
     expect(res.status).toBe(200);
-    expect(res.json()).toEqual({ available: true, platform: { percentBps: 100, fixedCents: 100 }, card: { percentBps: 290, fixedCents: 30 } });
+    expect(res.json()).toEqual({ available: true, platform: { percentBps: 300, fixedCents: 0 }, card: { percentBps: 290, fixedCents: 30 } });
     expect((await call("GET", "/v1/payments/fees", undefined, null)).status).toBe(401);
   });
 
@@ -177,7 +196,7 @@ describe("payouts", () => {
     expect((await s.call("POST", "/v1/teams/host/payouts/link", undefined, "coach")).status).toBe(403);
     const r = await s.call("GET", "/v1/teams/host/payouts");
     expect(r.status).toBe(200);
-    expect(r.json()).toEqual({ available: true, status: "none", feeLabel: "1% + $1" });
+    expect(r.json()).toEqual({ available: true, status: "none", feeLabel: "3%" });
   });
 
   it("says they aren't available without Stripe", async () => {
@@ -214,7 +233,7 @@ describe("payouts", () => {
 describe("paying", () => {
   it("shows the fee, and why it can't be paid online until the host connects", async () => {
     const r = await s.call("GET", "/v1/tournaments/t1/pay?team=haze", undefined, "captain");
-    expect(r.json()).toMatchObject({ online: false, amountCents: 40000, chargeCents: 40000, processingCents: 0, feeCents: 500, paid: false, pending: null });
+    expect(r.json()).toMatchObject({ online: false, amountCents: 40000, chargeCents: 42461, processingCents: 2461, feeCents: 1200, paid: false, pending: null });
     expect(r.json().reason).toMatch(/instructions/);
     ready();
     expect((await s.call("GET", "/v1/tournaments/t1/pay?team=haze", undefined, "captain")).json()).toMatchObject({ online: true, reason: null });
@@ -236,34 +255,44 @@ describe("paying", () => {
       throw new Error("stripe down");
     };
     const r = await s.call("POST", "/v1/tournaments/t1/checkout", { payer: "team", teamId: "haze" }, "captain");
-    expect(r.json()).toEqual({ url: "https://checkout.test/cs_1" });
+    expect(r.json()).toEqual({ url: "https://checkout.test/cs_1", clientSecret: null, account: "acct_1" });
   });
 
   it("makes a direct charge on the host's account with Stall 10's fee", async () => {
     ready();
     const r = await s.call("POST", "/v1/tournaments/t1/checkout", { payer: "team", teamId: "haze" }, "captain");
-    expect(r.json()).toEqual({ url: "https://checkout.test/cs_1" });
+    expect(r.json()).toEqual({ url: "https://checkout.test/cs_1", clientSecret: null, account: "acct_1" });
     const c = s.gateway.checkouts[0];
     expect(c).toMatchObject({
       account: "acct_1",
-      amountCents: 40000,
+      amountCents: 42461,
       currency: "USD",
-      feeCents: 500,
-      items: [{ name: "Bid fee: Spring Fling (Haze)", amountCents: 40000 }],
+      feeCents: 1200,
+      items: [
+        { name: "Bid fee: Spring Fling (Haze)", amountCents: 40000 },
+        { name: "Service and processing fees", amountCents: 2461 },
+      ],
       successUrl: `${site}/payments/done?tournament=t1`,
       cancelUrl: `${site}/tournaments/t1`,
       email: "captain@x.test",
       expiresAt: now / 1000 + 3600,
     });
     expect(c.metadata).toMatchObject({ tournamentId: "t1", payerKind: "team", payerId: "haze", hostId: "host" });
-    expect(s.store.doc("charges/cs_1")).toMatchObject({ status: "open", amountCents: 40000, feeCents: 500, createdBy: "captain" });
+    expect(s.store.doc("charges/cs_1")).toMatchObject({ status: "open", amountCents: 42461, baseCents: 40000, processingCents: 2461, feeCents: 1200, createdBy: "captain" });
   });
 
   it("players pay their own entry fee", async () => {
     ready();
     const r = await s.call("POST", "/v1/tournaments/hat/checkout", { payer: "player" }, "player");
     expect(r.status).toBe(200);
-    expect(s.gateway.checkouts[0]).toMatchObject({ amountCents: 6000, feeCents: 160, items: [{ name: "Entry fee: Hat", amountCents: 6000 }] });
+    expect(s.gateway.checkouts[0]).toMatchObject({
+      amountCents: 6395,
+      feeCents: 180,
+      items: [
+        { name: "Entry fee: Hat", amountCents: 6000 },
+        { name: "Service and processing fees", amountCents: 395 },
+      ],
+    });
     expect(s.gateway.checkouts[0].metadata.payerId).toBe("player");
   });
 
@@ -414,35 +443,24 @@ describe("the webhook", () => {
   });
 });
 
-describe("payers passing the fees on", () => {
-  it("charges enough that the host gets the whole fee", () => {
-    const fee = { percentBps: 100, fixedCents: 100 };
-    expect(chargeCoveringFees(10_000, fee)).toBe(10_541);
+describe("payers pay the fees on top", () => {
+  it("charges enough that the host gets the whole fee, with Stall 10's 3% of it", () => {
+    const fee = { percentBps: 300, fixedCents: 0 };
+    expect(chargeCoveringFees(10_000, fee)).toBe(10_639);
     for (const amount of [50, 999, 2_500, 10_000, 40_000, 123_457]) {
-      const charge = chargeCoveringFees(amount, fee);
-      const host = (c: number) => c - (Math.round(c / 100) + 100) - (Math.round((c * 290) / 10_000) + 30);
+      const { chargeCents: charge, platformCents } = onlineCharge({ amountCents: amount }, fee);
+      expect(platformCents).toBe(Math.round((amount * 3) / 100));
+      const host = (c: number) => c - platformCents - (Math.round((c * 290) / 10_000) + 30);
       expect(host(charge)).toBeGreaterThanOrEqual(amount);
       expect(host(charge - 1)).toBeLessThan(amount);
     }
-    expect(onlineCharge({ amountCents: 10_000 }, fee)).toEqual({ chargeCents: 10_000, processingCents: 0, platformCents: 200 });
-    expect(onlineCharge({ amountCents: 10_000, payerCoversFees: true }, fee)).toEqual({ chargeCents: 10_541, processingCents: 541, platformCents: 205 });
   });
 
-  it("shows the payer the processing fee and puts it on its own Checkout line", async () => {
+  it("whatever an older event's switch says", async () => {
     ready();
-    s.store.put("tournaments/t1", { ...s.store.doc("tournaments/t1"), bidFee: { ...fee(40_000), payerCoversFees: true } });
+    s.store.put("tournaments/t1", { ...s.store.doc("tournaments/t1"), bidFee: { ...fee(40_000), payerCoversFees: false } });
     const o = (await s.call("GET", "/v1/tournaments/t1/pay?team=haze", undefined, "captain")).json();
-    expect(o).toMatchObject({ online: true, amountCents: 40_000, chargeCents: 41_759, processingCents: 1_759, feeCents: 518 });
-    await s.call("POST", "/v1/tournaments/t1/checkout", { payer: "team", teamId: "haze" }, "captain");
-    expect(s.gateway.checkouts[0]).toMatchObject({
-      amountCents: 41_759,
-      feeCents: 518,
-      items: [
-        { name: "Bid fee: Spring Fling (Haze)", amountCents: 40_000 },
-        { name: "Processing fee", amountCents: 1_759 },
-      ],
-    });
-    expect(s.store.doc("charges/cs_1")).toMatchObject({ amountCents: 41_759, baseCents: 40_000, processingCents: 1_759 });
+    expect(o).toMatchObject({ online: true, amountCents: 40_000, chargeCents: 42_461, processingCents: 2_461, feeCents: 1_200 });
   });
 });
 
@@ -463,10 +481,10 @@ describe("a payer who lost their connection", () => {
     ready();
     await pay();
     s.store.put("tournaments/t1", { ...s.store.doc("tournaments/t1"), bidFee: fee(45_000) });
-    expect((await pay()).json()).toEqual({ url: "https://checkout.test/cs_2" });
+    expect((await pay()).json()).toEqual({ url: "https://checkout.test/cs_2", clientSecret: null, account: "acct_1" });
     expect(s.gateway.expired).toEqual(["cs_1"]);
     expect(s.store.doc("charges/cs_1")?.status).toBe("expired");
-    expect(s.gateway.checkouts[1].amountCents).toBe(45_000);
+    expect(s.gateway.checkouts[1].amountCents).toBe(onlineCharge({ amountCents: 45_000 }, { percentBps: 300, fixedCents: 0 }).chargeCents);
   });
 
   it("sees it paid on coming back, before the webhook arrives", async () => {
@@ -495,7 +513,7 @@ describe("a payer who lost their connection", () => {
     await pay();
     s.gateway.down = true;
     expect(await options()).toMatchObject({ paid: false, online: true });
-    expect((await pay()).json()).toEqual({ url: "https://checkout.test/cs_1" });
+    expect((await pay()).json()).toEqual({ url: "https://checkout.test/cs_1", clientSecret: null, account: "acct_1" });
   });
 });
 
@@ -531,7 +549,7 @@ describe("bank payments", () => {
     await s.hook("checkout.session.async_payment_failed", session());
     expect(s.store.doc("charges/cs_1")?.status).toBe("failed");
     expect(await options()).toMatchObject({ online: true, pending: null, paid: false });
-    expect((await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain")).json()).toEqual({ url: "https://checkout.test/cs_2" });
+    expect((await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain")).json()).toEqual({ url: "https://checkout.test/cs_2", clientSecret: null, account: "acct_1" });
   });
 
   it("sees a failed bank payment even if the webhook never came", async () => {
@@ -607,7 +625,8 @@ describe("the payment history", () => {
     await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
     await s.hook("checkout.session.completed", { id: "cs_1", payment_status: "paid", payment_intent: "pi_1", metadata: {} });
     await s.hook("charge.refunded", { payment_intent: "pi_1", refunded: true, amount_refunded: 40000, application_fee: "fee_1" });
-    const ids = { tournamentId: "t1", payerId: "haze", amountCents: 40000, currency: "USD", stripeAccount: "acct_1", checkoutSession: "cs_1", at: "t" };
+    // The whole charge, fees included.
+    const ids = { tournamentId: "t1", payerId: "haze", amountCents: 42461, currency: "USD", stripeAccount: "acct_1", checkoutSession: "cs_1", at: "t" };
     expect(log()).toEqual([
       { ...ids, action: "checkout_started", by: "captain" },
       { ...ids, action: "paid_online", by: "stripe", paymentIntent: "pi_1" },
@@ -630,6 +649,106 @@ describe("the payment history", () => {
     await s.hook("checkout.session.completed", { id: "cs_1", payment_status: "unpaid", payment_intent: "pi_1", metadata: {} });
     await s.hook("checkout.session.async_payment_failed", { id: "cs_1", payment_status: "unpaid", payment_intent: "pi_1", metadata: {} });
     expect(log().map((e) => e.action)).toEqual(["checkout_started", "bank_payment_processing", "payment_failed"]);
+  });
+});
+
+describe("the app's payment sheet", () => {
+  const sheet = (uid = "captain") => s.call("POST", "/v1/tournaments/t1/pay/intent", { payer: "team", teamId: "haze" }, uid);
+
+  it("makes a direct-charge PaymentIntent for the tournament's amount, and reuses it", async () => {
+    ready();
+    const r = await sheet();
+    expect(r.status).toBe(200);
+    expect(r.json()).toEqual({ clientSecret: "pi_sheet_1_secret", account: "acct_1", merchantName: "Fling Crew", amountCents: 42461, currency: "USD" });
+    expect(s.gateway.intentsMade[0]).toMatchObject({ account: "acct_1", amountCents: 42461, feeCents: 1200, currency: "USD" });
+    expect(s.gateway.intentsMade[0].metadata).toMatchObject({ tournamentId: "t1", payerKind: "team", payerId: "haze" });
+    expect(s.store.doc("charges/pi_sheet_1")).toMatchObject({ mode: "intent", status: "open", account: "acct_1", amountCents: 42461, baseCents: 40000 });
+    // Tapped again: the same one.
+    expect((await sheet()).json().clientSecret).toBe("pi_sheet_1_secret");
+    expect(s.gateway.intentsMade).toHaveLength(1);
+  });
+
+  it("only for those who can pay it, and not twice", async () => {
+    ready();
+    expect((await sheet("player")).status).toBe(403);
+    s.store.put("tournaments/t1/payments/haze", { paid: true, paidAt: new Date(now), note: "Cash" });
+    expect((await sheet()).status).toBe(412);
+    expect(s.gateway.intentsMade).toHaveLength(0);
+  });
+
+  it("closes an open Checkout page first, and the page closes the sheet's", async () => {
+    ready();
+    await s.call("POST", "/v1/tournaments/t1/checkout", { payer: "team", teamId: "haze" }, "captain");
+    await sheet();
+    expect(s.gateway.expired).toEqual(["cs_1"]);
+    expect(s.store.doc("charges/cs_1")?.status).toBe("expired");
+    await s.call("POST", "/v1/tournaments/t1/checkout", { payer: "team", teamId: "haze" }, "captain");
+    expect(s.gateway.cancelled).toEqual(["pi_sheet_1"]);
+    expect(s.store.doc("charges/pi_sheet_1")?.status).toBe("expired");
+  });
+
+  it("is marked paid by the webhook, only for its own account", async () => {
+    ready();
+    await sheet();
+    await s.hook("payment_intent.succeeded", { id: "pi_sheet_1" }, "acct_other");
+    expect(s.store.doc("tournaments/t1/payments/haze")).toBeUndefined();
+    await s.hook("payment_intent.succeeded", { id: "pi_sheet_1" });
+    expect(s.store.doc("tournaments/t1/payments/haze")).toEqual({ paid: true, paidAt: new Date(now), note: paidOnlineNote });
+    expect(s.store.doc("charges/pi_sheet_1")).toMatchObject({ status: "paid", paymentIntent: "pi_sheet_1" });
+    // Checkout's own intents (not the sheet's) are left to the session events.
+    await s.hook("payment_intent.succeeded", { id: "pi_checkout" });
+    expect(s.store.doc("charges/pi_checkout")).toBeUndefined();
+  });
+
+  it("follows a bank payment clearing, then failing", async () => {
+    ready();
+    await sheet();
+    await s.hook("payment_intent.processing", { id: "pi_sheet_1" });
+    expect(s.store.doc("charges/pi_sheet_1")?.status).toBe("processing");
+    // While it clears, nothing else can be started.
+    s.gateway.intents.set("pi_sheet_1", "processing");
+    expect((await sheet()).status).toBe(412);
+    await s.hook("payment_intent.payment_failed", { id: "pi_sheet_1" });
+    expect(s.store.doc("charges/pi_sheet_1")?.status).toBe("failed");
+    expect(s.store.doc("tournaments/t1/payments/haze")).toBeUndefined();
+  });
+
+  it("a card declined in the sheet stays open to try again", async () => {
+    ready();
+    await sheet();
+    await s.hook("payment_intent.payment_failed", { id: "pi_sheet_1" });
+    expect(s.store.doc("charges/pi_sheet_1")?.status).toBe("open");
+  });
+
+  it("asks Stripe when the payer comes back before the webhook", async () => {
+    ready();
+    await sheet();
+    s.gateway.intents.set("pi_sheet_1", "succeeded");
+    const r = await s.call("GET", "/v1/tournaments/t1/pay?team=haze", undefined, "captain");
+    expect(r.json()).toMatchObject({ paid: true });
+  });
+
+  it("a second payment for something paid is refunded", async () => {
+    ready();
+    await sheet();
+    s.store.put("tournaments/t1/payments/haze", { paid: true, paidAt: new Date(now), note: "Cash" });
+    await s.hook("payment_intent.succeeded", { id: "pi_sheet_1" });
+    expect(s.gateway.refunds).toEqual([{ account: "acct_1", paymentIntent: "pi_sheet_1", idempotencyKey: "duplicate:pi_sheet_1" }]);
+    expect(s.store.doc("charges/pi_sheet_1")?.status).toBe("refunded");
+  });
+});
+
+describe("Checkout in the website's page", () => {
+  it("gives the client secret and account, and a hosted request a new session", async () => {
+    ready();
+    const r = await s.call("POST", "/v1/tournaments/t1/checkout", { payer: "team", teamId: "haze", ui: "embedded" }, "captain");
+    expect(r.json()).toEqual({ url: null, clientSecret: "cs_1_secret", account: "acct_1" });
+    expect(s.gateway.checkouts[0].embedded).toBe(true);
+    // Again: the same one.
+    expect((await s.call("POST", "/v1/tournaments/t1/checkout", { payer: "team", teamId: "haze", ui: "embedded" }, "captain")).json().clientSecret).toBe("cs_1_secret");
+    // The hosted page instead: the embedded one is closed first.
+    expect((await s.call("POST", "/v1/tournaments/t1/checkout", { payer: "team", teamId: "haze" }, "captain")).json().url).toBe("https://checkout.test/cs_2");
+    expect(s.gateway.expired).toEqual(["cs_1"]);
   });
 });
 

@@ -146,17 +146,20 @@ and events; everything else in the hub is for members. A private group
 - A team's admins pay its bid or spot fee and a signed-up player pays
   their entry fee through Stripe Checkout: a direct charge on the host's
   account, with Stall 10's fee taken as the application fee. The fee is
-  a server setting (`PLATFORM_FEE_BPS`, `PLATFORM_FEE_FIXED_CENTS`),
-  1% + $1 to start, included in the amount, never added on top. US
-  dollars only; at least 50 cents, and more than the fee.
-- Hosts see what reaches them before they set a price: under each fee
-  in the event form and on the payout card, the fee less Stall 10's fee
-  and Stripe's usual card fee (2.9% + 30¢, an estimate; `GET
-  /v1/payments/fees`, `feeBreakdown`). $100 → about $94.80.
-- Hosts can have payers cover the fees (`payerCoversFees`): the charge
-  is grossed up so the host gets the whole fee ($100 → $105.41), shown as
-  a "Processing fee" line, the same for card and bank. Check card-network
-  and state rules on passing fees on before production.
+  a server setting (`PLATFORM_FEE_BPS`, `PLATFORM_FEE_FIXED_CENTS`):
+  3% of the fee (decided 2026-11-22), always paid by the payer on top,
+  so the host never loses any of their fee. US dollars only; at least 50
+  cents.
+- The payer also pays Stripe's card fee (2.9% + 30¢, an estimate): the
+  charge is the fee, plus Stall 10's 3% of it, plus just enough for
+  Stripe's fee on the whole charge (`onlineCharge`), so the host gets the
+  whole fee. $100 → $106.39; $400 → $424.61. It's one "Service and
+  processing fees" line, the same for card and bank (a bank payment
+  leaves the host a little more), never a card surcharge. Hosts see it
+  under each fee in the event form and on the payout card (`GET
+  /v1/payments/fees`). The old per-event switch (`payerCoversFees`) is
+  ignored. Check card-network and state rules on passing fees on before
+  production.
 - Bank payments (ACH) where the host switches them on in Stripe; they
   show as processing until they clear, and a failed one can be paid
   again.
@@ -1344,6 +1347,20 @@ Out of scope: payments, meeting recording, USA Ultimate data.
     words from `guides.ts` /
     `guides.dart`. Tests: shared `guide_fixtures.test.ts`, app
     `guide_fixtures_test.dart` and `guides_test.dart`.
+75. Tournament invites: a reply-by time (the host's **Invited teams
+    answer by**, 2 weeks by default), **Expired** past it with **Invite
+    again**, and Accept / Decline on the team page for its admins; an
+    organizer who also enters a team sees its entry and fee: [x] app;
+    [x] website. One rule: shared `inviteReplyBy` / `inviteExpired`,
+    app `HostedTournament.replyByFor` / `TournamentEntry.isExpired`.
+    Tests: shared `invite_reply_fixtures.test.ts`, app
+    `invite_reply_fixtures_test.dart`, `hosted_tournaments_test.dart`
+    and `team_home_test.dart`, API `tournaments.test.ts`, rules.
+76. Paying a fee without leaving the product: [x] app (Stripe's payment
+    sheet); [x] website (embedded Checkout). Both fall back to Stripe's
+    page without a publishable key. Tests: API `payments.test.ts`
+    ("the app's payment sheet", "Checkout in the website's page"), app
+    `payments_test.dart` ("payment sheet").
 
 Libraries the website may add (none today): a small data cache for API
 reads and mutations, the Firestore web SDK for listeners, and LiveKit's

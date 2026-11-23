@@ -173,6 +173,9 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
   late DateTime _startsOn;
   DateTime? _endsOn;
   TournamentVisibility visibility = TournamentVisibility.public;
+
+  /// Days before the start invited teams answer by, or null for none.
+  int? inviteReplyDays = HostedTournament.defaultInviteReplyDays;
   bool _hasFee = false;
   String feeAmount = '';
   String currency = 'USD';
@@ -299,6 +302,9 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
   /// Players sign up, and teams can also reserve a whole spot.
   bool get teamEntry => takesPlayers && _teamEntry;
 
+  /// Teams enter (so they can be invited, and answer by a reply-by time).
+  bool get takesTeams => !takesPlayers || teamEntry;
+
   void setTeamEntry(bool v) {
     _teamEntry = v;
     notifyListeners();
@@ -333,6 +339,7 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
     _startsOn = t.startsOn;
     _endsOn = t.endsOn;
     visibility = t.visibility;
+    inviteReplyDays = t.inviteReplyDays;
     _kind = t.kind;
     _entryType = t.entryType;
     draftMode = t.draftMode;
@@ -427,6 +434,11 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
 
   void setVisibility(TournamentVisibility v) {
     visibility = v;
+    notifyListeners();
+  }
+
+  void setInviteReplyDays(int? days) {
+    inviteReplyDays = days;
     notifyListeners();
   }
 
@@ -531,6 +543,7 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
           : null,
       season: () => isLeague ? _season : null,
       draftMode: draftMode,
+      inviteReplyDays: () => inviteReplyDays,
     );
     final format = _format.on(t);
     t = t.copyWith(format: format);

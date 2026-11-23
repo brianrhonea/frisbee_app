@@ -14,7 +14,7 @@
 //
 // Server-only collections (no client rules match them, so clients can't
 // read or write them): paymentLog/{id}, payoutAccounts/{teamId}, stripeAccounts/{acct}
-// (account → team), charges/{checkoutSessionId}, stripePayments/{pi}
+// (account → team), charges/{checkoutSessionId or paymentIntentId}, stripePayments/{pi}
 // (payment intent → charge), stripeEvents/{eventId} (handled once), and
 // payerCharges/{tournamentId}~{payerId} (the payer's latest session, so a
 // retried Pay reuses it and a returning payer's status is asked of Stripe
@@ -26,9 +26,17 @@
 // disputed, and a second payment for something already paid goes
 // duplicate → refunded. Both the webhook and the payer's own status check
 // settle a charge through the same idempotent path.
+//
+// A charge is one of three kinds (`mode`): Stripe's hosted Checkout page
+// ("hosted", charges made before modes have none), Checkout embedded in the
+// website's page ("embedded"), or a PaymentIntent paid in the app's own
+// payment sheet ("intent", keyed by the intent's id). A payer has one open
+// at a time: starting another closes the last.
 import {
   type CheckoutResult,
   checkoutRequestSchema,
+  paymentIntentRequestSchema,
+  type PaymentIntentResult,
   markPaymentRequestSchema,
   payOfflineRequestSchema,
   defaultPlatformFee,
@@ -60,7 +68,7 @@ import { limited, type MemoryRateLimiter } from "../limits/memory.js";
 import type { Limit } from "../limits/model.js";
 import { type Data, type DocStore, serverTime, type Tx } from "../store.js";
 import { can, isOwner } from "../teams/access.js";
-import type { CheckoutItem, GatewayEvent, PaymentGateway } from "./gateway.js";
+import type { CheckoutItem, GatewayEvent, GatewayIntentStatus, PaymentGateway } from "./gateway.js";
 import { logPayment, type PaymentLogAction } from "./log.js";
 
 const minute = 60_000;
@@ -80,7 +88,7 @@ export interface PaymentsConfig {
   returnUrl: string;
 }
 
-/** PLATFORM_FEE_BPS and PLATFORM_FEE_FIXED_CENTS, else 1% + $1. */
+/** PLATFORM_FEE_BPS and PLATFORM_FEE_FIXED_CENTS, else 3% (paid by the payer, on top of the fee). */
 export function platformFeeFromEnv(env: NodeJS.ProcessEnv = process.env): PlatformFee {
   const read = (v: string | undefined, fallback: number) => {
     if (v === undefined || v.trim() === "") return fallback;
@@ -117,8 +125,19 @@ const statusActions: Record<string, PaymentLogAction | undefined> = {
 /** A reused Checkout link must have this long left, or the payer gets a fresh one. */
 const reuseMarginMs = 10 * 60_000;
 
+/** How a charge is paid: Stripe's page, Checkout in the website's page, or the app's payment sheet. */
+type ChargeMode = "hosted" | "embedded" | "intent";
+const modeOf = (v: unknown): ChargeMode => (v === "embedded" || v === "intent" ? v : "hosted");
+
+/** How long an open payment-sheet charge is offered again before a fresh one is made. */
+const intentReuseMs = 24 * 60 * 60_000;
+
 /** Where the payer's latest session stands, after asking Stripe. */
-type Latest = { state: "none" } | { state: "paid" } | { state: "processing" } | { state: "open"; session: string; url: string; chargeCents: number; expiresAt: number };
+type Latest =
+  | { state: "none" }
+  | { state: "paid" }
+  | { state: "processing" }
+  | { state: "open"; session: string; mode: ChargeMode; url: string; clientSecret: string; chargeCents: number; expiresAt: number };
 
 const noEvent = () => new ApiError("not_found", "That event doesn't exist.");
 const ownersOnly = () => new ApiError("permission_denied", "Only the owner can set up payments.");
@@ -303,19 +322,20 @@ export class PaymentService {
     if (options.paid) throw new ApiError("failed_precondition", "That's already paid.");
     if (!options.online || !account) throw new ApiError("failed_precondition", options.reason ?? "This fee can't be paid online.");
     await this.stillReady(str(t.hostId), account);
+    const mode: ChargeMode = r.ui === "embedded" ? "embedded" : "hosted";
     if (latest.state === "open") {
-      if (latest.chargeCents === options.chargeCents && latest.expiresAt - this.now() > reuseMarginMs) return { url: latest.url };
-      // The fee changed or the link is nearly out: close it before making another.
-      if (!(await this.closeSession(id, payer.id, latest.session))) {
-        throw new ApiError("failed_precondition", "Your last payment is still going through. Check back in a minute.");
+      if (latest.mode === mode && latest.chargeCents === options.chargeCents && latest.expiresAt - this.now() > reuseMarginMs) {
+        return { url: mode === "hosted" ? latest.url : null, clientSecret: mode === "embedded" ? latest.clientSecret : null, account };
       }
+      // Another way of paying, the fee changed or the link is nearly out: close it before making another.
+      await this.closeOrRefuse(id, payer.id, latest.session);
     }
     const chargeId = this.store.newId("charges");
     const metadata = { chargeId, tournamentId: id, payerKind: payer.kind, payerId: payer.id, hostId: str(t.hostId) };
     const back = `${this.config.returnUrl}/tournaments/${encodeURIComponent(id)}`;
     const expiresAtSec = Math.floor(this.now() / 1000) + paymentLimits.checkoutMinutes * 60;
     const items: CheckoutItem[] = [{ name: payer.name, amountCents: options.amountCents }];
-    if (options.processingCents > 0) items.push({ name: "Processing fee", amountCents: options.processingCents });
+    if (options.processingCents > 0) items.push({ name: "Service and processing fees", amountCents: options.processingCents });
     const session = await this.config.gateway.createCheckout({
       account,
       amountCents: options.chargeCents,
@@ -328,10 +348,12 @@ export class PaymentService {
       expiresAt: expiresAtSec,
       metadata,
       idempotencyKey: `checkout:${chargeId}`,
+      embedded: mode === "embedded",
     });
     await this.store.transact(async (tx) => {
       tx.set(p.charge(session.id), {
         ...metadata,
+        mode,
         account,
         amountCents: options.chargeCents,
         baseCents: options.amountCents,
@@ -342,7 +364,15 @@ export class PaymentService {
         createdBy: caller.uid,
         createdAt: serverTime,
       });
-      tx.set(p.latest(id, payer.id), { session: session.id, url: session.url, chargeCents: options.chargeCents, expiresAt: expiresAtSec * 1000, createdAt: serverTime });
+      tx.set(p.latest(id, payer.id), {
+        session: session.id,
+        mode,
+        url: session.url ?? "",
+        clientSecret: session.clientSecret ?? "",
+        chargeCents: options.chargeCents,
+        expiresAt: expiresAtSec * 1000,
+        createdAt: serverTime,
+      });
       logPayment(this.store, tx, {
         tournamentId: id,
         payerId: payer.id,
@@ -354,7 +384,94 @@ export class PaymentService {
         checkoutSession: session.id,
       });
     });
-    return { url: session.url };
+    return { url: session.url, clientSecret: session.clientSecret, account };
+  }
+
+  /**
+   * The app's own payment sheet for the caller's fee (`POST …/pay/intent`):
+   * a PaymentIntent on the host's account, for the amount from the
+   * tournament, never the request. A retry gets the same one back while
+   * the fee is unchanged; an open Checkout page is closed first, so one fee
+   * has one live payment at a time.
+   */
+  async paymentIntent(caller: Caller, rawId: unknown, body: unknown): Promise<PaymentIntentResult> {
+    const id = docIdParam(rawId);
+    const r = parseBody(paymentIntentRequestSchema, body);
+    if (!this.config) throw notSetUp();
+    const { t, payer, options, account, latest } = await this.options(caller, id, r.payer, r.teamId);
+    if (options.paid) throw new ApiError("failed_precondition", "That's already paid.");
+    if (!options.online || !account) throw new ApiError("failed_precondition", options.reason ?? "This fee can't be paid online.");
+    await this.stillReady(str(t.hostId), account);
+    const merchantName = str(t.hostName) || str((await this.store.get(p.team(str(t.hostId))))?.name) || "Stall 10";
+    const result = (clientSecret: string): PaymentIntentResult => ({
+      clientSecret,
+      account,
+      merchantName: merchantName.slice(0, 100),
+      amountCents: options.chargeCents,
+      currency: options.currency,
+    });
+    if (latest.state === "open") {
+      if (latest.mode === "intent" && latest.chargeCents === options.chargeCents && latest.expiresAt > this.now() && latest.clientSecret) {
+        return result(latest.clientSecret);
+      }
+      await this.closeOrRefuse(id, payer.id, latest.session);
+    }
+    const chargeId = this.store.newId("charges");
+    const metadata = { chargeId, tournamentId: id, payerKind: payer.kind, payerId: payer.id, hostId: str(t.hostId) };
+    const description = options.processingCents > 0 ? `${payer.name} (with service and processing fees)` : payer.name;
+    const intent = await this.config.gateway.createIntent({
+      account,
+      amountCents: options.chargeCents,
+      currency: options.currency,
+      feeCents: options.feeCents,
+      description: description.slice(0, 200),
+      email: caller.email,
+      metadata,
+      idempotencyKey: `intent:${chargeId}`,
+    });
+    await this.store.transact(async (tx) => {
+      tx.set(p.charge(intent.id), {
+        ...metadata,
+        mode: "intent",
+        account,
+        amountCents: options.chargeCents,
+        baseCents: options.amountCents,
+        processingCents: options.processingCents,
+        currency: options.currency,
+        feeCents: options.feeCents,
+        status: "open",
+        createdBy: caller.uid,
+        createdAt: serverTime,
+      });
+      tx.set(p.intent(intent.id), { charge: intent.id });
+      tx.set(p.latest(id, payer.id), {
+        session: intent.id,
+        mode: "intent",
+        url: "",
+        clientSecret: intent.clientSecret,
+        chargeCents: options.chargeCents,
+        expiresAt: this.now() + intentReuseMs,
+        createdAt: serverTime,
+      });
+      logPayment(this.store, tx, {
+        tournamentId: id,
+        payerId: payer.id,
+        action: "checkout_started",
+        by: caller.uid,
+        amountCents: options.chargeCents,
+        currency: options.currency,
+        stripeAccount: account,
+        paymentIntent: intent.id,
+      });
+    });
+    return result(intent.clientSecret);
+  }
+
+  /** Closes the payer's open charge [session] before another; refuses while it turned out to be going through. */
+  private async closeOrRefuse(tournamentId: string, payerId: string, session: string) {
+    if (!(await this.closeSession(tournamentId, payerId, session))) {
+      throw new ApiError("failed_precondition", "Your last payment is still going through. Check back in a minute.");
+    }
   }
 
   /**
@@ -369,7 +486,16 @@ export class PaymentService {
     const account = str(charge?.account);
     if (!charge || !account) return { state: "none" };
     let status = str(charge.status);
-    if (status === "open" || status === "processing") {
+    const mode = modeOf(charge.mode);
+    if ((status === "open" || status === "processing") && mode === "intent") {
+      try {
+        const now = await this.config!.gateway.intent(account, session);
+        await this.intentStatus(session, account, now.status);
+        status = str((await this.store.get(p.charge(session)))?.status);
+      } catch {
+        // Stripe didn't answer: go by what's stored; the webhook catches up.
+      }
+    } else if (status === "open" || status === "processing") {
       try {
         const now = await this.config!.gateway.checkout(account, session);
         if (now.status === "complete" && now.paymentStatus !== "unpaid" && now.paymentIntent) {
@@ -389,9 +515,38 @@ export class PaymentService {
     if (status === "paid") return { state: "paid" };
     if (status === "processing") return { state: "processing" };
     if (status === "open") {
-      return { state: "open", session, url: str(pointer?.url), chargeCents: Number(pointer?.chargeCents) || 0, expiresAt: Number(pointer?.expiresAt) || 0 };
+      return {
+        state: "open",
+        session,
+        mode,
+        url: str(pointer?.url),
+        clientSecret: str(pointer?.clientSecret),
+        chargeCents: Number(pointer?.chargeCents) || 0,
+        expiresAt: Number(pointer?.expiresAt) || 0,
+      };
     }
     return { state: "none" };
+  }
+
+  /**
+   * A payment-sheet charge [key] (its PaymentIntent's id) brought in step
+   * with Stripe: paid, clearing, cancelled, or a bank payment that failed.
+   * A card declined in the sheet leaves it open, to try again.
+   */
+  private async intentStatus(key: string, account: string, status: GatewayIntentStatus | "failed") {
+    if (status === "succeeded") await this.settle(key, key, account);
+    else if (status === "processing") await this.setChargeStatus(key, "processing", ["open"], account);
+    else if (status === "canceled") await this.setChargeStatus(key, "expired", ["open"], account);
+    else if (status === "failed") await this.setChargeStatus(key, "failed", ["processing"], account);
+  }
+
+  /** A payment_intent.* event for a charge the app's payment sheet made; any other intent (Checkout's own) is left alone. */
+  private async intentEvent(event: GatewayEvent, status: GatewayIntentStatus | "failed") {
+    const key = storedId(event.object.id);
+    if (!key || !event.account) return;
+    const charge = await this.store.get(p.charge(key));
+    if (!charge || modeOf(charge.mode) !== "intent" || charge.account !== event.account) return;
+    await this.intentStatus(key, event.account, status);
   }
 
   /** Expires [session] before a new one replaces it; false when it turned out paid or clearing. */
@@ -400,7 +555,8 @@ export class PaymentService {
     const account = str(charge?.account);
     if (!account) return true;
     try {
-      await this.config!.gateway.expireCheckout(account, session);
+      if (modeOf(charge?.mode) === "intent") await this.config!.gateway.cancelIntent(account, session);
+      else await this.config!.gateway.expireCheckout(account, session);
       await this.setChargeStatus(session, "expired", ["open"]);
       return true;
     } catch {
@@ -486,6 +642,19 @@ export class PaymentService {
       case "checkout.session.expired":
         if (event.account) await this.setChargeStatus(str(event.object.id), "expired", ["open"], event.account);
         break;
+      // The app's payment sheet (charges with mode "intent").
+      case "payment_intent.succeeded":
+        await this.intentEvent(event, "succeeded");
+        break;
+      case "payment_intent.processing":
+        await this.intentEvent(event, "processing");
+        break;
+      case "payment_intent.payment_failed":
+        await this.intentEvent(event, "failed");
+        break;
+      case "payment_intent.canceled":
+        await this.intentEvent(event, "canceled");
+        break;
       case "charge.refunded":
         await this.refunded(event);
         break;
@@ -513,6 +682,7 @@ export class PaymentService {
 
   /** A history entry for [charge] (session [session]), as Stripe reported it. */
   private logCharge(tx: Pick<Tx, "set">, session: string, charge: Data, action: PaymentLogAction, extra: { amountCents?: number; paymentIntent?: string } = {}) {
+    const intent = modeOf(charge.mode) === "intent";
     logPayment(this.store, tx, {
       tournamentId: str(charge.tournamentId),
       payerId: str(charge.payerId),
@@ -521,8 +691,8 @@ export class PaymentService {
       amountCents: extra.amountCents ?? (typeof charge.amountCents === "number" ? charge.amountCents : undefined),
       currency: str(charge.currency) || undefined,
       stripeAccount: str(charge.account) || undefined,
-      checkoutSession: session,
-      paymentIntent: extra.paymentIntent ?? (str(charge.paymentIntent) || undefined),
+      checkoutSession: intent ? undefined : session,
+      paymentIntent: extra.paymentIntent ?? (intent ? session : str(charge.paymentIntent) || undefined),
     });
   }
 
@@ -657,6 +827,7 @@ export function paymentRoutes(app: FastifyInstance, payments: PaymentService, li
     payments.payOptions(caller(req, "status"), req.params.id, req.query),
   );
   app.post<Id>(paymentPaths.checkout(":id"), async (req) => payments.checkout(caller(req, "checkout"), req.params.id, req.body));
+  app.post<Id>(paymentPaths.intent(":id"), async (req) => payments.paymentIntent(caller(req, "checkout"), req.params.id, req.body));
   app.put<Id>(paymentPaths.offline(":id"), async (req, reply) => {
     await payments.payOffline(caller(req, "checkout"), req.params.id, req.body);
     return reply.code(204).send();

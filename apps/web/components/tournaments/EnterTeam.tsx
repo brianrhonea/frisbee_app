@@ -5,7 +5,7 @@
 // invite" (division and captains); ?team= with an entry already in is
 // "Captains". Every rule is the API's (PUT .../entries/:teamId); this page
 // only offers what the event page would.
-import { divisionLabel, type EntryDoc } from "@stall10/shared";
+import { divisionLabel, type EntryDoc, inviteExpired, inviteExpiredMessage } from "@stall10/shared";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -42,7 +42,9 @@ export function EnterTeam({ tournamentId, teamId }: { tournamentId: string; team
                 : null
       : !team
         ? "Only the team's admins can change its entry."
-        : null;
+        : mode === "invite" && entry && inviteExpired(entry, new Date())
+          ? inviteExpiredMessage
+          : null;
   return (
     <div className="stack hosted-page enter-team">
       <header className="bracket-page-head">

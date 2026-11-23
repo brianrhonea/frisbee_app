@@ -16,8 +16,12 @@ export interface PlatformFee {
   fixedCents: number;
 }
 
-/** 1% + $1 (docs/product-spec.md §7). The API reads PLATFORM_FEE_BPS / PLATFORM_FEE_FIXED_CENTS. */
-export const defaultPlatformFee: PlatformFee = { percentBps: 100, fixedCents: 100 };
+/**
+ * 3% of the fee (docs/product-spec.md §7), added to what the payer pays,
+ * never taken from the host. The API reads PLATFORM_FEE_BPS /
+ * PLATFORM_FEE_FIXED_CENTS.
+ */
+export const defaultPlatformFee: PlatformFee = { percentBps: 300, fixedCents: 0 };
 
 export const paymentLimits = {
   /** Stripe's smallest USD charge. */
@@ -76,25 +80,27 @@ export function feeBreakdown(amountCents: number, platform: PlatformFee, card: P
   return { amountCents, platformCents, stripeCents, hostCents: Math.max(0, amountCents - platformCents - stripeCents) };
 }
 
-/**
- * What to charge so that [amountCents] reaches the host after Stall 10's
- * fee and Stripe's card fee: the smallest charge whose breakdown leaves the
- * host at least [amountCents]. The payer sees the difference as a
- * processing fee. The same for every payment method (a cheaper bank
- * payment leaves the host a little more), so it's never a card surcharge.
- */
+/** What the payer is charged online for [amountCents]: [onlineCharge]'s charge. */
 export function chargeCoveringFees(amountCents: number, platform: PlatformFee, card: PlatformFee = stripeCardFeeEstimate): number {
-  if (amountCents <= 0) return amountCents;
-  const rate = (platform.percentBps + card.percentBps) / 10_000;
-  let charge = Math.max(amountCents, Math.floor((amountCents + platform.fixedCents + card.fixedCents) / (1 - rate)) - 2);
-  while (feeBreakdown(charge, platform, card).hostCents < amountCents) charge++;
-  return charge;
+  return onlineCharge({ amountCents }, platform, card).chargeCents;
 }
 
-/** What a payer is charged online for [fee]: the fee, plus the fees when the host passes them on. */
-export function onlineCharge(fee: { amountCents: number; payerCoversFees?: boolean }, platform: PlatformFee, card: PlatformFee = stripeCardFeeEstimate): { chargeCents: number; processingCents: number; platformCents: number } {
-  const chargeCents = fee.payerCoversFees === true ? chargeCoveringFees(fee.amountCents, platform, card) : fee.amountCents;
-  return { chargeCents, processingCents: chargeCents - fee.amountCents, platformCents: chargeCents > 0 ? platformFeeCents(chargeCents, platform) : 0 };
+/**
+ * What a payer is charged online for [fee]: the fee, plus Stall 10's fee
+ * on it ([platform], e.g. 3%), plus Stripe's card fee on the whole charge,
+ * so the full fee reaches the host. Always: hosts never pay the fees.
+ * [processingCents] is everything added (Stall 10's and Stripe's);
+ * [platformCents] is Stall 10's application fee. A cheaper bank payment
+ * leaves the host a little more; it's never a card surcharge.
+ */
+export function onlineCharge(fee: { amountCents: number }, platform: PlatformFee, card: PlatformFee = stripeCardFeeEstimate): { chargeCents: number; processingCents: number; platformCents: number } {
+  const amount = fee.amountCents;
+  if (amount <= 0) return { chargeCents: amount, processingCents: 0, platformCents: 0 };
+  const platformCents = platformFeeCents(amount, platform);
+  const rate = card.percentBps / 10_000;
+  let chargeCents = Math.max(amount + platformCents, Math.floor((amount + platformCents + card.fixedCents) / (1 - rate)) - 2);
+  while (chargeCents - platformCents - platformFeeCents(chargeCents, card) < amount) chargeCents++;
+  return { chargeCents, processingCents: chargeCents - amount, platformCents };
 }
 
 /** "$1", "$1.50". */
@@ -116,7 +122,7 @@ export interface PayoutAccountView {
   available: boolean;
   /** none: not connected; pending: Stripe still needs details; ready: can take payments. */
   status: PayoutStatus;
-  /** Stall 10's fee, e.g. "1% + $1". */
+  /** Stall 10's fee, e.g. "3%". */
   feeLabel: string;
 }
 
@@ -145,9 +151,9 @@ export interface PayOptions {
   online: boolean;
   /** The fee the host set. */
   amountCents: number;
-  /** What paying online costs: [amountCents], plus [processingCents] when the host passes the fees on. */
+  /** What paying online costs: [amountCents] plus [processingCents]. */
   chargeCents: number;
-  /** The processing fee added for the payer (0 unless the host passes the fees on). */
+  /** Stall 10's and Stripe's fees, added for the payer. */
   processingCents: number;
   currency: string;
   /** Stall 10's part of the charge (included, not added). */
@@ -195,13 +201,47 @@ export const checkoutRequestSchema = z
     payer: z.enum(payerKinds),
     /** The team paying its bid or spot fee; only for payer "team". */
     teamId: z.string().min(1).max(128).optional(),
+    /**
+     * "hosted": Stripe's own Checkout page to go to ([CheckoutResult.url]);
+     * "embedded": Checkout shown inside the website's page
+     * ([CheckoutResult.clientSecret], on [CheckoutResult.account]).
+     */
+    ui: z.enum(["hosted", "embedded"]).default("hosted"),
   })
   .refine((r) => (r.payer === "team") === (r.teamId !== undefined), { message: "Say which team is paying." });
 export type CheckoutRequest = z.infer<typeof checkoutRequestSchema>;
 
-/** The Stripe Checkout page to open. */
+/** The Stripe Checkout to open: a page to go to, or one to show in the website's page. */
 export interface CheckoutResult {
-  url: string;
+  /** The hosted page; null for an embedded one. */
+  url: string | null;
+  /** An embedded Checkout's client secret; null for a hosted one. */
+  clientSecret: string | null;
+  /** The host's Stripe account the charge is made on (Stripe.js needs it for an embedded one). */
+  account: string | null;
+}
+
+/**
+ * POST /v1/tournaments/:id/pay/intent: the app's own payment sheet (Stripe's
+ * PaymentSheet) for the same fee, instead of a web page.
+ */
+export const paymentIntentRequestSchema = z
+  .strictObject({
+    payer: z.enum(payerKinds),
+    teamId: z.string().min(1).max(128).optional(),
+  })
+  .refine((r) => (r.payer === "team") === (r.teamId !== undefined), { message: "Say which team is paying." });
+
+/** What the app's payment sheet needs: the payment, and the host's account it's made on. */
+export interface PaymentIntentResult {
+  clientSecret: string;
+  /** The host's connected Stripe account (a direct charge). */
+  account: string;
+  /** Shown on the sheet: the host's name. */
+  merchantName: string;
+  /** The whole charge, processing fee included. */
+  amountCents: number;
+  currency: string;
 }
 
 /** The note set on the payment record when Stripe confirms it. */
@@ -214,6 +254,7 @@ export const paymentPaths = {
   payoutLink: (teamId: string) => `/v1/teams/${teamId}/payouts/link`,
   payOptions: (tournamentId: string) => `/v1/tournaments/${tournamentId}/pay`,
   checkout: (tournamentId: string) => `/v1/tournaments/${tournamentId}/checkout`,
+  intent: (tournamentId: string) => `/v1/tournaments/${tournamentId}/pay/intent`,
   offline: (tournamentId: string) => `/v1/tournaments/${tournamentId}/pay/offline`,
   mark: (tournamentId: string, payerId: string) => `/v1/tournaments/${tournamentId}/payments/${payerId}`,
   fees: "/v1/payments/fees",

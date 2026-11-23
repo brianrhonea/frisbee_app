@@ -113,6 +113,30 @@ class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
       );
 
   @override
+  Future<Result<List<TeamTournamentInvite>>> teamInvites(String teamId) =>
+      guard(() async {
+        final json = await _client.send(
+          'GET',
+          '/v1/teams/${Uri.encodeComponent(teamId)}/tournament-invites',
+        );
+        return [
+          for (final i in (json['invites'] as List?) ?? const [])
+            if (i is Map)
+              TeamTournamentInvite.fromMap(Map<String, dynamic>.from(i)),
+        ];
+      });
+
+  @override
+  Future<Result<void>> declineInvite(String tournamentId, String teamId) =>
+      guard(
+        () => _client.put(
+          '/v1/tournaments/${Uri.encodeComponent(tournamentId)}/entries/'
+          '${Uri.encodeComponent(teamId)}/status',
+          {'status': EntryStatus.withdrawn.name},
+        ),
+      );
+
+  @override
   Stream<List<HostedTournament>> watchUpcoming({int limit = 50}) {
     final today = DateTime.now();
     final midnight = DateTime(today.year, today.month, today.day);

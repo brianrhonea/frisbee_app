@@ -10,6 +10,26 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.49
+
+**Tournaments**
+- Organizers choose when invited teams must answer by (2 weeks before
+  the event by default). After that the invite expires: the team can't
+  accept it any more, and the organizers can **Invite again**.
+- Team admins see their team's tournament invites at the top of the
+  team page, with **Accept** and **Decline**.
+- Organizers who also run a team that plays see their own team's entry
+  and fee on the event page (the website hid them).
+
+**Payments**
+- **Pay online** opens a secure Stripe checkout right in the app (and
+  inside the page on the website) instead of sending you to a browser.
+- Organizers now get their whole fee. Paying online adds Stall 10's 3%
+  and Stripe's card fee on top (a $400 bid fee is $424.61 by card). The
+  "Teams cover the processing fee" switch is gone.
+
+---
+
 ## 0.0.47
 
 **Teams and communities**

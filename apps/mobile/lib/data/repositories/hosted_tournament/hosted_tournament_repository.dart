@@ -27,6 +27,13 @@ abstract class HostedTournamentRepository {
   /// members.
   Stream<List<EnteredTournament>> watchEnteredBy(String teamId);
 
+  /// Tournament and league invites waiting on team [teamId], soonest
+  /// first; for its admins (through the API).
+  Future<Result<List<TeamTournamentInvite>>> teamInvites(String teamId);
+
+  /// Turns down [tournamentId]'s invite for [teamId] (the team withdraws).
+  Future<Result<void>> declineInvite(String tournamentId, String teamId);
+
   /// Published tournaments that haven't ended, soonest first.
   Stream<List<HostedTournament>> watchUpcoming({int limit = 50});
 

@@ -1,4 +1,5 @@
 import '../data/repositories/chat/chat_repository.dart';
+import '../data/services/payment_sheet_service.dart';
 import '../data/repositories/team/team_repository.dart';
 import '../data/repositories/profile/profile_repository.dart';
 import '../data/repositories/event/event_repository.dart';
@@ -106,6 +107,12 @@ GoRouter router(
   navigatorKey: _rootKey,
   initialLocation: Routes.home,
   refreshListenable: Listenable.merge([auth, personal, agreement]),
+  // Stripe coming back to the payment sheet (a bank or wallet page) is for
+  // Stripe, not a page to open.
+  onEnter: (_, _, next, _) {
+    if (!isStripeReturn(next.uri)) return const Allow();
+    return Block.then(() => completeStripeReturn(next.uri));
+  },
   redirect: (context, state) =>
       authRedirect(auth, state.uri, personal: personal, agreement: agreement),
   routes: [

@@ -73,6 +73,7 @@ void main() {
     String id, {
     PaymentRepository? payments,
     TournamentChatRepository? chats,
+    DateTime? at,
   }) async {
     final vm = HostedTournamentViewModel(
       tournamentId: id,
@@ -82,7 +83,7 @@ void main() {
       postRepository: posts,
       paymentRepository: payments,
       chatRepository: chats,
-      now: () => DateTime(2027, 4, 10),
+      now: () => at ?? DateTime(2027, 4, 10),
     );
     await pumpEventQueue();
     return vm;
@@ -205,6 +206,8 @@ void main() {
     final id = await host();
     repo.tournaments[id] = repo.tournaments[id]!.copyWith(
       visibility: TournamentVisibility.inviteOnly,
+      // Ahead of "now" (2027-04-10), so the invite has time to answer.
+      startsOn: DateTime(2027, 5, 1),
     );
     final dir = await page('director', id);
     final cap = await page('cap2', id);
@@ -225,6 +228,91 @@ void main() {
     expect(dir.entryOf('t2')!.status, EntryStatus.applied);
     dir.dispose();
     cap.dispose();
+  });
+
+  test('an invite has a reply-by time; past it the team can\'t accept, '
+      'and the host invites again', () async {
+    final id = await host();
+    repo.tournaments[id] = repo.tournaments[id]!.copyWith(
+      visibility: TournamentVisibility.inviteOnly,
+      startsOn: DateTime(2027, 5, 1),
+      inviteReplyDays: () => 14,
+    );
+    final dir = await page('director', id);
+    await dir.invite.execute((
+      team: TeamListing.of(teams.teams['t2']!),
+      divisionId: dir.division!.id,
+    ));
+    await pumpEventQueue();
+    // Two weeks before it starts.
+    expect(dir.entryOf('t2')!.replyBy, DateTime(2027, 4, 17));
+    expect(dir.entryOf('t2')!.isExpired(dir.now()), isFalse);
+
+    final late = await page('cap2', id, at: DateTime(2027, 4, 20));
+    expect(late.myEntries.single.isExpired(late.now()), isTrue);
+    await late.apply.execute((
+      teamId: 't2',
+      divisionId: dir.division!.id,
+      captainIds: ['cap2'],
+    ));
+    expect(late.apply.error, isTrue);
+    expect('${(late.apply.result as Error).error}', contains('expired'));
+    expect(late.entryOf('t2')!.status, EntryStatus.invited);
+
+    // Invited again: two days to answer, as it's past two weeks out.
+    final dir2 = await page('director', id, at: DateTime(2027, 4, 20));
+    await dir2.inviteAgain.execute(dir2.entryOf('t2')!);
+    await pumpEventQueue();
+    expect(dir2.entryOf('t2')!.replyBy, DateTime(2027, 4, 22));
+    final again = await page('cap2', id, at: DateTime(2027, 4, 21));
+    await again.apply.execute((
+      teamId: 't2',
+      divisionId: dir.division!.id,
+      captainIds: ['cap2'],
+    ));
+    await pumpEventQueue();
+    expect(again.entryOf('t2')!.status, EntryStatus.applied);
+    for (final v in [dir, late, dir2, again]) {
+      v.dispose();
+    }
+  });
+
+  test('an organizer who also runs a team sees its entry', () async {
+    final id = await host();
+    teams.teams['own'] = team('own', 'director');
+    teams.roster['own'] = [
+      for (var n = 1; n <= TournamentDivision.defaultMinRoster; n++)
+        RosterPlayer(id: 'own-$n', name: 'Player $n'),
+    ];
+    final dir = await page('director', id);
+    expect(dir.isManager, isTrue);
+    await dir.invite.execute((
+      team: TeamListing.of(teams.teams['own']!),
+      divisionId: dir.division!.id,
+    ));
+    await pumpEventQueue();
+    expect(dir.myEntries.map((e) => (e.teamId, e.status)), [
+      ('own', EntryStatus.invited),
+    ]);
+    dir.dispose();
+  });
+
+  test('the form keeps the reply-by choice, two weeks to start', () async {
+    final form = HostedTournamentFormViewModel(
+      hostId: 'host',
+      tournamentRepository: repo,
+      teamRepository: teams,
+      authRepository: as('director'),
+      now: () => DateTime(2027, 3, 1),
+    );
+    await pumpEventQueue();
+    expect(form.inviteReplyDays, HostedTournament.defaultInviteReplyDays);
+    form.name = 'Reply Cup';
+    form.setInviteReplyDays(21);
+    await form.save.execute();
+    final id = (form.save.result as Ok<String>).value;
+    expect(repo.tournaments[id]!.inviteReplyDays, 21);
+    form.dispose();
   });
 
   test('chats with the organizers: organizers and entered captains, '

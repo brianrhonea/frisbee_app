@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/data/repositories/payment/payment_repository.dart';
+import 'package:frisbee_app/data/services/payment_sheet_service.dart';
 import 'package:frisbee_app/domain/models/hosted_tournament.dart';
 import 'package:frisbee_app/domain/models/payments.dart';
 import 'package:frisbee_app/ui/payments/widgets/payment_widgets.dart';
@@ -16,7 +17,7 @@ class _FakePayments implements PaymentRepository {
   PayoutAccount account = const PayoutAccount(
     available: true,
     status: PayoutStatus.none,
-    feeLabel: r'1% + $1',
+    feeLabel: '3%',
   );
   PayOptions options = const PayOptions(
     online: true,
@@ -101,6 +102,39 @@ class _FakePayments implements PaymentRepository {
     calls.add('checkout $tournamentId ${teamId ?? 'me'}');
     return Result.ok(Uri.parse('https://checkout.test/$tournamentId'));
   }
+
+  @override
+  Future<Result<PaymentSheetRequest>> paymentSheet(
+    String tournamentId, {
+    String? teamId,
+  }) async {
+    calls.add('sheet $tournamentId ${teamId ?? 'me'}');
+    return Result.ok(
+      PaymentSheetRequest(
+        clientSecret: 'pi_1_secret',
+        account: 'acct_1',
+        merchantName: 'Fling Crew',
+        amountCents: options.chargeCents,
+        currency: 'USD',
+      ),
+    );
+  }
+}
+
+/// The payment sheet: [outcome] or [failure], recording what it showed.
+class _FakeSheet implements PaymentSheetService {
+  _FakeSheet({this.available = true});
+  @override
+  final bool available;
+  PaymentSheetOutcome outcome = PaymentSheetOutcome.completed;
+  String? failure;
+  final shown = <PaymentSheetRequest>[];
+  @override
+  Future<PaymentSheetOutcome> present(PaymentSheetRequest request) async {
+    shown.add(request);
+    if (failure != null) throw PaymentSheetException(failure!);
+    return outcome;
+  }
 }
 
 void main() {
@@ -117,15 +151,96 @@ void main() {
     opened = [];
   });
 
-  Future<void> pump(WidgetTester tester, Widget child) async {
+  Future<void> pump(
+    WidgetTester tester,
+    Widget child, {
+    PaymentSheetService? sheet,
+  }) async {
     await tester.pumpWidget(
-      Provider<PaymentRepository>.value(
-        value: payments,
+      MultiProvider(
+        providers: [
+          Provider<PaymentRepository>.value(value: payments),
+          Provider<PaymentSheetService?>.value(value: sheet),
+        ],
         child: MaterialApp(home: Scaffold(body: child)),
       ),
     );
     await tester.pumpAndSettle();
   }
+
+  group('payment sheet', () {
+    testWidgets('pays in the app, then asks whether it went through', (
+      tester,
+    ) async {
+      final sheet = _FakeSheet();
+      await pump(
+        tester,
+        PayOnlineButton(tournamentId: 't1', teamId: 'haze', open: open),
+        sheet: sheet,
+      );
+      payments.options = const PayOptions(
+        online: false,
+        amountCents: 40000,
+        feeCents: 500,
+        feeLabel: r'1% + $1',
+        paid: true,
+      );
+      await tester.tap(find.text(r'Pay $400 online'));
+      await tester.pumpAndSettle();
+      expect(payments.calls, [
+        'options t1 haze',
+        'sheet t1 haze',
+        'options t1 haze',
+      ]);
+      expect(sheet.shown.single.account, 'acct_1');
+      expect(opened, isEmpty);
+      expect(find.text(r'Pay $400 online'), findsNothing);
+    });
+
+    testWidgets('closing the sheet leaves the button', (tester) async {
+      final sheet = _FakeSheet()..outcome = PaymentSheetOutcome.canceled;
+      await pump(
+        tester,
+        PayOnlineButton(tournamentId: 't1', teamId: 'haze', open: open),
+        sheet: sheet,
+      );
+      await tester.tap(find.text(r'Pay $400 online'));
+      await tester.pumpAndSettle();
+      expect(payments.calls.last, 'sheet t1 haze');
+      expect(find.text(r'Pay $400 online'), findsOneWidget);
+    });
+
+    testWidgets("a declined payment shows Stripe's message", (tester) async {
+      final sheet = _FakeSheet()..failure = 'Your card was declined.';
+      await pump(
+        tester,
+        PayOnlineButton(tournamentId: 't1', teamId: 'haze', open: open),
+        sheet: sheet,
+      );
+      await tester.tap(find.text(r'Pay $400 online'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Your card was declined.'), findsOneWidget);
+    });
+
+    testWidgets('without a key, Checkout opens in the browser', (tester) async {
+      await pump(
+        tester,
+        PayOnlineButton(tournamentId: 't1', teamId: 'haze', open: open),
+        sheet: _FakeSheet(available: false),
+      );
+      await tester.tap(find.text(r'Pay $400 online'));
+      await tester.pumpAndSettle();
+      expect(payments.calls.last, 'checkout t1 haze');
+      expect(opened, hasLength(1));
+    });
+  });
+
+  test("Stripe's return link isn't a page", () {
+    expect(isStripeReturn(Uri.parse(stripeReturnUrl)), isTrue);
+    expect(isStripeReturn(Uri.parse('/safepay?x=1')), isTrue);
+    expect(isStripeReturn(Uri.parse('stall10://open/join/ABC')), isFalse);
+    expect(isStripeReturn(Uri.parse('/teams/t1')), isFalse);
+  });
 
   group('payouts card', () {
     testWidgets('offers Stripe with the fee, and opens its page', (
@@ -133,7 +248,10 @@ void main() {
     ) async {
       await pump(tester, PayoutsCard(teamId: 'host', open: open));
       expect(find.text('Take payments online'), findsOneWidget);
-      expect(find.textContaining(r'Stall 10 keeps 1% + $1'), findsOneWidget);
+      expect(
+        find.textContaining("payers also pay Stall 10's 3% and Stripe's card fee"),
+        findsOneWidget,
+      );
       await tester.tap(find.text('Set up with Stripe'));
       await tester.pumpAndSettle();
       expect(opened, [Uri.parse('https://connect.test/host')]);
@@ -214,38 +332,38 @@ void main() {
   });
 
   group('fee breakdown for hosts', () {
-    test(r'splits $100 into $2, $3.20 and $94.80 (same as the API)', () {
+    test(r'splits $100 into $3, $3.20 and the rest (same as the API)', () {
       const fees = PaymentFees(
         available: true,
         platform: PaymentFees.defaultPlatform,
         card: PaymentFees.defaultCard,
       );
       final b = fees.breakdown(10000);
-      expect(b.platformCents, 200);
+      expect(b.platformCents, 300);
       expect(b.stripeCents, 320);
-      expect(b.hostCents, 9480);
+      expect(b.hostCents, 9380);
       // packages/shared/test/payments.test.ts uses the same cases.
       final odd = fees.breakdown(3750);
       expect(
         (odd.platformCents, odd.stripeCents, odd.hostCents),
-        (138, 139, 3473),
+        (113, 139, 3498),
       );
-      expect(fees.breakdown(100).hostCents, 0);
+      expect(fees.breakdown(30).hostCents, 0);
       expect(PaymentFees.defaultCard.label, r'2.9% + $0.30');
-      expect(PaymentFees.defaultPlatform.label, r'1% + $1');
+      expect(PaymentFees.defaultPlatform.label, '3%');
     });
 
-    testWidgets('the form note says what the host gets', (tester) async {
+    testWidgets('the form note says payers pay the fees and the host gets it '
+        'all', (tester) async {
       await pump(
         tester,
         const FeeBreakdownNote(amountCents: 10000, currency: 'USD'),
       );
       expect(
         find.text(
-          r'Paid online in Stall 10, you get about $94.80 of each $100. '
-          r'Stall 10 keeps $2 (1% + $1) and Stripe about $3.20 '
-          r'(2.9% + $0.30, its usual card fee). Paid your own way, you keep '
-          'it all.',
+          r'Paid online, they pay $106.39: $100, plus $3 for Stall 10 (3%) '
+          r"and about $3.39 for Stripe's card fee. You get the whole $100. "
+          r'Paid your own way, they pay $100.',
         ),
         findsOneWidget,
       );
@@ -260,11 +378,6 @@ void main() {
         find.text('Online payments are in US dollars only.'),
         findsOneWidget,
       );
-      await pump(
-        tester,
-        FeeBreakdownNote(key: UniqueKey(), amountCents: 100, currency: 'USD'),
-      );
-      expect(find.text('This fee is too small to pay online.'), findsOneWidget);
     });
 
     testWidgets('says nothing while payments are off', (tester) async {
@@ -280,15 +393,15 @@ void main() {
       await pump(tester, const PayoutsCard(teamId: 'host', amountCents: 40000));
       expect(
         find.text(
-          r'On a $400 fee you get about $383.10: Stall 10 keeps $5 and '
-          r'Stripe about $11.90.',
+          r'On a $400 fee, payers pay $424.61 online and you get the whole '
+          r'$400.',
         ),
         findsOneWidget,
       );
     });
   });
 
-  group('payers covering the fees', () {
+  group('payers pay the fees', () {
     const fees = PaymentFees(
       available: true,
       platform: PaymentFees.defaultPlatform,
@@ -297,87 +410,37 @@ void main() {
 
     test('charge leaves the host the whole fee (same as the API)', () {
       // packages/shared/test/payments.test.ts uses the same cases.
-      expect(fees.chargeCoveringFees(10000), 10541);
-      expect(fees.chargeCoveringFees(40000), 41759);
-      expect(fees.breakdown(10541).hostCents, 10000);
+      expect(fees.chargeCoveringFees(10000), 10639);
+      expect(fees.chargeCoveringFees(40000), 42461);
+      expect(fees.platformOn(40000), 1200);
+      for (final amount in [50, 999, 3750, 6000, 10000, 40000, 123457]) {
+        final charge = fees.chargeCoveringFees(amount);
+        final host = charge - fees.platformOn(amount) - fees.card.on(charge);
+        expect(host, greaterThanOrEqualTo(amount));
+        expect(host, lessThanOrEqualTo(amount + 1));
+      }
     });
 
-    testWidgets('the form note says what payers pay', (tester) async {
-      await pump(
-        tester,
-        const FeeBreakdownNote(
-          amountCents: 10000,
-          currency: 'USD',
-          payerCovers: true,
-        ),
-      );
-      expect(
-        find.text(
-          r'Paid online, they pay $105.41 ($100 plus a $5.41 processing fee) '
-          r'and you get the whole $100. Paid your own way, they pay $100.',
-        ),
-        findsOneWidget,
-      );
-    });
-
-    testWidgets('the Pay button shows the total and the processing fee', (
-      tester,
-    ) async {
+    testWidgets('the Pay button shows the total and the fees', (tester) async {
       payments.options = const PayOptions(
         online: true,
         amountCents: 10000,
-        chargeCents: 10541,
-        processingCents: 541,
-        feeCents: 205,
-        feeLabel: r'1% + $1',
+        chargeCents: 10639,
+        processingCents: 639,
+        feeCents: 300,
+        feeLabel: '3%',
         paid: false,
       );
       await pump(tester, PayOnlineButton(tournamentId: 't1', open: open));
-      expect(find.text(r'Pay $105.41 online'), findsOneWidget);
+      expect(find.text(r'Pay $106.39 online'), findsOneWidget);
       expect(
-        find.textContaining(r'Includes a $5.41 processing fee.'),
-        findsOneWidget,
-      );
-    });
-  });
-
-  group('payers covering the fees, for the host', () {
-    testWidgets('the payout card says payers pay and the host gets it all', (
-      tester,
-    ) async {
-      await pump(
-        tester,
-        const PayoutsCard(
-          teamId: 'host',
-          amountCents: 10000,
-          payerCovers: true,
-        ),
-      );
-      expect(
-        find.text(
-          r'On a $100 fee, payers pay $105.41 online and you get the whole $100.',
-        ),
+        find.textContaining(r'Includes $6.39 in service and processing fees.'),
         findsOneWidget,
       );
     });
 
-    testWidgets('the switch shows only while payments are on', (tester) async {
-      await pump(
-        tester,
-        PayerCoversFeesSwitch(value: false, onChanged: (_) {}, players: false),
-      );
-      expect(find.text('Teams cover the processing fee'), findsOneWidget);
-      payments.feeAnswer = PaymentFees.unavailable;
-      await pump(
-        tester,
-        PayerCoversFeesSwitch(
-          key: UniqueKey(),
-          value: false,
-          onChanged: (_) {},
-          players: false,
-        ),
-      );
-      expect(find.byType(SwitchListTile), findsNothing);
+    testWidgets("the host form has no switch for it", (tester) async {
+      expect(find.byKey(const Key('payer-covers-fees')), findsNothing);
     });
   });
 
