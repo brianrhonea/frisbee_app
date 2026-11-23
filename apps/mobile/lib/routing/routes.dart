@@ -42,6 +42,7 @@ abstract final class Routes {
   static const settingsAccount = '/settings/account';
   static const settingsPersonal = '/settings/personal';
   static const settingsCalendar = '/settings/calendar';
+  static const settingsHelp = '/settings/help';
 
   /// Another player's profile.
   static String player(String uid) => '/players/$uid';
@@ -89,6 +90,9 @@ abstract final class Routes {
 
   /// Learn to play: the rules for beginners, over the page (`context.push`).
   static const learn = '/learn';
+
+  /// The rules of ultimate (our guide, linking the official rules).
+  static const rules = '/rules';
 
   /// A post's page; [comment] puts the cursor in the comment box.
   static String post(String id, {bool comment = false}) =>

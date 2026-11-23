@@ -672,6 +672,13 @@ from the right (on a computer, as a panel; click outside to close it).
   see on your profile (stats, teams, games). Answer follow requests at
   the top of [Notifications](#notifications).
 - **People you follow**.
+- **Help**: answers to common questions about Stall 10 (joining a team,
+  notifications, chats, events, tournaments, fees, safety, offline use,
+  your account), with **Contact support** (support@stall10.app).
+- **Rules of ultimate**: a plain-language guide to how the game is played
+  (Spirit of the Game, the pull, stall count, scoring, fouls, picks,
+  timeouts), with links to the official USA Ultimate and WFDF rules. On
+  the website it's at /rules, open to everyone.
 - **Account**: change your **display name**; see your **@username** and
   **email**; **Change password** (or "Forgot it?" for a reset link); **Delete account** (it asks you to type DELETE and confirm
   your password, or sign in with Google or Apple again). It works the

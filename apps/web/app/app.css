@@ -1772,3 +1772,18 @@ mark.mention.mention-me { background: color-mix(in srgb, var(--accent) 24%, tran
 .mention-menu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 8px; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
 .mention-menu button small { margin-left: auto; }
 .mention-menu button:hover, .mention-menu button.active { background: var(--field); }
+
+/* Rules of ultimate (app/rules) and Help in Settings (app/settings/help), from guides.ts. */
+.card.guide-official ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.card.guide-official li { display: grid; gap: 2px; }
+.card.guide-official a { color: var(--accent); font-weight: 700; }
+.help-topics { padding: 4px 0; }
+.help-topics details { border-top: 1px solid var(--line); }
+.help-topics details:first-child { border-top: 0; }
+.help-topics summary { padding: 14px 18px; font-weight: 700; cursor: pointer; list-style-position: inside; }
+.help-topics summary:hover { color: var(--accent); }
+.help-answer { padding: 0 18px 10px; color: var(--ink-soft); }
+.help-answer ul { margin: 0 0 6px; padding-left: 20px; }
+.help-answer li { margin-bottom: 6px; }
+.help-more { list-style: none; padding: 0; display: grid; gap: 8px; }
+.help-more a { color: var(--accent); font-weight: 700; }

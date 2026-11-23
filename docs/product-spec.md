@@ -1335,6 +1335,10 @@ Out of scope: payments, meeting recording, USA Ultimate data.
     `mention_fixtures.test.ts` and `team_chats_fixtures.test.ts`, app
     `mention_fixtures_test.dart` and `chat_test.dart`, functions
     `notifications/mentions.test.ts`.
+74. Help in Settings and the Rules of ultimate page: [x] app; [x] website
+    (`/settings/help`, `/rules`), the same words from `guides.ts` /
+    `guides.dart`. Tests: shared `guide_fixtures.test.ts`, app
+    `guide_fixtures_test.dart` and `guides_test.dart`.
 
 Libraries the website may add (none today): a small data cache for API
 reads and mutations, the Firestore web SDK for listeners, and LiveKit's

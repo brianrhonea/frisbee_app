@@ -20,6 +20,10 @@ With app 0.0.47 and API 0.43.0.
 - @mentions (`Mentions.tsx`): suggestions above the composer (arrows,
   Enter or Tab), mentions marked in messages, and "… mentioned you" on the
   team's row in Chats until the room is read (`useTeamChats`).
+- **Rules of ultimate** (`/rules`, public) and Settings → **Help**
+  (`/settings/help`), from `guides.ts` (`rulesGuide`, `helpTopics`,
+  `officialRules`), as the app. Our own summary, linking the official
+  USA Ultimate and WFDF rules.
 
 ## 0.55.1 — 2026-11-22
 

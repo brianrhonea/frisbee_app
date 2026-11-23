@@ -14,6 +14,8 @@ const sections = [
   ["/settings/following", "People you follow"],
   ["/settings/blocked", "Blocked accounts"],
   ["/settings/account", "Account"],
+  ["/settings/help", "Help"],
+  ["/rules", "Rules of ultimate"],
   ["/learn", "Learn to play"],
 ] as const;
 

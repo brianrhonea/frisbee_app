@@ -33,6 +33,12 @@ Firebase project; App Store builds come from `main` and use production.
   and @everyone). Mentioned people get a notification even if they
   muted the room, and Chats shows "… mentioned you" until they read it.
 
+**Help and rules**
+- Settings has a **Help** section with answers to common questions and a
+  way to contact support.
+- **Rules of ultimate**: a guide to how the game is played, with links to
+  the official USA Ultimate and WFDF rules.
+
 ---
 
 ## 0.0.46

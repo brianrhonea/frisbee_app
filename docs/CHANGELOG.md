@@ -94,6 +94,12 @@ With web 0.56.0 and API 0.43.0. Functions `notifications` changed.
   .watchMentions`; `TeamChatSummary` shows it as the row's subtitle and
   counts the room unread until it's read (fixture cases in
   `team_chats/summary.json`).
+- Settings → **Help** (`Routes.settingsHelp`, `HelpScreen`) and **Rules of
+  ultimate** (`Routes.rules`, `RulesScreen`), from
+  `domain/models/guides.dart` (`helpTopics`, `rulesGuide`,
+  `officialRules`), the same words as `guides.ts` (fixtures
+  `guides/guides.json`). The rules guide is our own summary; it links the
+  official USA Ultimate and WFDF rules and copies none of their text.
 
 ## 0.0.46 — Agree to the guidelines, Chats, composer header
 
