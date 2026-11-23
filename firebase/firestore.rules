@@ -149,8 +149,13 @@ service cloud.firestore {
 
     function validTeamFields(t) {
       return t.name is string && t.name.size() > 0 && t.name.size() <= 80
-        && t.division in ['mixed', 'open', 'women', 'masters']
-        && t.level in ['club', 'college', 'youth', 'league', 'pickup']
+        // Teams have a division and level; groups have none (hasDivision
+        // in packages/shared), though older apps still send them.
+        && (isGroup(t)
+              ? (t.get('division', 'mixed') in ['mixed', 'open', 'women', 'masters']
+                 && t.get('level', 'pickup') in ['club', 'college', 'youth', 'league', 'pickup'])
+              : (t.division in ['mixed', 'open', 'women', 'masters']
+                 && t.level in ['club', 'college', 'youth', 'league', 'pickup']))
         && validString(t.city, 80)
         && (!isGroup(t) || validGroupFields(t));
     }

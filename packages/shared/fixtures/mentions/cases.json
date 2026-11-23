@@ -1,0 +1,638 @@
+{
+  "about": "Team chat @mentions: the spans a text has, what it mentions (with and without @everyone and roles), the @query at a cursor, suggestions, and inserting one. Targets: members and roles in order.",
+  "cases": [
+    {
+      "members": [
+        {
+          "uid": "u1",
+          "name": "Sam"
+        },
+        {
+          "uid": "u2",
+          "name": "Sam Lee"
+        },
+        {
+          "uid": "u3",
+          "name": "Avery Jones"
+        },
+        {
+          "uid": "u4",
+          "name": "José Núñez"
+        },
+        {
+          "uid": "u5",
+          "name": "avery"
+        }
+      ],
+      "roles": [
+        {
+          "id": "r1",
+          "name": "Handlers"
+        },
+        {
+          "id": "r2",
+          "name": "Cutters"
+        },
+        {
+          "id": "r3",
+          "name": "Sam"
+        }
+      ]
+    },
+    {
+      "text": "hi @Sam",
+      "spans": [
+        {
+          "start": 3,
+          "end": 7,
+          "kind": "role",
+          "id": "r3"
+        }
+      ],
+      "mentions": {
+        "users": [],
+        "roles": [
+          "r3"
+        ],
+        "everyone": false
+      },
+      "mentionsNoGroups": {
+        "users": [
+          "u1"
+        ],
+        "roles": [],
+        "everyone": false
+      }
+    },
+    {
+      "text": "@Sam Lee are you in?",
+      "spans": [
+        {
+          "start": 0,
+          "end": 8,
+          "kind": "user",
+          "id": "u2"
+        }
+      ],
+      "mentions": {
+        "users": [
+          "u2"
+        ],
+        "roles": [],
+        "everyone": false
+      },
+      "mentionsNoGroups": {
+        "users": [
+          "u2"
+        ],
+        "roles": [],
+        "everyone": false
+      }
+    },
+    {
+      "text": "@sam lee, and @AVERY JONES!",
+      "spans": [
+        {
+          "start": 0,
+          "end": 8,
+          "kind": "user",
+          "id": "u2"
+        },
+        {
+          "start": 14,
+          "end": 26,
+          "kind": "user",
+          "id": "u3"
+        }
+      ],
+      "mentions": {
+        "users": [
+          "u2",
+          "u3"
+        ],
+        "roles": [],
+        "everyone": false
+      },
+      "mentionsNoGroups": {
+        "users": [
+          "u2",
+          "u3"
+        ],
+        "roles": [],
+        "everyone": false
+      }
+    },
+    {
+      "text": "email me at sam@example.com",
+      "spans": [],
+      "mentions": {
+        "users": [],
+        "roles": [],
+        "everyone": false
+      },
+      "mentionsNoGroups": {
+        "users": [],
+        "roles": [],
+        "everyone": false
+      }
+    },
+    {
+      "text": "@everyone practice moved",
+      "spans": [
+        {
+          "start": 0,
+          "end": 9,
+          "kind": "everyone",
+          "id": "everyone"
+        }
+      ],
+      "mentions": {
+        "users": [],
+        "roles": [],
+        "everyone": true
+      },
+      "mentionsNoGroups": {
+        "users": [],
+        "roles": [],
+        "everyone": false
+      }
+    },
+    {
+      "text": "@everyones",
+      "spans": [],
+      "mentions": {
+        "users": [],
+        "roles": [],
+        "everyone": false
+      },
+      "mentionsNoGroups": {
+        "users": [],
+        "roles": [],
+        "everyone": false
+      }
+    },
+    {
+      "text": "@Handlers and @Cutters line up",
+      "spans": [
+        {
+          "start": 0,
+          "end": 9,
+          "kind": "role",
+          "id": "r1"
+        },
+        {
+          "start": 14,
+          "end": 22,
+          "kind": "role",
+          "id": "r2"
+        }
+      ],
+      "mentions": {
+        "users": [],
+        "roles": [
+          "r1",
+          "r2"
+        ],
+        "everyone": false
+      },
+      "mentionsNoGroups": {
+        "users": [],
+        "roles": [],
+        "everyone": false
+      }
+    },
+    {
+      "text": "(@José Núñez)",
+      "spans": [
+        {
+          "start": 1,
+          "end": 12,
+          "kind": "user",
+          "id": "u4"
+        }
+      ],
+      "mentions": {
+        "users": [
+          "u4"
+        ],
+        "roles": [],
+        "everyone": false
+      },
+      "mentionsNoGroups": {
+        "users": [
+          "u4"
+        ],
+        "roles": [],
+        "everyone": false
+      }
+    },
+    {
+      "text": "@Samuel",
+      "spans": [],
+      "mentions": {
+        "users": [],
+        "roles": [],
+        "everyone": false
+      },
+      "mentionsNoGroups": {
+        "users": [],
+        "roles": [],
+        "everyone": false
+      }
+    },
+    {
+      "text": "@@Sam",
+      "spans": [
+        {
+          "start": 1,
+          "end": 5,
+          "kind": "role",
+          "id": "r3"
+        }
+      ],
+      "mentions": {
+        "users": [],
+        "roles": [
+          "r3"
+        ],
+        "everyone": false
+      },
+      "mentionsNoGroups": {
+        "users": [
+          "u1"
+        ],
+        "roles": [],
+        "everyone": false
+      }
+    },
+    {
+      "text": "no mentions here",
+      "spans": [],
+      "mentions": {
+        "users": [],
+        "roles": [],
+        "everyone": false
+      },
+      "mentionsNoGroups": {
+        "users": [],
+        "roles": [],
+        "everyone": false
+      }
+    },
+    {
+      "text": "@avery and @Avery Jones",
+      "spans": [
+        {
+          "start": 0,
+          "end": 6,
+          "kind": "user",
+          "id": "u5"
+        },
+        {
+          "start": 11,
+          "end": 23,
+          "kind": "user",
+          "id": "u3"
+        }
+      ],
+      "mentions": {
+        "users": [
+          "u5",
+          "u3"
+        ],
+        "roles": [],
+        "everyone": false
+      },
+      "mentionsNoGroups": {
+        "users": [
+          "u5",
+          "u3"
+        ],
+        "roles": [],
+        "everyone": false
+      }
+    },
+    {
+      "text": "@Sam @Sam @Sam",
+      "spans": [
+        {
+          "start": 0,
+          "end": 4,
+          "kind": "role",
+          "id": "r3"
+        },
+        {
+          "start": 5,
+          "end": 9,
+          "kind": "role",
+          "id": "r3"
+        },
+        {
+          "start": 10,
+          "end": 14,
+          "kind": "role",
+          "id": "r3"
+        }
+      ],
+      "mentions": {
+        "users": [],
+        "roles": [
+          "r3"
+        ],
+        "everyone": false
+      },
+      "mentionsNoGroups": {
+        "users": [
+          "u1"
+        ],
+        "roles": [],
+        "everyone": false
+      }
+    },
+    {
+      "query": "hey @",
+      "cursor": 5,
+      "found": {
+        "start": 4,
+        "query": ""
+      }
+    },
+    {
+      "query": "hey @Sa",
+      "cursor": 7,
+      "found": {
+        "start": 4,
+        "query": "Sa"
+      }
+    },
+    {
+      "query": "hey @Sam Le",
+      "cursor": 11,
+      "found": {
+        "start": 4,
+        "query": "Sam Le"
+      }
+    },
+    {
+      "query": "mail sam@ex",
+      "cursor": 11,
+      "found": null
+    },
+    {
+      "query": "@ever",
+      "cursor": 5,
+      "found": {
+        "start": 0,
+        "query": "ever"
+      }
+    },
+    {
+      "query": "@ ",
+      "cursor": 2,
+      "found": null
+    },
+    {
+      "query": "two @a @b",
+      "cursor": 9,
+      "found": {
+        "start": 7,
+        "query": "b"
+      }
+    },
+    {
+      "query": "no at",
+      "cursor": 5,
+      "found": null
+    },
+    {
+      "suggest": "",
+      "groups": true,
+      "results": [
+        {
+          "kind": "everyone",
+          "id": "everyone",
+          "label": "everyone"
+        },
+        {
+          "kind": "role",
+          "id": "r2",
+          "label": "Cutters"
+        },
+        {
+          "kind": "role",
+          "id": "r1",
+          "label": "Handlers"
+        },
+        {
+          "kind": "role",
+          "id": "r3",
+          "label": "Sam"
+        },
+        {
+          "kind": "user",
+          "id": "u5",
+          "label": "avery"
+        },
+        {
+          "kind": "user",
+          "id": "u3",
+          "label": "Avery Jones"
+        },
+        {
+          "kind": "user",
+          "id": "u4",
+          "label": "José Núñez"
+        },
+        {
+          "kind": "user",
+          "id": "u1",
+          "label": "Sam"
+        }
+      ]
+    },
+    {
+      "suggest": "",
+      "groups": false,
+      "results": [
+        {
+          "kind": "user",
+          "id": "u5",
+          "label": "avery"
+        },
+        {
+          "kind": "user",
+          "id": "u3",
+          "label": "Avery Jones"
+        },
+        {
+          "kind": "user",
+          "id": "u4",
+          "label": "José Núñez"
+        },
+        {
+          "kind": "user",
+          "id": "u1",
+          "label": "Sam"
+        },
+        {
+          "kind": "user",
+          "id": "u2",
+          "label": "Sam Lee"
+        }
+      ]
+    },
+    {
+      "suggest": "sa",
+      "groups": true,
+      "results": [
+        {
+          "kind": "role",
+          "id": "r3",
+          "label": "Sam"
+        },
+        {
+          "kind": "user",
+          "id": "u1",
+          "label": "Sam"
+        },
+        {
+          "kind": "user",
+          "id": "u2",
+          "label": "Sam Lee"
+        }
+      ]
+    },
+    {
+      "suggest": "sa",
+      "groups": false,
+      "results": [
+        {
+          "kind": "user",
+          "id": "u1",
+          "label": "Sam"
+        },
+        {
+          "kind": "user",
+          "id": "u2",
+          "label": "Sam Lee"
+        }
+      ]
+    },
+    {
+      "suggest": "av",
+      "groups": true,
+      "results": [
+        {
+          "kind": "user",
+          "id": "u5",
+          "label": "avery"
+        },
+        {
+          "kind": "user",
+          "id": "u3",
+          "label": "Avery Jones"
+        }
+      ]
+    },
+    {
+      "suggest": "av",
+      "groups": false,
+      "results": [
+        {
+          "kind": "user",
+          "id": "u5",
+          "label": "avery"
+        },
+        {
+          "kind": "user",
+          "id": "u3",
+          "label": "Avery Jones"
+        }
+      ]
+    },
+    {
+      "suggest": "h",
+      "groups": true,
+      "results": [
+        {
+          "kind": "role",
+          "id": "r1",
+          "label": "Handlers"
+        }
+      ]
+    },
+    {
+      "suggest": "h",
+      "groups": false,
+      "results": []
+    },
+    {
+      "suggest": "jo",
+      "groups": true,
+      "results": [
+        {
+          "kind": "user",
+          "id": "u3",
+          "label": "Avery Jones"
+        },
+        {
+          "kind": "user",
+          "id": "u4",
+          "label": "José Núñez"
+        }
+      ]
+    },
+    {
+      "suggest": "jo",
+      "groups": false,
+      "results": [
+        {
+          "kind": "user",
+          "id": "u3",
+          "label": "Avery Jones"
+        },
+        {
+          "kind": "user",
+          "id": "u4",
+          "label": "José Núñez"
+        }
+      ]
+    },
+    {
+      "suggest": "ev",
+      "groups": true,
+      "results": [
+        {
+          "kind": "everyone",
+          "id": "everyone",
+          "label": "everyone"
+        }
+      ]
+    },
+    {
+      "suggest": "ev",
+      "groups": false,
+      "results": []
+    },
+    {
+      "suggest": "zz",
+      "groups": true,
+      "results": []
+    },
+    {
+      "suggest": "zz",
+      "groups": false,
+      "results": []
+    },
+    {
+      "insert": "hey @Sa now",
+      "start": 4,
+      "cursor": 7,
+      "label": "Sam Lee",
+      "result": {
+        "text": "hey @Sam Lee  now",
+        "cursor": 13
+      }
+    }
+  ]
+}

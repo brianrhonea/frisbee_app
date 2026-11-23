@@ -256,7 +256,8 @@ export function listingFor(t: Data): Data {
   const name = str(t.name);
   const city = str(t.city);
   const kind = kindOf(t);
-  const listing: Data = { name, division: str(t.division, "mixed"), level: str(t.level, "club"), city };
+  // Groups have no division or level (hasDivision), even if an old one stored them.
+  const listing: Data = kind === "team" ? { name, division: str(t.division, "mixed"), level: str(t.level, "club"), city } : { name, city };
   if (kind !== "team") {
     listing.kind = kind;
     listing.description = str(t.description);
@@ -279,10 +280,12 @@ export function listingFor(t: Data): Data {
  */
 export function editDetails(t: Data, caller: string, e: EditTeamInput): Data {
   requirePermission(t, caller, "manageTeam", `You can't edit this ${nounOf(t)}.`);
-  if (e.division != null && e.division !== str(t.division, "mixed")) {
+  if (!isGroup(t) && e.division != null && e.division !== str(t.division, "mixed")) {
     throw new ApiError("failed_precondition", "A team's division can't be changed.");
   }
-  const update: Data = { name: e.name, level: e.level, city: e.city };
+  if (!isGroup(t) && e.level == null) throw new ApiError("invalid_argument", "Pick a level.");
+  // Groups have no level (hasDivision); one sent by an older app is ignored.
+  const update: Data = isGroup(t) ? { name: e.name, city: e.city } : { name: e.name, level: e.level, city: e.city };
   const groupFields = e.description !== undefined || e.requiresApproval !== undefined || e.location !== undefined;
   if (isGroup(t)) {
     if (e.description !== undefined) update.description = e.description;

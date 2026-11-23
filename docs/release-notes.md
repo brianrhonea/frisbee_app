@@ -10,6 +10,37 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.47
+
+**Teams and communities**
+- Pickup communities and schools/clubs no longer have a division or
+  level. A team made inside a school or club picks its own level.
+- Split a team fee: if you paid the whole team fee, set each teammate's
+  share and how to pay you (Venmo, cash…) on the team's page, then mark
+  people paid as they do. Payment happens outside Stall 10.
+
+**Leagues**
+- Choose who can sign up: **Teams apply**, **Players sign up**, or
+  **Teams and players**. Players who sign up alone are drafted onto
+  teams.
+
+**Chats**
+- Press and hold a room in a team's chat to mute or unmute it.
+- In Chats, tap **Team chats** or **Direct messages** to fold that list
+  away. It stays folded until you close the app.
+- Mention people with **@**: type @ and pick a teammate, a role or
+  @everyone (owners, coaches, captains and chat managers can use roles
+  and @everyone). Mentioned people get a notification even if they
+  muted the room, and Chats shows "… mentioned you" until they read it.
+
+**Help and rules**
+- Settings has a **Help** section with answers to common questions and a
+  way to contact support.
+- **Rules of ultimate**: a guide to how the game is played, with links to
+  the official USA Ultimate and WFDF rules.
+
+---
+
 ## 0.0.46
 
 **Before you start**

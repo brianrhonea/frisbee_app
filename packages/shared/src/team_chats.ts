@@ -17,8 +17,23 @@ export interface TeamChatSummary<R extends InboxRoom = InboxRoom> {
   lastAt: string | null;
   /** The room a click opens: the only unread one, else the newest, else the first. */
   open: R | null;
-  /** "New in #general and #carpool", "Team chat" or "No messages yet". */
+  /** "Cam mentioned you: …", "New in #general and #carpool", "Team chat" or "No messages yet". */
   subtitle: string;
+  /** The newest @mention of the user they haven't read, if any. */
+  mention: ChatMention | null;
+}
+
+/**
+ * An @mention of the user in a team room: their notification feed entry
+ * (users/{uid}/notifications/mention_{teamId}_{roomId}, `mention: true`).
+ * [text] is its body ("Cam mentioned you: …"); [personal] when they were
+ * named or reached by role, not @everyone.
+ */
+export interface ChatMention {
+  roomId: string;
+  text: string;
+  at: string;
+  personal: boolean;
 }
 
 const time = (iso?: string | null) => (iso ? Date.parse(iso) : Number.NaN);
@@ -44,21 +59,44 @@ export function teamChatSummary<R extends InboxRoom>(
   reads: Record<string, string | null | undefined>,
   /** Muted rooms never count as unread: muting hides the bubble too. */
   muted: (roomId: string) => boolean = () => false,
+  /**
+   * The user's @mentions in this team. One after their read of the room
+   * makes it unread and says so, even in a muted room when it names them
+   * (an @everyone in a muted room doesn't).
+   */
+  mentions: ChatMention[] = [],
 ): TeamChatSummary<R> {
   const rooms = readable.filter((r) => r.kind !== "voice");
-  const unread = rooms.filter((r) => roomUnread(r, reads[r.id]) && !muted(r.id)).sort((a, b) => time(b.lastAt) - time(a.lastAt));
+  const counted = mentions.filter((m) => {
+    const read = time(reads[m.roomId]);
+    const at = time(m.at);
+    if (Number.isNaN(at) || !rooms.some((r) => r.id === m.roomId)) return false;
+    if (!Number.isNaN(read) && at <= read) return false;
+    return m.personal || !muted(m.roomId);
+  });
+  let mention: ChatMention | null = null;
+  for (const m of counted) if (mention === null || time(m.at) > time(mention.at)) mention = m;
+  const unread = rooms
+    .filter((r) => (roomUnread(r, reads[r.id]) && !muted(r.id)) || counted.some((m) => m.roomId === r.id))
+    .sort((a, b) => time(b.lastAt) - time(a.lastAt));
   let newest: R | null = null;
   for (const r of rooms) {
     const at = time(r.lastAt);
     if (!Number.isNaN(at) && (newest === null || at > time(newest.lastAt))) newest = r;
   }
-  const open = unread.length === 1 ? unread[0] : (newest ?? rooms[0] ?? null);
+  const open = mention
+    ? (rooms.find((r) => r.id === mention.roomId) ?? null)
+    : unread.length === 1
+      ? unread[0]
+      : (newest ?? rooms[0] ?? null);
   let subtitle: string;
-  if (unread.length > 0) {
+  if (mention) {
+    subtitle = mention.text;
+  } else if (unread.length > 0) {
     const names = unread.map((r) => `#${roomHandle(r.name)}`);
     subtitle = `New in ${names.length <= 2 ? names.join(" and ") : `${names.slice(0, 2).join(", ")} and ${names.length - 2} more`}`;
   } else {
     subtitle = newest ? "Team chat" : "No messages yet";
   }
-  return { rooms, unread, lastAt: newest?.lastAt ?? null, open, subtitle };
+  return { rooms, unread, lastAt: newest?.lastAt ?? null, open, subtitle, mention };
 }

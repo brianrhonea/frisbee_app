@@ -18,6 +18,8 @@ import '../view_models/chat_room_viewmodel.dart';
 import 'chat_layout.dart';
 import 'chat_room_screen.dart';
 import 'chat_room_settings_screen.dart';
+import '../../../utils/result.dart';
+import '../../core/ui/error_message.dart';
 
 /// Team chat. Wide screens list rooms on the left and open the picked one
 /// on the right; phones list rooms and slide the picked one in full screen.
@@ -199,15 +201,27 @@ class _RoomListState extends State<RoomList> {
                                         access: vm.accessTo(room),
                                         audience: vm.audienceOf(room),
                                         selected: room.id == widget.selectedId,
+                                        // Muted: no unread dot (TeamChatSummary).
                                         unread:
                                             room.id != widget.selectedId &&
+                                            !vm.isMuted(room) &&
                                             vm.isUnread(room),
+                                        muted: vm.isMuted(room),
+                                        onHold: vm.canManage || vm.canMute
+                                            ? () => showRoomSheet(
+                                                context,
+                                                vm,
+                                                room,
+                                                first: i == 0,
+                                                last: i == g.rooms.length - 1,
+                                              )
+                                            : null,
                                         inVoice: room.isVoice
                                             ? vm.voiceParticipants(room).length
                                             : 0,
                                         onTap: () => widget.onOpen(room.id),
                                         drag: drag,
-                                        menu: vm.canManage
+                                        menu: vm.canManage || vm.canMute
                                             ? _RoomMenu(
                                                 viewModel: vm,
                                                 room: room,
@@ -292,8 +306,11 @@ class _DragHooks {
     required T data,
     required Widget child,
     required Widget feedback,
+    bool holdToDrag = true,
   }) {
-    if (!enabled) return child;
+    // A room's press and hold opens its menu on phones (mute, move), so
+    // rooms drag only with a mouse.
+    if (!enabled || (_touch && !holdToDrag)) return child;
     final dimmed = Opacity(opacity: 0.35, child: child);
     final lifted = Material(
       color: Colors.transparent,
@@ -610,51 +627,154 @@ class _RoomMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final vm = viewModel;
-    return PopupMenuButton<String>(
+    return PopupMenuButton<_RoomAction>(
       tooltip: 'Channel options',
       iconSize: 18,
       padding: EdgeInsets.zero,
       icon: Icon(Icons.more_horiz, color: AppColors.of(context).muted),
-      onSelected: (a) async {
-        switch (a) {
-          case 'settings':
-            context.push(Routes.chatRoomSettings(vm.teamId, room.id));
-          case 'up':
-            vm.shiftRoom.execute((id: room.id, by: -1));
-          case 'down':
-            vm.shiftRoom.execute((id: room.id, by: 1));
-          case 'move':
-            final picked = await showDialog<({String? id})>(
-              context: context,
-              builder: (context) => SimpleDialog(
-                title: Text('Move ${room.name} to'),
-                children: [
-                  for (final f in [null, ...vm.folders])
-                    ListTile(
-                      leading: Icon(
-                        f?.id == room.folderId
-                            ? Icons.radio_button_checked
-                            : Icons.radio_button_unchecked,
-                      ),
-                      title: Text(f?.name ?? 'No folder'),
-                      onTap: () => Navigator.pop(context, (id: f?.id)),
-                    ),
-                ],
-              ),
-            );
-            if (picked != null && picked.id != room.folderId) {
-              vm.moveRoom.execute((room: room, folderId: picked.id));
-            }
-        }
-      },
+      onSelected: (a) => _runRoomAction(context, vm, room, a),
       itemBuilder: (_) => [
-        const PopupMenuItem(value: 'settings', child: Text('Edit channel')),
-        if (!first) const PopupMenuItem(value: 'up', child: Text('Move up')),
-        if (!last) const PopupMenuItem(value: 'down', child: Text('Move down')),
-        if (vm.folders.isNotEmpty)
-          const PopupMenuItem(value: 'move', child: Text('Move to folder')),
+        for (final a in _roomActions(vm, room, first: first, last: last))
+          PopupMenuItem(value: a, child: Text(_roomActionLabel(vm, room, a))),
       ],
     );
+  }
+}
+
+enum _RoomAction { mute, settings, up, down, move }
+
+/// What the member can do to [room] from the list: mute it, and (chat
+/// managers) edit or move it.
+List<_RoomAction> _roomActions(
+  ChatListViewModel vm,
+  ChatRoom room, {
+  required bool first,
+  required bool last,
+}) => [
+  if (vm.canMute && !room.isVoice) _RoomAction.mute,
+  if (vm.canManage) ...[
+    _RoomAction.settings,
+    if (!first) _RoomAction.up,
+    if (!last) _RoomAction.down,
+    if (vm.folders.isNotEmpty) _RoomAction.move,
+  ],
+];
+
+String _roomActionLabel(ChatListViewModel vm, ChatRoom room, _RoomAction a) =>
+    switch (a) {
+      _RoomAction.mute =>
+        vm.isMuted(room) ? 'Unmute notifications' : 'Mute notifications',
+      _RoomAction.settings => 'Edit channel',
+      _RoomAction.up => 'Move up',
+      _RoomAction.down => 'Move down',
+      _RoomAction.move => 'Move to folder',
+    };
+
+IconData _roomActionIcon(ChatListViewModel vm, ChatRoom room, _RoomAction a) =>
+    switch (a) {
+      _RoomAction.mute =>
+        vm.isMuted(room)
+            ? Icons.notifications_active_outlined
+            : Icons.notifications_off_outlined,
+      _RoomAction.settings => Icons.edit_outlined,
+      _RoomAction.up => Icons.arrow_upward,
+      _RoomAction.down => Icons.arrow_downward,
+      _RoomAction.move => Icons.drive_file_move_outline,
+    };
+
+Future<void> _runRoomAction(
+  BuildContext context,
+  ChatListViewModel vm,
+  ChatRoom room,
+  _RoomAction a,
+) async {
+  switch (a) {
+    case _RoomAction.mute:
+      final muting = !vm.isMuted(room);
+      await vm.toggleMute.execute(room);
+      if (!context.mounted) return;
+      if (vm.toggleMute.result case Error(:final error)) {
+        showErrorSnackBar(context, error);
+      } else {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(
+            content: Text(
+              muting
+                  ? '#${room.name} muted: no notifications or unread bubble.'
+                  : '#${room.name} unmuted.',
+            ),
+          ),
+        );
+      }
+    case _RoomAction.settings:
+      context.push(Routes.chatRoomSettings(vm.teamId, room.id));
+    case _RoomAction.up:
+      vm.shiftRoom.execute((id: room.id, by: -1));
+    case _RoomAction.down:
+      vm.shiftRoom.execute((id: room.id, by: 1));
+    case _RoomAction.move:
+      final picked = await showDialog<({String? id})>(
+        context: context,
+        builder: (context) => SimpleDialog(
+          title: Text('Move ${room.name} to'),
+          children: [
+            for (final f in [null, ...vm.folders])
+              ListTile(
+                leading: Icon(
+                  f?.id == room.folderId
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                ),
+                title: Text(f?.name ?? 'No folder'),
+                onTap: () => Navigator.pop(context, (id: f?.id)),
+              ),
+          ],
+        ),
+      );
+      if (picked != null && picked.id != room.folderId) {
+        vm.moveRoom.execute((room: room, folderId: picked.id));
+      }
+  }
+}
+
+/// A room's press-and-hold menu: the same actions as its ⋯ menu.
+Future<void> showRoomSheet(
+  BuildContext context,
+  ChatListViewModel vm,
+  ChatRoom room, {
+  required bool first,
+  required bool last,
+}) async {
+  final actions = _roomActions(vm, room, first: first, last: last);
+  if (actions.isEmpty) return;
+  final picked = await showModalBottomSheet<_RoomAction>(
+    context: context,
+    showDragHandle: true,
+    builder: (context) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+            child: Text(
+              '#${room.name}',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+          for (final a in actions)
+            ListTile(
+              key: Key('room-action-${a.name}'),
+              leading: Icon(_roomActionIcon(vm, room, a)),
+              title: Text(_roomActionLabel(vm, room, a)),
+              onTap: () => Navigator.pop(context, a),
+            ),
+        ],
+      ),
+    ),
+  );
+  if (picked != null && context.mounted) {
+    await _runRoomAction(context, vm, room, picked);
   }
 }
 
@@ -671,6 +791,8 @@ class _RoomRow extends StatefulWidget {
     this.unread = false,
     this.inVoice = 0,
     this.menu,
+    this.onHold,
+    this.muted = false,
   });
 
   final ChatRoom room;
@@ -686,6 +808,12 @@ class _RoomRow extends StatefulWidget {
   final VoidCallback onTap;
   final _DragHooks drag;
   final Widget? menu;
+
+  /// Press and hold: the room's menu (mute, and moving it for managers).
+  final VoidCallback? onHold;
+
+  /// Muted by the member: a bell-off icon, and no unread dot.
+  final bool muted;
 
   @override
   State<_RoomRow> createState() => _RoomRowState();
@@ -759,7 +887,17 @@ class _RoomRowState extends State<_RoomRow> {
               ],
             ),
           ),
-        if (!lifted && unread)
+        if (!lifted && widget.muted)
+          Padding(
+            padding: const EdgeInsets.only(left: 8),
+            child: Icon(
+              Icons.notifications_off_outlined,
+              size: 16,
+              color: c.muted,
+              semanticLabel: 'Muted',
+            ),
+          )
+        else if (!lifted && unread)
           Padding(
             padding: const EdgeInsets.only(left: 8),
             child: Icon(
@@ -787,6 +925,7 @@ class _RoomRowState extends State<_RoomRow> {
               : Colors.transparent,
           child: InkWell(
             onTap: widget.onTap,
+            onLongPress: widget.onHold,
             child: SizedBox(
               height: 52,
               child: Padding(
@@ -805,6 +944,7 @@ class _RoomRowState extends State<_RoomRow> {
     );
     return widget.drag.wrap<ChatRoom>(
       data: room,
+      holdToDrag: false,
       feedback: Container(
         height: 52,
         padding: const EdgeInsets.symmetric(horizontal: 14),

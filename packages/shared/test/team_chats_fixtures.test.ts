@@ -11,7 +11,8 @@ interface SummaryCase {
   rooms: Array<{ id: string; name: string; kind: string; lastAt: string | null; canRead: boolean }>;
   reads: Record<string, string>;
   muted?: string[];
-  summary: { rooms: string[]; unread: string[]; lastAt: string | null; open: string | null; subtitle: string };
+  mentions?: Array<{ roomId: string; text: string; at: string; personal: boolean }>;
+  summary: { rooms: string[]; unread: string[]; lastAt: string | null; open: string | null; subtitle: string; mention: string | null };
 }
 
 describe("team chats in the inbox match the app (fixtures/team_chats/summary.json)", () => {
@@ -20,6 +21,7 @@ describe("team chats in the inbox match the app (fixtures/team_chats/summary.jso
       c.rooms.filter((r) => r.canRead),
       c.reads,
       (roomId) => (c.muted ?? []).includes(roomId),
+      c.mentions ?? [],
     );
     expect({
       rooms: s.rooms.map((r) => r.id),
@@ -27,6 +29,7 @@ describe("team chats in the inbox match the app (fixtures/team_chats/summary.jso
       lastAt: s.lastAt,
       open: s.open?.id ?? null,
       subtitle: s.subtitle,
+      mention: s.mention?.roomId ?? null,
     }).toEqual(c.summary);
   });
 });

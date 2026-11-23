@@ -252,6 +252,11 @@ something new.
   it. Turn **Read receipts** off in Settings → Privacy; then they don't
   see yours and you don't see theirs.
 - Search shows names, @usernames and photos only, never email addresses.
+- Tap **Team chats** or **Direct messages** to fold that list away (tap
+  again to open it). In the app it stays folded until you close the app;
+  on the website, until you close the tab.
+- When someone @mentions you, your team's row says "… mentioned you: …"
+  until you open the room.
 
 ### Sending while offline
 
@@ -293,6 +298,13 @@ members, with a count of waiting join requests) and the ⋮ menu.
   post. Attach photos or files up to 10 MB; tap a photo to enlarge or save
   it, tap a file to save it. You can delete your own messages; the owner can
   delete any.
+  **Mute** a room: press and hold it in the room list (on the website,
+  its ⋯ or a right-click) → **Mute notifications**. A muted room shows a
+  crossed-out bell and no unread dot.
+  **@mentions**: type **@** and pick a teammate. Owners, coaches,
+  captains and chat managers can also pick a role or **@everyone**.
+  Mentioned people get a notification, even in a room they muted (except
+  for @everyone), and their mentions stand out in the chat.
   On a computer, rooms are listed on the left and the open room is on the
   right. On a phone, tap a room to slide it open; the 💬 button at the top
   left opens your room list, and tapping the open room takes you back.
@@ -429,6 +441,18 @@ and **Message the organizers** for a private thread about their own team.
 lists the tournaments you follow that start within a week or are on now.
 Tagged posts show **At …**, which opens the tournament.
 
+**Who can enter** (step 1): a tournament takes **Teams apply** or
+**Players sign up** (players are drafted onto teams), with **Teams can
+also reserve a spot** for players' events. A league can also take **Teams
+and players**: teams sign up, and people without a team sign up alone and
+are drafted onto new teams.
+
+**Splitting a team fee**: if you paid your team's whole fee, open your
+team's page → **Split a team fee** → **Split a fee**: set the total (or each person's
+share) and how to pay you, then mark people paid as they do. Everyone on
+the team sees their own share. The money goes between you, outside
+Stall 10.
+
 **Playing in one**: find tournaments in **Events → Find events** (or **Explore → Find a tournament or league**).
 A team's owner or captain taps **Apply with a team**, picks the division
 and up to 4 captains (they report scores), or **Accept invite** if
@@ -477,6 +501,8 @@ with a men's team and a women's team. Start one from Teams → **New** →
 - **Add teams**: tap **New team** to make one inside the community, or
   have an existing team's owner open its ⋮ menu → **School or club** and
   ask to join; accept the request on the community's Teams tab.
+- **Levels**: a school or club has no division or level of its own; each
+  team you make in it picks its level (high school, college, club…).
 - **Who's on each team**: for each team pick the community roles that get
   onto it (say Woof Captain, Woof Coach, Woof Player for Woof). People
   with one of those roles join the team automatically, and leave it when
@@ -646,6 +672,13 @@ from the right (on a computer, as a panel; click outside to close it).
   see on your profile (stats, teams, games). Answer follow requests at
   the top of [Notifications](#notifications).
 - **People you follow**.
+- **Help**: answers to common questions about Stall 10 (joining a team,
+  notifications, chats, events, tournaments, fees, safety, offline use,
+  your account), with **Contact support** (support@stall10.app).
+- **Rules of ultimate**: a plain-language guide to how the game is played
+  (Spirit of the Game, the pull, stall count, scoring, fouls, picks,
+  timeouts), with links to the official USA Ultimate and WFDF rules. On
+  the website it's at /rules, open to everyone.
 - **Account**: change your **display name**; see your **@username** and
   **email**; **Change password** (or "Forgot it?" for a reset link); **Delete account** (it asks you to type DELETE and confirm
   your password, or sign in with Google or Apple again). It works the

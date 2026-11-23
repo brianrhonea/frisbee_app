@@ -7,6 +7,7 @@ import '../../../domain/models/notification.dart';
 import '../../../domain/models/team.dart';
 import '../team/team_repository.dart';
 import 'chat_repository.dart';
+import '../../../domain/models/mentions.dart';
 
 /// One team's chat as the inbox lists it. The same rules as
 /// teamChatSummary in packages/shared/src/team_chats.ts (vectors in
@@ -16,6 +17,7 @@ class TeamChatSummary {
     required this.team,
     this.rooms = const [],
     this.unreadRooms = const [],
+    this.mention,
   });
 
   /// From the team's [rooms] the user can read ([readable]) and their
@@ -23,24 +25,52 @@ class TeamChatSummary {
   ///
   /// Rooms in [muted] (NotificationPreferences.roomKey) never count as
   /// unread: muting a room hides its bubble as well as its notifications.
+  ///
+  /// An @mention in [mentions] after the user's read of its room makes it
+  /// unread and says so, even in a muted room when it names them (an
+  /// @everyone in a muted room doesn't).
   factory TeamChatSummary.fromReadable(
     Team team,
     Iterable<ChatRoom> readable,
     Map<String, DateTime> reads, {
     Set<String> muted = const {},
+    Iterable<ChatMention> mentions = const [],
   }) {
     final rooms = [
       for (final r in readable)
         if (!r.isVoice) r,
     ];
+    bool isMuted(String roomId) =>
+        muted.contains(NotificationPreferences.roomKey(team.id, roomId));
+    final counted = [
+      for (final m in mentions)
+        if (rooms.any((r) => r.id == m.roomId) &&
+            (reads[m.roomId] == null || m.at.isAfter(reads[m.roomId]!)) &&
+            (m.personal || !isMuted(m.roomId)))
+          m,
+    ];
+    ChatMention? mention;
+    for (final m in counted) {
+      if (mention == null || m.at.isAfter(mention.at)) mention = m;
+    }
     final unread = [
       for (final r in rooms)
-        if (r.unreadSince(reads[r.id]) &&
-            !muted.contains(NotificationPreferences.roomKey(team.id, r.id)))
+        if ((r.unreadSince(reads[r.id]) && !isMuted(r.id)) ||
+            counted.any((m) => m.roomId == r.id))
           r,
-    ]..sort((a, b) => b.lastAt!.compareTo(a.lastAt!));
-    return TeamChatSummary(team: team, rooms: rooms, unreadRooms: unread);
+    ]..sort((a, b) => (b.lastAt ?? _epoch).compareTo(a.lastAt ?? _epoch));
+    return TeamChatSummary(
+      team: team,
+      rooms: rooms,
+      unreadRooms: unread,
+      mention: mention,
+    );
   }
+
+  static final _epoch = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// The newest @mention of the user they haven't read, if any.
+  final ChatMention? mention;
 
   final Team team;
 
@@ -65,6 +95,9 @@ class TeamChatSummary {
   /// The room a tap opens: the only unread one, else the newest, else the
   /// first (General).
   ChatRoom? get openRoom {
+    if (mention case final m?) {
+      return rooms.where((r) => r.id == m.roomId).firstOrNull;
+    }
     if (unreadRooms.length == 1) return unreadRooms.single;
     final last = lastAt;
     return rooms.where((r) => r.lastAt == last && last != null).firstOrNull ??
@@ -73,6 +106,7 @@ class TeamChatSummary {
 
   /// "New in #general and #carpool", "Team chat" or "No messages yet".
   String get subtitle {
+    if (mention case final m?) return m.text;
     if (unread) {
       final names = [for (final r in unreadRooms) '#${r.handle}'];
       final shown = names.length <= 2
@@ -111,7 +145,14 @@ class TeamChatActivity extends ChangeNotifier {
       _reads = r;
       notifyListeners();
     }, onError: (Object _) {});
+    _mentionSub = _chats.watchMentions(uid).listen((m) {
+      _mentions = m;
+      if (!_disposed) notifyListeners();
+    }, onError: (Object _) {});
   }
+
+  StreamSubscription<List<ChatMention>>? _mentionSub;
+  List<ChatMention> _mentions = const [];
 
   final String uid;
   final ChatRepository _chats;
@@ -180,6 +221,10 @@ class TeamChatActivity extends ChangeNotifier {
           ],
           _reads[t.id] ?? const {},
           muted: _muted,
+          mentions: [
+            for (final m in _mentions)
+              if (m.teamId == t.id) m,
+          ],
         ),
       );
     }
@@ -201,6 +246,7 @@ class TeamChatActivity extends ChangeNotifier {
     _disposed = true;
     _teamSub?.cancel();
     _readSub?.cancel();
+    _mentionSub?.cancel();
     for (final s in _roomSubs.values) {
       s.cancel();
     }

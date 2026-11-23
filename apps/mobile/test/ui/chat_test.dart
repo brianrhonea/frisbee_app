@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +10,7 @@ import 'package:frisbee_app/data/repositories/team/team_repository.dart';
 import 'package:frisbee_app/data/repositories/voice/voice_repository.dart';
 import 'package:frisbee_app/data/services/file_picker_service.dart';
 import 'package:frisbee_app/domain/models/chat.dart';
+import 'package:frisbee_app/domain/models/notification.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/ui/chat/view_models/chat_list_viewmodel.dart';
 import 'package:frisbee_app/ui/chat/view_models/chat_room_settings_viewmodel.dart';
@@ -714,6 +716,57 @@ void main() {
     expect(find.text('No messages yet'), findsOneWidget);
   });
 
+  testWidgets('press and hold a room to mute it: no unread dot, a bell-off '
+      'icon, and unmute from the same menu', (tester) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    joinAs(TeamRole.player);
+    final vm = ChatListViewModel(
+      teamId: 't1',
+      teamRepository: teams,
+      chatRepository: chats,
+      authRepository: auth,
+      voiceRepository: voice,
+      notificationRepository: notifications,
+    );
+    addTearDown(vm.dispose);
+    await tester.pumpWidget(
+      withRepos(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: Scaffold(
+            body: RoomList(viewModel: vm, onOpen: (_) {}),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(vm.canMute, isTrue);
+    await tester.longPress(find.text('general'));
+    await tester.pumpAndSettle();
+    expect(find.text('Mute notifications'), findsOneWidget);
+    // A player can't edit or move rooms.
+    expect(find.text('Edit channel'), findsNothing);
+    await tester.tap(find.byKey(const Key('room-action-mute')));
+    await tester.pumpAndSettle();
+    expect(
+      notifications.prefs.mutedRooms,
+      contains(NotificationPreferences.roomKey('t1', 'general')),
+    );
+    expect(find.byIcon(Icons.notifications_off_outlined), findsOneWidget);
+
+    await tester.longPress(find.text('general'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Unmute notifications'));
+    await tester.pumpAndSettle();
+    expect(notifications.prefs.mutedRooms, isEmpty);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
   group('ChatRoomScreen', () {
     Future<ChatRoomViewModel> pump(WidgetTester tester, String roomId) async {
       final vm = ChatRoomViewModel(
@@ -757,6 +810,55 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.byType(Drawer), findsNothing);
+    });
+
+    testWidgets('typing @ suggests members (and @everyone for captains); a '
+        'tap fills it in, and a mention of the user is drawn', (tester) async {
+      joinAs(TeamRole.captain);
+      teams.teams['t1'] = teams.teams['t1']!.copyWith(
+        memberNames: const {'o': 'Olive', 'u1': 'Me', 'p2': 'Pat Lee'},
+      );
+      chats.messages['general'] = [
+        ChatMessage(
+          id: 'm1',
+          authorId: 'p2',
+          authorName: 'Pat Lee',
+          text: 'hey @Me bring cones',
+          createdAt: DateTime(2026, 11, 1),
+        ),
+      ];
+      await pump(tester, 'general');
+      await tester.pump();
+      expect(find.textContaining('bring cones', findRichText: true), findsOne);
+      await tester.enterText(find.byType(TextField), 'hi @pa');
+      await tester.pump();
+      expect(find.byKey(const Key('mention-user-p2')), findsOneWidget);
+      // The user isn't offered themselves.
+      expect(find.byKey(const Key('mention-user-u1')), findsNothing);
+      await tester.tap(find.byKey(const Key('mention-user-p2')));
+      await tester.pump();
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        'hi @Pat Lee ',
+      );
+      await tester.enterText(find.byType(TextField), '@ev');
+      await tester.pump();
+      expect(
+        find.byKey(const Key('mention-everyone-everyone')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('players are not offered @everyone', (tester) async {
+      joinAs(TeamRole.player);
+      teams.teams['t1'] = teams.teams['t1']!.copyWith(
+        memberNames: const {'o': 'Olive', 'u1': 'Me', 'p2': 'Pat Lee'},
+      );
+      await pump(tester, 'general');
+      await tester.enterText(find.byType(TextField), '@');
+      await tester.pump();
+      expect(find.byKey(const Key('mention-everyone-everyone')), findsNothing);
+      expect(find.byKey(const Key('mention-user-o')), findsOneWidget);
     });
 
     testWidgets('posts a message', (tester) async {

@@ -23,6 +23,40 @@ enum TournamentEntryType {
   players,
 }
 
+/// Who can enter, as the host picks it (entryChoices in
+/// packages/shared/src/tournaments.ts): teams apply; players sign up and
+/// are drafted; or, for a league, both: a captain pays the team fee and
+/// brings their own players, and everyone else is drafted onto the other
+/// teams. A tournament still offers that third way as a switch.
+enum EntryChoice {
+  teams('Teams apply'),
+  players('Players sign up'),
+  both('Teams and players');
+
+  const EntryChoice(this.label);
+  final String label;
+
+  /// The choices a [kind] offers: all three for a league.
+  static List<EntryChoice> forKind(HostedKind kind) =>
+      kind == HostedKind.league ? values : const [teams, players];
+
+  /// The choice an event's fields make (a tournament's switch reads as
+  /// [players]).
+  static EntryChoice of(
+    HostedKind kind,
+    TournamentEntryType entryType,
+    bool teamEntry,
+  ) => entryType != TournamentEntryType.players
+      ? teams
+      : kind == HostedKind.league && teamEntry
+      ? both
+      : players;
+
+  TournamentEntryType get entryType =>
+      this == teams ? TournamentEntryType.teams : TournamentEntryType.players;
+  bool get teamEntry => this == both;
+}
+
 /// What kind of event a hosted tournament is. A league runs a weekly
 /// season (with optional playoffs) instead of one weekend.
 enum HostedKind {

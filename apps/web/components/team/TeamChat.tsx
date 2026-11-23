@@ -4,10 +4,11 @@ import { where } from "firebase/firestore";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { type ChatPoll, type InboxRoom, roomUnread } from "@stall10/shared";
+import { type ChatPoll, type InboxRoom, mutedRoomKey, roomUnread } from "@stall10/shared";
 import { callApi } from "@/lib/client";
 import { useAuth } from "../AuthProvider";
 import { canReadRoom } from "../useTeamChats";
+import { useMutedRooms } from "../useUnreadChats";
 import { Avatar } from "../Avatar";
 import { LocalTime } from "../LocalTime";
 import { ChatAttachment, type ChatFile } from "../ChatAttachment";
@@ -24,6 +25,7 @@ import { VoiceRoom } from "./meetings/VoiceRoom";
 import { useVoice } from "../voice/VoiceProvider";
 import { EmptyState, Loading } from "../StatusViews";
 import { ReportButton } from "../Report";
+import { MentionText, teamMentions } from "../Mentions";
 
 type Room = ManagedRoom & InboxRoom;
 type Folder = ManagedFolder;
@@ -73,6 +75,34 @@ export function TeamChat() {
   const rooms = useLiveQueries<Room>(member ? `teams/${teamId}/chats` : null, queries, all ? "all" : (member?.audience.join(",") ?? ""));
   const folders = useLiveQuery<Folder>(member ? `teams/${teamId}/chatFolders` : null, [], "folders");
   const readAt = (id: string) => reads.data?.rooms?.[id];
+  // Muting from the list (the room's ⋯, right-click or press and hold), as the app.
+  const mutedRooms = useMutedRooms(member?.uid);
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [muting, setMuting] = useState(false);
+  useEffect(() => {
+    if (!menuFor) return;
+    const close = (e: MouseEvent | KeyboardEvent) => {
+      if (e instanceof KeyboardEvent ? e.key === "Escape" : !(e.target as Element).closest?.(".chat-room-item.menu-open")) setMenuFor(null);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, [menuFor]);
+  async function toggleMute(roomId: string, muted: boolean) {
+    if (!user) return;
+    setMuting(true);
+    try {
+      await callApi(user, "/v1/me/notification-settings/mute", { method: "PUT", body: { teamId, roomId, muted: !muted } });
+      setMenuFor(null);
+    } catch {
+      window.alert("Couldn't change that. Try again.");
+    } finally {
+      setMuting(false);
+    }
+  }
   const openRoom = (rooms.data ?? []).find((r) => r.id === params.get("room")) ?? (rooms.data ?? []).slice().sort(byPosition).find((r) => r.kind !== "voice");
   const openUnread = !!member && !!openRoom && reads.data !== undefined && canReadRoom(member.team, member.uid, openRoom) && roomUnread(openRoom, readAt(openRoom.id));
   // The open room counts as read, now and as each message arrives.
@@ -115,11 +145,22 @@ export function TeamChat() {
             {g.name && <h3 className="chat-folder">{g.name}</h3>}
             <ul className="hub-items">
               {g.rooms.map((r) => {
-                const unread = r.id !== open?.id && canReadRoom(member.team, member.uid, r) && roomUnread(r, readAt(r.id));
+                const muted = mutedRooms.has(mutedRoomKey(teamId, r.id));
+                // Muted: no unread dot, as the app (TeamChatSummary).
+                const unread = !muted && r.id !== open?.id && canReadRoom(member.team, member.uid, r) && roomUnread(r, readAt(r.id));
                 // As the app: who's in a voice room shows once you're connected to it.
                 const inVoice = r.kind === "voice" && voice.isIn(teamId, r.id) && voice.state.connected ? voice.state.people.length : 0;
                 return (
-                  <li key={r.id}>
+                  <li
+                    key={r.id}
+                    className={`chat-room-item${menuFor === r.id ? " menu-open" : ""}`}
+                    // Right-click, or press and hold on a phone: the room's menu (the app's press and hold).
+                    onContextMenu={(e) => {
+                      if (r.kind === "voice") return;
+                      e.preventDefault();
+                      setMenuFor(r.id);
+                    }}
+                  >
                     <Link
                       href={`${pathname}?room=${r.id}`}
                       scroll={false}
@@ -133,8 +174,31 @@ export function TeamChat() {
                         {r.name || "Room"}
                         {inVoice > 0 && <small className="chat-in-voice">{inVoice} in voice</small>}
                       </span>
+                      {muted && (
+                        <span className="chat-room-muted" title="Muted" aria-label="Muted">
+                          🔕
+                        </span>
+                      )}
                       {unread && <span className="notice-dot" aria-label="Unread" />}
                     </Link>
+                    {r.kind !== "voice" && (
+                      <button
+                        type="button"
+                        className="chat-room-more"
+                        aria-label={`Options for ${r.name || "room"}`}
+                        aria-expanded={menuFor === r.id}
+                        onClick={() => setMenuFor(menuFor === r.id ? null : r.id)}
+                      >
+                        ⋯
+                      </button>
+                    )}
+                    {menuFor === r.id && (
+                      <div className="chat-room-menu" role="menu">
+                        <button type="button" role="menuitem" disabled={muting} onClick={() => void toggleMute(r.id, muted)}>
+                          {muted ? "Unmute notifications" : "Mute notifications"}
+                        </button>
+                      </div>
+                    )}
                   </li>
                 );
               })}
@@ -210,6 +274,9 @@ function Thread({
   const [polling, setPolling] = useState(false);
   const names = viewer.state === "member" ? (viewer.team.memberNames ?? {}) : {};
   const nameOf = (uid: string) => names[uid] || "Member";
+  // @mentions: suggested in the composer and marked in messages, as the app.
+  const mentions =
+    viewer.state === "member" ? teamMentions(viewer.team, me, viewer.tier === "owner" || viewer.can("manageChats")) : undefined;
   const pins = useRoomPins<Message>(teamId, roomId);
   const pinActions = usePinActions(teamId, roomId);
   // From the live pins only: older pages of messages aren't live.
@@ -264,7 +331,11 @@ function Thread({
                       ↪ {m.replyTo.authorName}: {m.replyTo.text}
                     </p>
                   )}
-                  {m.text && <p className="message-text">{m.text}</p>}
+                  {m.text && (
+                    <p className="message-text">
+                      <MentionText text={m.text} mentions={mentions} />
+                    </p>
+                  )}
                   {m.event?.id && <ChatEventCard teamId={teamId} eventId={m.event.id} uid={me} />}
                   {m.poll && (
                     <ChatPollCard
@@ -334,6 +405,7 @@ function Thread({
           outbox={{ kind: "teamChat", target: `${teamId}/${roomId}` }}
           onShareEvent={canShareEvents ? () => setSharing(true) : undefined}
           onCreatePoll={() => setPolling(true)}
+          mentions={mentions}
         />
       ) : (
         <footer className="thread-foot muted small">You can read this room but not post in it.</footer>

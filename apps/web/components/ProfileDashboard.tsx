@@ -2,6 +2,7 @@ import type { PublicProfile, StatTotals } from "@stall10/shared";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Avatar } from "./Avatar";
+import { NavIcon, type NavIconName } from "./NavIcons";
 import "./member.css";
 
 /**
@@ -29,32 +30,46 @@ export function ProfileCard({
   staff?: boolean;
 }) {
   const name = profile.name || "Player";
-  const facts = [
-    profile.pronouns,
-    profile.hometown,
-    profile.school,
-    profile.throwingHand && `Throws ${profile.throwingHand === "both" ? "with both hands" : profile.throwingHand}`,
-    profile.playingSince && `Playing since ${profile.playingSince}`,
-  ].filter((f): f is string => Boolean(f));
+  // One line each, with an icon: where they're from, school, hand, since.
+  const facts = (
+    [
+      ["place", profile.hometown],
+      ["school", profile.school],
+      ["disc", profile.throwingHand && `Throws ${profile.throwingHand === "both" ? "with both hands" : profile.throwingHand}`],
+      ["clock", profile.playingSince && `Playing since ${profile.playingSince}`],
+    ] as Array<[NavIconName, string | undefined | false]>
+  ).filter((f): f is [NavIconName, string] => Boolean(f[1]));
+  const handle = [profile.username && `@${profile.username}`, profile.pronouns].filter(Boolean).join(" · ");
   return (
     <div className={`card profile-card${profile.headerUrl ? " has-header" : ""}`}>
       {profile.headerUrl && <div className="profile-header" style={{ backgroundImage: `url(${JSON.stringify(profile.headerUrl)})` }} />}
       <Avatar name={name} url={profile.photoUrl} size={96} />
       <h1>{name}</h1>
-      {profile.username && <p className="muted handle">@{profile.username}</p>}
-      {staff && (
-        <p className="staff-badge" title="Stall 10 staff">
-          <span aria-hidden="true">✓</span> Stall 10 staff
-        </p>
+      {handle && <p className="muted handle">{handle}</p>}
+      {(staff || profile.private) && (
+        <div className="profile-badges">
+          {staff && (
+            <span className="staff-badge" title="Stall 10 staff">
+              <span aria-hidden="true">✓</span> Stall 10 staff
+            </span>
+          )}
+          {profile.private && <span className="pill">Private profile</span>}
+        </div>
       )}
-      {profile.private && <p className="pill">Private profile</p>}
-      {profile.bio && <p className="bio">{profile.bio}</p>}
-      {facts.length > 0 && (
-        <ul className="profile-facts">
-          {facts.map((f) => (
-            <li key={f}>{f}</li>
-          ))}
-        </ul>
+      {(profile.bio || facts.length > 0) && (
+        <div className="profile-about">
+          {profile.bio && <p className="bio">{profile.bio}</p>}
+          {facts.length > 0 && (
+            <ul className="profile-facts">
+              {facts.map(([icon, text]) => (
+                <li key={icon}>
+                  <NavIcon name={icon} size={16} />
+                  <span>{text}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
       {actions && <div className="profile-actions">{actions}</div>}
     </div>

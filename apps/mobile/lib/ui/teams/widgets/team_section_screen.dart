@@ -243,6 +243,7 @@ class _TeamSectionBodyState extends State<TeamSectionBody> {
         chatRepository: c.read(),
         authRepository: c.read(),
         voiceRepository: c.read(),
+        notificationRepository: c.read(),
       ),
       builder: (_, chatVm) => ChatTab(viewModel: chatVm),
     ),

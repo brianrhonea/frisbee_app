@@ -45,7 +45,8 @@ export async function deliver(
 async function deliverTo(db: Firestore, messaging: Messaging, uid: string, notice: Notice) {
   const user = db.collection("users").doc(uid);
   const prefs = ((await user.collection("settings").doc("notifications").get()).data() ?? {}) as Prefs;
-  if (!wants(prefs, notice.category, notice.teamId, notice.roomId, notice.conversationId)) return;
+  // An @mention of the member reaches them in a room they muted.
+  if (!wants(prefs, notice.category, notice.teamId, notice.ignoresRoomMute ? undefined : notice.roomId, notice.conversationId)) return;
 
   const feed = user.collection("notifications");
   const entry = notice.collapseId ? feed.doc(notice.collapseId) : feed.doc();

@@ -539,6 +539,8 @@ class _NewTeamDialog extends StatefulWidget {
 class _NewTeamDialogState extends State<_NewTeamDialog> {
   final _name = TextEditingController();
   Division _division = Division.open;
+  // The school or club has no level of its own: each team picks one.
+  CompetitionLevel _level = CompetitionLevel.college;
   String? _nameError;
 
   /// Past the name, to pick who gets on it.
@@ -605,7 +607,18 @@ class _NewTeamDialogState extends State<_NewTeamDialog> {
                     ],
                     onChanged: (v) => setState(() => _division = v!),
                   ),
-                  if (org?.level == CompetitionLevel.club) ...[
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<CompetitionLevel>(
+                    key: const Key('community-team-level'),
+                    initialValue: _level,
+                    decoration: const InputDecoration(labelText: 'Level'),
+                    items: [
+                      for (final l in CompetitionLevel.values)
+                        DropdownMenuItem(value: l, child: Text(l.label)),
+                    ],
+                    onChanged: (v) => setState(() => _level = v!),
+                  ),
+                  if (_level == CompetitionLevel.club) ...[
                     const SizedBox(height: 8),
                     Text(
                       clubTooYoungMessage,
@@ -623,7 +636,7 @@ class _NewTeamDialogState extends State<_NewTeamDialog> {
                   team: NewTeam(
                     name: _name.text.trim(),
                     division: _division,
-                    level: org?.level ?? CompetitionLevel.college,
+                    level: _level,
                     city: org?.city ?? '',
                   ),
                   access: access,

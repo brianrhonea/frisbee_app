@@ -4,6 +4,7 @@ import '../../../domain/models/app_user.dart';
 import '../../../domain/models/chat.dart';
 import '../../../domain/models/team.dart';
 import '../../../utils/result.dart';
+import '../../../domain/models/mentions.dart';
 
 abstract class ChatRepository {
   /// Rooms [uid] can see on [team], in order ([sortRooms]). Members who
@@ -41,6 +42,11 @@ abstract class ChatRepository {
   /// When [uid] last read each room: team id → room id → time. Private to
   /// them; compared with [ChatRoom.lastAt] for unread dots.
   Stream<Map<String, Map<String, DateTime>>> watchReads(String uid);
+
+  /// [uid]'s @mentions in team rooms, from their notification feed (one per
+  /// room, the newest; written by the notifications trigger). The Chats
+  /// list says "Cam mentioned you: ..." until they read the room.
+  Stream<List<ChatMention>> watchMentions(String uid);
 
   /// Marks [roomId] on [teamId] read by [uid] now.
   Future<Result<void>> markRead(String teamId, String roomId, String uid);

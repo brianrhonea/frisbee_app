@@ -141,10 +141,29 @@ class SettingsScreen extends StatelessWidget {
                     subtitle: 'Only you can see these',
                     onTap: () => context.push(Routes.settingsPersonal),
                   ),
+                ],
+              ),
+              SettingsGroup(
+                title: 'Help',
+                children: [
+                  SettingsTile(
+                    key: const Key('settings-help'),
+                    icon: Icons.help_outline,
+                    title: 'Help',
+                    subtitle: 'Common questions about Stall 10',
+                    onTap: () => context.push(Routes.settingsHelp),
+                  ),
+                  SettingsTile(
+                    key: const Key('settings-rules'),
+                    icon: Icons.sports,
+                    title: 'Rules of ultimate',
+                    subtitle: 'How the game is played, and the official rules',
+                    onTap: () => context.push(Routes.rules),
+                  ),
                   SettingsTile(
                     icon: Icons.menu_book_outlined,
                     title: 'Learn to play',
-                    subtitle: 'The rules of ultimate',
+                    subtitle: 'Ultimate in five minutes',
                     onTap: () => context.push(Routes.learn),
                   ),
                 ],

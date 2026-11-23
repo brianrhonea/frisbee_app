@@ -16,6 +16,7 @@ import '../../../utils/command.dart';
 import '../../../utils/on_screen.dart';
 import '../../../utils/pending_removals.dart';
 import '../../../utils/result.dart';
+import '../../../domain/models/mentions.dart';
 
 /// How a thread lays out its messages.
 enum ThreadStyle {
@@ -230,6 +231,18 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
 
   /// Whether messages can carry photos and files.
   bool get canAttach => true;
+
+  /// Who the composer suggests for @mentions, and whose mentions messages
+  /// draw (team chat; none in direct messages).
+  MentionTargets get mentionTargets => MentionTargets.none;
+
+  /// Whether the user can @mention everyone and roles (the owner, coaches,
+  /// captains and chat managers; the notifications trigger agrees).
+  bool get canMentionGroups => false;
+
+  /// Whether [span] mentions the user: by name, a role of theirs, or
+  /// everyone. Drawn brighter, as Discord does.
+  bool mentionsMe(MentionSpan span) => false;
 
   /// The color (0xAARRGGBB) to show [uid]'s name in, from their top
   /// colored role, or null for the default.

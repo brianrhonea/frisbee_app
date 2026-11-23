@@ -39,10 +39,15 @@ class LinkifiedText extends StatefulWidget {
     super.key,
     this.style,
     this.selectable = true,
+    this.mentions = const [],
   });
 
   final String text;
   final TextStyle? style;
+
+  /// @mentions to draw: [start, end) in [text], and whether it's of the
+  /// reader (drawn brighter).
+  final List<({int start, int end, bool me})> mentions;
 
   /// False draws plain text, so a long-press reaches the widget around it
   /// (a chat message's actions, where Copy is one).
@@ -86,7 +91,14 @@ class _LinkifiedTextState extends State<LinkifiedText> {
   @override
   Widget build(BuildContext context) {
     final parts = splitLinks(widget.text);
-    if (parts.every((p) => p.$2 == null)) {
+    // Where each part starts in the text, for its mentions.
+    final offsets = <int>[];
+    var at = 0;
+    for (final (text, _) in parts) {
+      offsets.add(at);
+      at += text.length;
+    }
+    if (parts.every((p) => p.$2 == null) && widget.mentions.isEmpty) {
       return widget.selectable
           ? SelectableText(widget.text, style: widget.style)
           : Text(widget.text, style: widget.style);
@@ -95,9 +107,9 @@ class _LinkifiedTextState extends State<LinkifiedText> {
     final span = TextSpan(
       style: widget.style,
       children: [
-        for (final (text, uri) in parts)
+        for (final (i, (text, uri)) in parts.indexed)
           if (uri == null)
-            TextSpan(text: text)
+            ..._plain(text, offsets[i])
           else
             TextSpan(
               text: text,
@@ -108,5 +120,38 @@ class _LinkifiedTextState extends State<LinkifiedText> {
       ],
     );
     return widget.selectable ? SelectableText.rich(span) : Text.rich(span);
+  }
+
+  /// A plain run starting at [offset], with its @mentions drawn.
+  List<InlineSpan> _plain(String text, int offset) {
+    final end = offset + text.length;
+    final inside = [
+      for (final m in widget.mentions)
+        if (m.start >= offset && m.end <= end) m,
+    ];
+    if (inside.isEmpty) return [TextSpan(text: text)];
+    final scheme = Theme.of(context).colorScheme;
+    final out = <InlineSpan>[];
+    var at = offset;
+    for (final m in inside) {
+      if (m.start > at) {
+        out.add(TextSpan(text: widget.text.substring(at, m.start)));
+      }
+      out.add(
+        TextSpan(
+          text: widget.text.substring(m.start, m.end),
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: scheme.primary,
+            backgroundColor: scheme.primary.withValues(
+              alpha: m.me ? 0.22 : 0.1,
+            ),
+          ),
+        ),
+      );
+      at = m.end;
+    }
+    if (at < end) out.add(TextSpan(text: widget.text.substring(at, end)));
+    return out;
   }
 }

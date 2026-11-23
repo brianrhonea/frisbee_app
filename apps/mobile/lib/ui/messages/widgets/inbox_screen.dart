@@ -317,14 +317,56 @@ class _InboxListState extends State<InboxList> {
         for (final i in vm.items)
           if (!(i.isRequest && !i.isGroup && blocks.hides(i.otherId))) i,
       ];
-      final teamChats = vm.teamChats;
-      // Section headings only when both kinds are listed.
-      final headed = teamChats.isNotEmpty && items.isNotEmpty;
-      final lead = teamChats.isEmpty ? 0 : teamChats.length + (headed ? 1 : 0);
-      Widget heading(String text, {bool first = false}) => Padding(
-        padding: EdgeInsets.fromLTRB(16, first ? 6 : 18, 16, 0),
-        child: SectionHeader(text),
-      );
+      final allTeamChats = vm.teamChats;
+      // Section headings only when both kinds are listed; each folds away
+      // (until the app restarts) to keep the other in view.
+      final headed = allTeamChats.isNotEmpty && items.isNotEmpty;
+      final teamChats = headed && vm.isCollapsed(InboxSection.teams)
+          ? const <TeamChatSummary>[]
+          : allTeamChats;
+      final allItems = items;
+      final shownItems = headed && vm.isCollapsed(InboxSection.direct)
+          ? const <InboxItem>[]
+          : allItems;
+      final lead = allTeamChats.isEmpty
+          ? 0
+          : teamChats.length + (headed ? 1 : 0);
+      Widget heading(
+        String text,
+        InboxSection section,
+        int count, {
+        bool first = false,
+      }) {
+        final open = !vm.isCollapsed(section);
+        return Padding(
+          padding: EdgeInsets.fromLTRB(8, first ? 2 : 14, 8, 0),
+          child: InkWell(
+            key: Key('inbox-section-${section.name}'),
+            borderRadius: BorderRadius.circular(8),
+            onTap: () => vm.toggleSection(section),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 4, 4, 4),
+              child: Row(
+                children: [
+                  Expanded(child: SectionHeader(text)),
+                  if (!open)
+                    Text(
+                      '$count',
+                      style: TextStyle(fontSize: 12, color: c.muted),
+                    ),
+                  Icon(
+                    open ? Icons.expand_less : Icons.expand_more,
+                    size: 20,
+                    color: c.muted,
+                    semanticLabel: open ? 'Hide $text' : 'Show $text',
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -356,7 +398,7 @@ class _InboxListState extends State<InboxList> {
               ),
             ),
           Expanded(
-            child: items.isEmpty && teamChats.isEmpty
+            child: allItems.isEmpty && allTeamChats.isEmpty
                 ? vm.error != null
                       ? ErrorView(error: vm.error)
                       : EmptyView(
@@ -380,10 +422,15 @@ class _InboxListState extends State<InboxList> {
                     child: ListView.builder(
                       controller: _scroll,
                       padding: EdgeInsets.only(top: headed ? 0 : 4, bottom: 16),
-                      itemCount: lead + (headed ? 1 : 0) + items.length,
+                      itemCount: lead + (headed ? 1 : 0) + shownItems.length,
                       itemBuilder: (context, i) {
                         if (headed && i == 0) {
-                          return heading('Team chats', first: true);
+                          return heading(
+                            'Team chats',
+                            InboxSection.teams,
+                            allTeamChats.length,
+                            first: true,
+                          );
                         }
                         if (i < lead) {
                           final t = i - (headed ? 1 : 0);
@@ -407,14 +454,18 @@ class _InboxListState extends State<InboxList> {
                           );
                         }
                         if (headed && i == lead) {
-                          return heading('Direct messages');
+                          return heading(
+                            'Direct messages',
+                            InboxSection.direct,
+                            allItems.length,
+                          );
                         }
                         final d = i - lead - (headed ? 1 : 0);
-                        final item = items[d];
+                        final item = shownItems[d];
                         Widget slice(Widget child) => _CardSlice(
                           flat: widget.flat,
                           first: d == 0,
-                          last: d == items.length - 1,
+                          last: d == shownItems.length - 1,
                           child: child,
                         );
                         final tile = _InboxTile(
@@ -877,7 +928,13 @@ class _TeamChatTile extends StatelessWidget {
                             summary.subtitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: _InboxTile._previewStyle(c, unread),
+                            // "Cam mentioned you: ..." stands out, as Discord's.
+                            style: summary.mention != null
+                                ? _InboxTile._previewStyle(c, unread).copyWith(
+                                    color: c.accent,
+                                    fontWeight: FontWeight.w700,
+                                  )
+                                : _InboxTile._previewStyle(c, unread),
                           ),
                         ),
                         if (unread) ...[

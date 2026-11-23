@@ -57,6 +57,8 @@ import {
   reminderNotice,
   reminderRecipients,
   type RoomDoc,
+  mentionedReaders,
+  mentionNotice,
   roomReaders,
   type TeamDoc,
   teamPostNotice,
@@ -89,19 +91,28 @@ export const chatMessage = onDocumentCreated(
     const roomData = room.data() as RoomDoc | undefined;
     if (!team || !roomData) return;
     const recipients = roomReaders(team, roomData).filter((uid) => uid !== message.authorId);
-    await deliver(
-      getFirestore(),
-      getMessaging(),
-      recipients,
-      chatNotice({
-        teamId,
-        roomId,
-        teamName: teamName(team),
-        roomName: roomData.name || "Chat",
-        message,
-        messageId: event.params.messageId,
-      }),
-    );
+    const about = {
+      teamId,
+      roomId,
+      teamName: teamName(team),
+      roomName: roomData.name || "Chat",
+      message,
+      messageId: event.params.messageId,
+    };
+    // @mentioned readers get "X mentioned you" instead of the room's notice.
+    const mentioned = mentionedReaders(team, recipients, message);
+    const personal = new Set(mentioned.personal);
+    const byMention = new Set(mentioned.all);
+    await Promise.all([
+      deliver(getFirestore(), getMessaging(), recipients.filter((uid) => !byMention.has(uid)), chatNotice(about)),
+      deliver(getFirestore(), getMessaging(), mentioned.personal, mentionNotice({ ...about, personal: true })),
+      deliver(
+        getFirestore(),
+        getMessaging(),
+        mentioned.all.filter((uid) => !personal.has(uid)),
+        mentionNotice({ ...about, personal: false }),
+      ),
+    ]);
   },
 );
 

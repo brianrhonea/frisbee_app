@@ -9,6 +9,7 @@ import 'package:frisbee_app/domain/models/notification.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 
 import 'fixture_file.dart';
+import 'package:frisbee_app/domain/models/mentions.dart';
 
 final _team = Team(
   id: 't1',
@@ -101,7 +102,45 @@ final _cases = <Map<String, Object?>>[
     'reads': <String, Object?>{},
     'muted': ['rides'],
   },
+  {
+    'name': 'an unread mention says so and opens its room',
+    'rooms': [
+      _room('general', 'General', lastAt: _t2),
+      _room('rides', 'Car Pool', lastAt: _t1),
+    ],
+    'reads': {'general': _t0},
+    'mentions': [
+      _mention('rides', 'Cam mentioned you: who drives?', _t1),
+      _mention('general', 'Avery mentioned you: old', _t0),
+    ],
+  },
+  {
+    'name': 'a mention read already is not shown',
+    'rooms': [_room('general', 'General', lastAt: _t1)],
+    'reads': {'general': _t2},
+    'mentions': [_mention('general', 'Cam mentioned you: hi', _t1)],
+  },
+  {
+    'name': 'a named mention shows in a muted room; @everyone does not',
+    'rooms': [
+      _room('general', 'General', lastAt: _t2),
+      _room('rides', 'Car Pool', lastAt: _t3),
+    ],
+    'reads': <String, Object?>{},
+    'muted': ['general', 'rides'],
+    'mentions': [
+      _mention('general', 'Cam mentioned you: named', _t2),
+      _mention('rides', 'Cam mentioned you: everyone', _t3, personal: false),
+    ],
+  },
 ];
+
+Map<String, Object?> _mention(
+  String roomId,
+  String text,
+  String at, {
+  bool personal = true,
+}) => {'roomId': roomId, 'text': text, 'at': at, 'personal': personal};
 
 void main() {
   test('team chat summary (team_chats/summary.json)', () {
@@ -113,7 +152,9 @@ void main() {
           'read). `unread` is newest first; `open` is the room a tap opens '
           '(the only unread one, else the newest, else the first); '
           '`subtitle` is what the row says. Rooms in `muted` (room ids, '
-          'muted by the user) are never unread.',
+          'muted by the user) are never unread. An unread @mention (in '
+          '`mentions`, after its room was read) makes the room unread, opens '
+          'it and is the subtitle; a personal one even in a muted room.',
       [
         for (final c in _cases)
           () {
@@ -140,6 +181,18 @@ void main() {
                 for (final r in (c['muted'] as List<String>?) ?? const [])
                   NotificationPreferences.roomKey(_team.id, r),
               },
+              mentions: [
+                for (final m
+                    in (c['mentions'] as List<Map<String, Object?>>?) ??
+                        const <Map<String, Object?>>[])
+                  ChatMention(
+                    teamId: _team.id,
+                    roomId: m['roomId']! as String,
+                    text: m['text']! as String,
+                    at: DateTime.parse(m['at']! as String),
+                    personal: m['personal']! as bool,
+                  ),
+              ],
             );
             return {
               ...c,
@@ -149,6 +202,7 @@ void main() {
                 'lastAt': s.lastAt,
                 'open': s.openRoom?.id,
                 'subtitle': s.subtitle,
+                'mention': s.mention?.roomId,
               },
             };
           }(),

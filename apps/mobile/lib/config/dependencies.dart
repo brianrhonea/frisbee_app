@@ -13,6 +13,7 @@ import '../data/services/callable_client.dart';
 import '../data/repositories/auth/auth_repository.dart';
 import '../data/repositories/auth/auth_repository_firebase.dart';
 import '../data/repositories/agreement/agreement_repository.dart';
+import '../data/repositories/team_share/team_share_repository.dart';
 import '../data/repositories/personal/personal_repository.dart';
 import '../data/repositories/payment/payment_repository.dart';
 import '../data/repositories/payment/payment_repository_api.dart';
@@ -142,6 +143,11 @@ List<SingleChildWidget> get firebaseProviders => [
   ),
   Provider<PaymentRepository>(
     create: (context) => PaymentRepositoryApi(api: context.read<ApiClient?>()),
+  ),
+  // Nullable, as TeamShareCard reads it (pages built without it skip the card).
+  Provider<TeamShareRepository?>(
+    create: (context) =>
+        TeamShareRepositoryApi(api: context.read<ApiClient?>()),
   ),
   ChangeNotifierProvider<AgreementRepository>(
     create: (context) => AgreementRepositoryApi(

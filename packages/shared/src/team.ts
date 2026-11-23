@@ -17,6 +17,13 @@ export type TeamKind = (typeof teamKinds)[number];
 export const isGroupLike = (kind: TeamKind) => kind !== "team";
 
 /**
+ * Whether a team or listing has a division and level: teams do; pickup
+ * communities and schools/clubs don't (their teams each have their own).
+ * Groups made before this may still store them; they're ignored.
+ */
+export const hasDivision = (t: { kind?: unknown } | null | undefined) => t?.kind == null || t.kind === "team";
+
+/**
  * A club team: a team (no `kind`, or "team") at the club level (a stored
  * team with no level reads as club, as the app and listings read it).
  * Joining one needs [clubMinimumAge] (personal.ts); groups and other
@@ -47,8 +54,9 @@ export const teamLimits = {
 export const createTeamRequestSchema = z
   .strictObject({
     name: clean(z.string().trim().min(1, "Name your team.").max(teamLimits.name)),
-    division: z.enum(divisions),
-    level: z.enum(competitionLevels),
+    /** Teams only: communities and schools/clubs have no division or level (hasDivision). */
+    division: z.enum(divisions).optional(),
+    level: z.enum(competitionLevels).optional(),
     city: clean(z.string().trim().max(teamLimits.city).default("")),
     kind: z.enum(teamKinds).default("team"),
     description: clean(z.string().trim().max(teamLimits.description).default("")),
@@ -58,6 +66,8 @@ export const createTeamRequestSchema = z
     leagueId: z.string().min(1).max(teamLimits.leagueId).nullable().default(null),
   })
   .superRefine((t, ctx) => {
+    if (!isGroupLike(t.kind) && t.division == null) ctx.addIssue({ code: "custom", path: ["division"], message: "Pick a division." });
+    if (!isGroupLike(t.kind) && t.level == null) ctx.addIssue({ code: "custom", path: ["level"], message: "Pick a level." });
     if (isGroupLike(t.kind) && t.leagueId != null) {
       ctx.addIssue({ code: "custom", path: ["leagueId"], message: "Only a team can reserve a league spot." });
     }

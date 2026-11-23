@@ -11,6 +11,7 @@ import 'package:frisbee_app/data/services/file_picker_service.dart';
 import 'package:provider/provider.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/chat.dart';
+import 'package:frisbee_app/domain/models/mentions.dart';
 import 'package:frisbee_app/domain/models/direct_message.dart';
 import 'package:frisbee_app/domain/models/model_utils.dart';
 import 'package:frisbee_app/domain/models/team.dart';
@@ -839,6 +840,86 @@ void main() {
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(find.text('Team chats'), findsOneWidget);
+    });
+
+    testWidgets('an unread @mention shows on the team row', (tester) async {
+      tester.view.physicalSize = const Size(390, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      seed();
+      chats.mentions[testUser.uid] = [
+        ChatMention(
+          teamId: 't1',
+          roomId: 'rides',
+          text: 'Cam mentioned you: who drives?',
+          at: DateTime(2026, 11, 2),
+        ),
+      ];
+      final vm = withTeams();
+      addTearDown(vm.dispose);
+      await tester.pumpWidget(
+        withRepos(
+          MaterialApp(
+            theme: AppTheme.light,
+            home: Scaffold(body: InboxScreen(viewModel: vm)),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Cam mentioned you: who drives?'), findsOneWidget);
+    });
+
+    testWidgets('team chats and direct messages fold away, and stay folded '
+        'while the app runs', (tester) async {
+      tester.view.physicalSize = const Size(390, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      addTearDown(InboxViewModel.resetCollapsed);
+      seed();
+      dms.conversations['a_u1'] = Conversation(
+        id: 'a_u1',
+        participants: const ['a', 'u1'],
+        names: const {'a': 'Avery Jones'},
+        lastMessage: 'See you at practice',
+        lastMessageAt: DateTime(2026, 10, 1),
+        lastSenderId: 'a',
+      );
+      final vm = withTeams();
+      addTearDown(vm.dispose);
+      await tester.pumpWidget(
+        withRepos(
+          MaterialApp(
+            theme: AppTheme.light,
+            home: Scaffold(body: InboxScreen(viewModel: vm)),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('inbox-section-teams')));
+      await tester.pumpAndSettle();
+      expect(find.text('Northside Flyers'), findsNothing);
+      expect(find.text('Avery Jones'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('inbox-section-direct')));
+      await tester.pumpAndSettle();
+      expect(find.text('Avery Jones'), findsNothing);
+      expect(find.text('Team chats'), findsOneWidget);
+
+      // A new page (leaving Chats and coming back) keeps them folded.
+      final again = withTeams();
+      addTearDown(again.dispose);
+      await tester.pumpWidget(
+        withRepos(
+          MaterialApp(
+            theme: AppTheme.light,
+            home: Scaffold(body: InboxScreen(viewModel: again)),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Northside Flyers'), findsNothing);
+      await tester.tap(find.byKey(const Key('inbox-section-teams')));
+      await tester.pumpAndSettle();
+      expect(find.text('Northside Flyers'), findsOneWidget);
     });
   });
 

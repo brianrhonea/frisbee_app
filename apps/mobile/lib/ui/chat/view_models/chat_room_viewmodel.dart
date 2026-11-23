@@ -14,6 +14,7 @@ import '../../../domain/models/team.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 import 'message_thread_viewmodel.dart';
+import '../../../domain/models/mentions.dart';
 
 /// Backs a team chat room: its messages, the composer and attachments.
 class ChatRoomViewModel extends MessageThreadViewModel {
@@ -132,6 +133,30 @@ class ChatRoomViewModel extends MessageThreadViewModel {
 
   /// Members who can manage chats change the room's name and access.
   bool get canManage => _team?.has(uid, TeamPermission.manageChats) ?? false;
+
+  @override
+  MentionTargets get mentionTargets {
+    final t = _team;
+    if (t == null) return MentionTargets.none;
+    return MentionTargets(
+      members: {
+        for (final e in t.memberNames.entries)
+          if (t.roleOf(e.key) != null) e.key: e.value,
+      },
+      roles: {for (final r in t.sortedRoles) r.id: r.name},
+    );
+  }
+
+  @override
+  bool get canMentionGroups => canManage;
+
+  @override
+  bool mentionsMe(MentionSpan span) => switch (span.kind) {
+    MentionKind.everyone => true,
+    MentionKind.user => span.id == uid,
+    MentionKind.role =>
+      _team?.rolesOf(uid).any((r) => r.id == span.id) ?? false,
+  };
 
   // Pins (redesign F2) ------------------------------------------------------
 

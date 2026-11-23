@@ -136,8 +136,8 @@ class _HostedTournamentFormScreenState
         2,
         'Who can play',
         [
-          vm.takesPlayers ? 'Players sign up' : 'Teams apply',
-          if (vm.teamEntry) 'teams can reserve a spot',
+          vm.entryChoice.label,
+          if (vm.teamEntry && !vm.isLeague) 'teams can reserve a spot',
           vm.visibility.label,
         ].join(' · '),
       ),
@@ -259,34 +259,28 @@ class _HostedTournamentFormScreenState
         padding: const EdgeInsets.only(bottom: 12),
         child: Wrap(
           spacing: 8,
-          children: [
-            Chip(
-              label: Text(vm.takesPlayers ? 'Players sign up' : 'Teams apply'),
-            ),
-          ],
+          children: [Chip(label: Text(vm.entryChoice.label))],
         ),
       );
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SegmentedButton<TournamentEntryType>(
-          segments: const [
-            ButtonSegment(
-              value: TournamentEntryType.teams,
-              label: Text('Teams apply'),
-            ),
-            ButtonSegment(
-              value: TournamentEntryType.players,
-              label: Text('Players sign up'),
-            ),
+        SegmentedButton<EntryChoice>(
+          segments: [
+            for (final c in vm.entryChoices)
+              ButtonSegment(value: c, label: Text(c.label)),
           ],
-          selected: {vm.entryType},
-          onSelectionChanged: (s) => vm.setEntryType(s.first),
+          selected: {vm.entryChoice},
+          onSelectionChanged: (s) => vm.setEntryChoice(s.first),
         ),
         Padding(
           padding: const EdgeInsets.only(top: 6, bottom: 8),
           child: Text(switch ((vm.kind, vm.entryType)) {
+            (HostedKind.league, _) when vm.entryChoice == EntryChoice.both =>
+              'A weekly league: a captain can pay the team fee and bring '
+                  'their own team, or players sign up on their own and are '
+                  'drafted onto the other teams.',
             (HostedKind.tournament, TournamentEntryType.teams) =>
               'A weekend tournament for teams that apply.',
             (HostedKind.tournament, TournamentEntryType.players) =>
@@ -301,17 +295,19 @@ class _HostedTournamentFormScreenState
           }, style: TextStyle(fontSize: 12.5, color: c.muted)),
         ),
         if (vm.entryType == TournamentEntryType.players) ...[
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Teams can also reserve a spot'),
-            subtitle: const Text(
-              'A captain pays the team fee, names their team and invites '
-              'their own players. Everyone else signs up on their own and '
-              'is drafted into the remaining spots.',
+          // A league picks this as its third choice above.
+          if (!vm.isLeague)
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Teams can also reserve a spot'),
+              subtitle: const Text(
+                'A captain pays the team fee, names their team and invites '
+                'their own players. Everyone else signs up on their own and '
+                'is drafted into the remaining spots.',
+              ),
+              value: vm.teamEntry,
+              onChanged: vm.setTeamEntry,
             ),
-            value: vm.teamEntry,
-            onChanged: vm.setTeamEntry,
-          ),
           const SizedBox(height: 4),
           SegmentedButton<DraftMode>(
             segments: [

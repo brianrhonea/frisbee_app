@@ -120,7 +120,8 @@ export const saveRolesRequestSchema = z.strictObject({
  */
 export const editTeamRequestSchema = z.strictObject({
   name: clean(z.string().trim().min(1, "Name your team.").max(teamLimits.name)),
-  level: z.enum(competitionLevels),
+  /** Teams only (required for them); groups have none. */
+  level: z.enum(competitionLevels).optional(),
   city: clean(z.string().trim().max(teamLimits.city).default("")),
   /** Accepted only if unchanged. */
   division: z.enum(divisions).optional(),

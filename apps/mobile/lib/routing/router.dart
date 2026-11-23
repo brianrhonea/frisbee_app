@@ -91,6 +91,7 @@ import '../ui/workouts/widgets/record_workout_screen.dart';
 import '../ui/workouts/widgets/route_widgets.dart';
 import 'route_builders.dart';
 import 'routes.dart';
+import '../ui/learn/widgets/guide_screens.dart';
 
 const splashPath = '/splash';
 const _publicRoutes = {Routes.signIn, Routes.signUp};
@@ -189,6 +190,7 @@ GoRouter router(
       ),
     ),
     GoRoute(path: Routes.learn, builder: (_, _) => learnPage()),
+    GoRoute(path: Routes.rules, builder: (_, _) => const RulesScreen()),
     // Settings, from the gear on the user's profile: slides over the page
     // (a panel on wide screens), and its sections slide over it.
     GoRoute(
@@ -220,6 +222,16 @@ GoRouter router(
         GoRoute(
           path: 'follow-requests',
           redirect: (_, _) => Routes.followRequests,
+        ),
+        GoRoute(
+          path: 'help',
+          pageBuilder: (context, state) => slideOverPage(
+            context,
+            state.pageKey,
+            const HelpScreen(),
+            panelOnWide: true,
+            dim: false,
+          ),
         ),
         GoRoute(
           path: 'personal',

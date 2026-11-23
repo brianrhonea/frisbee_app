@@ -53,7 +53,10 @@ export function newTeamDocuments<T>(
 ): Record<string, Doc<T>> {
   // A private group's location is for members only.
   const privateGroup = isGroupLike(t.kind) && t.requiresApproval;
-  const base = { name: t.name, division: t.division, level: t.level, city: t.city };
+  // Groups have no division or level (hasDivision); their teams have their own.
+  const base = isGroupLike(t.kind)
+    ? { name: t.name, city: t.city }
+    : { name: t.name, division: t.division, level: t.level, city: t.city };
   const room = (name: string, kind: "text" | "voice", folderId: string | null, position: number) => ({
     name,
     ...openAccess(),
