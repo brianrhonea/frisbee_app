@@ -92,6 +92,24 @@ export function Messages() {
   const shownTeams =
     view === "inbox" ? (teamChats.chats ?? []).filter((c) => !q || (c.team.name ?? "").toLowerCase().includes(q)) : [];
   const headed = shownTeams.length > 0 && shown.length > 0;
+  // Each section folds away for this browser session, as the app (until it restarts).
+  const [folded, setFolded] = useFoldedSections();
+  const teamsFolded = headed && folded.has("teams");
+  const directFolded = headed && folded.has("direct");
+  const heading = (key: Section, text: string, count: number) => {
+    const isFolded = folded.has(key);
+    return (
+      <h3 className="conv-heading">
+        <button type="button" className="conv-heading-btn" aria-expanded={!isFolded} onClick={() => setFolded(key)}>
+          <span>{text}</span>
+          {isFolded && <small>{count}</small>}
+          <span className="conv-heading-chevron" aria-hidden="true">
+            {isFolded ? "▸" : "▾"}
+          </span>
+        </button>
+      </h3>
+    );
+  };
 
   const go = (q: Record<string, string | null>) => {
     const next = new URLSearchParams(params);
@@ -180,8 +198,8 @@ export function Messages() {
         />
         {shownTeams.length > 0 && (
           <>
-            {headed && <h3 className="conv-heading">Team chats</h3>}
-            <ul className="hub-items conv-list" aria-label="Team chats">
+            {headed && heading("teams", "Team chats", shownTeams.length)}
+            <ul className="hub-items conv-list" aria-label="Team chats" hidden={teamsFolded}>
               {shownTeams.map((c) => (
                 <li key={c.team.id}>
                   <Link
@@ -201,7 +219,7 @@ export function Messages() {
                 </li>
               ))}
             </ul>
-            {headed && <h3 className="conv-heading">Direct messages</h3>}
+            {headed && heading("direct", "Direct messages", shown.length)}
           </>
         )}
         {!convs.data ? (
@@ -219,7 +237,7 @@ export function Messages() {
                   : "No conversations yet."}
           </p>
         ) : (
-          <ul className="hub-items conv-list">
+          <ul className="hub-items conv-list" hidden={directFolded}>
             {shown.map(({ c, d }) => (
               <li key={c.id}>
                 <Link
@@ -245,7 +263,7 @@ export function Messages() {
             ))}
           </ul>
         )}
-        {convs.data && <LoadMore paged={{ ...convs, loadMore }} label="More conversations" />}
+        {convs.data && !directFolded && <LoadMore paged={{ ...convs, loadMore }} label="More conversations" />}
       </nav>
       <section className="hub-detail chat-thread">
         {composing ? (
@@ -787,4 +805,32 @@ function useTyping(convId: string, me: string, names: Record<string, string> | u
     .filter((d) => d.id !== me && d.at && new Date(d.at).getTime() > fresh)
     .map((d) => names?.[d.id] || "Someone");
   return { others, report };
+}
+
+type Section = "teams" | "direct";
+const foldedKey = "stall10.chats.folded";
+
+/** Chats sections folded away, kept in sessionStorage (this tab, until it closes). */
+function useFoldedSections(): [Set<Section>, (s: Section) => void] {
+  const [folded, setFolded] = useState<Set<Section>>(new Set());
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(foldedKey) ?? "[]") as Section[];
+      if (Array.isArray(saved) && saved.length > 0) setFolded(new Set(saved));
+    } catch {
+      // No storage (private window): stays unfolded.
+    }
+  }, []);
+  const toggle = (s: Section) =>
+    setFolded((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(s)) next.add(s);
+      try {
+        sessionStorage.setItem(foldedKey, JSON.stringify([...next]));
+      } catch {
+        // Not saved; still folds for this page.
+      }
+      return next;
+    });
+  return [folded, toggle];
 }

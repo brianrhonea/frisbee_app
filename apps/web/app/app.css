@@ -1368,6 +1368,11 @@ button.poll-option.on { border-color: var(--accent); }
 .messages-tools { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
 .conv-list { margin-top: 10px; }
 .conv-heading { margin: 14px 10px 0; font-size: 0.75rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.conv-heading-btn { display: flex; align-items: center; gap: 6px; width: 100%; padding: 4px 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; }
+.conv-heading-btn > span:first-child { flex: 1; text-align: left; }
+.conv-heading-btn small { font-size: 0.75rem; text-transform: none; }
+.conv-heading-btn:hover { color: var(--ink); }
+.conv-heading-chevron { font-size: 0.85rem; }
 .conv-row {
   display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 10px; align-items: center;
   padding: 8px 10px; border-radius: 12px; color: inherit; text-decoration: none; position: relative;

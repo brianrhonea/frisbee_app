@@ -13,6 +13,9 @@ import '../../../domain/models/notification.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 
+/// The two parts of Chats that fold away: team chats and direct messages.
+enum InboxSection { teams, direct }
+
 /// Which inbox entries to list.
 enum InboxFilter {
   all,
@@ -175,6 +178,21 @@ class InboxViewModel extends ChangeNotifier {
 
   /// Silences a conversation's notifications, or turns them back on.
   late final Command1<void, InboxItem> toggleMute;
+
+  /// Sections folded away in Chats. Kept for as long as the app runs (not
+  /// saved), so ignoring one doesn't hide it for good.
+  static final _collapsed = <InboxSection>{};
+
+  bool isCollapsed(InboxSection section) => _collapsed.contains(section);
+
+  void toggleSection(InboxSection section) {
+    if (!_collapsed.remove(section)) _collapsed.add(section);
+    notifyListeners();
+  }
+
+  /// Unfolds everything (tests start fresh).
+  @visibleForTesting
+  static void resetCollapsed() => _collapsed.clear();
 
   /// Whether conversations can be muted here.
   bool get canMute => _notices != null;
