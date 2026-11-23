@@ -7,6 +7,15 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.45.0 — 2026-11-22
+
+- Tournaments store `inviteReplyDays` (null or 3/7/14/21/30). An invite's
+  entry stores `replyBy` and `teamId`; accepting an invite past
+  `replyBy` is refused (`failed_precondition`), and inviting a team
+  whose invite expired invites it again.
+- `GET /v1/teams/:teamId/tournament-invites` (team admins): the team's
+  open invites, soonest first, with reply-by and expiry.
+
 ## 0.44.0 — 2026-11-22
 
 - Hosts' Stripe accounts are made with Accounts v2 (`/v2/core/accounts`,

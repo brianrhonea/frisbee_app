@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.49  | 2026-11-22 | `feature/tournament-invites-pay`        |                     |
 | 0.0.48  | 2026-11-22 | `feature/security-hardening`           |                     |
 | 0.0.47  | 2026-11-22 | `feature/profile-staff`                 |                     |
 | 0.0.46  | 2026-11-22 | `feature/launch-fixes`                  |                     |
@@ -61,6 +62,29 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.49 — Tournament invites: reply-by time, team page answers
+
+With web 0.57.0 and API 0.45.0. Firestore rules changed.
+
+- Hosts pick when invited teams must answer by (**Invited teams answer
+  by**: 3 days, 1, 2, 3 weeks or 30 days before it starts, or no
+  deadline; new events default to 2 weeks). `tournaments/{id}` gains
+  `inviteReplyDays` (null or one of 3/7/14/21/30, checked in
+  `validHosted`).
+- An invite's entry stores `replyBy` (the start less those days, at least
+  2 days after the invite, never after the start) and `teamId`. Past
+  `replyBy` the invite has expired: the rules (`inviteOpen()` in
+  `teamApplies`) and the API (`putEntry`) refuse accepting it, both sides
+  see **Expired**, and the host's **Invite again** sets a fresh time.
+  Shared logic: `inviteReplyBy` / `inviteExpired` in
+  `packages/shared/src/tournaments.ts`, the Dart copy on
+  `HostedTournament`, cross-checked by `fixtures/invite_reply`.
+- Team page: a team's admins see its open tournament invites with
+  **Accept** (opens the event to pick captains) and **Decline** (the team
+  withdraws), from `GET /v1/teams/:id/tournament-invites` (the team's
+  `tournamentEntries` records, no new index).
+- The event page shows the invite's reply-by time on your team's card.
 
 ## 0.0.48 — Security fixes
 

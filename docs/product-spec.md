@@ -1344,6 +1344,15 @@ Out of scope: payments, meeting recording, USA Ultimate data.
     words from `guides.ts` /
     `guides.dart`. Tests: shared `guide_fixtures.test.ts`, app
     `guide_fixtures_test.dart` and `guides_test.dart`.
+75. Tournament invites: a reply-by time (the host's **Invited teams
+    answer by**, 2 weeks by default), **Expired** past it with **Invite
+    again**, and Accept / Decline on the team page for its admins; an
+    organizer who also enters a team sees its entry and fee: [x] app;
+    [x] website. One rule: shared `inviteReplyBy` / `inviteExpired`,
+    app `HostedTournament.replyByFor` / `TournamentEntry.isExpired`.
+    Tests: shared `invite_reply_fixtures.test.ts`, app
+    `invite_reply_fixtures_test.dart`, `hosted_tournaments_test.dart`
+    and `team_home_test.dart`, API `tournaments.test.ts`, rules.
 
 Libraries the website may add (none today): a small data cache for API
 reads and mutations, the Firestore web SDK for listeners, and LiveKit's

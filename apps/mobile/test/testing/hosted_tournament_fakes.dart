@@ -95,6 +95,22 @@ class FakeHostedTournamentRepository implements HostedTournamentRepository {
   Stream<List<EnteredTournament>> watchEnteredBy(String teamId) =>
       _watch(() => sortEntered([...?entered[teamId]]));
 
+  /// Team id → its open invites ([teamInvites]); [declined] records
+  /// (tournamentId, teamId) pairs turned down.
+  final Map<String, List<TeamTournamentInvite>> invites = {};
+  final List<(String, String)> declined = [];
+
+  @override
+  Future<Result<List<TeamTournamentInvite>>> teamInvites(String teamId) async =>
+      Result.ok([...?invites[teamId]]);
+
+  @override
+  Future<Result<void>> declineInvite(String tournamentId, String teamId) async {
+    declined.add((tournamentId, teamId));
+    invites[teamId]?.removeWhere((i) => i.tournamentId == tournamentId);
+    return const Result.ok(null);
+  }
+
   @override
   Stream<List<HostedTournament>> watchHostedBy(
     String hostId, {

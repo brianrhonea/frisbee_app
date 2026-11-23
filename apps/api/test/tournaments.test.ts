@@ -11,7 +11,7 @@ let store: FakeStore;
 /** Collections the service queried, to check callers are authorized before any list. */
 let queried: string[];
 type Res = { status: number; json: () => any };
-let call: (method: "POST" | "PUT" | "PATCH" | "DELETE", url: string, body?: object, uid?: string) => Promise<Res>;
+let call: (method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE", url: string, body?: object, uid?: string) => Promise<Res>;
 
 const iso = (y: number, m: number, d: number, h = 0) => new Date(Date.UTC(y, m, d, h)).toISOString();
 const settings = {
@@ -148,7 +148,7 @@ describe("hosting (create: manages, createdBy, createdAt, validHosted, officialH
     expect(Object.keys(t).sort()).toEqual(
       [
         "hostId", "hostName", "hostKind", "hostOfficial", "name", "startsOn", "endsOn", "description", "location", "visibility",
-        "entryType", "status", "bidFee", "teamEntry", "teamFee", "kind", "season", "draftMode", "divisions", "format", "createdBy", "createdAt",
+        "entryType", "status", "bidFee", "teamEntry", "teamFee", "kind", "season", "draftMode", "inviteReplyDays", "divisions", "format", "createdBy", "createdAt",
       ].sort(),
     );
     expect(t).toMatchObject({ createdBy: "mgr", createdAt: new Date(now), hostName: "Host Club", hostKind: "community", hostOfficial: false, status: "draft" });
@@ -410,7 +410,7 @@ describe("entries (validEntry, teamApplies, teamEdits, teamWithdraws, manages)",
     await call("PUT", `/v1/tournaments/${t.id}/status`, { status: "registration" });
     expect((await call("PUT", `/v1/tournaments/${t.id}/entries/red`, { divisionId: t.div, captainIds: ["cap"] }, "cap2")).status).toBe(403);
     expect((await enter(t.id, t.div, "red", "cap")).status).toBe(204);
-    expect(store.doc(`tournaments/${t.id}/entries/red`)).toEqual({ teamName: "Red", divisionId: t.div, status: "applied", captainIds: ["cap"], updatedAt: new Date(now) });
+    expect(store.doc(`tournaments/${t.id}/entries/red`)).toEqual({ teamName: "Red", divisionId: t.div, status: "applied", captainIds: ["cap"], teamId: "red", replyBy: null, updatedAt: new Date(now) });
     await call("PUT", `/v1/tournaments/${t.id}/status`, { status: "seeding" });
     expect(code(await enter(t.id, t.div, "blue", "bcap"))).toBe("failed_precondition");
     store.put("teams/group", { ...team("Group", "gl"), kind: "community" });
@@ -507,6 +507,75 @@ describe("entries (validEntry, teamApplies, teamEdits, teamWithdraws, manages)",
     expect(store.doc(`tournaments/${t.id}/divisions/${t.div}`)?.seeds).toEqual(["blue", "red"]);
     await call("PUT", `/v1/tournaments/${t.id}/divisions/${t.div}/schedule`, { games: plan(["blue", "red"]) });
     expect(code(await call("PUT", url, { seeds: ["red", "blue"] }))).toBe("failed_precondition");
+  });
+});
+
+describe("invites: reply-by time, expiry, the team's list and declining", () => {
+  const day = 24 * 60 * 60 * 1000;
+  // The event starts 2026-12-05; `now` is 2026-11-14 12:00 UTC.
+  it("an invite carries the event's reply-by time and the team id", async () => {
+    const t = await open({ visibility: "inviteOnly", inviteReplyDays: 14 });
+    expect(store.doc(`tournaments/${t.id}`)?.inviteReplyDays).toBe(14);
+    expect((await call("POST", `/v1/tournaments/${t.id}/entries/red/invite`, { divisionId: t.div })).status).toBe(204);
+    const entry = store.doc(`tournaments/${t.id}/entries/red`)!;
+    expect(entry).toMatchObject({ status: "invited", teamId: "red" });
+    expect((entry.replyBy as Date).toISOString()).toBe(new Date(Date.UTC(2026, 11, 5) - 14 * day).toISOString());
+  });
+
+  it("no deadline without inviteReplyDays; only the choices are taken", async () => {
+    const t = await open({ visibility: "inviteOnly" });
+    await call("POST", `/v1/tournaments/${t.id}/entries/red/invite`, { divisionId: t.div });
+    expect(store.doc(`tournaments/${t.id}/entries/red`)?.replyBy).toBeNull();
+    expect(code(await call("POST", "/v1/tournaments", hosting({ inviteReplyDays: 10 })))).toBe("invalid_argument");
+  });
+
+  it("past its reply-by time an invite can't be accepted; the host can invite again", async () => {
+    const t = await open({ visibility: "inviteOnly", inviteReplyDays: 14 });
+    await call("POST", `/v1/tournaments/${t.id}/entries/red/invite`, { divisionId: t.div });
+    store.put(`tournaments/${t.id}/entries/red`, { ...store.doc(`tournaments/${t.id}/entries/red`)!, replyBy: new Date(now - day) });
+    const late = await enter(t.id, t.div, "red", "cap");
+    expect(code(late)).toBe("failed_precondition");
+    expect(late.json().error.message).toMatch(/expired/);
+    expect((await call("POST", `/v1/tournaments/${t.id}/entries/red/invite`, { divisionId: t.div })).status).toBe(204);
+    expect((await enter(t.id, t.div, "red", "cap")).status).toBe(204);
+    expect(store.doc(`tournaments/${t.id}/entries/red`)).toMatchObject({ status: "applied", replyBy: null });
+  });
+
+  it("a late invite still gets two days to answer", async () => {
+    const soon = new Date(now + 5 * day).toISOString();
+    const t = await open({ visibility: "inviteOnly", inviteReplyDays: 14, startsOn: soon, format: { settings: { ...settings, startsAt: soon }, level: "club", maxTeams: 8, minRoster: null } });
+    await call("POST", `/v1/tournaments/${t.id}/entries/red/invite`, { divisionId: t.div });
+    expect((store.doc(`tournaments/${t.id}/entries/red`)!.replyBy as Date).getTime()).toBe(now + 2 * day);
+  });
+
+  // The team's record of the entry, as the entrySchedule trigger keeps it.
+  const record = (id: string, status = "invited") => store.put(`teams/red/tournamentEntries/${id}`, { name: "Spring Fling", status });
+
+  it("a team's admins list its invites, and decline one", async () => {
+    const t = await open({ visibility: "inviteOnly", inviteReplyDays: 14 });
+    await call("POST", `/v1/tournaments/${t.id}/entries/red/invite`, { divisionId: t.div });
+    record(t.id);
+    const res = await call("GET", "/v1/teams/red/tournament-invites", undefined, "cap");
+    expect(res.status).toBe(200);
+    expect(res.json().invites).toEqual([
+      expect.objectContaining({ tournamentId: t.id, name: "Spring Fling", hostName: "Host Club", divisionId: t.div, divisionLabel: expect.any(String), expired: false }),
+    ]);
+    // Not for the team's players, nor other teams' admins.
+    expect((await call("GET", "/v1/teams/red/tournament-invites", undefined, "cap2")).status).toBe(403);
+    expect((await call("GET", "/v1/teams/red/tournament-invites", undefined, "bcap")).status).toBe(403);
+    // Declining: the team withdraws.
+    expect((await call("PUT", `/v1/tournaments/${t.id}/entries/red/status`, { status: "withdrawn" }, "cap")).status).toBe(204);
+    expect(store.doc(`tournaments/${t.id}/entries/red`)).toMatchObject({ status: "withdrawn", replyBy: null });
+    // Before the trigger catches up, the entry itself has the last word.
+    expect((await call("GET", "/v1/teams/red/tournament-invites", undefined, "cap")).json().invites).toEqual([]);
+  });
+
+  it("an expired invite is listed as expired", async () => {
+    const t = await open({ visibility: "inviteOnly", inviteReplyDays: 14 });
+    await call("POST", `/v1/tournaments/${t.id}/entries/red/invite`, { divisionId: t.div });
+    record(t.id);
+    store.put(`tournaments/${t.id}/entries/red`, { ...store.doc(`tournaments/${t.id}/entries/red`)!, replyBy: new Date(now - day) });
+    expect((await call("GET", "/v1/teams/red/tournament-invites", undefined, "cap")).json().invites[0]).toMatchObject({ expired: true });
   });
 });
 

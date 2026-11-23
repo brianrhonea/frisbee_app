@@ -1822,7 +1822,9 @@ service cloud.firestore {
                  'description', 'location', 'visibility', 'entryType', 'status',
                  'bidFee', 'kind', 'season', 'draftMode', 'divisions',
                  'hostOfficial', 'format', 'teamEntry', 'teamFee',
-                 'createdBy', 'createdAt'])
+                 'inviteReplyDays', 'createdBy', 'createdAt'])
+          // Days before the start invited teams answer by (inviteReplyChoices).
+          && t.get('inviteReplyDays', null) in [null, 3, 7, 14, 21, 30]
           // Teams reserving spots alongside players who sign up.
           && t.get('teamEntry', false) is bool
           && (!t.get('teamEntry', false) || t.entryType == 'players')
@@ -2013,7 +2015,10 @@ service cloud.firestore {
       match /entries/{teamId} {
         function validEntry(e) {
           return e.keys().hasOnly(['teamName', 'divisionId', 'status',
-                                   'captainIds', 'updatedAt'])
+                                   'captainIds', 'teamId', 'replyBy',
+                                   'updatedAt'])
+            && e.get('teamId', teamId) == teamId
+            && (e.get('replyBy', null) == null || e.replyBy is timestamp)
             && e.teamName is string && e.teamName.size() > 0
             && e.teamName.size() <= 100
             && validString(e.divisionId, 100)
@@ -2025,9 +2030,16 @@ service cloud.firestore {
                  .size() == 0
             && e.updatedAt == request.time;
         }
+        // An invite past its reply-by time can't be taken up (inviteExpired).
+        function inviteOpen() {
+          return resource == null || resource.data.status != 'invited'
+            || resource.data.get('replyBy', null) == null
+            || request.time <= resource.data.replyBy;
+        }
         function teamApplies(t) {
           return teamAdmin(teamId)
             && request.resource.data.status == 'applied'
+            && inviteOpen()
             && t.status == 'registration'
             // Player-entry events take teams only when they reserve spots.
             && (t.entryType != 'players' || t.get('teamEntry', false))

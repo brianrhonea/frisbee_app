@@ -948,7 +948,8 @@ class _MyEntryCard extends StatelessWidget {
               ? ('Bid fee overdue', PillTone.needsYou)
               : ('Bid fee unpaid', PillTone.needsYou)
         : null;
-    final active = e.status.isActive || accepted;
+    final expired = e.isExpired(vm.now());
+    final active = (e.status.isActive || accepted) && !expired;
     return Card(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 12, 8, 6),
@@ -988,6 +989,28 @@ class _MyEntryCard extends StatelessWidget {
               const SizedBox(height: 8),
               Pill(feePill.$1, tone: feePill.$2),
             ],
+            if (expired) ...[
+              const SizedBox(height: 8),
+              const Pill('Expired', tone: PillTone.needsYou),
+              const SizedBox(height: 4),
+              Text(
+                TournamentEntry.expiredMessage,
+                key: ValueKey('invite-expired-${e.teamId}'),
+                style: TextStyle(fontSize: 12.5, color: c.ink2),
+              ),
+            ] else if (e.status == EntryStatus.invited && e.replyBy != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  'Reply by ${DateFormat('EEE, MMM d').format(e.replyBy!.toLocal())}',
+                  key: ValueKey('invite-reply-by-${e.teamId}'),
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: c.highlightInk,
+                  ),
+                ),
+              ),
             if (e.captainIds.isNotEmpty) ...[
               const SizedBox(height: 6),
               Text(
@@ -1015,7 +1038,9 @@ class _MyEntryCard extends StatelessWidget {
               spacing: 4,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                if (e.status == EntryStatus.invited && t.status.acceptsEntries)
+                if (e.status == EntryStatus.invited &&
+                    t.status.acceptsEntries &&
+                    !expired)
                   FilledButton(
                     style: FilledButton.styleFrom(
                       backgroundColor: c.highlight,
@@ -1103,6 +1128,7 @@ class _TeamsTabState extends State<_TeamsTab> {
       if (e.status != EntryStatus.declined) ('Decline', EntryStatus.declined),
     ];
     final decide = e.status == EntryStatus.applied;
+    final expired = e.isExpired(vm.now());
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 10, 4, 10),
       child: Row(
@@ -1121,7 +1147,11 @@ class _TeamsTabState extends State<_TeamsTab> {
                 ),
                 Text(
                   [
-                    e.status.label,
+                    if (expired) 'Invite expired' else e.status.label,
+                    if (e.status == EntryStatus.invited &&
+                        !expired &&
+                        e.replyBy != null)
+                      'reply by ${DateFormat('MMM d').format(e.replyBy!.toLocal())}',
                     if (fee != null && e.status == EntryStatus.accepted)
                       paymentStatusLabel(
                         vm.paymentOf(e.teamId),
@@ -1147,6 +1177,19 @@ class _TeamsTabState extends State<_TeamsTab> {
                       status: EntryStatus.accepted,
                     )),
               child: const Text('Accept'),
+            ),
+          ],
+          if (expired && vm.tournament!.status.acceptsEntries) ...[
+            const SizedBox(width: 8),
+            OutlinedButton(
+              key: ValueKey('invite-again-${e.teamId}'),
+              style: OutlinedButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+              ),
+              onPressed: vm.inviteAgain.running
+                  ? null
+                  : () => vm.inviteAgain.execute(e),
+              child: const Text('Invite again'),
             ),
           ],
           if (vm.offersChats && HostedTournamentViewModel.inChats(e))

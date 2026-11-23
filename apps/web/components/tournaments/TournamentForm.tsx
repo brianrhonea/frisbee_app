@@ -10,6 +10,9 @@ import {
   divisionLabels,
   divisions as allDivisions,
   draftModeLabels,
+  defaultInviteReplyDays,
+  inviteReplyChoices,
+  inviteReplyLabel,
   type DraftMode,
   type EntryDoc,
   type FormFormat,
@@ -91,6 +94,8 @@ interface FormState {
   kind: HostedKind;
   entryType: TournamentEntryType;
   draftMode: DraftMode;
+  /** Days before the start invited teams answer by, or null. */
+  inviteReplyDays: number | null;
   season: EngineSeason;
   teamEntry: boolean;
   teamFeeAmount: string;
@@ -118,6 +123,7 @@ function blank(type: HostedType | null): FormState {
     kind,
     entryType: type === "hat" ? "players" : "teams",
     draftMode: "balanced",
+    inviteReplyDays: defaultInviteReplyDays,
     season: defaultSeason,
     teamEntry: false,
     teamFeeAmount: "",
@@ -152,6 +158,7 @@ function filled(t: TournamentDoc, divisions: Array<Doc<DivisionDoc>>): FormState
     kind,
     entryType: t.entryType,
     draftMode: t.draftMode ?? "balanced",
+    inviteReplyDays: t.inviteReplyDays ?? null,
     season: engineSeason(t.season) ?? defaultSeason,
     teamEntry: t.teamEntry === true,
     teamFeeAmount: t.teamFee ? amountOf(t.teamFee.amountCents) : "",
@@ -159,6 +166,9 @@ function filled(t: TournamentDoc, divisions: Array<Doc<DivisionDoc>>): FormState
     wanted: divisions.map((d) => d.division),
   };
 }
+
+/** Whether the event takes teams (so it can invite them). */
+const takesTeamsOf = (f: FormState) => f.entryType === "teams" || f.teamEntry;
 
 /** Why the form can't be saved yet (problem in the app). */
 function problemOf(f: FormState): string | null {
@@ -194,6 +204,7 @@ function requestOf(f: FormState) {
     teamFee: fee && teamEntry ? { ...fee, amountCents: centsOf(f.teamFeeAmount) ?? 0 } : null,
     season: season ? { ...season, skipDates: season.skipDates.map((d) => d.toISOString()) } : null,
     draftMode: f.draftMode,
+    inviteReplyDays: takesTeamsOf(f) ? f.inviteReplyDays : null,
     format: formatRequest(formatOn(f.format, { kind: f.kind, startsOn: f.startsOn, endsOn: f.endsOn, season })),
     divisions: allDivisions.filter((d) => f.wanted.includes(d)),
   };
@@ -515,6 +526,22 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
             ))}
           </div>
           <small className="muted">{visibilityLabels[f.visibility].summary}. The page, schedule, results and news are public either way.</small>
+          {takesTeamsOf(f) && (
+            <label>
+              <span className="field-label">Invited teams answer by</span>
+              <select
+                value={f.inviteReplyDays ?? ""}
+                onChange={(e) => set({ inviteReplyDays: e.target.value ? Number(e.target.value) : null })}
+              >
+                {[null, ...inviteReplyChoices].map((d) => (
+                  <option key={d ?? "none"} value={d ?? ""}>
+                    {inviteReplyLabel(d)}
+                  </option>
+                ))}
+              </select>
+              <small className="muted">After this an invite expires and you can invite another team. A late invite still gets two days.</small>
+            </label>
+          )}
         </section>
       )}
       {step === 3 && (

@@ -4508,6 +4508,22 @@ describe("hosted tournaments", () => {
     await assertSucceeds(setDoc(entryRef(CAPTAIN), entry()));
   });
 
+  it("an invite past its reply-by time can't be answered; it carries its team id", async () => {
+    await seed({ visibility: "inviteOnly", inviteReplyDays: 14 });
+    await assertFails(setDoc(tRef(DIRECTOR), tournament({ inviteReplyDays: 10 })));
+    await assertFails(setDoc(entryRef(DIRECTOR), entry({ status: "invited", captainIds: [], teamId: "someoneElse" })));
+    await assertFails(setDoc(entryRef(DIRECTOR), entry({ status: "invited", captainIds: [], replyBy: "soon" })));
+    await assertSucceeds(
+      setDoc(entryRef(DIRECTOR), entry({ status: "invited", captainIds: [], teamId: TEAM, replyBy: new Date(Date.now() - 60_000) })),
+    );
+    await assertFails(setDoc(entryRef(CAPTAIN), entry({ teamId: TEAM })));
+    // Invited again with time to answer.
+    await assertSucceeds(
+      setDoc(entryRef(DIRECTOR), entry({ status: "invited", captainIds: [], teamId: TEAM, replyBy: new Date(Date.now() + 86_400_000) })),
+    );
+    await assertSucceeds(setDoc(entryRef(CAPTAIN), entry({ teamId: TEAM })));
+  });
+
   it("no applying once registration closes", async () => {
     await seed({ status: "seeding" });
     await assertFails(setDoc(entryRef(CAPTAIN), entry()));

@@ -30,6 +30,9 @@ import {
   liveScoreOf,
   liveScoreRequestSchema,
   inviteRequestSchema,
+  inviteExpired,
+  inviteExpiredMessage,
+  inviteReplyBy,
   isDone,
   laterGamesPlayed,
   leagueFitProblem,
@@ -47,6 +50,7 @@ import {
   tournamentStatusRequestSchema,
   bracketSeeds,
   type TournamentFormat,
+  type TeamTournamentInvite,
 } from "@stall10/shared";
 import type { Caller } from "../auth.js";
 import { ApiError, parseBody } from "../errors.js";
@@ -70,6 +74,12 @@ const p = {
 /** Writes per transaction when a change is too big for one (Firestore takes 500). */
 const chunk = 450;
 const listMax = 2200;
+
+/** A stored time (a Date from Firestore, or an ISO string) as a Date, or null. */
+const dateOf = (v: unknown): Date | null => {
+  const d = v instanceof Date ? v : typeof v === "string" ? new Date(v) : null;
+  return d && !Number.isNaN(d.getTime()) ? d : null;
+};
 
 const notFound = () => new ApiError("not_found", "That tournament doesn't exist.");
 const noDivision = () => new ApiError("not_found", "That division doesn't exist.");
@@ -261,6 +271,7 @@ export class TournamentService {
       kind,
       season: kind === "league" && r.season ? { ...r.season } : null,
       draftMode: r.draftMode,
+      inviteReplyDays: r.inviteReplyDays,
       divisions,
       format: formatDoc(r.format),
     };
@@ -481,7 +492,10 @@ export class TournamentService {
   // ---- Entries -------------------------------------------------------------
 
   /** validEntry(e): shape, and captains from the team's members. */
-  private entryDoc(team: Data, e: { teamName: string; divisionId: string; status: EntryStatus; captainIds: string[] }): Data {
+  private entryDoc(
+    team: Data,
+    e: { teamId: string; teamName: string; divisionId: string; status: EntryStatus; captainIds: string[]; replyBy?: Date | null },
+  ): Data {
     if (e.teamName.length < 1 || e.teamName.length > tournamentLimits.teamName) throw new ApiError("invalid_argument", "The team needs a name.");
     if (e.divisionId.length > tournamentLimits.divisionId) throw new ApiError("invalid_argument", "Invalid division.");
     if (e.captainIds.length > tournamentLimits.maxCaptains) {
@@ -489,7 +503,16 @@ export class TournamentService {
     }
     const members = new Set(strings(team.memberIds));
     if (!e.captainIds.every((c) => members.has(c))) throw new ApiError("invalid_argument", "Captains have to be on the team.");
-    return { teamName: e.teamName, divisionId: e.divisionId, status: e.status, captainIds: e.captainIds, updatedAt: serverTime };
+    return {
+      teamName: e.teamName,
+      divisionId: e.divisionId,
+      status: e.status,
+      captainIds: e.captainIds,
+      teamId: e.teamId,
+      // An invite's answer-by time; gone once it's answered.
+      replyBy: e.status === "invited" ? (e.replyBy ?? null) : null,
+      updatedAt: serverTime,
+    };
   }
 
   /**
@@ -522,10 +545,14 @@ export class TournamentService {
         if (existing?.divisionId !== divId) {
           throw new ApiError("failed_precondition", "To change division, withdraw and apply again.");
         }
-        tx.set(p.entry(id, teamId), this.entryDoc(team, { teamName: String(existing.teamName ?? ""), divisionId: divId, status: was, captainIds: r.captainIds }));
+        tx.set(p.entry(id, teamId), this.entryDoc(team, { teamId, teamName: String(existing.teamName ?? ""), divisionId: divId, status: was, captainIds: r.captainIds }));
         return;
       }
       if (was === "declined") throw new ApiError("failed_precondition", "The host declined this team. They can invite it again.");
+      // Past its reply-by time (inviteReplyDays) an invite can't be taken up.
+      if (was === "invited" && inviteExpired({ status: was, replyBy: dateOf(existing?.replyBy) }, new Date(this.now()))) {
+        throw new ApiError("failed_precondition", inviteExpiredMessage);
+      }
       // teamApplies(t).
       if (kindOf(team) !== "team") throw new ApiError("invalid_argument", "Only teams enter tournaments.");
       if (t.status !== "registration") throw new ApiError("failed_precondition", "Registration isn't open.");
@@ -551,28 +578,82 @@ export class TournamentService {
       }
       tx.set(
         p.entry(id, teamId),
-        this.entryDoc(team, { teamName: String(team.name ?? "").slice(0, tournamentLimits.teamName), divisionId: divId, status: "applied", captainIds: r.captainIds }),
+        this.entryDoc(team, { teamId, teamName: String(team.name ?? "").slice(0, tournamentLimits.teamName), divisionId: divId, status: "applied", captainIds: r.captainIds }),
       );
     });
   }
 
-  /** The host invites a team (not one already entered). */
+  /**
+   * The host invites a team (not one already entered; again once it
+   * withdrew, or its invite expired), to answer by the event's reply-by
+   * time (inviteReplyBy).
+   */
   async invite(caller: Caller, rawId: unknown, rawTeam: unknown, body: unknown): Promise<void> {
     const id = docIdParam(rawId);
     const teamId = docIdParam(rawTeam);
     const divId = docIdParam(parseBody(inviteRequestSchema, body).divisionId);
     await this.store.transact(async (tx) => {
-      await this.managed(tx, id, caller.uid);
+      const t = await this.managed(tx, id, caller.uid);
       const team = await tx.get(p.team(teamId));
       if (!team || kindOf(team) !== "team") throw new ApiError("not_found", "That team doesn't exist.");
       const existing = await tx.get(p.entry(id, teamId));
       if (!(await tx.get(p.division(id, divId)))) throw noDivision();
       const was = entryStatusOf(existing);
-      if (was && was !== "withdrawn") {
+      const now = new Date(this.now());
+      const expired = was === "invited" && inviteExpired({ status: was, replyBy: dateOf(existing?.replyBy) }, now);
+      if (was && was !== "withdrawn" && !expired) {
         throw new ApiError("already_exists", `${String(team.name ?? "That team")} is already ${String(was === "waitlisted" ? "on the waitlist" : was)}.`);
       }
-      tx.set(p.entry(id, teamId), this.entryDoc(team, { teamName: String(team.name ?? "Team").slice(0, 100), divisionId: divId, status: "invited", captainIds: [] }));
+      const startsOn = dateOf(t.startsOn);
+      const replyBy = startsOn ? inviteReplyBy(startsOn, typeof t.inviteReplyDays === "number" ? t.inviteReplyDays : null, now) : null;
+      tx.set(
+        p.entry(id, teamId),
+        this.entryDoc(team, { teamId, teamName: String(team.name ?? "Team").slice(0, 100), divisionId: divId, status: "invited", captainIds: [], replyBy }),
+      );
     });
+  }
+
+  /**
+   * A team's open tournament invites, for its admins (manageTeam): the
+   * team page's Accept / Decline. Expired ones are listed as expired until
+   * the event starts; answered ones and events that have started aren't.
+   * Found through the team's records of its entries
+   * (teams/{id}/tournamentEntries, kept by the entrySchedule trigger), then
+   * read from the entries themselves, which have the last word.
+   */
+  async teamInvites(caller: Caller, rawTeam: unknown): Promise<TeamTournamentInvite[]> {
+    const teamId = docIdParam(rawTeam);
+    const team = await this.store.get(p.team(teamId));
+    if (!team) throw new ApiError("not_found", "That team doesn't exist.");
+    if (!can(team, caller.uid, "manageTeam")) throw new ApiError("permission_denied", "Only the team's admins see its tournament invites.");
+    const ids = await this.queries.ids(`teams/${teamId}/tournamentEntries`, 50, { status: "invited" });
+    const [events, entries] = await Promise.all([this.store.getAll(ids.map((t) => p.tournament(t))), this.store.getAll(ids.map((t) => p.entry(t, teamId)))]);
+    const now = new Date(this.now());
+    const out: TeamTournamentInvite[] = [];
+    for (const [i, tid] of ids.entries()) {
+      const t = events[i];
+      const entry = entries[i];
+      if (!t || !entry || entryStatusOf(entry) !== "invited" || statusOf(t) === "draft") continue;
+      const startsOn = dateOf(t.startsOn);
+      if (!startsOn || startsOn.getTime() + 24 * 60 * 60 * 1000 < now.getTime()) continue;
+      const divisionId = String(entry.divisionId ?? "");
+      const summary = (Array.isArray(t.divisions) ? t.divisions : []).find((d) => mapOf(d).id === divisionId);
+      const replyBy = dateOf(entry.replyBy);
+      out.push({
+        tournamentId: tid,
+        name: String(t.name ?? "Tournament"),
+        hostName: String(t.hostName ?? ""),
+        kind: t.kind === "league" ? "league" : "tournament",
+        startsOn: startsOn.toISOString(),
+        endsOn: dateOf(t.endsOn)?.toISOString() ?? null,
+        location: String(t.location ?? ""),
+        divisionId,
+        divisionLabel: summary ? divisionLabel(mapOf(summary) as { division: Division; level: "club" }) : "",
+        replyBy: replyBy?.toISOString() ?? null,
+        expired: inviteExpired({ status: "invited", replyBy }, now),
+      });
+    }
+    return out.sort((a, b) => a.startsOn.localeCompare(b.startsOn));
   }
 
   /**
@@ -593,7 +674,7 @@ export class TournamentService {
       if (!team) throw new ApiError("not_found", "That team doesn't exist.");
       const divId = storedId(entry.divisionId);
       const division = divId ? await tx.get(p.division(id, divId)) : null;
-      const fields = { teamName: String(entry.teamName ?? ""), divisionId: String(entry.divisionId ?? ""), captainIds: strings(entry.captainIds) };
+      const fields = { teamId, teamName: String(entry.teamName ?? ""), divisionId: String(entry.divisionId ?? ""), captainIds: strings(entry.captainIds) };
       if (!manager) {
         if (status !== "withdrawn" || !can(team, caller.uid, "manageTeam")) throw hostOnly("Only the host decides on entries.");
         tx.set(p.entry(id, teamId), this.entryDoc(team, { ...fields, status }));

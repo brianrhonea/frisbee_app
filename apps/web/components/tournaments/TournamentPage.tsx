@@ -10,6 +10,8 @@ import {
   feeLabel,
   hostedTypeLabels,
   hostedType,
+  inviteExpired,
+  inviteExpiredMessage,
   mixedEntry,
   type SearchPage,
   spotFee,
@@ -21,6 +23,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { FollowButton } from "@/components/FollowButton";
+import { LocalTime } from "@/components/LocalTime";
 import { ShareButton, tournamentUrl } from "@/components/ShareButton";
 import { usePayments } from "@/components/drafts/data";
 import { HostPaymentControls, PayOnline, PayoutsCard } from "@/components/payments/Payments";
@@ -311,7 +314,8 @@ function Overview({ s }: { s: TournamentState }) {
       {s.manager && <HostChecklist s={s} />}
       {/* The host's owner connects Stripe here (hidden for others). */}
       {s.manager && s.user && (fee || (t.entryType === "players" && t.bidFee)) && <PayoutsCard user={s.user} teamId={t.hostId} amountCents={(fee ?? t.bidFee)?.amountCents} payerCovers={(fee ?? t.bidFee)?.payerCoversFees === true} />}
-      {!s.manager && !s.visitor && takesTeams(t) && <YourTeams s={s} />}
+      {/* An organizer who also runs a team sees its entry and fee too. */}
+      {!s.visitor && takesTeams(t) && <YourTeams s={s} />}
       {/* Captains ask the organizers; organizers answer everyone at once. */}
       {!s.visitor && takesTeams(t) && <OrganizerChats s={s} />}
       {t.description && (
@@ -395,6 +399,38 @@ function Overview({ s }: { s: TournamentState }) {
 const enterHref = (tournamentId: string, teamId?: string) =>
   `/tournaments/${encodeURIComponent(tournamentId)}/enter${teamId ? `?team=${encodeURIComponent(teamId)}` : ""}`;
 
+/**
+ * An invite's answer: its reply-by time and Accept (the enter page, to
+ * pick captains) / Decline, or Expired once that time has passed.
+ */
+export function InviteAnswer({ entry, href, busy, onDecline }: { entry: { status: string; replyBy?: string | null }; href: string; busy: boolean; onDecline: () => void }) {
+  if (inviteExpired(entry, new Date())) {
+    return (
+      <div className="stack">
+        <span className="pill">Expired</span>
+        <small className="muted">{inviteExpiredMessage}</small>
+      </div>
+    );
+  }
+  return (
+    <div className="stack">
+      {entry.replyBy && (
+        <small className="muted">
+          Reply by <LocalTime iso={entry.replyBy} />
+        </small>
+      )}
+      <div className="home-actions">
+        <Link className="btn btn-primary btn-small" href={href}>
+          Accept
+        </Link>
+        <button type="button" className="btn btn-small" disabled={busy} onClick={onDecline}>
+          Decline
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** "Your teams" (EventGuide, team side): entries of teams the viewer runs. */
 function YourTeams({ s }: { s: TournamentState }) {
   const t = s.t!;
@@ -425,9 +461,14 @@ function YourTeams({ s }: { s: TournamentState }) {
                   )}
                 </div>
                 {e.status === "invited" ? (
-                  <Link className="btn btn-primary btn-small" href={enterHref(s.id, e.id)}>
-                    Accept the invite
-                  </Link>
+                  <InviteAnswer
+                    entry={e}
+                    href={enterHref(s.id, e.id)}
+                    busy={busy}
+                    onDecline={() => {
+                      if (window.confirm(`Decline the invite for ${e.teamName}?`)) void run(`${tournamentPath(s.id)}/entries/${encodeURIComponent(e.id)}/status`, "PUT", { status: "withdrawn" });
+                    }}
+                  />
                 ) : (
                   e.status !== "declined" && (
                     <div className="home-actions">
@@ -539,7 +580,7 @@ function TeamsTab({ s }: { s: TournamentState }) {
   return (
     <div className="stack">
       <DivisionPicker s={s} />
-      {!s.manager && !s.visitor && <YourTeams s={s} />}
+      {!s.visitor && <YourTeams s={s} />}
       <div className="hosted-stats">
         <div className="hosted-stat">
           <b>
@@ -631,12 +672,32 @@ function TeamsTab({ s }: { s: TournamentState }) {
       {s.manager && others.length > 0 && (
         <section className="card">
           <h2 className="card-title">Invited and others</h2>
-          {others.map((e) => (
-            <div key={e.id} className="row-card">
-              <span>{e.teamName}</span>
-              <span className="pill">{entryStatusLabels[e.status]}</span>
-            </div>
-          ))}
+          {others.map((e) => {
+            const expired = inviteExpired(e, new Date());
+            return (
+              <div key={e.id} className="row-card">
+                <span>
+                  {e.teamName}
+                  {e.status === "invited" && e.replyBy && !expired && (
+                    <>
+                      <br />
+                      <small className="muted">
+                        Reply by <LocalTime iso={e.replyBy} />
+                      </small>
+                    </>
+                  )}
+                </span>
+                <span className="home-actions">
+                  <span className="pill">{expired ? "Expired" : entryStatusLabels[e.status]}</span>
+                  {expired && ["draft", "registration", "seeding"].includes(s.t!.status) && (
+                    <button type="button" className="btn btn-small" disabled={busy} onClick={() => void run(`${tournamentPath(s.id)}/entries/${encodeURIComponent(e.id)}/invite`, "POST", { divisionId: e.divisionId })}>
+                      Invite again
+                    </button>
+                  )}
+                </span>
+              </div>
+            );
+          })}
         </section>
       )}
       {s.manager && ["draft", "registration", "seeding"].includes(s.t.status) && <InviteTeams s={s} divisionId={d.id} />}

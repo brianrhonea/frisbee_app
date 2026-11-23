@@ -336,6 +336,7 @@ class HostedTournament {
     this.kind = HostedKind.tournament,
     this.season,
     this.draftMode = DraftMode.balanced,
+    this.inviteReplyDays,
     this.divisions = const [],
     this.format,
     this.createdBy,
@@ -343,6 +344,41 @@ class HostedTournament {
   });
 
   static const maxDivisions = 12;
+
+  /// The organizer's reply-by choices for invites, in days before the
+  /// start (inviteReplyChoices in packages/shared): 2 weeks is the usual.
+  static const inviteReplyChoices = [3, 7, 14, 21, 30];
+
+  /// What a new event starts with.
+  static const defaultInviteReplyDays = 14;
+
+  /// The least time a team gets to answer an invite, however late.
+  static const inviteMinReply = Duration(days: 2);
+
+  /// A reply-by choice as the form shows it ("2 weeks before it starts");
+  /// null: "No deadline". inviteReplyLabel in packages/shared.
+  static String inviteReplyLabel(int? days) {
+    if (days == null || days <= 0) return 'No deadline';
+    final span = days % 7 == 0
+        ? (days == 7 ? '1 week' : '${days ~/ 7} weeks')
+        : '$days days';
+    return '$span before it starts';
+  }
+
+  /// When a team invited at [now] answers by: [inviteReplyDays] before the
+  /// start, at least [inviteMinReply] after the invite unless the event
+  /// starts sooner (then by its start). Null without a deadline.
+  /// inviteReplyBy in packages/shared.
+  DateTime? inviteReplyBy(DateTime now) =>
+      replyByFor(startsOn, inviteReplyDays, now);
+
+  static DateTime? replyByFor(DateTime startsOn, int? days, DateTime now) {
+    if (days == null || days <= 0) return null;
+    final due = startsOn.subtract(Duration(days: days));
+    final earliest = now.add(inviteMinReply);
+    final later = due.isAfter(earliest) ? due : earliest;
+    return later.isAfter(startsOn) ? startsOn : later;
+  }
 
   /// The format every division plays (set once for the event). Null for
   /// events from before it was shared; see [formatOr].
@@ -392,6 +428,10 @@ class HostedTournament {
 
   /// How player-entry teams are built.
   final DraftMode draftMode;
+
+  /// Days before the start invited teams answer by (inviteReplyChoices), or
+  /// null for no deadline.
+  final int? inviteReplyDays;
   final List<DivisionSummary> divisions;
   final String? createdBy;
   final DateTime? createdAt;
@@ -448,6 +488,7 @@ class HostedTournament {
     BidFee? Function()? teamFee,
     LeagueSeason? Function()? season,
     DraftMode? draftMode,
+    int? Function()? inviteReplyDays,
     List<DivisionSummary>? divisions,
     EventFormat? format,
   }) => HostedTournament(
@@ -470,6 +511,9 @@ class HostedTournament {
     kind: kind,
     season: season != null ? season() : this.season,
     draftMode: draftMode ?? this.draftMode,
+    inviteReplyDays: inviteReplyDays != null
+        ? inviteReplyDays()
+        : this.inviteReplyDays,
     divisions: divisions ?? this.divisions,
     format: format ?? this.format,
     createdBy: createdBy,
@@ -511,6 +555,10 @@ class HostedTournament {
       map['draftMode'],
       DraftMode.balanced,
     ),
+    inviteReplyDays: switch (map['inviteReplyDays']) {
+      final num n when inviteReplyChoices.contains(n.toInt()) => n.toInt(),
+      _ => null,
+    },
     divisions: [
       for (final d in (map['divisions'] as List?) ?? const [])
         if (d is Map) DivisionSummary.fromMap(Map<String, dynamic>.from(d)),
@@ -540,6 +588,7 @@ class HostedTournament {
     'kind': kind.name,
     'season': season?.toMap(),
     'draftMode': draftMode.name,
+    'inviteReplyDays': takesTeams ? inviteReplyDays : null,
     'divisions': [for (final d in divisions) d.toMap()],
     'format': format?.toMap(),
   };
@@ -943,10 +992,15 @@ class TournamentEntry {
     required this.divisionId,
     this.status = EntryStatus.applied,
     this.captainIds = const [],
+    this.replyBy,
     this.updatedAt,
   });
 
   static const maxCaptains = 4;
+
+  /// Shown when an invite's reply-by time has passed (inviteExpiredMessage).
+  static const expiredMessage =
+      'This invite has expired. Ask the organizers to invite your team again.';
 
   final String teamId;
   final String teamName;
@@ -955,7 +1009,18 @@ class TournamentEntry {
 
   /// Who reports scores for the team, picked by its admins.
   final List<String> captainIds;
+
+  /// An invite's answer-by time (HostedTournament.inviteReplyBy); past it,
+  /// the invite is expired ([isExpired]).
+  final DateTime? replyBy;
   final DateTime? updatedAt;
+
+  /// An invite nobody answered by its reply-by time (inviteExpired in
+  /// packages/shared): it can't be accepted; the host can invite again.
+  bool isExpired(DateTime now) =>
+      status == EntryStatus.invited &&
+      replyBy != null &&
+      now.isAfter(replyBy!);
 
   TournamentEntry copyWith({
     String? divisionId,
@@ -967,6 +1032,7 @@ class TournamentEntry {
     divisionId: divisionId ?? this.divisionId,
     status: status ?? this.status,
     captainIds: captainIds ?? this.captainIds,
+    replyBy: replyBy,
     updatedAt: updatedAt,
   );
 
@@ -983,15 +1049,20 @@ class TournamentEntry {
         captainIds: [
           for (final u in (map['captainIds'] as List?) ?? const []) '$u',
         ],
+        replyBy: parseDate(map['replyBy']),
         updatedAt: parseDate(map['updatedAt']),
       );
 
-  /// Everything but `updatedAt`, which the repository stamps.
+  /// Everything but `updatedAt`, which the repository stamps. The reply-by
+  /// time is kept as it is (the rules let a team withdraw without
+  /// changing it).
   Map<String, dynamic> toMap() => {
     'teamName': teamName,
     'divisionId': divisionId,
     'status': status.name,
     'captainIds': captainIds,
+    'teamId': teamId,
+    'replyBy': replyBy,
   };
 }
 
@@ -1190,6 +1261,53 @@ class EnteredTournament {
           map['status'],
           EntryStatus.applied,
         ),
+      );
+}
+
+/// A tournament or league invite waiting on a team, for its admins
+/// (`GET /v1/teams/:id/tournament-invites`; TeamTournamentInvite in
+/// packages/shared): the team page's Accept / Decline.
+class TeamTournamentInvite {
+  const TeamTournamentInvite({
+    required this.tournamentId,
+    required this.name,
+    required this.startsOn,
+    this.hostName = '',
+    this.endsOn,
+    this.location = '',
+    this.divisionId = '',
+    this.divisionLabel = '',
+    this.replyBy,
+    this.expired = false,
+  });
+
+  final String tournamentId;
+  final String name;
+  final String hostName;
+  final DateTime startsOn;
+  final DateTime? endsOn;
+  final String location;
+  final String divisionId;
+  final String divisionLabel;
+
+  /// When the team must answer by; null without a deadline.
+  final DateTime? replyBy;
+
+  /// Past [replyBy]: it can't be accepted any more.
+  final bool expired;
+
+  factory TeamTournamentInvite.fromMap(Map<String, dynamic> map) =>
+      TeamTournamentInvite(
+        tournamentId: map['tournamentId'] as String? ?? '',
+        name: map['name'] as String? ?? 'Tournament',
+        hostName: map['hostName'] as String? ?? '',
+        startsOn: parseDate(map['startsOn']) ?? DateTime(2000),
+        endsOn: parseDate(map['endsOn']),
+        location: map['location'] as String? ?? '',
+        divisionId: map['divisionId'] as String? ?? '',
+        divisionLabel: map['divisionLabel'] as String? ?? '',
+        replyBy: parseDate(map['replyBy']),
+        expired: map['expired'] == true,
       );
 }
 

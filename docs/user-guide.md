@@ -419,7 +419,12 @@ run it.
 3. **Publish and open registration**. The page, schedule, results and
    news are public either way.
 4. **Teams** tab: accept, waitlist or decline applications; **Invite**
-   searches for teams. Accepted teams show the bid fee **Paid** switch;
+   searches for teams. **Invited teams answer by** (in the form; 2
+   weeks before it starts unless you change it) is when an invite
+   expires: after it the team can't accept, the invite shows
+   **Expired**, and **Invite again** gives them a fresh deadline. A
+   team's admins see its invites at the top of the team page, with
+   **Accept** and **Decline**. Accepted teams show the bid fee **Paid** switch;
    **Unpaid only** filters, and unpaid teams past the due date show
    **Overdue**.
 5. **Close registration**, then drag teams into seed order (1 is the

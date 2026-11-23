@@ -76,6 +76,61 @@ export const levelLabels: Record<CompetitionLevel, string> = {
 };
 
 /** The rules' and the app's limits. */
+/**
+ * The organizer's reply-by choices for invites, in days before the event
+ * starts (HostedTournament.inviteReplyChoices in the app): 2 weeks is the
+ * usual. No deadline is null.
+ */
+export const inviteReplyChoices = [3, 7, 14, 21, 30] as const;
+/** What a new event starts with. */
+export const defaultInviteReplyDays = 14;
+/** A reply-by choice as the form shows it, e.g. "2 weeks before it starts"; null: "No deadline". */
+export function inviteReplyLabel(days: number | null): string {
+  if (!days) return "No deadline";
+  const span = days % 7 === 0 ? (days === 7 ? "1 week" : `${days / 7} weeks`) : `${days} days`;
+  return `${span} before it starts`;
+}
+/** The least time a team gets to answer an invite, however late it's sent. */
+export const inviteMinReplyMs = 2 * 24 * 60 * 60 * 1000;
+
+/**
+ * When a team invited at [now] must answer by: [days] before [startsOn],
+ * but at least two days after the invite (inviteMinReplyMs), unless the
+ * event starts sooner: then by its start. Null when the event has no deadline.
+ * HostedTournament.inviteReplyBy in the app.
+ */
+export function inviteReplyBy(startsOn: Date, days: number | null | undefined, now: Date): Date | null {
+  if (!days || days <= 0) return null;
+  const due = startsOn.getTime() - days * 24 * 60 * 60 * 1000;
+  const earliest = now.getTime() + inviteMinReplyMs;
+  return new Date(Math.min(Math.max(due, earliest), startsOn.getTime()));
+}
+
+/** Whether an entry is an invite nobody answered by its reply-by time. */
+export function inviteExpired(entry: { status: string; replyBy?: Date | string | null }, now: Date): boolean {
+  if (entry.status !== "invited" || !entry.replyBy) return false;
+  const by = entry.replyBy instanceof Date ? entry.replyBy.getTime() : Date.parse(entry.replyBy);
+  return !Number.isNaN(by) && now.getTime() > by;
+}
+
+/** Shown when an invite's reply-by time has passed. */
+export const inviteExpiredMessage = "This invite has expired. Ask the organizers to invite your team again.";
+
+/** A team's open invite (GET /v1/teams/:teamId/tournament-invites), for its admins. */
+export interface TeamTournamentInvite {
+  tournamentId: string;
+  name: string;
+  hostName: string;
+  kind: HostedKind;
+  startsOn: string;
+  endsOn: string | null;
+  location: string;
+  divisionId: string;
+  divisionLabel: string;
+  replyBy: string | null;
+  expired: boolean;
+}
+
 export const tournamentLimits = {
   name: 100,
   hostName: 100,
@@ -169,6 +224,16 @@ const detailsShape = {
   teamFee: feeSchema.nullable().default(null),
   season: seasonSchema.nullable().default(null),
   draftMode: z.enum(draftModes).default("balanced"),
+  /**
+   * How many days before it starts invited teams must answer by (inviteReplyBy);
+   * null: no deadline. One of inviteReplyChoices.
+   */
+  inviteReplyDays: z
+    .number()
+    .int()
+    .refine((n) => (inviteReplyChoices as readonly number[]).includes(n), "Pick a reply-by choice.")
+    .nullable()
+    .default(null),
   format: formatSchema,
   /** The divisions to have open (one per gender division). */
   divisions: z
@@ -392,6 +457,8 @@ export interface TournamentDoc {
   kind?: HostedKind;
   season?: SeasonDoc | null;
   draftMode?: DraftMode;
+  /** Days before the start invited teams answer by (inviteReplyBy), or none. */
+  inviteReplyDays?: number | null;
   divisions: DivisionSummaryDoc[];
   format?: FormatDoc | null;
   createdBy?: string;
@@ -420,6 +487,10 @@ export interface EntryDoc {
   divisionId: string;
   status: EntryStatus;
   captainIds: string[];
+  /** The team's id (the doc's id too), so a team's invites can be found. */
+  teamId?: string;
+  /** An invite's answer-by time (inviteReplyBy); past it, it's expired (inviteExpired). */
+  replyBy?: string | null;
   updatedAt?: string;
 }
 export interface GameDoc {

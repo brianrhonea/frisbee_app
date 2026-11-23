@@ -736,6 +736,39 @@ class _HostedTournamentFormScreenState
                           style: small,
                         ),
                       ),
+                      if (vm.takesTeams) ...[
+                        const SizedBox(height: 16),
+                        DropdownButtonFormField<int?>(
+                          key: const Key('invite-reply-days'),
+                          initialValue: vm.inviteReplyDays,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Invited teams answer by',
+                          ),
+                          items: [
+                            for (final d in <int?>[
+                              null,
+                              ...HostedTournament.inviteReplyChoices,
+                            ])
+                              DropdownMenuItem(
+                                value: d,
+                                child: Text(
+                                  HostedTournament.inviteReplyLabel(d),
+                                ),
+                              ),
+                          ],
+                          onChanged: vm.setInviteReplyDays,
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            'After this an invite expires and you can '
+                            'invite another team. A late invite still gets '
+                            'two days.',
+                            style: small,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                   3 => _formStep(

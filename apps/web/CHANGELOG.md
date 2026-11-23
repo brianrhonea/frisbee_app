@@ -4,6 +4,18 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.57.0 — 2026-11-22
+
+- Tournament invites have a reply-by time: the host form's **Invited
+  teams answer by** (2 weeks before it starts by default, or 3 days, 1
+  or 3 weeks, 30 days, or no deadline). After it the invite is
+  **Expired** for both sides; the host's **Invite again** sends a fresh
+  one.
+- A team's admins see its tournament invites on the team page, with
+  **Accept** (straight to picking captains) and **Decline**.
+- Organizers who also enter a team see **Your teams** (its entry, invite
+  and fee) on the event page; it was hidden from the event's managers.
+
 ## 0.56.1 — 2026-11-22
 
 - Pinned messages are their own view, from a room's ⋯: a card for each

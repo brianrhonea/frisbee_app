@@ -27,6 +27,7 @@ import { TournamentDayCard } from "../tournaments/TournamentDayCard";
 import { useTournamentDays } from "../tournaments/useTournamentDays";
 import { ReportButton } from "../Report";
 import { TeamShare } from "./TeamShare";
+import { TournamentInvites } from "./TournamentInvites";
 
 const postLimit = 30;
 const leads = new Set(["owner", "coach", "captain"]);
@@ -78,6 +79,7 @@ export function TeamFeed({ publicPosts, publicEvents }: { publicPosts: PublicTea
         <SectionsHint />
         {pickup && <NextPickupCard event={ahead[0]} />}
         {member && <TeamStatTiles next={events.data?.[0]} chat={chat} />}
+        {admin && kind === "team" && <TournamentInvites teamId={teamId} />}
         {admin && <TeamPostComposer teamId={teamId} prompt={kind === "team" ? "Post to the team…" : "Post to the community…"} />}
         {viewer.state === "loading" || (member && !live.data && !live.error) ? (
           <Loading label="Loading posts…" />
