@@ -39,6 +39,7 @@ class ChatRoomScreen extends StatelessWidget {
         chatRepository: c.read(),
         authRepository: c.read(),
         voiceRepository: c.read(),
+        notificationRepository: c.read(),
       ),
       builder: (context, listVm) {
         // Switching rooms replaces this page, so back still leaves chat.

@@ -4,10 +4,12 @@ import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/chat/chat_repository.dart';
+import '../../../data/repositories/notification/notification_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
 import '../../../data/repositories/voice/voice_repository.dart';
 import '../../../data/services/meeting_call.dart';
 import '../../../domain/models/chat.dart';
+import '../../../domain/models/notification.dart';
 import '../../../domain/models/team.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
@@ -30,9 +32,11 @@ class ChatListViewModel extends ChangeNotifier {
     required ChatRepository chatRepository,
     required AuthRepository authRepository,
     required VoiceRepository voiceRepository,
+    NotificationRepository? notificationRepository,
   }) : _chats = chatRepository,
        _auth = authRepository,
-       _voice = voiceRepository {
+       _voice = voiceRepository,
+       _notifications = notificationRepository {
     _voice.addListener(notifyListeners);
     placeRoom = Command1<void, RoomDrop>(_placeRoom);
     placeFolder = Command1<void, FolderDrop>(_placeFolder);
@@ -55,12 +59,36 @@ class ChatListViewModel extends ChangeNotifier {
       _folders = f;
       notifyListeners();
     }, onError: (Object _) {});
+    toggleMute = Command1<void, ChatRoom>(_toggleMute);
     if (uid.isNotEmpty) {
+      _prefsSub = _notifications?.watchPreferences(uid).listen((p) {
+        _prefs = p;
+        notifyListeners();
+      }, onError: (Object _) {});
       _readSub = _chats.watchReads(uid).listen((r) {
         _reads = r[teamId] ?? const {};
         notifyListeners();
       }, onError: (Object _) {});
     }
+  }
+
+  final NotificationRepository? _notifications;
+  StreamSubscription<NotificationPreferences>? _prefsSub;
+  NotificationPreferences? _prefs;
+
+  /// Whether the member muted [room]: no notifications, no unread bubble.
+  bool isMuted(ChatRoom room) => _prefs?.isRoomMuted(teamId, room.id) ?? false;
+
+  /// Whether rooms can be muted from the list (press and hold, or the menu).
+  bool get canMute => _notifications != null && uid.isNotEmpty;
+
+  /// Mutes or unmutes [room] for the member.
+  late final Command1<void, ChatRoom> toggleMute;
+
+  Future<Result<void>> _toggleMute(ChatRoom room) async {
+    final repo = _notifications;
+    if (repo == null) return const Result.ok(null);
+    return repo.setRoomMuted(uid, teamId, room.id, muted: !isMuted(room));
   }
 
   /// Creates or renames a folder (and sets its default access).
@@ -368,6 +396,7 @@ class ChatListViewModel extends ChangeNotifier {
     _folderSub.cancel();
     _roomSub?.cancel();
     _readSub?.cancel();
+    _prefsSub?.cancel();
     super.dispose();
   }
 }

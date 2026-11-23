@@ -1733,3 +1733,25 @@ small.fee-note {
 .team-share .pill { justify-self: start; }
 .team-share-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .team-share-list label { display: flex; align-items: center; gap: 8px; padding: 4px 0; cursor: pointer; }
+
+/* A room's ⋯ menu in the team chat list (TeamChat.tsx): Mute notifications,
+   also on right-click or press and hold. Shown on hover, and always on
+   touch screens. */
+.chat-room-item { position: relative; }
+.chat-room-item > a.chat-room { padding-right: 34px; }
+.chat-room-muted { margin-left: auto; font-size: 0.8rem; opacity: 0.7; }
+.chat-room-more {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  width: 28px; height: 28px; border: 0; border-radius: 8px; background: none;
+  color: var(--muted); font-size: 1.1rem; line-height: 1; cursor: pointer; opacity: 0;
+}
+.chat-room-item:hover .chat-room-more, .chat-room-more:focus-visible, .chat-room-item.menu-open .chat-room-more { opacity: 1; }
+.chat-room-more:hover { background: var(--field); }
+@media (hover: none) { .chat-room-more { opacity: 1; } }
+.chat-room-menu {
+  position: absolute; right: 4px; top: calc(100% - 2px); z-index: 20; min-width: 200px;
+  display: grid; padding: 4px; border-radius: 10px; background: var(--card);
+  border: 1px solid var(--line); box-shadow: 0 8px 24px rgb(0 0 0 / 0.16);
+}
+.chat-room-menu button { text-align: left; padding: 8px 10px; border: 0; border-radius: 8px; background: none; color: var(--ink); font: inherit; cursor: pointer; }
+.chat-room-menu button:hover { background: var(--field); }
