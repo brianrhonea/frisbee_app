@@ -6,6 +6,10 @@ here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
 ## 0.56.1 — 2026-11-22
 
+- Chats: the reactions bubble on the first message (no room above it in
+  the message list) opens under the message instead of behind the chat
+  header, so its emoji can be picked.
+
 - Security headers on every page: no framing (`X-Frame-Options: DENY`,
   `frame-ancestors 'none'`), `nosniff`, a strict referrer policy and a
   permissions policy; `X-Powered-By` removed (pentest P5).

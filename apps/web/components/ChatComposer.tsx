@@ -2,7 +2,7 @@
 import { insertMention, type MentionSuggestion } from "@stall10/shared";
 import { type MentionContext, MentionMenu, suggestionsAt } from "./Mentions";
 import { chatAttachmentsMax, chatQuickReactions, chatReactionGroups, chatTextMax, formatFileSize } from "@stall10/shared";
-import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { OutboxKind } from "@stall10/shared";
 import { callApi } from "@/lib/client";
 import { queuedNotice, submitOutbox } from "@/lib/outbox";
@@ -396,7 +396,24 @@ export function MessageActions({
 /** The quick reactions in a pill over the message, then + for every emoji. Escape or a click outside closes it. */
 function ReactionBubble({ mine, onPick, onClose }: { mine: string | null; onPick: (emoji: string) => void; onClose: () => void }) {
   const [more, setMore] = useState(false);
+  // Under the message when there's no room above it inside the message
+  // list (the first message): above, the list's edge and the chat header
+  // would cover it.
+  const [below, setBelow] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const message = el?.offsetParent;
+    if (!el || !message) return;
+    let clipTop = 0;
+    for (let n = message.parentElement; n; n = n.parentElement) {
+      if (/(auto|scroll|hidden)/.test(getComputedStyle(n).overflowY)) {
+        clipTop = Math.max(clipTop, n.getBoundingClientRect().top);
+        break;
+      }
+    }
+    setBelow(message.getBoundingClientRect().top - clipTop < el.getBoundingClientRect().height + 4);
+  }, [more]);
   const close = useRef(onClose);
   close.current = onClose;
   useEffect(() => {
@@ -416,7 +433,7 @@ function ReactionBubble({ mine, onPick, onClose }: { mine: string | null; onPick
   }, []);
   const other = mine && !(chatQuickReactions as readonly string[]).includes(mine) ? mine : null;
   return (
-    <div className="reaction-bubble" ref={ref} role="dialog" aria-label="React to this message">
+    <div className={below ? "reaction-bubble below" : "reaction-bubble"} ref={ref} role="dialog" aria-label="React to this message">
       <div className="reaction-quick" role="group" aria-label="Quick reactions">
         {chatQuickReactions.map((e) => (
           <button key={e} type="button" className={mine === e ? "on" : ""} aria-pressed={mine === e} aria-label={`React ${e}`} onClick={() => onPick(e)}>

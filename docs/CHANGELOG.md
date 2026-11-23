@@ -64,8 +64,10 @@ Plain-language notes for testers are in
 
 ## 0.0.48 — Security fixes
 
-With web 0.56.1 and API 0.43.1. Firestore and Storage rules changed.
+With web 0.56.1 and API 0.44.0. Firestore and Storage rules changed.
 
+- Chats: the reactions bubble opens under a message near the top of the
+  screen, so the title bar never covers it.
 - Your email is never shown as your name: someone without a name
   appears as "Player" on teams, chats, posts and follows (pentest P6).
 - Rules: private profiles' posts can't be listed by people who don't

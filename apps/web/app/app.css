@@ -1350,6 +1350,7 @@ button.poll-option.on { border-color: var(--accent); }
   background: var(--card); border: 1px solid var(--line); border-radius: 22px; box-shadow: var(--shadow); padding: 4px 6px;
 }
 .message.mine .reaction-bubble { left: auto; right: 0; }
+.reaction-bubble.below { bottom: auto; top: calc(100% - 4px); }
 .reaction-quick { display: flex; gap: 2px; align-items: center; overflow-x: auto; }
 .reaction-bubble button {
   border: 0; background: none; border-radius: 999px; width: 38px; height: 38px; flex: none;
