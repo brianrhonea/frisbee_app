@@ -47,6 +47,37 @@ class PayoutAccount {
   );
 }
 
+/// The app's payment sheet for one fee (`POST /v1/tournaments/:id/pay/intent`;
+/// PaymentIntentResult in packages/shared).
+class PaymentSheetRequest {
+  const PaymentSheetRequest({
+    required this.clientSecret,
+    required this.account,
+    required this.merchantName,
+    required this.amountCents,
+    required this.currency,
+  });
+
+  final String clientSecret;
+
+  /// The host's Stripe account the payment is made on.
+  final String account;
+
+  /// The host's name, on the sheet.
+  final String merchantName;
+  final int amountCents;
+  final String currency;
+
+  factory PaymentSheetRequest.fromMap(Map<String, Object?> m) =>
+      PaymentSheetRequest(
+        clientSecret: m['clientSecret'] as String? ?? '',
+        account: m['account'] as String? ?? '',
+        merchantName: m['merchantName'] as String? ?? 'Stall 10',
+        amountCents: (m['amountCents'] as num?)?.toInt() ?? 0,
+        currency: m['currency'] as String? ?? 'USD',
+      );
+}
+
 /// Whether the caller can pay a fee online (`GET /v1/tournaments/:id/pay`).
 class PayOptions {
   const PayOptions({
@@ -74,7 +105,7 @@ class PayOptions {
   /// What paying online costs: [amountCents] plus [processingCents].
   final int chargeCents;
 
-  /// The processing fee added when the host passes the fees on (else 0).
+  /// Stall 10's and Stripe's fees, added to the fee (payers always pay them).
   final int processingCents;
 
   /// A bank payment is clearing (days): no Pay button until it settles.
@@ -156,8 +187,8 @@ class PaymentFees {
     required this.card,
   });
 
-  /// 1% + $1 (defaultPlatformFee).
-  static const defaultPlatform = FeeRate(percentBps: 100, fixedCents: 100);
+  /// 3% of the fee, paid by the payer (defaultPlatformFee).
+  static const defaultPlatform = FeeRate(percentBps: 300, fixedCents: 0);
 
   /// Stripe's standard US online card rate, 2.9% + 30¢ (stripeCardFeeEstimate).
   static const defaultCard = FeeRate(percentBps: 290, fixedCents: 30);
@@ -196,21 +227,25 @@ class PaymentFees {
     );
   }
 
-  /// What to charge so [amountCents] reaches the host after both fees
-  /// (chargeCoveringFees in packages/shared).
+  /// What the payer is charged online for a fee of [amountCents]: the fee,
+  /// Stall 10's fee on it, and Stripe's fee on the whole charge, so the
+  /// full fee reaches the host (onlineCharge in packages/shared).
   int chargeCoveringFees(int amountCents) {
     if (amountCents <= 0) return amountCents;
-    final rate = (platform.percentBps + card.percentBps) / 10000;
+    final ours = platform.on(amountCents);
+    final rate = card.percentBps / 10000;
     var charge =
-        ((amountCents + platform.fixedCents + card.fixedCents) / (1 - rate))
-            .floor() -
-        2;
-    if (charge < amountCents) charge = amountCents;
-    while (breakdown(charge).hostCents < amountCents) {
+        ((amountCents + ours + card.fixedCents) / (1 - rate)).floor() - 2;
+    if (charge < amountCents + ours) charge = amountCents + ours;
+    while (charge - ours - card.on(charge) < amountCents) {
       charge++;
     }
     return charge;
   }
+
+  /// Stall 10's fee on a fee of [amountCents], added to what the payer pays.
+  int platformOn(int amountCents) =>
+      amountCents <= 0 ? 0 : platform.on(amountCents);
 
   /// Why [amountCents] can't be paid online, or null (onlinePaymentProblem).
   String? problem(int amountCents, String currency) {

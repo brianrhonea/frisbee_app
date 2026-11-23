@@ -15,6 +15,22 @@ The running version is in `GET /health` and in every response's
   whose invite expired invites it again.
 - `GET /v1/teams/:teamId/tournament-invites` (team admins): the team's
   open invites, soonest first, with reply-by and expiry.
+- `POST /v1/tournaments/:id/pay/intent`: the app's payment sheet, a
+  direct-charge PaymentIntent on the host's account (automatic payment
+  methods, Stall 10's application fee) for the amount from the
+  tournament; reused while open, and it closes an open Checkout session
+  first (and Checkout closes it), so a fee has one live payment. Charges
+  gain `mode` (hosted, embedded, intent). The webhook handles
+  `payment_intent.succeeded`, `.processing`, `.payment_failed` and
+  `.canceled` for sheet charges on their own account only; the payer's
+  status check asks Stripe about the intent too.
+- Fees: the default platform fee is 3% (was 1% + $1), taken on the fee
+  itself, and every online charge adds it and Stripe's card fee on top
+  (`onlineCharge`), whatever `payerCoversFees` says, so the host gets the
+  whole fee. Checkout's extra line is "Service and processing fees".
+- `POST /v1/tournaments/:id/checkout` takes `ui: "embedded"` (Checkout
+  inside the website, `ui_mode: embedded_page`) and returns
+  `{url, clientSecret, account}`.
 
 ## 0.44.0 — 2026-11-22
 

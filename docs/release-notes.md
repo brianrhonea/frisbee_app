@@ -21,6 +21,13 @@ Firebase project; App Store builds come from `main` and use production.
 - Organizers who also run a team that plays see their own team's entry
   and fee on the event page (the website hid them).
 
+**Payments**
+- **Pay online** opens a secure Stripe checkout right in the app (and
+  inside the page on the website) instead of sending you to a browser.
+- Organizers now get their whole fee. Paying online adds Stall 10's 3%
+  and Stripe's card fee on top (a $400 bid fee is $424.61 by card). The
+  "Teams cover the processing fee" switch is gone.
+
 ---
 
 ## 0.0.47

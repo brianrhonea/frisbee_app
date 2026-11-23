@@ -85,6 +85,19 @@ With web 0.57.0 and API 0.45.0. Firestore rules changed.
   withdraws), from `GET /v1/teams/:id/tournament-invites` (the team's
   `tournamentEntries` records, no new index).
 - The event page shows the invite's reply-by time on your team's card.
+- **Pay online** opens Stripe's payment sheet in the app (flutter_stripe
+  14.2.0) instead of Checkout in the browser: a PaymentIntent on the
+  host's account from `POST /v1/tournaments/:id/pay/intent`. Needs
+  `STRIPE_PUBLISHABLE_KEY` in the secrets file; without it the browser
+  checkout stays. Android's `MainActivity` is a `FlutterFragmentActivity`
+  with AppCompat themes and Stripe's R8 rules (`proguard-rules.pro`);
+  Stripe's return link `stall10://open/safepay` is kept from the router
+  (`onEnter`). `data/services/payment_sheet_service.dart`.
+- Fees: Stall 10's fee is 3% of the fee (was 1% + $1), and payers always
+  pay it and Stripe's card fee on top, so hosts get the whole fee
+  (`onlineCharge`; the Dart `PaymentFees.chargeCoveringFees` /
+  `platformOn`). The host form's "Teams cover the processing fee" switch
+  is gone; `payerCoversFees` is ignored.
 
 ## 0.0.48 — Security fixes
 

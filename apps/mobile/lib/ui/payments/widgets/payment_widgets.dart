@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../data/repositories/payment/payment_repository.dart';
+import '../../../data/services/payment_sheet_service.dart';
 import '../../../domain/models/hosted_tournament.dart';
 import '../../../domain/models/payments.dart';
 import '../../core/ui/error_message.dart';
@@ -47,6 +48,14 @@ class _OnResumeState extends State<_OnResume> {
 }
 
 /// The app's payments, or null where none is provided (payments are off).
+PaymentSheetService? _sheet(BuildContext context) {
+  try {
+    return context.read<PaymentSheetService?>();
+  } on ProviderNotFoundException {
+    return null;
+  }
+}
+
 PaymentRepository? _payments(BuildContext context) {
   try {
     return context.read<PaymentRepository>();
@@ -120,17 +129,13 @@ class PayoutsCard extends StatelessWidget {
     super.key,
     required this.teamId,
     this.amountCents,
-    this.payerCovers = false,
     this.open,
   });
 
   final String teamId;
 
-  /// The event's fee, for the "you get about..." line ($100 without one).
+  /// The event's fee, for the "payers pay..." line ($100 without one).
   final int? amountCents;
-
-  /// The event passes the fees on to payers.
-  final bool payerCovers;
 
   /// Opens Stripe's page; tests pass a fake.
   final OpenPage? open;
@@ -164,8 +169,8 @@ class PayoutsCard extends StatelessWidget {
         'Take payments online',
         'Let teams and players pay their fees in Stall 10 instead of '
             'collecting them yourself. Payments go to your own Stripe '
-            'account. Stripe keeps its card fee and Stall 10 keeps '
-            '${a.feeLabel} of each payment.',
+            'account, and you get the whole fee: payers also pay Stall '
+            "10's ${a.feeLabel} and Stripe's card fee.",
         'Set up with Stripe',
       ),
       PayoutStatus.pending => (
@@ -176,8 +181,8 @@ class PayoutsCard extends StatelessWidget {
       PayoutStatus.ready => (
         'Online payments are on',
         'Teams and players can pay their fees in Stall 10. Refunds and '
-            'payouts are in your Stripe Dashboard. Stall 10 keeps '
-            '${a.feeLabel} of each payment.',
+            'payouts are in your Stripe Dashboard. You get the whole fee: '
+            "payers also pay Stall 10's ${a.feeLabel} and Stripe's card fee.",
         null,
       ),
     };
@@ -208,7 +213,6 @@ class PayoutsCard extends StatelessWidget {
               amountCents: amountCents ?? 10000,
               currency: 'USD',
               compact: true,
-              payerCovers: payerCovers,
             ),
             if (action != null) ...[
               const SizedBox(height: 12),
@@ -256,6 +260,7 @@ class PayOnlineButton extends StatelessWidget {
         tournamentId: tournamentId,
         teamId: teamId,
         open: open ?? openStripePage,
+        sheet: _sheet(c),
       ),
       builder: (context, vm) => _OnResume(
         load: vm.load.execute,
@@ -337,8 +342,8 @@ class PayOnlineButton extends StatelessWidget {
                   Text(
                     [
                       if (o.processingCents > 0)
-                        'Includes a ${centsLabel(o.processingCents)} '
-                            'processing fee.',
+                        'Includes ${centsLabel(o.processingCents)} in '
+                            'service and processing fees.',
                       'Secure checkout by Stripe. It shows as paid here once '
                           'Stripe confirms it.',
                     ].join(' '),
@@ -355,47 +360,33 @@ class PayOnlineButton extends StatelessWidget {
   }
 }
 
-/// What reaches the host of [amountCents] paid online: the host form's
-/// note under the price, and (with [compact]) the payout card's example.
-/// Mirrors feeNote in apps/web/components/payments/Payments.tsx.
+/// What payers pay online for [amountCents], which reaches the host in
+/// full: the host form's note under the price, and (with [compact]) the
+/// payout card's example. Mirrors feeNote in
+/// apps/web/components/payments/Payments.tsx.
 String? feeNote(
   PaymentFees fees,
   int amountCents,
   String currency, {
   bool compact = false,
-  bool payerCovers = false,
 }) {
   if (!fees.available || amountCents <= 0) return null;
-  final charge = payerCovers
-      ? fees.chargeCoveringFees(amountCents)
-      : amountCents;
+  final charge = fees.chargeCoveringFees(amountCents);
   final problem = fees.problem(charge, currency);
   if (problem != null) return compact ? null : problem;
-  if (payerCovers && compact) {
-    return 'On a ${centsLabel(amountCents)} fee, payers pay '
-        '${centsLabel(charge)} online and you get the whole '
-        '${centsLabel(amountCents)}.';
-  }
-  if (payerCovers) {
-    return 'Paid online, they pay ${centsLabel(charge)} '
-        '(${centsLabel(amountCents)} plus a '
-        '${centsLabel(charge - amountCents)} processing fee) and you get the '
-        'whole ${centsLabel(amountCents)}. Paid your own way, they pay '
-        '${centsLabel(amountCents)}.';
-  }
-  final b = fees.breakdown(amountCents);
-  final amount = centsLabel(b.amountCents);
-  final host = centsLabel(b.hostCents);
-  final ours = centsLabel(b.platformCents);
-  final stripe = centsLabel(b.stripeCents);
+  final amount = centsLabel(amountCents);
   if (compact) {
-    return 'On a $amount fee you get about $host: Stall 10 keeps $ours and '
-        'Stripe about $stripe.';
+    return 'On a $amount fee, payers pay ${centsLabel(charge)} online and '
+        'you get the whole $amount.';
   }
-  return 'Paid online in Stall 10, you get about $host of each $amount. '
-      'Stall 10 keeps $ours (${fees.platform.label}) and Stripe about '
-      '$stripe (${fees.card.label}, its usual card fee). Paid your own way, '
-      'you keep it all.';
+  final ours = centsLabel(fees.platformOn(amountCents));
+  final stripe = centsLabel(
+    charge - amountCents - fees.platformOn(amountCents),
+  );
+  return 'Paid online, they pay ${centsLabel(charge)}: $amount, plus '
+      "$ours for Stall 10 (${fees.platform.label}) and about $stripe for "
+      "Stripe's card fee. You get the whole $amount. Paid your own way, "
+      'they pay $amount.';
 }
 
 /// [feeNote] for a price a host is setting. Shows nothing while online
@@ -406,15 +397,11 @@ class FeeBreakdownNote extends StatelessWidget {
     required this.amountCents,
     required this.currency,
     this.compact = false,
-    this.payerCovers = false,
   });
 
   final int? amountCents;
   final String currency;
   final bool compact;
-
-  /// The host passes the fees on to payers.
-  final bool payerCovers;
 
   @override
   Widget build(BuildContext context) {
@@ -426,13 +413,7 @@ class FeeBreakdownNote extends StatelessWidget {
       builder: (context, vm) => ListenableBuilder(
         listenable: vm,
         builder: (context, _) {
-          final note = feeNote(
-            vm.fees,
-            amount,
-            currency,
-            compact: compact,
-            payerCovers: payerCovers,
-          );
+          final note = feeNote(vm.fees, amount, currency, compact: compact);
           if (note == null) return const SizedBox.shrink();
           final theme = Theme.of(context);
           return Padding(
@@ -446,53 +427,6 @@ class FeeBreakdownNote extends StatelessWidget {
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
             ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-/// The host form's "Teams cover the processing fee" switch: shown only when
-/// the server takes payments online.
-class PayerCoversFeesSwitch extends StatelessWidget {
-  const PayerCoversFeesSwitch({
-    super.key,
-    required this.value,
-    required this.onChanged,
-    required this.players,
-  });
-
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  /// Players pay (a player-entry event), not teams.
-  final bool players;
-
-  @override
-  Widget build(BuildContext context) {
-    final payments = _payments(context);
-    if (payments == null) return const SizedBox.shrink();
-    return ViewModelHost<PaymentFeesViewModel>(
-      create: (c) => PaymentFeesViewModel(payments: payments),
-      builder: (context, vm) => ListenableBuilder(
-        listenable: vm,
-        builder: (context, _) {
-          if (!vm.fees.available) return const SizedBox.shrink();
-          return SwitchListTile(
-            key: const Key('payer-covers-fees'),
-            contentPadding: EdgeInsets.zero,
-            title: Text(
-              players
-                  ? 'Payers cover the processing fee'
-                  : 'Teams cover the processing fee',
-            ),
-            subtitle: const Text(
-              "When they pay online, they also pay Stripe's and Stall 10's "
-              'fees, so you get the whole fee.',
-            ),
-            value: value,
-            onChanged: onChanged,
           );
         },
       ),

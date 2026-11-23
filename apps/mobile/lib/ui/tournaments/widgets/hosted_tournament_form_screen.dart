@@ -853,7 +853,6 @@ class _HostedTournamentFormScreenState
                         FeeBreakdownNote(
                           amountCents: vm.feeCents,
                           currency: vm.currency,
-                          payerCovers: vm.payerCoversFees,
                         ),
                         if (vm.teamEntry) ...[
                           const SizedBox(height: 12),
@@ -879,14 +878,8 @@ class _HostedTournamentFormScreenState
                           FeeBreakdownNote(
                             amountCents: vm.teamFeeCents,
                             currency: vm.currency,
-                            payerCovers: vm.payerCoversFees,
                           ),
                         ],
-                        PayerCoversFeesSwitch(
-                          value: vm.payerCoversFees,
-                          onChanged: vm.setPayerCoversFees,
-                          players: vm.takesPlayers,
-                        ),
                         const SizedBox(height: 12),
                         // With online payments on, these are the other ways
                         // (a school's check or PO).

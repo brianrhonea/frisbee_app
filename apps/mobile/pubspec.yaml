@@ -70,6 +70,7 @@ dependencies:
   path_provider: ^2.1.6
   qr_flutter: ^4.1.0
   flutter_timezone: ^5.1.1
+  flutter_stripe: 14.2.0
 
 dev_dependencies:
   flutter_test:

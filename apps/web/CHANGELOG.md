@@ -15,6 +15,14 @@ here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
   **Accept** (straight to picking captains) and **Decline**.
 - Organizers who also enter a team see **Your teams** (its entry, invite
   and fee) on the event page; it was hidden from the event's managers.
+- **Pay online** opens Stripe's embedded Checkout inside the page
+  (`@stripe/stripe-js` 10.2.1, on the host's account) when
+  `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` is set; without it, Stripe's page
+  as before. `Permissions-Policy` allows `payment` for Stripe's frames
+  (wallets).
+- Fees: Stall 10's 3% and Stripe's card fee are always added to what the
+  payer pays, so organizers get the whole fee; the form's "Teams cover
+  the processing fee" checkbox is gone and the notes say what payers pay.
 
 ## 0.56.1 — 2026-11-22
 

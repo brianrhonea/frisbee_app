@@ -719,17 +719,8 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
                   />
                 </label>
               </div>
-              <FeeBreakdownNote user={user} amountCents={centsOf(f.feeAmount)} currency={f.currency} payerCovers={f.payerCoversFees} />
-              {players && f.teamEntry && <FeeBreakdownNote user={user} amountCents={centsOf(f.teamFeeAmount)} currency={f.currency} payerCovers={f.payerCoversFees} />}
-              {paymentFees?.available && (
-              <label className="check-row">
-                <input type="checkbox" checked={f.payerCoversFees} onChange={(e) => set({ payerCoversFees: e.target.checked })} />
-                <span>
-                  {players ? "Payers cover the processing fee" : "Teams cover the processing fee"}
-                  <small className="muted">When they pay online, they also pay Stripe&apos;s and Stall 10&apos;s fees, so you get the whole fee.</small>
-                </span>
-              </label>
-              )}
+              <FeeBreakdownNote user={user} amountCents={centsOf(f.feeAmount)} currency={f.currency} />
+              {players && f.teamEntry && <FeeBreakdownNote user={user} amountCents={centsOf(f.teamFeeAmount)} currency={f.currency} />}
               {/* With online payments on, these are the other ways (a school's check or PO). */}
               <label>
                 {paymentFees?.available ? "Other ways to pay" : "How to pay"}

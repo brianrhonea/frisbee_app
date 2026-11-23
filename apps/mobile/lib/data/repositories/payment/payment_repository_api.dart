@@ -102,6 +102,23 @@ class PaymentRepositoryApi implements PaymentRepository {
   );
 
   @override
+  Future<Result<PaymentSheetRequest>> paymentSheet(
+    String tournamentId, {
+    String? teamId,
+  }) => guard(() async {
+    final r = PaymentSheetRequest.fromMap(
+      await _client.post('/v1/tournaments/${_id(tournamentId)}/pay/intent', {
+        'payer': teamId == null ? 'player' : 'team',
+        'teamId': ?teamId,
+      }),
+    );
+    if (r.clientSecret.isEmpty || r.account.isEmpty) {
+      throw const ApiException('internal', 'Stripe sent back no payment.');
+    }
+    return r;
+  });
+
+  @override
   Future<Result<Uri>> checkout(String tournamentId, {String? teamId}) => guard(
     () async => _url(
       await _client.post('/v1/tournaments/${_id(tournamentId)}/checkout', {

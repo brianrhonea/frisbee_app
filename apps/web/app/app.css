@@ -1696,6 +1696,25 @@ dialog.dialog:has(.scope-dialog) { width: min(100% - 32px, 420px); }
 .scope-actions .text-btn { justify-self: center; }
 
 /* Online payments (components/payments) */
+.embedded-pay {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  padding: 12px;
+  background: #fff;
+  color: #1a1a1a;
+  width: 100%;
+  max-width: 560px;
+}
+.embedded-pay-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.embedded-pay-frame {
+  min-height: 320px;
+}
 .pay-online {
   display: flex;
   flex-direction: column;

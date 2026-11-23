@@ -8,6 +8,7 @@ import '../data/repositories/discord/discord_import_repository_firebase.dart';
 import '../data/repositories/voice/voice_repository.dart';
 import '../data/repositories/voice/voice_repository_livekit.dart';
 import '../data/services/device_calendar_service.dart';
+import '../data/services/payment_sheet_service.dart';
 import '../data/services/device_permissions.dart';
 import '../data/services/callable_client.dart';
 import '../data/repositories/auth/auth_repository.dart';
@@ -144,6 +145,8 @@ List<SingleChildWidget> get firebaseProviders => [
   Provider<PaymentRepository>(
     create: (context) => PaymentRepositoryApi(api: context.read<ApiClient?>()),
   ),
+  // The app's own checkout (Stripe's payment sheet); off without a key.
+  Provider<PaymentSheetService?>(create: (_) => StripePaymentSheetService()),
   // Nullable, as TeamShareCard reads it (pages built without it skip the card).
   Provider<TeamShareRepository?>(
     create: (context) =>

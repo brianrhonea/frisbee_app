@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/payment/payment_repository.dart';
+import '../../../data/services/payment_sheet_service.dart';
 import '../../../domain/models/payments.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
@@ -64,8 +65,10 @@ class PayOnlineViewModel extends ChangeNotifier {
     required this.tournamentId,
     this.teamId,
     required OpenPage open,
+    PaymentSheetService? sheet,
   }) : _payments = payments,
-       _open = open {
+       _open = open,
+       _sheet = sheet {
     load = Command0(_load)..execute();
     pay = Command0(_pay);
     payOffline = Command1(_payOffline);
@@ -73,6 +76,7 @@ class PayOnlineViewModel extends ChangeNotifier {
 
   final PaymentRepository _payments;
   final OpenPage _open;
+  final PaymentSheetService? _sheet;
   final String tournamentId;
   final String? teamId;
 
@@ -133,9 +137,12 @@ class PayOnlineViewModel extends ChangeNotifier {
     return r;
   }
 
-  /// Opens Stripe Checkout. The payment shows as paid once Stripe confirms
-  /// it (the payments list updates by itself).
+  /// Pays in the app's own payment sheet when it can be shown, else opens
+  /// Stripe Checkout in the browser. The payment shows as paid once Stripe
+  /// confirms it (the payments list updates by itself).
   Future<Result<void>> _pay() async {
+    final sheet = _sheet;
+    if (sheet != null && sheet.available) return _payInSheet(sheet);
     final r = await _payments.checkout(tournamentId, teamId: teamId);
     switch (r) {
       case Ok(:final value):
@@ -146,6 +153,26 @@ class PayOnlineViewModel extends ChangeNotifier {
         return const Result.ok(null);
       case Error(:final error):
         return Result.error(error);
+    }
+  }
+
+  Future<Result<void>> _payInSheet(PaymentSheetService sheet) async {
+    final r = await _payments.paymentSheet(tournamentId, teamId: teamId);
+    switch (r) {
+      case Error(:final error):
+        return Result.error(error);
+      case Ok(:final value):
+        try {
+          final outcome = await sheet.present(value);
+          if (outcome == PaymentSheetOutcome.completed) {
+            // Ask the API (which asks Stripe) rather than wait for the webhook.
+            _awaitingReturn = true;
+            await load.execute();
+          }
+          return const Result.ok(null);
+        } on PaymentSheetException catch (e) {
+          return Result.error(e);
+        }
     }
   }
 }

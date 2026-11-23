@@ -38,4 +38,11 @@ abstract class PaymentRepository {
 
   /// A Stripe Checkout page for that fee.
   Future<Result<Uri>> checkout(String tournamentId, {String? teamId});
+
+  /// The same fee in the app's own payment sheet (a PaymentIntent on the
+  /// host's account).
+  Future<Result<PaymentSheetRequest>> paymentSheet(
+    String tournamentId, {
+    String? teamId,
+  });
 }

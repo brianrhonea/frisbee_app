@@ -684,7 +684,6 @@ class _OverviewTab extends StatelessWidget {
             PayoutsCard(
               teamId: t.hostId,
               amountCents: (fee ?? t.entryFee)?.amountCents,
-              payerCovers: (fee ?? t.entryFee)?.payerCoversFees ?? false,
             ),
           // Each of the user's teams that still owes its bid or spot fee.
           if (fee != null && fee.amountCents > 0)

@@ -176,7 +176,10 @@ const feeSchema = z.strictObject({
   currency: z.string().regex(/^[A-Z]{3}$/, "Pick a currency."),
   instructions: z.string().trim().max(tournamentLimits.feeInstructions).default(""),
   dueAt: isoDate.nullable().default(null),
-  /** Paid online, the payer also pays Stripe's and Stall 10's fees, so the host gets the full amount. */
+  /**
+   * Unused: paid online, the payer always pays Stripe's and Stall 10's
+   * fees on top (onlineCharge). Kept so older events' fees still parse.
+   */
   payerCoversFees: z.boolean().default(false),
 });
 
