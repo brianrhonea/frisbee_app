@@ -73,8 +73,6 @@
     },
     "listing": {
       "name": "Open Pickup",
-      "division": "mixed",
-      "level": "pickup",
       "city": "",
       "kind": "community",
       "description": "",
@@ -137,8 +135,6 @@
     },
     "listing": {
       "name": "Austin Pickup",
-      "division": "mixed",
-      "level": "pickup",
       "city": "Austin",
       "kind": "community",
       "description": "Sundays",
@@ -182,8 +178,6 @@
     },
     "listing": {
       "name": "St. Mary’s High",
-      "division": "women",
-      "level": "youth",
       "city": "New York",
       "kind": "organization",
       "description": "Go Saints",

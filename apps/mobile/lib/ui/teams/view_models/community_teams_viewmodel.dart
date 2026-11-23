@@ -95,7 +95,8 @@ class CommunityTeamsViewModel extends ChangeNotifier {
     id: team.id,
     name: team.name,
     division: team.division,
-    level: _org?.level ?? CompetitionLevel.college,
+    // Its own level isn't listed here; the API checks club ages on invite.
+    level: CompetitionLevel.college,
     ownerId: '',
     members: const {},
     orgId: orgId,

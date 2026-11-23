@@ -379,6 +379,11 @@ class Team {
   /// with approval, no roster or stats of its own.
   bool get isCommunity => kind.isGroupLike;
 
+  /// Teams have a division and level; pickup communities and schools/clubs
+  /// don't (their teams each have their own). hasDivision in
+  /// packages/shared/src/team.ts.
+  bool get hasDivision => !kind.isGroupLike;
+
   /// A club team: a team at the club level, for players 16 and over
   /// (clubMinimumAge). Groups and other levels are open to everyone.
   bool get isClubTeam =>
@@ -594,8 +599,8 @@ class Team {
   /// set at creation and never changes.
   Map<String, dynamic> toEditableMap() => {
     'name': name,
-    'division': division.name,
-    'level': level.name,
+    // Groups have no division or level (hasDivision).
+    if (hasDivision) ...{'division': division.name, 'level': level.name},
     'city': city,
     ...communityFields(
       kind: kind,
@@ -779,8 +784,11 @@ class NewTeam {
 
   Map<String, dynamic> toMap() => {
     'name': name,
-    'division': division.name,
-    'level': level.name,
+    // Groups have no division or level (hasDivision).
+    if (kind == TeamKind.team) ...{
+      'division': division.name,
+      'level': level.name,
+    },
     'city': city,
     ...communityFields(
       kind: kind,
@@ -797,8 +805,10 @@ class NewTeam {
   /// through the API yet.
   Map<String, Object?> toRequest() => {
     'name': name,
-    'division': division.name,
-    'level': level.name,
+    if (kind == TeamKind.team) ...{
+      'division': division.name,
+      'level': level.name,
+    },
     'city': city,
     'kind': kind.name,
     'description': description,
@@ -917,8 +927,9 @@ class TeamListing {
   bool sameAs(Team team) =>
       id == team.id &&
       name == team.name &&
-      division == team.division &&
-      level == team.level &&
+      // Groups have no division or level (hasDivision).
+      (team.isCommunity ||
+          (division == team.division && level == team.level)) &&
       city == team.city &&
       kind == team.kind &&
       description == team.description &&
@@ -950,8 +961,11 @@ class TeamListing {
 
   Map<String, dynamic> toMap() => {
     'name': name,
-    'division': division.name,
-    'level': level.name,
+    // Groups have no division or level (hasDivision).
+    if (kind == TeamKind.team) ...{
+      'division': division.name,
+      'level': level.name,
+    },
     'city': city,
     ...communityFields(
       kind: kind,

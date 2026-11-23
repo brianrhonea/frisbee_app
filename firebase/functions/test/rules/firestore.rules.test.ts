@@ -127,6 +127,17 @@ describe("team create", () => {
     await assertSucceeds(setDoc(doc(db(OUTSIDER), "teams", "myleague_team"), newTeam()));
   });
 
+  it("lets a group leave out division and level, but not a team", async () => {
+    const group = { kind: "organization", description: "", requiresApproval: false, location: null };
+    const { division: _d, level: _l, ...bare } = newTeam(group);
+    await assertSucceeds(setDoc(doc(db(OUTSIDER), "teams", "org-bare"), bare));
+    // An older app still sends them: allowed, if valid.
+    await assertSucceeds(setDoc(doc(db(OUTSIDER), "teams", "org-old"), newTeam(group)));
+    await assertFails(setDoc(doc(db(OUTSIDER), "teams", "org-bad"), newTeam({ ...group, division: "coed" })));
+    const { division: _td, level: _tl, ...bareTeam } = newTeam();
+    await assertFails(setDoc(doc(db(OUTSIDER), "teams", "team-bare"), bareTeam));
+  });
+
   it("refuses starting a club team directly: the API checks the creator is 16 or over", async () => {
     await assertFails(setDoc(doc(db(OUTSIDER), "teams", "t2"), newTeam({ level: "club" })));
     await assertFails(setDoc(doc(db(OUTSIDER), "teams", "t2"), newTeam({ level: "club", orgId: "org1", orgName: "Org" })));

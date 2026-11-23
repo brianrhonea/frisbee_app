@@ -82,6 +82,11 @@ void main() {
 
       expect(g.toEditableMap().containsKey('kind'), isFalse);
       expect(g.toEditableMap()['requiresApproval'], isFalse);
+      // Groups have no division or level; their teams each have their own.
+      expect(g.toEditableMap().containsKey('division'), isFalse);
+      expect(g.toEditableMap().containsKey('level'), isFalse);
+      expect(map.containsKey('division'), isFalse);
+      expect(map.containsKey('level'), isFalse);
 
       // A private group keeps its location off the public listing.
       final private = makeGroup(requiresApproval: true, location: location);

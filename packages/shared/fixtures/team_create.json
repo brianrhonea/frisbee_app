@@ -291,8 +291,6 @@
     "docs": {
       "teams/group1": {
         "name": "Austin Pickup",
-        "division": "mixed",
-        "level": "pickup",
         "city": "Austin",
         "kind": "community",
         "description": "Sundays at the park.",
@@ -316,8 +314,6 @@
       },
       "teamDirectory/group1": {
         "name": "Austin Pickup",
-        "division": "mixed",
-        "level": "pickup",
         "city": "Austin",
         "kind": "community",
         "description": "Sundays at the park.",
@@ -446,8 +442,6 @@
     "docs": {
       "teams/org1": {
         "name": "St. Mary’s High",
-        "division": "women",
-        "level": "youth",
         "city": "New York",
         "kind": "organization",
         "description": "",
@@ -471,8 +465,6 @@
       },
       "teamDirectory/org1": {
         "name": "St. Mary’s High",
-        "division": "women",
-        "level": "youth",
         "city": "New York",
         "kind": "organization",
         "description": "",

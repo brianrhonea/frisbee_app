@@ -28,7 +28,7 @@ export function CreateTeam() {
   const copy = kindCopy[kind];
   const [name, setName] = useState("");
   const [division, setDivision] = useState<string>("mixed");
-  const [level, setLevel] = useState<string>(kind === "community" ? "pickup" : "club");
+  const [level, setLevel] = useState<string>("club");
   const [city, setCity] = useState("");
   const [description, setDescription] = useState("");
   const [approval, setApproval] = useState(false);
@@ -42,8 +42,8 @@ export function CreateTeam() {
     setError(null);
     const body: CreateTeamRequest = {
       name: name.trim(),
-      division: division as CreateTeamRequest["division"],
-      level: level as CreateTeamRequest["level"],
+      // Communities and schools/clubs have no division or level (hasDivision).
+      ...(kind === "team" && { division: division as CreateTeamRequest["division"], level: level as CreateTeamRequest["level"] }),
       city: city.trim(),
       kind,
       ...(kind !== "team" && { description: description.trim(), requiresApproval: approval }),
@@ -84,6 +84,7 @@ export function CreateTeam() {
         {copy.name}
         <input value={name} required maxLength={80} autoFocus onChange={(e) => setName(e.target.value)} />
       </label>
+      {kind === "team" && (
       <div className="form-row">
         <label>
           Division
@@ -106,6 +107,7 @@ export function CreateTeam() {
           </select>
         </label>
       </div>
+      )}
       {kind === "team" && level === "club" && <ClubAgeNote />}
       <label>
         City <small className="muted">(optional)</small>

@@ -115,7 +115,8 @@ function DetailsForm() {
     e.preventDefault();
     const body: EditTeamRequest = {
       name: name.trim(),
-      level: level as EditTeamRequest["level"],
+      // Groups have no level (hasDivision).
+      ...(!group && { level: level as EditTeamRequest["level"] }),
       city: city.trim(),
       ...(group && { description: description.trim(), requiresApproval: approval }),
     };
@@ -130,6 +131,7 @@ function DetailsForm() {
         <input value={name} required maxLength={80} onChange={(e) => setName(e.target.value)} />
       </label>
       <div className="form-row">
+        {!group && (
         <label>
           Level
           <select value={level} onChange={(e) => setLevel(e.target.value)}>
@@ -140,6 +142,7 @@ function DetailsForm() {
             ))}
           </select>
         </label>
+        )}
         <label>
           City
           <input value={city} maxLength={80} onChange={(e) => setCity(e.target.value)} />

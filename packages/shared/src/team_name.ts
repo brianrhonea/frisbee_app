@@ -43,13 +43,13 @@ export interface NameListing {
   id: string;
   name: string;
   kind: TeamKind;
-  division: Division;
+  division?: Division;
 }
 
 /** Whether [name] for a [kind] team in [division] is taken by [listing]. */
 export function teamNameClashes(
   listing: NameListing,
-  opts: { name: string; kind: TeamKind; division: Division; excludeId?: string },
+  opts: { name: string; kind: TeamKind; division?: Division; excludeId?: string },
 ): boolean {
   if (listing.id === opts.excludeId) return false;
   if (listing.kind !== opts.kind) return false;
@@ -87,8 +87,8 @@ export function teamNameProbe(name: string): string[] {
 }
 
 /** The message the app shows when a name is taken (TeamNameTakenException). */
-export function nameTakenMessage(name: string, kind: TeamKind, division: Division): string {
-  return kind === "team"
+export function nameTakenMessage(name: string, kind: TeamKind, division?: Division): string {
+  return kind === "team" && division
     ? `There's already a ${divisionLabels[division]} team called "${name}". Pick a different name.`
     : `There's already a ${teamKindLabels[kind].toLowerCase()} called "${name}". Pick a different name.`;
 }
