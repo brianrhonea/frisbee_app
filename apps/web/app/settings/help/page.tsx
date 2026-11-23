@@ -26,10 +26,7 @@ export default function HelpSettingsPage() {
       <h3>More help</h3>
       <ul className="help-more">
         <li>
-          <Link href="/rules">Rules of ultimate</Link> <small className="muted">How the game is played</small>
-        </li>
-        <li>
-          <Link href="/learn">Learn to play</Link> <small className="muted">Ultimate in five minutes</small>
+          <Link href="/learn">Learn to play</Link> <small className="muted">The basics and the rules of ultimate</small>
         </li>
         <li>
           <a href={`mailto:${supportEmail}`}>Contact support</a> <small className="muted">{supportEmail}</small>

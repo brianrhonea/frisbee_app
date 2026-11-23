@@ -32,8 +32,15 @@ class AppUser {
     username: username,
   );
 
-  String get label =>
-      (displayName?.isNotEmpty ?? false) ? displayName! : (email ?? 'Player');
+  /// The name written for this user where others see it (teams, chats,
+  /// posts, follows): their name, or "Player". Never their email (pentest
+  /// P6; callerLabel in apps/api/src/auth.ts).
+  String get label {
+    final name = displayName?.trim() ?? '';
+    return name.isNotEmpty && !_emailLike.hasMatch(name) ? name : 'Player';
+  }
+
+  static final _emailLike = RegExp(r'\S@\S+\.\S');
 
   /// The name others see on their profile: never the email.
   String get publicName => (displayName?.trim().isNotEmpty ?? false)

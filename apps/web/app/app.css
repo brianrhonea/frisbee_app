@@ -1350,6 +1350,7 @@ button.poll-option.on { border-color: var(--accent); }
   background: var(--card); border: 1px solid var(--line); border-radius: 22px; box-shadow: var(--shadow); padding: 4px 6px;
 }
 .message.mine .reaction-bubble { left: auto; right: 0; }
+.reaction-bubble.below { bottom: auto; top: calc(100% - 4px); }
 .reaction-quick { display: flex; gap: 2px; align-items: center; overflow-x: auto; }
 .reaction-bubble button {
   border: 0; background: none; border-radius: 999px; width: 38px; height: 38px; flex: none;
@@ -1777,13 +1778,41 @@ mark.mention.mention-me { background: color-mix(in srgb, var(--accent) 24%, tran
 .card.guide-official ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .card.guide-official li { display: grid; gap: 2px; }
 .card.guide-official a { color: var(--accent); font-weight: 700; }
-.help-topics { padding: 4px 0; }
-.help-topics details { border-top: 1px solid var(--line); }
-.help-topics details:first-child { border-top: 0; }
-.help-topics summary { padding: 14px 18px; font-weight: 700; cursor: pointer; list-style-position: inside; }
-.help-topics summary:hover { color: var(--accent); }
-.help-answer { padding: 0 18px 10px; color: var(--ink-soft); }
-.help-answer ul { margin: 0 0 6px; padding-left: 20px; }
-.help-answer li { margin-bottom: 6px; }
+.help-topics, .card.rules-list { padding: 4px 0; }
+.help-topics details, .rules-list details { border-top: 1px solid var(--line); }
+.help-topics details:first-child, .rules-list details:first-child { border-top: 0; }
+.help-topics summary, .rules-list summary { padding: 14px 18px; font-weight: 700; cursor: pointer; list-style-position: inside; }
+.help-topics summary:hover, .rules-list summary:hover { color: var(--accent); }
+.help-answer, .rules-answer { padding: 0 18px 10px; color: var(--ink-soft); }
+.help-answer ul, .rules-answer ul { margin: 0 0 6px; padding-left: 20px; }
+.help-answer li, .rules-answer li { margin-bottom: 6px; }
+.rules-answer p { margin: 0 0 8px; }
+/* Learn to play's second part: the rules of ultimate (app/learn/page.tsx). */
+.learn-rules { display: grid; gap: 14px; margin-top: 48px; padding-top: 28px; border-top: 1px solid var(--line); scroll-margin-top: 80px; }
+.learn-rules > .eyebrow { margin: 0; }
+.learn-rules > h2 { font-size: clamp(1.6rem, 3.4vw, 2.1rem); line-height: 1.1; letter-spacing: -0.035em; margin: -6px 0 0; }
+.learn-rules-intro { margin: 0; color: var(--ink-soft); }
+.learn-rules .card { margin: 0; }
+.learn-toc a.learn-toc-rules { border-style: dashed; }
+/* Phones: the lessons index as one compact list rather than tiles, and less
+   space between the parts. */
+@media (max-width: 560px) {
+  .card.learn-toc { padding: 4px 0; background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .learn-progress { margin: 8px 16px 4px; }
+  .learn-toc ol { grid-template-columns: 1fr; gap: 0; }
+  .learn-toc a {
+    display: flex; align-items: center; gap: 12px; padding: 11px 16px; border: 0; border-top: 1px solid var(--line);
+    border-radius: 0; box-shadow: none; background: none; font-size: 0.95rem;
+  }
+  .learn-toc li:first-child a { border-top: 0; }
+  .learn-toc a.read { background: none; }
+  .learn-toc a.learn-toc-rules { border-style: solid; }
+  .learn-num { font-size: 1.15rem; min-width: 1.6em; }
+  .learn-body section { margin-top: 24px; }
+  .learn-body h2 { font-size: 1.2rem; }
+  .learn-rules { margin-top: 32px; padding-top: 20px; gap: 12px; }
+  .rules-list summary, .help-topics summary { padding: 13px 16px; }
+  .rules-answer, .help-answer { padding: 0 16px 10px; }
+}
 .help-more { list-style: none; padding: 0; display: grid; gap: 8px; }
 .help-more a { color: var(--accent); font-weight: 700; }

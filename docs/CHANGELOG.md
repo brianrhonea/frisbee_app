@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.48  | 2026-11-22 | `feature/security-hardening`           |                     |
 | 0.0.47  | 2026-11-22 | `feature/profile-staff`                 |                     |
 | 0.0.46  | 2026-11-22 | `feature/launch-fixes`                  |                     |
 | 0.0.45  | 2026-11-22 | `feature/tournament-fixes`              |                     |
@@ -60,6 +61,27 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.48 — Security fixes
+
+With web 0.56.1 and API 0.44.0. Firestore and Storage rules changed.
+
+- Chats: the reactions bubble opens under a message near the top of the
+  screen, so the title bar never covers it.
+- Pinned messages are their own page, from a room's ⋯ (as in Discord):
+  a card for each pin with its author, date, text and files. Tap one to
+  jump to it in the chat, loading older messages as needed; it's tinted
+  for a moment. The pinned strip at the top of the room is gone.
+- Learn to play and the rules of ultimate are one page: the lessons (now
+  in one card, divided), then the rules, each opening in place, with the
+  official rule books. Settings and Help have one "Learn to play";
+  `/rules` opens the rules part.
+- Your email is never shown as your name: someone without a name
+  appears as "Player" on teams, chats, posts and follows (pentest P6).
+- Rules: private profiles' posts can't be listed by people who don't
+  follow them, at most 50 a query (P1); uploads must be a photo, video
+  or document type, never SVG, HTML or untyped (P3); `users/{uid}`
+  takes only the fields the app writes (P10).
 
 ## 0.0.47 — Communities without a level, league entry, fee shares, mentions
 

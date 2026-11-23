@@ -47,10 +47,10 @@ describe("POST /v1/teams", () => {
     expect(t.teams.created[0].owner).toEqual({ uid: "u1", label: "Pat Lee" });
   });
 
-  it("falls back to the email when the account has no name", async () => {
+  it("never stores the email as the owner's name (pentest P6)", async () => {
     t.users.records.set("u1", { email: "pat@x.test" });
     await t.post(team);
-    expect(t.teams.created[0].owner.label).toBe("pat@x.test");
+    expect(t.teams.created[0].owner.label).toBe("Player");
   });
 
   it("needs a signed-in caller", async () => {

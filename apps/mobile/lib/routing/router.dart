@@ -189,8 +189,13 @@ GoRouter router(
         builder: (_, vm) => RecordWorkoutScreen(viewModel: vm),
       ),
     ),
-    GoRoute(path: Routes.learn, builder: (_, _) => learnPage()),
-    GoRoute(path: Routes.rules, builder: (_, _) => const RulesScreen()),
+    GoRoute(
+      path: Routes.learn,
+      builder: (_, s) =>
+          learnPage(openRules: s.uri.queryParameters['part'] == 'rules'),
+    ),
+    // The rules are part of Learn to play now; old links land there.
+    GoRoute(path: Routes.rules, redirect: (_, _) => Routes.learnRules),
     // Settings, from the gear on the user's profile: slides over the page
     // (a panel on wide screens), and its sections slide over it.
     GoRoute(

@@ -154,16 +154,10 @@ class SettingsScreen extends StatelessWidget {
                     onTap: () => context.push(Routes.settingsHelp),
                   ),
                   SettingsTile(
-                    key: const Key('settings-rules'),
-                    icon: Icons.sports,
-                    title: 'Rules of ultimate',
-                    subtitle: 'How the game is played, and the official rules',
-                    onTap: () => context.push(Routes.rules),
-                  ),
-                  SettingsTile(
+                    key: const Key('settings-learn'),
                     icon: Icons.menu_book_outlined,
                     title: 'Learn to play',
-                    subtitle: 'Ultimate in five minutes',
+                    subtitle: 'The basics and the rules of ultimate',
                     onTap: () => context.push(Routes.learn),
                   ),
                 ],

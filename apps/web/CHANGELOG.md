@@ -4,6 +4,25 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.56.1 — 2026-11-22
+
+- Pinned messages are their own view, from a room's ⋯: a card for each
+  pin (author, date, text and files). Click one to jump to it in the
+  chat, loading older messages as needed; it's tinted for a moment. The
+  pinned strip is gone.
+- Learn to play and the rules of ultimate are one page (`/learn`, the
+  rules at `#rules`, each opening in place; `/rules` redirects there).
+  On phones the lessons index is a compact list and the spacing is
+  tighter. Settings and Help link Learn to play once.
+
+- Chats: the reactions bubble on the first message (no room above it in
+  the message list) opens under the message instead of behind the chat
+  header, so its emoji can be picked.
+
+- Security headers on every page: no framing (`X-Frame-Options: DENY`,
+  `frame-ancestors 'none'`), `nosniff`, a strict referrer policy and a
+  permissions policy; `X-Powered-By` removed (pentest P5).
+
 ## 0.56.0 — 2026-11-22
 
 With app 0.0.47 and API 0.43.0.

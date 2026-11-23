@@ -69,8 +69,9 @@ class _BubbleLayer extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     final pad = MediaQuery.paddingOf(context);
-    // Above the message, or under it when it's at the top of the screen.
-    final above = anchor.top - _height - _gap >= pad.top + 8;
+    // Above the message, or under it when it's near the top of the screen,
+    // so it never sits over the page's title bar.
+    final above = anchor.top - _height - _gap >= pad.top + kToolbarHeight + 8;
     final top = above
         ? anchor.top - _height - _gap
         : (anchor.bottom + _gap).clamp(pad.top + 8, size.height - _height - 8);

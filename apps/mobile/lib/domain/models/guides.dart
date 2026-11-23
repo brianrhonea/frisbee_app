@@ -51,7 +51,7 @@ const officialRules = [
   ),
 ];
 
-/// The Rules of ultimate screen (Routes.rules; /rules on the website).
+/// The rules of ultimate, on Learn to play (Routes.learnRules; /learn#rules on the website).
 const rulesGuide = [
   GuideSection(
     id: 'spirit',

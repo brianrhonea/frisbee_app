@@ -1211,6 +1211,38 @@ void main() {
     expect(find.text('Profile a'), findsOneWidget);
   });
 
+  testWidgets('a message just under the title bar gets its reactions below '
+      'it, clear of the bar, and they can be picked', (tester) async {
+    late BuildContext ctx;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(
+          appBar: AppBar(title: const Text('Chat')),
+          body: Builder(
+            builder: (c) {
+              ctx = c;
+              return const SizedBox.expand();
+            },
+          ),
+        ),
+      ),
+    );
+    final picked = showReactionBubble(
+      ctx,
+      anchor: const Rect.fromLTWH(16, kToolbarHeight + 4, 200, 40),
+    );
+    await tester.pumpAndSettle();
+    final bubble = find.byType(ReactionBubble);
+    expect(
+      tester.getTopLeft(bubble).dy,
+      greaterThanOrEqualTo(kToolbarHeight + 44),
+    );
+    await tester.tap(find.bySemanticsLabel('React ${quickReactions.first}'));
+    await tester.pumpAndSettle();
+    expect(await picked, quickReactions.first);
+  });
+
   testWidgets('double-tap a message for a bubble of reactions over it; '
       'its + offers every emoji', (tester) async {
     await dms.openConversation(

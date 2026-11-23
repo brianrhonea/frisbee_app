@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:frisbee_app/ui/chat/widgets/pinned_messages_screen.dart';
+import 'package:frisbee_app/ui/chat/view_models/message_thread_viewmodel.dart';
 import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
 import 'package:frisbee_app/data/repositories/chat/chat_repository.dart';
 import 'package:frisbee_app/data/repositories/event/event_repository.dart';
@@ -257,32 +259,71 @@ void main() {
       return vm;
     }
 
-    testWidgets('the pinned strip shows the newest pin and lists them all', (
+    Future<void> openPins(WidgetTester tester) async {
+      await tester.tap(find.byTooltip('Room options'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('room-pinned')));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets("pinned messages are their own page, from the room's ⋯", (
       tester,
     ) async {
       joinAs(TeamRole.player);
       chats.pinned['general'] = ['m11', 'm3'];
       await pump(tester);
-      expect(find.text('PINNED · 2'), findsOneWidget);
-      expect(find.text('Riley: Message 11'), findsOneWidget);
-      await tester.tap(find.text('PINNED · 2'));
-      await tester.pumpAndSettle();
+      await openPins(tester);
+      expect(find.byType(PinnedMessagesScreen), findsOneWidget);
       expect(find.text('Pinned messages'), findsOneWidget);
-      expect(find.text('Message 3'), findsWidgets);
+      expect(find.byKey(const Key('pin-m11')), findsOneWidget);
+      expect(find.byKey(const Key('pin-m3')), findsOneWidget);
       // Players can't unpin.
-      expect(find.text('Unpin'), findsNothing);
+      expect(find.byTooltip('Pin options'), findsNothing);
     });
 
-    testWidgets('chat managers pin from the long-press sheet', (tester) async {
+    testWidgets('a room with no pins says how to pin', (tester) async {
       joinAs(TeamRole.captain);
       await pump(tester);
-      expect(find.textContaining('PINNED'), findsNothing);
+      await openPins(tester);
+      expect(find.text('Nothing pinned yet'), findsOneWidget);
+    });
+
+    testWidgets('tapping a pin jumps to it in the chat, loading older '
+        'messages, and highlights it', (tester) async {
+      joinAs(TeamRole.player);
+      chats.messages['general'] = [
+        for (var i = 0; i < 160; i++) msg('m$i', 'Message $i'),
+      ];
+      chats.pinned['general'] = ['m2'];
+      final vm = await pump(tester);
+      expect(find.text('Message 2'), findsNothing);
+      await openPins(tester);
+      await tester.tap(find.byKey(const Key('pin-m2')));
+      await tester.pumpAndSettle();
+      expect(find.byType(PinnedMessagesScreen), findsNothing);
+      expect(find.text('Message 2').hitTestable(), findsOneWidget);
+      expect(vm.highlightedId, 'm2');
+      await tester.pump(MessageThreadViewModel.highlightFor);
+      await tester.pumpAndSettle();
+      expect(vm.highlightedId, isNull);
+    });
+
+    testWidgets('chat managers pin from the long-press sheet, and unpin '
+        'from the pinned page', (tester) async {
+      joinAs(TeamRole.captain);
+      await pump(tester);
       await tester.longPress(find.text('Message 11'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Pin message'));
       await tester.pumpAndSettle();
       expect(chats.pinned['general'], ['m11']);
-      expect(find.text('PINNED'), findsOneWidget);
+      await openPins(tester);
+      await tester.tap(find.byTooltip('Pin options'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Unpin'));
+      await tester.pumpAndSettle();
+      expect(chats.pinned['general'], isEmpty);
+      expect(find.text('Nothing pinned yet'), findsOneWidget);
     });
 
     testWidgets('players get no Pin in the long-press sheet', (tester) async {

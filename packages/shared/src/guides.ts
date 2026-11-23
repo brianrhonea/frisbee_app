@@ -24,7 +24,7 @@ export const officialRules: readonly GuideLink[] = [
   { label: "WFDF rules", url: "https://rules.wfdf.org/", note: "The World Flying Disc Federation's rules, used at international events." },
 ];
 
-/** The Rules of ultimate page (/rules; the app's Rules screen). */
+/** The rules of ultimate, the second part of Learn to play (/learn#rules; the app's LearnScreen). */
 export const rulesGuide: readonly GuideSection[] = [
   {
     id: "spirit",

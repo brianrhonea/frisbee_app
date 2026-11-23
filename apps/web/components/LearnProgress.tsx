@@ -113,6 +113,15 @@ export function LearnToc() {
             </li>
           );
         })}
+        {/* The rules of ultimate, after the lessons on the same page (not counted as read). */}
+        <li>
+          <a href="#rules" className="learn-toc-rules">
+            <span className="learn-num" aria-hidden="true">
+              ⚑
+            </span>
+            <span>The rules of ultimate</span>
+          </a>
+        </li>
       </ol>
     </nav>
   );

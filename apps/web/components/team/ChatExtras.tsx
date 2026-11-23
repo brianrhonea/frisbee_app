@@ -94,88 +94,120 @@ export function usePinActions(teamId: string, roomId: string) {
   };
 }
 
-/** The strip at the top of a room: the newest pin; click for every pin. */
-export function PinnedStrip({
+/**
+ * A room's pins as their own view (the room's ⋯ → Pinned messages, as in
+ * Discord; the app's PinnedMessagesScreen): a card each, newest pin first,
+ * with the author, date, whole text and files. Clicking one goes back to
+ * the chat at that message ([onOpen]); chat managers unpin here.
+ */
+export function PinnedView({
   pins,
   canPin,
   actions,
+  onOpen,
+  onBack,
 }: {
   pins: Array<Doc<ExtrasMessage>>;
   canPin: boolean;
   actions: ReturnType<typeof usePinActions>;
+  onOpen: (messageId: string) => void;
+  onBack: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const latest = pins[0];
   return (
-    <>
-      {latest && (
-        <button type="button" className="pinned-strip" onClick={() => setOpen(true)} aria-label={`Pinned messages, ${pins.length}`}>
-          <span className="pinned-icon" aria-hidden="true">
-            📌
-          </span>
-          <span className="pinned-text">
-            <b>{pins.length > 1 ? `Pinned · ${pins.length}` : "Pinned"}</b>
-            <span>
-              {latest.authorName || "Member"}: {previewOf(latest)}
-            </span>
-          </span>
-          <span aria-hidden="true">›</span>
+    <div className="pinned-view">
+      <div className="pinned-view-head">
+        <button type="button" className="text-btn" onClick={onBack}>
+          ‹ Back to the chat
         </button>
+        <h3>
+          Pinned messages <small className="muted">{pins.length} of {chatPinsMax}</small>
+        </h3>
+      </div>
+      {actions.error && <p className="form-error">{actions.error}</p>}
+      {pins.length === 0 ? (
+        <EmptyState>
+          Nothing pinned yet.{" "}
+          {canPin ? "Choose Pin on a message to keep it here." : "Coaches and captains pin important messages here."}
+        </EmptyState>
+      ) : (
+        <ul className="pin-cards">
+          {pins.map((m) => (
+            <li key={m.id} className="pin-card">
+              <button type="button" className="pin-card-open" onClick={() => onOpen(m.id)} aria-label={`See this message in the chat: ${previewOf(m)}`}>
+                <span className="pin-card-meta">
+                  <span className="pin-avatar" aria-hidden="true">
+                    {(m.authorName || "M").charAt(0).toUpperCase()}
+                  </span>
+                  <b>{m.authorName || "Member"}</b>
+                  <small className="muted">
+                    <LocalTime iso={m.createdAt} />
+                  </small>
+                </span>
+                {(m.text?.trim() || previewOf(m)) && <span className="pin-card-text">{m.text?.trim() ? m.text : previewOf(m)}</span>}
+                {files(m).length > 0 && (
+                  <span className="pin-card-files">
+                    {files(m).map((f, i) => (
+                      <span key={`${f.name}-${i}`} className="pin-file">
+                        <span aria-hidden="true">{fileIcon(f.contentType)}</span> {f.name}
+                      </span>
+                    ))}
+                  </span>
+                )}
+                <span className="pin-card-go">See it in the chat →</span>
+              </button>
+              {canPin && (
+                <button type="button" className="text-btn pin-card-unpin" onClick={() => void actions.unpin(m.id)}>
+                  Unpin
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
       )}
-      {actions.error && <p className="form-error pinned-error">{actions.error}</p>}
-      {(open || actions.replacing) && (
-        <Dialog
-          label={actions.replacing ? "Unpin one to pin this" : "Pinned messages"}
-          onClose={() => {
-            setOpen(false);
-            actions.cancelReplace();
-          }}
-          className="card pins-dialog"
-          dismissOnBackdrop
-        >
-          <h2>{actions.replacing ? "Unpin one to pin this" : "Pinned messages"}</h2>
-          {actions.replacing && <p className="muted small">A room holds {chatPinsMax} pinned messages.</p>}
-          {pins.length === 0 ? (
-            <EmptyState>Nothing is pinned.</EmptyState>
-          ) : (
-            <ul className="pins-list">
-              {pins.map((m) => (
-                <li key={m.id}>
-                  <p className="pin-meta">
-                    {m.authorName || "Member"} · <LocalTime iso={m.createdAt} />
-                  </p>
-                  {/* The whole text: opening the message in a paged thread isn't cheap. */}
-                  <p className="pin-text">{m.text?.trim() ? m.text : previewOf(m)}</p>
-                  {actions.replacing ? (
-                    <button type="button" className="btn btn-small" onClick={() => void actions.replace(m.id)}>
-                      Unpin this one
-                    </button>
-                  ) : (
-                    canPin && (
-                      <button type="button" className="text-btn" onClick={() => void actions.unpin(m.id)}>
-                        Unpin
-                      </button>
-                    )
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="form-actions">
-            <button
-              type="button"
-              className="btn btn-small"
-              onClick={() => {
-                setOpen(false);
-                actions.cancelReplace();
-              }}
-            >
-              Close
+    </div>
+  );
+}
+
+/** A message's files, as far as the pin cards show them. */
+function files(m: ExtrasMessage): Array<{ name: string; contentType: string }> {
+  return (m.attachments ?? []).flatMap((a) => {
+    const f = a as { name?: unknown; contentType?: unknown };
+    return typeof f.name === "string" ? [{ name: f.name, contentType: typeof f.contentType === "string" ? f.contentType : "" }] : [];
+  });
+}
+
+function fileIcon(type: string): string {
+  if (type.startsWith("image/")) return "🖼️";
+  if (type.startsWith("video/")) return "🎬";
+  return type === "application/pdf" ? "📕" : "📄";
+}
+
+/** Pinning into a full room: which pin to take down (usePinActions' replacing), and pin errors. */
+export function ReplacePinDialog({ pins, actions }: { pins: Array<Doc<ExtrasMessage>>; actions: ReturnType<typeof usePinActions> }) {
+  if (!actions.replacing) return actions.error ? <p className="form-error pinned-error">{actions.error}</p> : null;
+  return (
+    <Dialog label="Unpin one to pin this" onClose={actions.cancelReplace} className="card pins-dialog" dismissOnBackdrop>
+      <h2>Unpin one to pin this</h2>
+      <p className="muted small">A room holds {chatPinsMax} pinned messages.</p>
+      <ul className="pins-list">
+        {pins.map((m) => (
+          <li key={m.id}>
+            <p className="pin-meta">
+              {m.authorName || "Member"} · <LocalTime iso={m.createdAt} />
+            </p>
+            <p className="pin-text">{m.text?.trim() ? m.text : previewOf(m)}</p>
+            <button type="button" className="btn btn-small" onClick={() => void actions.replace(m.id)}>
+              Unpin this one
             </button>
-          </div>
-        </Dialog>
-      )}
-    </>
+          </li>
+        ))}
+      </ul>
+      <div className="form-actions">
+        <button type="button" className="btn btn-small" onClick={actions.cancelReplace}>
+          Cancel
+        </button>
+      </div>
+    </Dialog>
   );
 }
 

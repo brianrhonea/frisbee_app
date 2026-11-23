@@ -1,10 +1,6 @@
-// Security review S1, phase B: firestore.rules still lets any post query
-// through (`allow list: if signedIn()`) so app 0.0.28 keeps working. This
-// loads the rules with the list check phase B turns on,
-// `canListPost(resource.data)`, and the cap of 50 a query (security review
-// S4: 0.0.28's community feed asks for posts by id with no limit), and runs
-// every query app 0.0.29 and web 0.39.0 make, so that switch is known to be
-// safe before it's made.
+// Security review S1, phase B (pentest P1): posts' list rule,
+// `canListPost(resource.data)` and a cap of 50 a query (S4), against every
+// query the app and the website make.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -25,21 +21,12 @@ const db = (uid: string) => env.authenticatedContext(uid).firestore();
 const posts = (uid: string) => collection(db(uid), "posts");
 const newest = [orderBy("createdAt", "desc"), limit(20)] as const;
 
-const listLine =
-  "      allow list: if signedIn();\n      allow delete: if signedIn() && resource.data.authorId == uid();";
+const listLine = "      allow list: if signedIn() && capped(50) && canListPost(resource.data);";
 
 beforeAll(async () => {
   const rules = readFileSync(join(__dirname, "../../../firestore.rules"), "utf8").split("\r\n").join("\n");
-  if (rules.split(listLine).length !== 2) throw new Error("posts' list rule moved: update this test");
-  env = await initializeTestEnvironment({
-    projectId: "demo-phase-b",
-    firestore: {
-      rules: rules.replace(
-        listLine,
-        "      allow list: if signedIn() && capped(50) && canListPost(resource.data);\n      allow delete: if signedIn() && resource.data.authorId == uid();",
-      ),
-    },
-  });
+  if (rules.split(listLine).length !== 2) throw new Error("posts' list rule changed: update this test");
+  env = await initializeTestEnvironment({ projectId: "demo-phase-b", firestore: { rules } });
   await env.withSecurityRulesDisabled(async (ctx) => {
     const fs = ctx.firestore();
     const post = (author: string, priv: boolean, extra: Record<string, unknown> = {}) => ({
