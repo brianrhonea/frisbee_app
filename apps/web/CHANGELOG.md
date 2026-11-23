@@ -20,6 +20,9 @@ here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
   `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` is set; without it, Stripe's page
   as before. `Permissions-Policy` allows `payment` for Stripe's frames
   (wallets).
+- Accessibility (Lighthouse on dev): a post's author and time links are
+  at least 24px tall (tap target size), and the footer's version text is
+  no longer faded below 4.5:1 contrast.
 - Fees: Stall 10's 3% and Stripe's card fee are always added to what the
   payer pays, so organizers get the whole fee; the form's "Teams cover
   the processing fee" checkbox is gone and the notes say what payers pay.
