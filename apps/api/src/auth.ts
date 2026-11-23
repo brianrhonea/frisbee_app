@@ -46,9 +46,14 @@ export interface UserLookup {
   setDisabled?(uid: string, disabled: boolean): Promise<void>;
 }
 
-/** The name the app shows for [caller] (AppUser.label in the app). */
+/**
+ * The name stored for [caller] on teams, invites and join requests: their
+ * name, or "Player". Never their email, which teammates would see
+ * (pentest P6; posts/author.ts does the same).
+ */
 export function callerLabel(caller: Caller): string {
-  return caller.name ? caller.name : (caller.email ?? "Player");
+  const name = caller.name?.trim();
+  return name && !/\S@\S+\.\S/.test(name) ? name : "Player";
 }
 
 /**

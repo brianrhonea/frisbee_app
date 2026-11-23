@@ -3760,6 +3760,20 @@ describe("team post pins and comments", () => {
 
 // S1: a private profile's posts, their comments and likes are for the
 // author and accepted followers (users/{me}/follows/user_{author}).
+describe("users/{uid}", () => {
+  it("takes only the fields the app writes; the API sets the rest (pentest P10)", async () => {
+    const me = doc(db(PLAYER), "users", PLAYER);
+    await assertSucceeds(setDoc(me, { email: "p@example.com", displayName: "Pat", photoUrl: null, updatedAt: serverTimestamp() }, { merge: true }));
+    await assertSucceeds(setDoc(me, { firstName: "Pat", lastName: "P" }, { merge: true }));
+    await assertSucceeds(setDoc(me, { messagePolicy: "everyone", readReceipts: false }, { merge: true }));
+    await assertFails(setDoc(me, { agreedTerms: { version: 99 } }, { merge: true }));
+    await assertFails(setDoc(me, { readReceipts: "no" }, { merge: true }));
+    await assertSucceeds(getDoc(me));
+    await assertFails(getDoc(doc(db(OUTSIDER), "users", PLAYER)));
+    await assertFails(setDoc(doc(db(OUTSIDER), "users", PLAYER), { displayName: "Not me" }, { merge: true }));
+  });
+});
+
 describe("private profiles' posts", () => {
   const AUTHOR = PLAYER; // private profile
   const FAN = COACH; // follows AUTHOR
@@ -3824,6 +3838,18 @@ describe("private profiles' posts", () => {
     await assertSucceeds(
       getDocs(query(collection(db(OUTSIDER), "posts"), where("authorId", "in", [AUTHOR, OUTSIDER]), where("private", "==", false), limit(20))),
     );
+  });
+
+  it("can't be listed by anyone else, in bulk or without a limit (pentest P1)", async () => {
+    const posts = (as: string) => collection(db(as), "posts");
+    // Every post on Stall 10, or a private author's, by someone who doesn't follow them.
+    await assertFails(getDocs(query(posts(OUTSIDER), limit(20))));
+    await assertFails(getDocs(query(posts(OUTSIDER), where("authorId", "==", AUTHOR), limit(20))));
+    await assertFails(getDocs(query(posts(OUTSIDER), where("authorId", "in", [AUTHOR, OUTSIDER]), limit(20))));
+    // No limit, or more than 50.
+    await assertFails(getDocs(query(posts(OUTSIDER), where("private", "==", false))));
+    await assertFails(getDocs(query(posts(OUTSIDER), where("private", "==", false), limit(51))));
+    await assertSucceeds(getDocs(query(posts(OUTSIDER), where("private", "==", false), limit(50))));
   });
 
   it("are liked and commented on by followers only", async () => {

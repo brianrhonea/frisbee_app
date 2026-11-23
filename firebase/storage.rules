@@ -18,16 +18,36 @@ service firebase.storage {
     }
     function isMember(t) { return request.auth.uid in t.memberIds; }
 
+    // Pentest P3: only the types the app and site send, never SVG, HTML or
+    // an untyped file (download URLs serve files inline on a Google domain).
+    function photoType() {
+      return request.resource.contentType != null
+        && request.resource.contentType.matches('image/(jpeg|png|gif|webp|heic|heif|bmp)');
+    }
+    function videoType() {
+      return request.resource.contentType != null
+        && request.resource.contentType.matches('video/(mp4|quicktime|webm|3gpp)');
+    }
+    // Message attachments: photos, videos and the documents in
+    // chatFileTypes (packages/shared media.ts, chat.dart's _contentTypes),
+    // anything else as application/octet-stream (downloaded, not shown).
+    function attachmentType() {
+      return photoType() || videoType()
+        || request.resource.contentType.matches(
+          'application/(pdf|msword|vnd[.]ms-excel|vnd[.]ms-powerpoint|zip|octet-stream'
+          + '|vnd[.]openxmlformats-officedocument[.](wordprocessingml[.]document|spreadsheetml[.]sheet|presentationml[.]presentation))'
+          + '|text/(plain|csv)');
+    }
+
     // Message attachments: 10 MB, or 100 MB for videos (maxAttachmentBytes
-    // and maxVideoBytes in lib/domain/models/chat.dart). The desktop SDK
-    // sets the content type in a second write, so videos are known by name.
+    // and maxVideoBytes in lib/domain/models/chat.dart); videos are known
+    // by name, and sent as a video type or octet-stream.
     function attachmentSizeOk(fileName) {
       return request.resource.size <= 10 * 1024 * 1024
         || (request.resource.size <= 100 * 1024 * 1024
             && fileName.lower().matches('.*[.](mp4|mov|m4v|webm|3gp)')
-            && (request.resource.contentType == null
-                || request.resource.contentType == 'application/octet-stream'
-                || request.resource.contentType.matches('video/.*')));
+            && (request.resource.contentType == 'application/octet-stream'
+                || videoType()));
     }
 
     // Same as can() in firestore.rules: owners, coaches and captains have
@@ -77,11 +97,10 @@ service firebase.storage {
     // chat managers who can read the room, delete any.
     match /teams/{teamId}/chats/{roomId}/{userId}/{messageId}/{fileName} {
       allow get: if request.auth != null && canRead(teamId, roomId);
-      // The desktop SDK uploads the bytes, then sets the content type as an
-      // update, so authors may update their own files too.
       allow create, update: if request.auth != null
         && request.auth.uid == userId
         && attachmentSizeOk(fileName)
+        && request.resource.contentType != null && attachmentType()
         && canWrite(teamId, roomId);
       allow delete: if request.auth != null
         && (request.auth.uid == userId
@@ -119,23 +138,20 @@ service firebase.storage {
       allow create, update: if request.auth != null
         && can(team(teamId), 'manageTeam')
         && request.resource.size <= 10 * 1024 * 1024
-        && (request.resource.contentType == null
-            || request.resource.contentType.matches('image/.*'));
+        && photoType();
       allow delete: if request.auth != null && can(team(teamId), 'manageTeam');
     }
 
     // Uploaded team videos (TeamVideo.file in firestore.rules): video
     // files up to 500 MB, uploaded by members who can manage the team;
-    // members watch. The desktop SDK sets the content type as a second write, so
-    // it may be missing on create.
+    // members watch.
     match /teams/{teamId}/videos/{videoId}/{fileName} {
 
       allow get: if request.auth != null && isMember(team(teamId));
       allow create, update: if request.auth != null
         && can(team(teamId), 'manageTeam')
         && request.resource.size <= 500 * 1024 * 1024
-        && (request.resource.contentType == null
-            || request.resource.contentType.matches('video/.*'));
+        && videoType();
       allow delete: if request.auth != null && can(team(teamId), 'manageTeam');
     }
 
@@ -168,8 +184,7 @@ service firebase.storage {
       allow create, update: if request.auth != null
         && request.auth.uid == userId
         && request.resource.size <= 10 * 1024 * 1024
-        && (request.resource.contentType == null
-            || request.resource.contentType.matches('image/.*'));
+        && photoType();
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
 
@@ -181,8 +196,7 @@ service firebase.storage {
       allow create, update: if request.auth != null
         && request.auth.uid == userId
         && request.resource.size <= 10 * 1024 * 1024
-        && (request.resource.contentType == null
-            || request.resource.contentType.matches('image/.*'));
+        && photoType();
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
 
@@ -200,7 +214,8 @@ service firebase.storage {
       allow get: if inConversation();
       allow create, update: if inConversation()
         && request.auth.uid == userId
-        && attachmentSizeOk(fileName);
+        && attachmentSizeOk(fileName)
+        && request.resource.contentType != null && attachmentType();
       allow delete: if inConversation() && request.auth.uid == userId;
     }
   }

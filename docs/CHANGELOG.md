@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.48  | 2026-11-22 | `feature/security-hardening`           |                     |
 | 0.0.47  | 2026-11-22 | `feature/profile-staff`                 |                     |
 | 0.0.46  | 2026-11-22 | `feature/launch-fixes`                  |                     |
 | 0.0.45  | 2026-11-22 | `feature/tournament-fixes`              |                     |
@@ -60,6 +61,17 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.48 — Security fixes
+
+With web 0.56.1 and API 0.43.1. Firestore and Storage rules changed.
+
+- Your email is never shown as your name: someone without a name
+  appears as "Player" on teams, chats, posts and follows (pentest P6).
+- Rules: private profiles' posts can't be listed by people who don't
+  follow them, at most 50 a query (P1); uploads must be a photo, video
+  or document type, never SVG, HTML or untyped (P3); `users/{uid}`
+  takes only the fields the app writes (P10).
 
 ## 0.0.47 — Communities without a level, league entry, fee shares, mentions
 

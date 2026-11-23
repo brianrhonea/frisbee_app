@@ -82,11 +82,11 @@ describe("chat attachments", () => {
   });
 
   it("writers upload into their own folder", async () => {
-    await assertSucceeds(file(OWNER, OWNER).put(bytes(10)).then());
-    await assertFails(file(CAPTAIN, OWNER).put(bytes(10)).then());
-    await assertFails(file(COACH, COACH).put(bytes(10)).then());
-    await assertFails(file(GUEST, GUEST).put(bytes(10)).then());
-    await assertFails(file(PLAYER, PLAYER).put(bytes(10)).then());
+    await assertSucceeds(file(OWNER, OWNER).put(bytes(10), { contentType: "image/png" }).then());
+    await assertFails(file(CAPTAIN, OWNER).put(bytes(10), { contentType: "image/png" }).then());
+    await assertFails(file(COACH, COACH).put(bytes(10), { contentType: "image/png" }).then());
+    await assertFails(file(GUEST, GUEST).put(bytes(10), { contentType: "image/png" }).then());
+    await assertFails(file(PLAYER, PLAYER).put(bytes(10), { contentType: "image/png" }).then());
   });
 
   it("authors update their own file's metadata; others cannot", async () => {
@@ -98,12 +98,12 @@ describe("chat attachments", () => {
     await assertSucceeds(
       storage(CAPTAIN)
         .ref(`teams/${TEAM}/chats/r1/${CAPTAIN}/m2/0-ok.png`)
-        .put(bytes(10 * 1024 * 1024)).then(),
+        .put(bytes(10 * 1024 * 1024), { contentType: "image/png" }).then(),
     );
     await assertFails(
       storage(CAPTAIN)
         .ref(`teams/${TEAM}/chats/r1/${CAPTAIN}/m2/1-big.png`)
-        .put(bytes(10 * 1024 * 1024 + 1)).then(),
+        .put(bytes(10 * 1024 * 1024 + 1), { contentType: "image/png" }).then(),
     );
   });
 
@@ -111,10 +111,15 @@ describe("chat attachments", () => {
     const at = (name: string) => storage(CAPTAIN).ref(`teams/${TEAM}/chats/r1/${CAPTAIN}/m3/${name}`);
     await assertSucceeds(at("0-clip.MP4").put(bytes(10 * 1024 * 1024 + 1), { contentType: "video/mp4" }).then());
     // Before the desktop SDK sets the type.
-    await assertSucceeds(at("1-clip.mov").put(bytes(10 * 1024 * 1024 + 1)).then());
+    await assertSucceeds(at("1-clip.mov").put(bytes(10 * 1024 * 1024 + 1), { contentType: "video/quicktime" }).then());
     await assertFails(at("2-clip.mp4").put(bytes(100 * 1024 * 1024 + 1), { contentType: "video/mp4" }).then());
     await assertFails(at("3-big.png").put(bytes(10 * 1024 * 1024 + 1), { contentType: "video/mp4" }).then());
     await assertFails(at("4-fake.mp4").put(bytes(10 * 1024 * 1024 + 1), { contentType: "application/zip" }).then());
+    // Documents and unknown files go as their type or octet-stream; never a page or SVG (pentest P3).
+    await assertSucceeds(at("5-plan.pdf").put(bytes(10), { contentType: "application/pdf" }).then());
+    await assertSucceeds(at("6-notes.bin").put(bytes(10), { contentType: "application/octet-stream" }).then());
+    await assertFails(at("7-page.html").put(bytes(10), { contentType: "text/html" }).then());
+    await assertFails(at("8-logo.svg").put(bytes(10), { contentType: "image/svg+xml" }).then());
   });
 
   const restore = () =>
@@ -122,7 +127,7 @@ describe("chat attachments", () => {
       ctx
         .storage()
         .ref(`teams/${TEAM}/chats/r1/${CAPTAIN}/m1/0-photo.png`)
-        .put(bytes(10)).then(),
+        .put(bytes(10), { contentType: "image/png" }).then(),
     );
 
   it("authors, the owner and moderators who read the room delete", async () => {
@@ -152,7 +157,7 @@ describe("chat attachments", () => {
       });
     });
     await assertSucceeds(file(PLAYER, CAPTAIN).getMetadata());
-    await assertSucceeds(file(PLAYER, PLAYER).put(bytes(10)).then());
+    await assertSucceeds(file(PLAYER, PLAYER).put(bytes(10), { contentType: "image/png" }).then());
     await assertFails(file(PLAYER, CAPTAIN).delete());
     await assertSucceeds(file(GUEST, CAPTAIN).delete());
   });
@@ -168,7 +173,7 @@ describe("chat attachments", () => {
       }),
     );
     await assertSucceeds(file(PLAYER, CAPTAIN).getMetadata());
-    await assertFails(file(PLAYER, PLAYER).put(bytes(10)).then());
+    await assertFails(file(PLAYER, PLAYER).put(bytes(10), { contentType: "image/png" }).then());
     await assertFails(file(OUTSIDER, CAPTAIN).getMetadata());
   });
 });
@@ -246,15 +251,15 @@ describe("direct message attachments", () => {
     storage(uid).ref(`conversations/${CONV}/${author}/m1/0-photo.png`);
 
   it("only the two participants read and upload, into their own folder", async () => {
-    await assertSucceeds(dm(PLAYER, PLAYER).put(bytes(10)).then());
+    await assertSucceeds(dm(PLAYER, PLAYER).put(bytes(10), { contentType: "image/png" }).then());
     await assertSucceeds(dm(OWNER, PLAYER).getMetadata());
     await assertFails(dm(COACH, PLAYER).getMetadata());
-    await assertFails(dm(OWNER, PLAYER).put(bytes(10)).then());
-    await assertFails(dm(COACH, COACH).put(bytes(10)).then());
+    await assertFails(dm(OWNER, PLAYER).put(bytes(10), { contentType: "image/png" }).then());
+    await assertFails(dm(COACH, COACH).put(bytes(10), { contentType: "image/png" }).then());
     await assertFails(
       storage(OWNER)
         .ref(`conversations/${CONV}/${OWNER}/m2/0-big.png`)
-        .put(bytes(10 * 1024 * 1024 + 1))
+        .put(bytes(10 * 1024 * 1024 + 1), { contentType: "image/png" })
         .then(),
     );
   });
@@ -267,7 +272,7 @@ describe("direct message attachments", () => {
 
   it("authors delete their own", async () => {
     await env.withSecurityRulesDisabled((ctx) =>
-      ctx.storage().ref(`conversations/${CONV}/${PLAYER}/m1/0-photo.png`).put(bytes(10)).then(),
+      ctx.storage().ref(`conversations/${CONV}/${PLAYER}/m1/0-photo.png`).put(bytes(10), { contentType: "image/png" }).then(),
     );
     await assertFails(dm(OWNER, PLAYER).delete());
     await assertSucceeds(dm(PLAYER, PLAYER).delete());
@@ -282,11 +287,11 @@ describe("group message attachments", () => {
     await env.withSecurityRulesDisabled((ctx) =>
       setDoc(doc(ctx.firestore(), "conversations", GROUP), { kind: "group", participants: [OWNER, PLAYER] }),
     );
-    await assertSucceeds(file(PLAYER, PLAYER).put(bytes(10)).then());
+    await assertSucceeds(file(PLAYER, PLAYER).put(bytes(10), { contentType: "image/png" }).then());
     await assertSucceeds(file(OWNER, PLAYER).getMetadata());
     await assertFails(file(COACH, PLAYER).getMetadata());
-    await assertFails(file(COACH, COACH).put(bytes(10)).then());
-    await assertFails(file(OWNER, PLAYER).put(bytes(10)).then());
+    await assertFails(file(COACH, COACH).put(bytes(10), { contentType: "image/png" }).then());
+    await assertFails(file(OWNER, PLAYER).put(bytes(10), { contentType: "image/png" }).then());
   });
 });
 
@@ -298,6 +303,11 @@ describe("profile pictures and headers", () => {
     await assertFails(image(OUTSIDER, PLAYER).put(bytes(10), { contentType: "image/jpeg" }).then());
     await assertFails(image(PLAYER).put(bytes(10), { contentType: "video/mp4" }).then());
     await assertFails(image(PLAYER).put(bytes(10 * 1024 * 1024 + 1), { contentType: "image/jpeg" }).then());
+    // Pentest P3: no SVG, HTML or untyped files.
+    await assertFails(image(PLAYER).put(bytes(10), { contentType: "image/svg+xml" }).then());
+    await assertFails(image(PLAYER).put(bytes(10), { contentType: "text/html" }).then());
+    await assertFails(image(PLAYER).put(bytes(10)).then());
+    await assertSucceeds(image(PLAYER).put(bytes(10), { contentType: "image/heic" }).then());
     await assertSucceeds(image(OUTSIDER, PLAYER).getMetadata());
     await assertFails(image(OUTSIDER, PLAYER).delete());
     await assertSucceeds(image(PLAYER).delete());
@@ -322,7 +332,7 @@ describe("user post photos", () => {
       await setDoc(doc(ctx.firestore(), "profiles", PLAYER), { name: "Pat" });
       await setDoc(doc(ctx.firestore(), "profiles", OWNER), { name: "Olive", private: true });
       for (const uid of [PLAYER, OWNER, COACH]) {
-        await ctx.storage().ref(`users/${uid}/posts/p1/1/0-photo.png`).put(bytes(10)).then();
+        await ctx.storage().ref(`users/${uid}/posts/p1/1/0-photo.png`).put(bytes(10), { contentType: "image/png" }).then();
       }
     });
     const visitor = (owner: string) =>
@@ -337,7 +347,7 @@ describe("user post photos", () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), "profiles", OWNER), { name: "Olive", private: true });
       await setDoc(doc(ctx.firestore(), "users", COACH, "follows", `user_${OWNER}`), { key: `user_${OWNER}` });
-      await ctx.storage().ref(`users/${OWNER}/posts/p1/1/0-photo.png`).put(bytes(10)).then();
+      await ctx.storage().ref(`users/${OWNER}/posts/p1/1/0-photo.png`).put(bytes(10), { contentType: "image/png" }).then();
     });
     await assertSucceeds(photo(OWNER).getMetadata());
     await assertSucceeds(photo(COACH, OWNER).getMetadata());

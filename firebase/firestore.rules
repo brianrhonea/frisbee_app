@@ -302,7 +302,16 @@ service cloud.firestore {
     // ---- Users ------------------------------------------------------------
 
     match /users/{userId} {
-      allow read, write: if signedIn() && uid() == userId;
+      allow read, delete: if signedIn() && uid() == userId;
+      // Only the fields the app writes itself (pentest P10/S11): sign-in
+      // details, names, and the messaging settings. Anything else
+      // (agreedTerms, …) only the API sets.
+      allow create, update: if signedIn() && uid() == userId
+        && request.resource.data.diff(resource == null ? {} : resource.data).affectedKeys().hasOnly([
+             'email', 'displayName', 'photoUrl', 'updatedAt', 'firstName',
+             'lastName', 'messagePolicy', 'readReceipts'])
+        && (!('messagePolicy' in request.resource.data) || request.resource.data.messagePolicy is string)
+        && (!('readReceipts' in request.resource.data) || request.resource.data.readReceipts is bool);
 
       // Who the user blocked, or who blocked them (mine says which; see
       // blockedWith). Only the API writes them.
@@ -2420,13 +2429,10 @@ service cloud.firestore {
       // whether its post arrived).
       allow get: if signedIn()
         && (resource == null || canSeePost(resource.data));
-      // TODO(S1 phase B): `canListPost(resource.data)` once app 0.0.29 is
-      // on testers' phones: queries over several authors then ask for
-      // `private == false`, and private authors one at a time. App 0.0.28
-      // queries without that filter, which a tighter rule would refuse.
-      // Phase B also caps the list (S4) at `capped(50)`: 0.0.28's
-      // community feed asks for posts by id with no limit.
-      allow list: if signedIn();
+      // S1 phase B (pentest P1): queries over several authors ask for
+      // `private == false`; a private author's posts one author at a time,
+      // by the author or an accepted follower. At most 50 a page (S4).
+      allow list: if signedIn() && capped(50) && canListPost(resource.data);
       allow delete: if signedIn() && resource.data.authorId == uid();
       allow create: if signedIn() && notMuted()
         && request.resource.data.keys().hasOnly([

@@ -4,6 +4,12 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.56.1 — 2026-11-22
+
+- Security headers on every page: no framing (`X-Frame-Options: DENY`,
+  `frame-ancestors 'none'`), `nosniff`, a strict referrer policy and a
+  permissions policy; `X-Powered-By` removed (pentest P5).
+
 ## 0.56.0 — 2026-11-22
 
 With app 0.0.47 and API 0.43.0.

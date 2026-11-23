@@ -7,6 +7,12 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.43.1 — 2026-11-22
+
+- Names stored on teams, invites and join requests never fall back to
+  the caller's email; "Player" instead (pentest P6).
+- `sharp` 0.35.5 (libvips, libheif and librsvg advisories; pentest P2).
+
 ## 0.43.0 — 2026-11-22
 
 With app 0.0.47 and web 0.56.0.
