@@ -16,6 +16,7 @@ import '../../services/shared_streams.dart';
 import '../outbox/outbox_repository.dart';
 import 'chat_repository.dart';
 import '../../../domain/models/word_filter.dart';
+import '../../../domain/models/mentions.dart';
 
 /// Rooms live at `teams/{teamId}/chats/{roomId}` with messages beneath, and
 /// folders at `teams/{teamId}/chatFolders/{folderId}`.
@@ -100,6 +101,34 @@ class ChatRepositoryFirebase implements ChatRepository {
       },
     ),
   );
+
+  @override
+  Stream<List<ChatMention>> watchMentions(String uid) => _shared.get(
+    'mentions/$uid',
+    () => _db
+        .collection('users')
+        .doc(uid)
+        .collection('notifications')
+        .where('mention', isEqualTo: true)
+        .snapshots()
+        .map(
+          (snap) => [for (final d in snap.docs) ?_mention(plainData(d.data()))],
+        ),
+  );
+
+  static ChatMention? _mention(Map<String, dynamic> d) {
+    final teamId = d['teamId'];
+    final roomId = d['roomId'];
+    final at = parseDate(d['createdAt']);
+    if (teamId is! String || roomId is! String || at == null) return null;
+    return ChatMention(
+      teamId: teamId,
+      roomId: roomId,
+      text: (d['body'] as String?) ?? '',
+      at: at,
+      personal: d['personal'] != false,
+    );
+  }
 
   @override
   Future<Result<void>> markRead(String teamId, String roomId, String uid) =>

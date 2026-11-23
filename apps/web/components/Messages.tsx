@@ -209,7 +209,7 @@ export function Messages() {
                     <Avatar name={c.team.name ?? "Team"} size={36} />
                     <span className="conv-main">
                       <b>{c.team.name ?? "Team"}</b>
-                      <small>{c.subtitle}</small>
+                      <small className={c.mention ? "conv-mention" : undefined}>{c.subtitle}</small>
                     </span>
                     <small className="conv-time">
                       <LocalTime iso={c.lastAt ?? undefined} style="relative" />

@@ -41,6 +41,7 @@ import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/domain/models/team_event.dart';
 import 'package:frisbee_app/domain/models/team_post.dart';
 import 'package:frisbee_app/utils/result.dart';
+import 'package:frisbee_app/domain/models/mentions.dart';
 
 const testUser = AppUser(uid: 'u1', email: 'a@b.com', displayName: 'Alex');
 
@@ -1625,6 +1626,13 @@ class FakeChatRepository implements ChatRepository {
 
   /// (teamId, roomId) for each markRead call.
   final marked = <(String, String)>[];
+
+  /// uid → their @mentions (watchMentions).
+  final mentions = <String, List<ChatMention>>{};
+
+  @override
+  Stream<List<ChatMention>> watchMentions(String uid) =>
+      _watch(() => List.of(mentions[uid] ?? const <ChatMention>[]));
 
   @override
   Stream<Map<String, Map<String, DateTime>>> watchReads(String uid) => _watch(

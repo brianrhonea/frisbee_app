@@ -1,5 +1,5 @@
 {
-  "about": "TeamChatSummary.fromReadable: a team's chat in the inbox. Of the rooms the user can read (canRead), voice channels are left out; a room is unread when lastAt is after its read time (or never read). `unread` is newest first; `open` is the room a tap opens (the only unread one, else the newest, else the first); `subtitle` is what the row says. Rooms in `muted` (room ids, muted by the user) are never unread.",
+  "about": "TeamChatSummary.fromReadable: a team's chat in the inbox. Of the rooms the user can read (canRead), voice channels are left out; a room is unread when lastAt is after its read time (or never read). `unread` is newest first; `open` is the room a tap opens (the only unread one, else the newest, else the first); `subtitle` is what the row says. Rooms in `muted` (room ids, muted by the user) are never unread. An unread @mention (in `mentions`, after its room was read) makes the room unread, opens it and is the subtitle; a personal one even in a muted room.",
   "cases": [
     {
       "name": "no messages yet",
@@ -20,7 +20,8 @@
         "unread": [],
         "lastAt": null,
         "open": "general",
-        "subtitle": "No messages yet"
+        "subtitle": "No messages yet",
+        "mention": null
       }
     },
     {
@@ -54,7 +55,8 @@
         ],
         "lastAt": "2026-11-01T09:05:00.000",
         "open": "general",
-        "subtitle": "New in #general"
+        "subtitle": "New in #general",
+        "mention": null
       }
     },
     {
@@ -87,7 +89,8 @@
         ],
         "lastAt": "2026-11-01T09:05:00.000",
         "open": "rides",
-        "subtitle": "New in #car-pool and #general"
+        "subtitle": "New in #car-pool and #general",
+        "mention": null
       }
     },
     {
@@ -138,7 +141,8 @@
         ],
         "lastAt": "2026-11-01T10:00:00.000",
         "open": "film",
-        "subtitle": "New in #film, #lines and 2 more"
+        "subtitle": "New in #film, #lines and 2 more",
+        "mention": null
       }
     },
     {
@@ -171,7 +175,8 @@
         "unread": [],
         "lastAt": "2026-11-01T09:05:00.000",
         "open": "general",
-        "subtitle": "Team chat"
+        "subtitle": "Team chat",
+        "mention": null
       }
     },
     {
@@ -209,7 +214,8 @@
         "unread": [],
         "lastAt": "2026-11-01T09:00:00.000",
         "open": "general",
-        "subtitle": "Team chat"
+        "subtitle": "Team chat",
+        "mention": null
       }
     },
     {
@@ -235,7 +241,8 @@
         ],
         "lastAt": "2026-11-01T09:05:00.000",
         "open": "general",
-        "subtitle": "New in #general"
+        "subtitle": "New in #general",
+        "mention": null
       }
     },
     {
@@ -270,7 +277,142 @@
         ],
         "lastAt": "2026-11-01T09:05:00.000",
         "open": "general",
-        "subtitle": "New in #general"
+        "subtitle": "New in #general",
+        "mention": null
+      }
+    },
+    {
+      "name": "an unread mention says so and opens its room",
+      "rooms": [
+        {
+          "id": "general",
+          "name": "General",
+          "kind": "text",
+          "lastAt": "2026-11-01T09:09:00.000",
+          "canRead": true
+        },
+        {
+          "id": "rides",
+          "name": "Car Pool",
+          "kind": "text",
+          "lastAt": "2026-11-01T09:05:00.000",
+          "canRead": true
+        }
+      ],
+      "reads": {
+        "general": "2026-11-01T09:00:00.000"
+      },
+      "mentions": [
+        {
+          "roomId": "rides",
+          "text": "Cam mentioned you: who drives?",
+          "at": "2026-11-01T09:05:00.000",
+          "personal": true
+        },
+        {
+          "roomId": "general",
+          "text": "Avery mentioned you: old",
+          "at": "2026-11-01T09:00:00.000",
+          "personal": true
+        }
+      ],
+      "summary": {
+        "rooms": [
+          "general",
+          "rides"
+        ],
+        "unread": [
+          "general",
+          "rides"
+        ],
+        "lastAt": "2026-11-01T09:09:00.000",
+        "open": "rides",
+        "subtitle": "Cam mentioned you: who drives?",
+        "mention": "rides"
+      }
+    },
+    {
+      "name": "a mention read already is not shown",
+      "rooms": [
+        {
+          "id": "general",
+          "name": "General",
+          "kind": "text",
+          "lastAt": "2026-11-01T09:05:00.000",
+          "canRead": true
+        }
+      ],
+      "reads": {
+        "general": "2026-11-01T09:09:00.000"
+      },
+      "mentions": [
+        {
+          "roomId": "general",
+          "text": "Cam mentioned you: hi",
+          "at": "2026-11-01T09:05:00.000",
+          "personal": true
+        }
+      ],
+      "summary": {
+        "rooms": [
+          "general"
+        ],
+        "unread": [],
+        "lastAt": "2026-11-01T09:05:00.000",
+        "open": "general",
+        "subtitle": "Team chat",
+        "mention": null
+      }
+    },
+    {
+      "name": "a named mention shows in a muted room; @everyone does not",
+      "rooms": [
+        {
+          "id": "general",
+          "name": "General",
+          "kind": "text",
+          "lastAt": "2026-11-01T09:09:00.000",
+          "canRead": true
+        },
+        {
+          "id": "rides",
+          "name": "Car Pool",
+          "kind": "text",
+          "lastAt": "2026-11-01T10:00:00.000",
+          "canRead": true
+        }
+      ],
+      "reads": {},
+      "muted": [
+        "general",
+        "rides"
+      ],
+      "mentions": [
+        {
+          "roomId": "general",
+          "text": "Cam mentioned you: named",
+          "at": "2026-11-01T09:09:00.000",
+          "personal": true
+        },
+        {
+          "roomId": "rides",
+          "text": "Cam mentioned you: everyone",
+          "at": "2026-11-01T10:00:00.000",
+          "personal": false
+        }
+      ],
+      "summary": {
+        "rooms": [
+          "general",
+          "rides"
+        ],
+        "unread": [
+          "general"
+        ],
+        "lastAt": "2026-11-01T10:00:00.000",
+        "open": "general",
+        "subtitle": "Cam mentioned you: named",
+        "mention": "general"
       }
     }
   ]

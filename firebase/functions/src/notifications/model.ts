@@ -1,3 +1,4 @@
+import { type MentionTargets, mentionsIn } from "./mentions";
 // Pure notification logic: who gets what, and how it's worded. No Firebase
 // calls here, so it's unit-tested in test/notifications.
 
@@ -30,6 +31,10 @@ export interface TeamDoc {
   memberIds?: string[];
   memberRoles?: Record<string, string[]>;
   memberPerms?: Record<string, string[]>;
+  /** uid → display name, for @mentions. */
+  memberNames?: Record<string, string>;
+  /** Custom roles: id → { name }, for @mentions. */
+  roles?: Record<string, { name?: string } | undefined>;
   deletingAt?: unknown;
   /** false: the "Public team page" is off, so public posts stay with members (publicPageOn in packages/shared). */
   publicPage?: boolean;
@@ -267,6 +272,8 @@ export interface Notice {
   category: Category;
   teamId?: string;
   roomId?: string;
+  /** Reaches the member even in a room they muted (an @mention of them or their role). */
+  ignoresRoomMute?: boolean;
   /** A direct or group conversation, which its members can mute. */
   conversationId?: string;
   route: string;
@@ -408,6 +415,74 @@ export function chatNotice(a: {
     collapseId: `chat_${a.teamId}_${a.roomId}`,
     pushId: a.messageId,
     text: () => ({ title: `${a.roomName} · ${a.teamName}`, body: line }),
+  };
+}
+
+/**
+ * Readers a team chat message @mentions (other than its author): by name,
+ * by a role of theirs, or @everyone. @everyone and roles count only from the
+ * owner, coaches, captains and members who manage chats (as the composer
+ * offers them). [personal] is who was named or reached by role, which a room
+ * mute doesn't silence; @everyone respects it.
+ */
+export function mentionedReaders(
+  team: TeamDoc,
+  readers: string[],
+  message: Data,
+): { all: string[]; personal: string[] } {
+  const text = typeof message.text === "string" ? message.text : "";
+  const author = String(message.authorId ?? "");
+  if (!text.includes("@")) return { all: [], personal: [] };
+  const targets: MentionTargets = {
+    members: Object.entries(team.memberNames ?? {})
+      .filter(([uid, name]) => typeof name === "string" && (team.memberIds ?? []).includes(uid))
+      .map(([uid, name]) => ({ uid, name })),
+    roles: Object.entries(team.roles ?? {}).map(([id, r]) => ({ id, name: String(r?.name ?? "") })),
+  };
+  const m = mentionsIn(text, targets, canManageChats(team, author));
+  const all: string[] = [];
+  const personal: string[] = [];
+  for (const uid of readers) {
+    if (uid === author) continue;
+    const named = m.users.includes(uid) || (team.memberRoles?.[uid] ?? []).some((r) => m.roles.includes(r));
+    if (named) personal.push(uid);
+    if (named || m.everyone) all.push(uid);
+  }
+  return { all, personal };
+}
+
+/** can(team, 'manageChats') in firestore.rules: owners, coaches, captains, or granted it. */
+function canManageChats(team: TeamDoc, uid: string): boolean {
+  const tier = team.members?.[uid];
+  if (tier === "owner" || tier === "coach" || tier === "captain") return true;
+  return (team.memberIds ?? []).includes(uid) && (team.memberPerms?.[uid] ?? []).includes("manageChats");
+}
+
+/** A team chat message that @mentions the recipient: its own notice, apart from the room's. */
+export function mentionNotice(a: {
+  teamId: string;
+  roomId: string;
+  teamName: string;
+  roomName: string;
+  message: Data;
+  messageId?: string;
+  personal: boolean;
+}): Notice {
+  const author = String(a.message.authorName ?? "") || "Someone";
+  return {
+    category: "chat",
+    teamId: a.teamId,
+    roomId: a.roomId,
+    ignoresRoomMute: a.personal,
+    route: `/teams/${a.teamId}/chats/${a.roomId}`,
+    collapseId: `mention_${a.teamId}_${a.roomId}`,
+    pushId: a.messageId,
+    // As the Chats list shows it (ChatMention in packages/shared team_chats.ts).
+    text: () => ({
+      title: `#${a.roomName} · ${a.teamName}`,
+      body: `${author} mentioned you: ${messagePreview(a.message)}`,
+    }),
+    extra: { mention: true, roomId: a.roomId, personal: a.personal },
   };
 }
 

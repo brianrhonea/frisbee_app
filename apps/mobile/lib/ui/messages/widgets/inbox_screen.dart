@@ -928,7 +928,13 @@ class _TeamChatTile extends StatelessWidget {
                             summary.subtitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: _InboxTile._previewStyle(c, unread),
+                            // "Cam mentioned you: ..." stands out, as Discord's.
+                            style: summary.mention != null
+                                ? _InboxTile._previewStyle(c, unread).copyWith(
+                                    color: c.accent,
+                                    fontWeight: FontWeight.w700,
+                                  )
+                                : _InboxTile._previewStyle(c, unread),
                           ),
                         ),
                         if (unread) ...[

@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.47  | 2026-11-22 | `feature/profile-staff`                 |                     |
 | 0.0.46  | 2026-11-22 | `feature/launch-fixes`                  |                     |
 | 0.0.45  | 2026-11-22 | `feature/tournament-fixes`              |                     |
 | 0.0.44  | 2026-11-21 | `feature/payments`                      |                     |
@@ -59,6 +60,40 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.47 — Communities without a level, league entry, fee shares, mentions
+
+With web 0.56.0 and API 0.43.0. Functions `notifications` changed.
+
+- Pickup communities and schools/clubs have no division or level
+  (`Team.hasDivision`; maps leave them out, `sameAs` ignores them; rules'
+  `validTeamFields` let groups omit them). A team made inside a school or
+  club picks its own level (`community-team-level`, college by default).
+  `firebase/scripts/backfill-group-divisions.mjs` cleared them on dev.
+- Hosted events: **Who can enter** is `EntryChoice` (teams, players, both;
+  `entryChoices` in shared, fixtures `entry_choices/choices.json`).
+  Leagues offer all three; tournaments two plus "Teams can also reserve a
+  spot". Players in "Teams and players" are drafted onto new teams.
+- Split a team fee (`TeamShareCard`, `TeamShareRepositoryApi`,
+  `/v1/teams/:id/share`): whoever manages the team sets each member's
+  share and how to pay the collector, then marks people paid. Stored in
+  `teams/{id}/private/share` (server only). No money goes through Stall 10.
+- Team chat rooms: press and hold (or ⋯) for **Mute notifications**;
+  muted rooms show a bell-off icon and no unread dot. Rooms drag only with
+  a mouse now, since press and hold opens the menu.
+- Chats: **Team chats** and **Direct messages** fold away
+  (`InboxViewModel.toggleSection`), kept until the app restarts.
+- @mentions (`domain/models/mentions.dart`, `mentions.ts`, fixtures
+  `mentions/cases.json`): the composer suggests @everyone and roles (the
+  owner, coaches, captains, chat managers) and members; messages draw
+  mentions, the reader's brighter. The `chatMessage` trigger reads them
+  from the text: mentioned readers get "#room · Team / Cam mentioned you:
+  …" instead of the room's notice, through a room mute for a personal
+  or role mention (@everyone respects it). Its feed entry
+  (`mention_{team}_{room}`, `mention: true`) is `ChatRepository
+  .watchMentions`; `TeamChatSummary` shows it as the row's subtitle and
+  counts the room unread until it's read (fixture cases in
+  `team_chats/summary.json`).
 
 ## 0.0.46 — Agree to the guidelines, Chats, composer header
 

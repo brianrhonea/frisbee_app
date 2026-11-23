@@ -1,5 +1,5 @@
 "use client";
-import { type InboxRoom, mutedRoomKey, teamChatSummary, type TeamChatSummary } from "@stall10/shared";
+import { type ChatMention, type InboxRoom, mutedRoomKey, teamChatSummary, type TeamChatSummary } from "@stall10/shared";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
 import { firestoreDb } from "@/lib/firebase";
@@ -33,6 +33,12 @@ export function useTeamChats(uid: string | null | undefined): { chats: TeamChat[
   const reads = useLiveQuery<{ rooms?: Record<string, string> }>(uid ? `users/${uid}/chatReads` : null, [], uid ?? "");
   const [rooms, setRooms] = useState<Record<string, ChatRoomDoc[]>>({});
   const muted = useMutedRooms(uid);
+  // @mentions of the user: their feed entries the notifications trigger tags (ChatMention).
+  const mentionDocs = useLiveQuery<{ teamId?: string; roomId?: string; body?: string; createdAt?: string; personal?: boolean }>(
+    uid ? `users/${uid}/notifications` : null,
+    [where("mention", "==", true)],
+    `mentions-${uid ?? ""}`,
+  );
 
   // Re-ask when the teams, or the member's roles on them, change.
   const key = (teams.data ?? [])
@@ -73,6 +79,11 @@ export function useTeamChats(uid: string | null | undefined): { chats: TeamChat[
 
   const chats = useMemo(() => {
     if (!uid || !teams.data) return undefined;
+    const mentions: Array<ChatMention & { teamId: string }> = (mentionDocs.data ?? []).flatMap((d) =>
+      d.teamId && d.roomId && d.createdAt
+        ? [{ teamId: d.teamId, roomId: d.roomId, text: d.body ?? "", at: d.createdAt, personal: d.personal !== false }]
+        : [],
+    );
     const readsByTeam = new Map((reads.data ?? []).map((r) => [r.id, r.rooms ?? {}] as const));
     const byPosition = (a: ChatRoomDoc, b: ChatRoomDoc) => (a.position ?? 0) - (b.position ?? 0) || (a.name ?? "").localeCompare(b.name ?? "");
     const out: TeamChat[] = teams.data.map((team) => ({
@@ -81,6 +92,7 @@ export function useTeamChats(uid: string | null | undefined): { chats: TeamChat[
         (rooms[team.id] ?? []).filter((r) => canReadRoom(team, uid, r)).sort(byPosition),
         readsByTeam.get(team.id) ?? {},
         (roomId) => muted.has(mutedRoomKey(team.id, roomId)),
+        mentions.filter((m) => m.teamId === team.id),
       ),
     }));
     const at = (iso: string | null) => (iso ? Date.parse(iso) : 0);
@@ -90,7 +102,7 @@ export function useTeamChats(uid: string | null | undefined): { chats: TeamChat[
         at(b.lastAt) - at(a.lastAt) ||
         (a.team.name ?? "").toLowerCase().localeCompare((b.team.name ?? "").toLowerCase()),
     );
-  }, [uid, teams.data, reads.data, rooms, muted]);
+  }, [uid, teams.data, reads.data, rooms, muted, mentionDocs.data]);
 
   return { chats, unread: chats?.filter((c) => c.unread.length > 0).length ?? 0 };
 }

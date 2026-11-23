@@ -4,6 +4,23 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.56.0 — 2026-11-22
+
+With app 0.0.47 and API 0.43.0.
+
+- Pickup communities and schools/clubs have no division or level (create
+  and settings); a team inside a school or club picks its level.
+- Hosted events: **Who can enter** (Teams apply / Players sign up / Teams
+  and players for leagues), `entryChoices` in shared.
+- Team fee shares (`TeamShare.tsx`) on the team feed, as the app.
+- Team chat rooms: ⋯ or right-click → **Mute notifications**; muted rooms
+  show 🔕 and no unread dot.
+- Chats: **Team chats** and **Direct messages** fold away for the browser
+  session (sessionStorage).
+- @mentions (`Mentions.tsx`): suggestions above the composer (arrows,
+  Enter or Tab), mentions marked in messages, and "… mentioned you" on the
+  team's row in Chats until the room is read (`useTeamChats`).
+
 ## 0.55.1 — 2026-11-22
 
 - Profile card: the name, then "@username · pronouns" and the badges

@@ -737,7 +737,9 @@ void main() {
       withRepos(
         MaterialApp(
           theme: AppTheme.light,
-          home: Scaffold(body: RoomList(viewModel: vm, onOpen: (_) {})),
+          home: Scaffold(
+            body: RoomList(viewModel: vm, onOpen: (_) {}),
+          ),
         ),
       ),
     );
@@ -808,6 +810,55 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.byType(Drawer), findsNothing);
+    });
+
+    testWidgets('typing @ suggests members (and @everyone for captains); a '
+        'tap fills it in, and a mention of the user is drawn', (tester) async {
+      joinAs(TeamRole.captain);
+      teams.teams['t1'] = teams.teams['t1']!.copyWith(
+        memberNames: const {'o': 'Olive', 'u1': 'Me', 'p2': 'Pat Lee'},
+      );
+      chats.messages['general'] = [
+        ChatMessage(
+          id: 'm1',
+          authorId: 'p2',
+          authorName: 'Pat Lee',
+          text: 'hey @Me bring cones',
+          createdAt: DateTime(2026, 11, 1),
+        ),
+      ];
+      await pump(tester, 'general');
+      await tester.pump();
+      expect(find.textContaining('bring cones', findRichText: true), findsOne);
+      await tester.enterText(find.byType(TextField), 'hi @pa');
+      await tester.pump();
+      expect(find.byKey(const Key('mention-user-p2')), findsOneWidget);
+      // The user isn't offered themselves.
+      expect(find.byKey(const Key('mention-user-u1')), findsNothing);
+      await tester.tap(find.byKey(const Key('mention-user-p2')));
+      await tester.pump();
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        'hi @Pat Lee ',
+      );
+      await tester.enterText(find.byType(TextField), '@ev');
+      await tester.pump();
+      expect(
+        find.byKey(const Key('mention-everyone-everyone')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('players are not offered @everyone', (tester) async {
+      joinAs(TeamRole.player);
+      teams.teams['t1'] = teams.teams['t1']!.copyWith(
+        memberNames: const {'o': 'Olive', 'u1': 'Me', 'p2': 'Pat Lee'},
+      );
+      await pump(tester, 'general');
+      await tester.enterText(find.byType(TextField), '@');
+      await tester.pump();
+      expect(find.byKey(const Key('mention-everyone-everyone')), findsNothing);
+      expect(find.byKey(const Key('mention-user-o')), findsOneWidget);
     });
 
     testWidgets('posts a message', (tester) async {

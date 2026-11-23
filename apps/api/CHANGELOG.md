@@ -7,6 +7,17 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.43.0 — 2026-11-22
+
+With app 0.0.47 and web 0.56.0.
+
+- Pickup communities and schools/clubs are created and edited without a
+  division or level (`createTeamRequestSchema`, `editDetails`,
+  `listingFor`); teams still need both.
+- `GET`/`PUT`/`DELETE /v1/teams/:id/share` and
+  `PUT /v1/teams/:id/share/members/:uid` (`teams/share.ts`): a team fee
+  split among members, stored in `teams/{id}/private/share`.
+
 ## 0.42.0 — 2026-11-22
 
 With app 0.0.46 and web 0.55.0.

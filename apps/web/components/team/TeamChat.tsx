@@ -25,6 +25,7 @@ import { VoiceRoom } from "./meetings/VoiceRoom";
 import { useVoice } from "../voice/VoiceProvider";
 import { EmptyState, Loading } from "../StatusViews";
 import { ReportButton } from "../Report";
+import { MentionText, teamMentions } from "../Mentions";
 
 type Room = ManagedRoom & InboxRoom;
 type Folder = ManagedFolder;
@@ -273,6 +274,9 @@ function Thread({
   const [polling, setPolling] = useState(false);
   const names = viewer.state === "member" ? (viewer.team.memberNames ?? {}) : {};
   const nameOf = (uid: string) => names[uid] || "Member";
+  // @mentions: suggested in the composer and marked in messages, as the app.
+  const mentions =
+    viewer.state === "member" ? teamMentions(viewer.team, me, viewer.tier === "owner" || viewer.can("manageChats")) : undefined;
   const pins = useRoomPins<Message>(teamId, roomId);
   const pinActions = usePinActions(teamId, roomId);
   // From the live pins only: older pages of messages aren't live.
@@ -327,7 +331,11 @@ function Thread({
                       ↪ {m.replyTo.authorName}: {m.replyTo.text}
                     </p>
                   )}
-                  {m.text && <p className="message-text">{m.text}</p>}
+                  {m.text && (
+                    <p className="message-text">
+                      <MentionText text={m.text} mentions={mentions} />
+                    </p>
+                  )}
                   {m.event?.id && <ChatEventCard teamId={teamId} eventId={m.event.id} uid={me} />}
                   {m.poll && (
                     <ChatPollCard
@@ -397,6 +405,7 @@ function Thread({
           outbox={{ kind: "teamChat", target: `${teamId}/${roomId}` }}
           onShareEvent={canShareEvents ? () => setSharing(true) : undefined}
           onCreatePoll={() => setPolling(true)}
+          mentions={mentions}
         />
       ) : (
         <footer className="thread-foot muted small">You can read this room but not post in it.</footer>

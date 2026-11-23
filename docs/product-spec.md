@@ -1314,6 +1314,27 @@ Out of scope: payments, meeting recording, USA Ultimate data.
 67. Back from a notification goes to its parent page: [x] app; [x]
     website (`openFromNotifications`; `webParent`). Tests: app
     `open_link_test.dart`, shared `routes.test.ts`.
+68. Communities and schools/clubs without division or level: [x] app;
+    [x] website (`hasDivision`). Tests: app `groups_test.dart`, rules
+    "lets a group leave out division and level", shared fixtures
+    `team_create.json`.
+69. Who can enter a hosted event (`entryChoices`): [x] app; [x] website.
+    Tests: shared `entry_choice_fixtures.test.ts`, app
+    `entry_choice_fixtures_test.dart` and `host_event_test.dart`.
+70. Split a team fee (`/v1/teams/:id/share`): [x] app; [x] website.
+    Tests: API `team_share.test.ts`, shared `team_share.test.ts`, app
+    `team_share_test.dart`.
+71. Mute a room from the room list: [x] app (press and hold); [x] website
+    (⋯ or right-click). Tests: app `chat_test.dart`.
+72. Fold away Team chats and Direct messages in Chats: [x] app (until
+    restart); [x] website (for the session). Tests: app
+    `messages_test.dart`.
+73. @mentions in team chat: [x] app; [x] website. Suggestions, marked
+    mentions, "… mentioned you" in Chats and the push (through a room
+    mute for personal and role mentions). Tests: shared
+    `mention_fixtures.test.ts` and `team_chats_fixtures.test.ts`, app
+    `mention_fixtures_test.dart` and `chat_test.dart`, functions
+    `notifications/mentions.test.ts`.
 
 Libraries the website may add (none today): a small data cache for API
 reads and mutations, the Firestore web SDK for listeners, and LiveKit's

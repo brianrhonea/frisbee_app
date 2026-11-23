@@ -21,8 +21,7 @@ class FakeTeamShareRepository implements TeamShareRepository {
   bool cleared = false;
 
   @override
-  Future<Result<TeamShareView>> view(String teamId) async =>
-      Result.ok(current);
+  Future<Result<TeamShareView>> view(String teamId) async => Result.ok(current);
 
   @override
   Future<Result<TeamShareView>> set(

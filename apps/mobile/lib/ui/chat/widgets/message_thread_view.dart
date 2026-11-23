@@ -25,6 +25,7 @@ import 'reaction_bubble.dart';
 import '../../core/ui/skeleton.dart';
 import '../../../domain/models/moderation.dart';
 import '../../moderation/widgets/report_sheet.dart';
+import '../../../domain/models/mentions.dart';
 
 /// Messages with a composer below, for a team room or a direct message.
 /// Shows [readOnlyNotice] in place of the composer when the user can't post.
@@ -292,7 +293,12 @@ class _MessageThreadViewState extends State<MessageThreadView>
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: vm,
-    builder: (context, _) => ConstrainedContent(
+    builder: (context, _) =>
+        _MentionScope(viewModel: vm, child: _body(context)),
+  );
+
+  Widget _body(BuildContext context) => Builder(
+    builder: (context) => ConstrainedContent(
       maxWidth: 900,
       child: Column(
         children: [
@@ -330,7 +336,9 @@ class _MessageThreadViewState extends State<MessageThreadView>
           if (vm.showsTyping) _TypingIndicator(label: vm.typingLabel),
           if (widget.footer case final footer?)
             footer
-          else if (vm.canWrite)
+          else if (vm.canWrite) ...[
+            if (vm.mentionTargets.members.isNotEmpty)
+              _MentionSuggestions(viewModel: vm, controller: _text),
             _Composer(
               viewModel: vm,
               controller: _text,
@@ -340,8 +348,8 @@ class _MessageThreadViewState extends State<MessageThreadView>
               hintText: widget.hintText,
               onShareEvent: widget.onShareEvent,
               onCreatePoll: widget.onCreatePoll,
-            )
-          else
+            ),
+          ] else
             _ReadOnlyBar(text: widget.readOnlyNotice),
         ],
       ),
@@ -1056,8 +1064,133 @@ class _MessageText extends StatelessWidget {
   final TextStyle style;
 
   @override
-  Widget build(BuildContext context) =>
-      LinkifiedText(text, style: style, selectable: false);
+  Widget build(BuildContext context) {
+    final vm = _MentionScope.of(context);
+    final spans = vm == null || !text.contains('@')
+        ? const <MentionSpan>[]
+        : mentionSpans(text, vm.mentionTargets);
+    return LinkifiedText(
+      text,
+      style: style,
+      selectable: false,
+      mentions: [
+        for (final s in spans)
+          (start: s.start, end: s.end, me: vm!.mentionsMe(s)),
+      ],
+    );
+  }
+}
+
+/// The thread's view model for its messages' @mentions (team chat).
+class _MentionScope extends InheritedWidget {
+  const _MentionScope({required this.viewModel, required super.child});
+
+  final MessageThreadViewModel viewModel;
+
+  static MessageThreadViewModel? of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_MentionScope>()?.viewModel;
+
+  @override
+  bool updateShouldNotify(_MentionScope old) => true;
+}
+
+/// Above the composer while an @name is typed: everyone and roles (for
+/// those who can mention them), then members. A tap puts it in the text.
+class _MentionSuggestions extends StatelessWidget {
+  const _MentionSuggestions({
+    required this.viewModel,
+    required this.controller,
+  });
+
+  final MessageThreadViewModel viewModel;
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder(
+    valueListenable: controller,
+    builder: (context, value, _) {
+      final cursor = value.selection.baseOffset;
+      final found = value.selection.isCollapsed
+          ? mentionQuery(value.text, cursor)
+          : null;
+      if (found == null) return const SizedBox.shrink();
+      final vm = viewModel;
+      final options = mentionSuggestions(
+        found.query,
+        vm.mentionTargets,
+        canMentionGroups: vm.canMentionGroups,
+        limit: 6,
+      ).where((t) => t.kind != MentionKind.user || t.id != vm.uid).toList();
+      if (options.isEmpty) return const SizedBox.shrink();
+      final c = AppColors.of(context);
+      return Container(
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+        decoration: BoxDecoration(
+          color: c.card,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: c.border),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final o in options)
+              InkWell(
+                key: Key('mention-${o.kind.name}-${o.id}'),
+                onTap: () {
+                  final next = insertMention(
+                    value.text,
+                    found.start,
+                    cursor,
+                    o.label,
+                  );
+                  controller.value = TextEditingValue(
+                    text: next.text,
+                    selection: TextSelection.collapsed(offset: next.cursor),
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        switch (o.kind) {
+                          MentionKind.everyone => Icons.campaign_outlined,
+                          MentionKind.role => Icons.shield_outlined,
+                          MentionKind.user => Icons.person_outline,
+                        },
+                        size: 18,
+                        color: c.muted,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '@${o.label}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: c.ink,
+                          ),
+                        ),
+                      ),
+                      Text(switch (o.kind) {
+                        MentionKind.everyone => 'Everyone in this room',
+                        MentionKind.role => 'Role',
+                        MentionKind.user => '',
+                      }, style: TextStyle(fontSize: 12, color: c.muted)),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    },
+  );
 }
 
 /// The quote above a reply: who it answers and what they said.

@@ -1,4 +1,6 @@
 "use client";
+import { insertMention, type MentionSuggestion } from "@stall10/shared";
+import { type MentionContext, MentionMenu, suggestionsAt } from "./Mentions";
 import { chatAttachmentsMax, chatQuickReactions, chatReactionGroups, chatTextMax, formatFileSize } from "@stall10/shared";
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import type { OutboxKind } from "@stall10/shared";
@@ -28,6 +30,7 @@ export function ChatComposer({
   outbox,
   onShareEvent,
   onCreatePoll,
+  mentions,
 }: {
   path: string;
   /** Where this thread's messages wait while Stall 10 can't be reached (the app's OutboxKind and target). */
@@ -44,6 +47,8 @@ export function ChatComposer({
   onShareEvent?: () => void;
   /** "Poll" in the attach menu (team rooms, F33). Without either, there's no menu. */
   onCreatePoll?: () => void;
+  /** Team chat: suggest @mentions while typing (Mentions.tsx). */
+  mentions?: MentionContext;
 }) {
   const { user } = useAuth();
   const [text, setText] = useState("");
@@ -54,6 +59,21 @@ export function ChatComposer({
   const [notice, setNotice] = useState<string | null>(null);
   const [attachMenu, setAttachMenu] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  const box = useRef<HTMLTextAreaElement>(null);
+  const [cursor, setCursor] = useState(0);
+  const [active, setActive] = useState(0);
+  const suggest = suggestionsAt(text, cursor, mentions);
+  function pick(o: MentionSuggestion) {
+    if (!suggest) return;
+    const next = insertMention(text, suggest.start, cursor, o.label);
+    edit(next.text);
+    setCursor(next.cursor);
+    setActive(0);
+    requestAnimationFrame(() => {
+      box.current?.focus();
+      box.current?.setSelectionRange(next.cursor, next.cursor);
+    });
+  }
   /** Files removed while still uploading: deleted once their upload finishes. */
   const dropped = useRef(new Set<string>());
   const uid = user?.uid;
@@ -163,6 +183,7 @@ export function ChatComposer({
           {error}
         </p>
       )}
+      {suggest && <MentionMenu options={suggest.options} active={Math.min(active, suggest.options.length - 1)} onPick={pick} />}
       {notice && (
         <p className="muted small" role="status">
           {notice}
@@ -237,6 +258,7 @@ export function ChatComposer({
           </button>
         )}
         <textarea
+          ref={box}
           aria-label={placeholder}
           placeholder={placeholder}
           rows={1}
@@ -244,14 +266,36 @@ export function ChatComposer({
           maxLength={chatTextMax}
           onChange={(e) => {
             edit(e.target.value);
+            setCursor(e.target.selectionStart ?? e.target.value.length);
+            setActive(0);
             onTyping?.(e.target.value.trim().length > 0);
           }}
+          onSelect={(e) => setCursor(e.currentTarget.selectionStart ?? 0)}
           onBlur={() => onTyping?.(false)}
           onPaste={(e) => {
             const pasted = [...e.clipboardData.files];
             if (pasted.length) addFiles(pasted);
           }}
           onKeyDown={(e) => {
+            // While @mentions are suggested: arrows move, Enter or Tab picks, Escape closes.
+            if (suggest) {
+              const n = suggest.options.length;
+              if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                e.preventDefault();
+                setActive((a) => (a + (e.key === "ArrowDown" ? 1 : n - 1)) % n);
+                return;
+              }
+              if (e.key === "Enter" || e.key === "Tab") {
+                e.preventDefault();
+                pick(suggest.options[Math.min(active, n - 1)]);
+                return;
+              }
+              if (e.key === "Escape") {
+                e.preventDefault();
+                setCursor(-1);
+                return;
+              }
+            }
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               void send();

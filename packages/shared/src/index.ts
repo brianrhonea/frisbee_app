@@ -32,6 +32,7 @@ export * from "./stats_tracker.js";
 export * from "./group_tournaments.js";
 export * from "./tournament_engine.js";
 export * from "./tournaments.js";
+export * from "./mentions.js";
 export * from "./public_tournaments.js";
 export * from "./outbox.js";
 export * from "./payments.js";
