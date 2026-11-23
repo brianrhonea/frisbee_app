@@ -4,6 +4,18 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.55.1 — 2026-11-22
+
+- Profile card: the name, then "@username · pronouns" and the badges
+  (Stall 10 staff, Private profile) centered; the bio and details below a
+  rule, left-aligned, one detail per line with an icon (hometown, school,
+  throwing hand, playing since).
+- Settings shows **Stall 10 staff: reports** (the `/staff` queue) to
+  staff.
+- `firebase/scripts/set-staff.mjs` read the first argument as the
+  project when `--project` was left out; new `set-official.mjs` marks a
+  team an official organizer.
+
 ## 0.55.0 — 2026-11-22
 
 Works with API 0.42.0.

@@ -34,7 +34,7 @@ const name = at >= 0 ? args[at + 1] : "dev";
 const project = projects[name] ?? name;
 const remove = args.includes("--remove");
 const list = args.includes("--list");
-const who = args.find((a, i) => !a.startsWith("--") && i !== at + 1);
+const who = args.find((a, i) => !a.startsWith("--") && (at < 0 || i !== at + 1));
 if (!project || project.startsWith("--") || (!who && !list)) {
   console.error("usage: node set-staff.mjs <email or uid> [--remove] [--project dev|prod|<id>]");
   console.error("       node set-staff.mjs --list [--project dev|prod|<id>]");

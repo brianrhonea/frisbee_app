@@ -250,8 +250,14 @@ dialog.dialog > * { max-height: calc(100vh - 32px); overflow-y: auto; }
 .profile-card { text-align: center; }
 .profile-card h1 { font-size: 1.5rem; margin: 12px 0 0; overflow-wrap: anywhere; }
 .profile-card .handle { margin: 2px 0 0; }
-.profile-card .bio { margin: 12px 0 0; text-align: left; }
-.profile-card .profile-facts { justify-content: center; margin-top: 10px; }
+.profile-card .profile-badges { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 8px; }
+.profile-card .profile-badges > * { margin: 0; }
+/* Bio and details: left-aligned under a rule, one detail per line. */
+.profile-card .profile-about { display: grid; gap: 10px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); text-align: left; }
+.profile-card .bio { margin: 0; overflow-wrap: anywhere; line-height: 1.45; }
+.profile-card .profile-facts { display: grid; gap: 6px; margin: 0; }
+.profile-card .profile-facts li { display: grid; grid-template-columns: 16px 1fr; align-items: center; gap: 8px; overflow-wrap: anywhere; }
+.profile-card .profile-facts svg { color: var(--muted); }
 .profile-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 14px; }
 .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .tile {
