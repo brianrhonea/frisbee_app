@@ -27,12 +27,47 @@ abstract class HostedTournamentRepository {
   /// members.
   Stream<List<EnteredTournament>> watchEnteredBy(String teamId);
 
-  /// Tournament and league invites waiting on team [teamId], soonest
-  /// first; for its admins (through the API).
-  Future<Result<List<TeamTournamentInvite>>> teamInvites(String teamId);
+  /// Tournament and league invites waiting on team [teamId], and its
+  /// entries still missing a roster or fee, soonest first; for its admins
+  /// (through the API).
+  Future<Result<TeamTournamentBusiness>> teamInvites(String teamId);
 
-  /// Turns down [tournamentId]'s invite for [teamId] (the team withdraws).
+  /// Turns down [tournamentId]'s invite for [teamId] (the team withdraws,
+  /// with the reason "declined").
   Future<Result<void>> declineInvite(String tournamentId, String teamId);
+
+  /// The respond flow's first step (PUT .../entries/:teamId): accepts an
+  /// invite (straight in, or waitlisted when the division is full),
+  /// applies, or changes captains. Answers the entry's status.
+  Future<Result<EntryStatus>> respond(
+    String tournamentId,
+    String teamId, {
+    required String divisionId,
+    required List<String> captainIds,
+  });
+
+  /// The players [teamId] brings ([playerIds], from its roster).
+  Future<Result<void>> saveRoster(
+    String tournamentId,
+    String teamId,
+    List<String> playerIds,
+  );
+
+  /// Saves a division's seed order; with [confirm], marks them confirmed
+  /// (the run sheet). Any later change unconfirms them.
+  Future<Result<void>> saveSeeds(
+    String tournamentId,
+    String divisionId,
+    List<String> seeds, {
+    bool confirm = false,
+  });
+
+  /// Publishes every division's schedule at once ([games] by division id);
+  /// every division's seeds must be confirmed.
+  Future<Result<void>> publishAll(
+    String tournamentId,
+    Map<String, List<GroupGame>> games,
+  );
 
   /// Published tournaments that haven't ended, soonest first.
   Stream<List<HostedTournament>> watchUpcoming({int limit = 50});
@@ -145,6 +180,7 @@ abstract class HostedTournamentRepository {
 
   /// Replaces a division's games with [games] (seeds and settings saved
   /// with them).
+  /// Also makes the event scheduled when it isn't yet.
   Future<Result<void>> publishSchedule(
     String tournamentId,
     TournamentDivision division,

@@ -106,9 +106,12 @@ class HostedTournamentViewModel extends ChangeNotifier {
     setPaymentNote = Command1<void, ({String teamId, String note})>(
       _setPaymentNote,
     );
+    refund = Command1<void, String>(_refund);
     openChat = Command1<String, String?>(_openChat);
     saveSeeds = Command1<void, List<String>>(_saveSeeds);
     publish = Command0<void>(_publish);
+    confirmSeeds = Command1<void, String>(_confirmSeeds);
+    publishAll = Command0<void>(_publishAll);
     report = Command1<void, HostedScore>(_report);
     confirm = Command1<void, GroupGame>(_confirm);
     setFinalScore = Command1<void, HostedScore>(_setFinalScore);
@@ -252,6 +255,10 @@ class HostedTournamentViewModel extends ChangeNotifier {
 
   /// The host's note on a team's payment ("Check #1042").
   late final Command1<void, ({String teamId, String note})> setPaymentNote;
+
+  /// Refunds a team's fee paid online (organizers; the payment record then
+  /// says so).
+  late final Command1<void, String> refund;
   late final Command1<void, List<String>> saveSeeds;
   late final Command0<void> publish;
   late final Command1<void, HostedScore> report;
@@ -280,6 +287,8 @@ class HostedTournamentViewModel extends ChangeNotifier {
     setPaid,
     saveSeeds,
     publish,
+    confirmSeeds,
+    publishAll,
     report,
     confirm,
     setFinalScore,
@@ -628,9 +637,11 @@ class HostedTournamentViewModel extends ChangeNotifier {
   bool isPaid(String teamId) => _payments[teamId]?.paid ?? false;
 
   /// Unpaid once the bid fee's due date has passed.
+  /// Unpaid past the entry deadline (effectiveDeadline, as the website).
   bool isOverdue(String teamId) {
-    final due = _tournament?.spotFee?.dueAt;
-    return due != null && !isPaid(teamId) && _now().isAfter(due);
+    final t = _tournament;
+    if (t?.spotFee == null) return false;
+    return !isPaid(teamId) && _now().isAfter(t!.effectiveDeadline);
   }
 
   /// Accepted teams (any division) that haven't paid.
@@ -932,6 +943,14 @@ class HostedTournamentViewModel extends ChangeNotifier {
     );
   }
 
+  Future<Result<void>> _refund(String teamId) async {
+    final api = _paymentsApi;
+    if (api == null || !api.available) {
+      return Result.error(Exception("Online payments aren't set up here yet."));
+    }
+    return api.refund(tournamentId, teamId);
+  }
+
   Future<Result<void>> _setPaymentNote(({String teamId, String note}) p) {
     final old = _payments[p.teamId] ?? EntryPayment(teamId: p.teamId);
     return _savePayment(
@@ -1103,10 +1122,78 @@ class HostedTournamentViewModel extends ChangeNotifier {
     if (t == null || d == null) {
       return Result.error(Exception('Pick a division.'));
     }
-    return switch (await _repo.saveDivision(t, d.copyWith(seeds: seeds))) {
-      Ok() => const Result.ok(null),
-      Error(:final error) => Result.error(error),
-    };
+    // Through the API: a change unconfirms the seeds.
+    return _repo.saveSeeds(tournamentId, d.id, seeds);
+  }
+
+  /// The host confirms [divisionId]'s seeds as they stand (the run sheet).
+  late final Command1<void, String> confirmSeeds;
+
+  Future<Result<void>> _confirmSeeds(String divisionId) async {
+    final d = divisionById(divisionId);
+    if (d == null) return Result.error(Exception('Pick a division.'));
+    if (d.seeds.length < 2) {
+      return Result.error(Exception('A division needs at least 2 teams.'));
+    }
+    return _repo.saveSeeds(tournamentId, d.id, d.seeds, confirm: true);
+  }
+
+  /// Accepted teams whose event roster is short of their division's
+  /// minimum (the organizer's "Roster missing" flag).
+  List<TournamentEntry> get teamsMissingRoster {
+    final t = _tournament;
+    // Rosters lock once play starts: nothing left to flag.
+    if (t == null ||
+        t.mixedEntry ||
+        t.status == HostedStatus.live ||
+        t.status == HostedStatus.finished) {
+      return const [];
+    }
+    return [
+      for (final e in entriesWith(EntryStatus.accepted))
+        if (e.roster.length <
+            (divisionById(e.divisionId)?.effectiveMinRoster ??
+                TournamentDivision.defaultMinRoster))
+          e,
+    ];
+  }
+
+  /// Accepted teams that haven't paid a fee they owe ("Unpaid").
+  List<TournamentEntry> get teamsUnpaid {
+    final fee = _tournament?.spotFee;
+    if (fee == null || fee.amountCents <= 0) return const [];
+    return [
+      for (final e in entriesWith(EntryStatus.accepted))
+        if (!isPaid(e.teamId) && owesSpotFee(e.teamId)) e,
+    ];
+  }
+
+  /// Past the entry deadline (flags turn amber).
+  bool get pastDeadline {
+    final t = _tournament;
+    return t != null && _now().isAfter(t.effectiveDeadline);
+  }
+
+  /// Every division's seeds are confirmed: the schedule can be published.
+  bool get allSeedsConfirmed =>
+      divisions.isNotEmpty && divisions.every((d) => d.seedsConfirmed);
+
+  /// Publishes every division's schedule at once (PUT /schedule); the
+  /// event becomes scheduled and teams are notified.
+  late final Command0<void> publishAll;
+
+  Future<Result<void>> _publishAll() async {
+    final t = _tournament;
+    if (t == null) return Result.error(Exception('Nothing to publish.'));
+    final games = <String, List<GroupGame>>{};
+    for (final d in divisions) {
+      try {
+        games[d.id] = planFor(t, d, d.seeds).games;
+      } on ScheduleException catch (e) {
+        return Result.error(Exception('${d.label}: ${e.message}'));
+      }
+    }
+    return _repo.publishAll(tournamentId, games);
   }
 
   /// The schedule [division] would get now, or why it can't have one.
@@ -1152,16 +1239,12 @@ class HostedTournamentViewModel extends ChangeNotifier {
     if (t == null || d == null || plan == null) {
       return Result.error(Exception(problem ?? 'Nothing to publish.'));
     }
-    final r = await _repo.publishSchedule(
+    // Publishing makes the event scheduled (the repository does it).
+    return _repo.publishSchedule(
       tournamentId,
       d.copyWith(settings: d.settings.copyWith(format: formatOf(d))),
       plan.games,
     );
-    if (r is Error) return r;
-    if (t.status.index < HostedStatus.scheduled.index) {
-      return _repo.setStatus(tournamentId, HostedStatus.scheduled);
-    }
-    return r;
   }
 
   // ---- Games --------------------------------------------------------------

@@ -50,7 +50,7 @@ async function idTokenFor(uid: string, displayName: string): Promise<string> {
 }
 
 const tokens: Record<string, string> = {};
-const call = (method: "GET" | "POST", url: string, uid: string) =>
+const call = (method: "GET" | "POST" | "DELETE", url: string, uid: string) =>
   app.inject({ method, url, ...(method === "POST" && { payload: {} }), headers: { authorization: `Bearer ${tokens[uid]}` } });
 
 beforeAll(async () => {
@@ -91,6 +91,22 @@ describe("tournament chats on Firestore", () => {
     const team = await call("POST", "/v1/tournaments/tc-t/chats/teams/tc-haze", "cap");
     expect(team.statusCode, team.body).toBe(200);
     expect((await db.doc(`conversations/${team.json().id}`).get()).get("kind")).toBe("tournament");
+  });
+});
+
+describe("deleting a tournament on Firestore", () => {
+  it("deletes its chats' conversations and messages, so they leave every inbox", async () => {
+    await db.doc("tournaments/tc-del").set({ hostId: "tc-host", name: "Gone Fling", status: "registration", startsOn: Timestamp.now() });
+    const opened = await call("POST", "/v1/tournaments/tc-del/chats/captains", "dir");
+    expect(opened.statusCode, opened.body).toBe(200);
+    const id = opened.json().id as string;
+    await db.doc(`conversations/${id}/messages/m1`).set({ text: "Fields at 8", senderId: "tc-dir" });
+    const gone = await call("DELETE", "/v1/tournaments/tc-del", "dir");
+    expect(gone.statusCode, gone.body).toBeLessThan(300);
+    expect((await db.doc("tournaments/tc-del").get()).exists).toBe(false);
+    // The pointers stay for the tournamentDeleted function (attachments).
+    expect((await db.doc(`conversations/${id}`).get()).exists).toBe(false);
+    expect((await db.collection(`conversations/${id}/messages`).get()).empty).toBe(true);
   });
 });
 

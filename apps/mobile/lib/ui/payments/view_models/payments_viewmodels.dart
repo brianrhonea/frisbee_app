@@ -32,10 +32,21 @@ class PayoutsViewModel extends ChangeNotifier {
   PayoutAccount _account = PayoutAccount.unavailable;
   PayoutAccount get account => _account;
 
+  /// The host's fees paid online: held until each event is over, sent,
+  /// refunded. Empty until payouts are linked.
+  Earnings _earnings = Earnings.none;
+  Earnings get earnings => _earnings;
+
   Future<Result<void>> _load() async {
     final r = await _payments.payouts(teamId);
     if (r case Ok(:final value)) {
       _account = value;
+      if (value.available && value.status != PayoutStatus.none) {
+        // Not having them doesn't stop the card showing.
+        if (await _payments.earnings(teamId) case Ok(value: final e)) {
+          _earnings = e;
+        }
+      }
       notifyListeners();
     }
     return r;

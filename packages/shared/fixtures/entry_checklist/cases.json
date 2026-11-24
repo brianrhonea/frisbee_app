@@ -1,0 +1,258 @@
+{
+  "about": "When rosters and fees are due (the entry deadline, else the fee's due date, else the day before the start), when a deadline is allowed, and where an entry stands: roster set, paid, overdue.",
+  "cases": [
+    {
+      "event": {
+        "startsOn": "2026-12-05T09:00:00.000Z",
+        "entryDeadline": null,
+        "entryType": "teams",
+        "teamEntry": false,
+        "bidFee": {
+          "dueAt": null
+        },
+        "teamFee": null
+      },
+      "deadline": "2026-12-04T09:00:00.000Z"
+    },
+    {
+      "event": {
+        "startsOn": "2026-12-05T09:00:00.000Z",
+        "entryDeadline": "2026-11-28T23:59:00.000Z",
+        "entryType": "teams",
+        "teamEntry": false,
+        "bidFee": {
+          "dueAt": "2026-11-25T00:00:00.000Z"
+        },
+        "teamFee": null
+      },
+      "deadline": "2026-11-28T23:59:00.000Z"
+    },
+    {
+      "event": {
+        "startsOn": "2026-12-05T09:00:00.000Z",
+        "entryDeadline": null,
+        "entryType": "teams",
+        "teamEntry": false,
+        "bidFee": {
+          "dueAt": "2026-11-25T00:00:00.000Z"
+        },
+        "teamFee": null
+      },
+      "deadline": "2026-11-25T00:00:00.000Z"
+    },
+    {
+      "event": {
+        "startsOn": "2026-12-05T09:00:00.000Z",
+        "entryDeadline": null,
+        "entryType": "players",
+        "teamEntry": false,
+        "bidFee": {
+          "dueAt": "2026-11-25T00:00:00.000Z"
+        },
+        "teamFee": null
+      },
+      "deadline": "2026-11-25T00:00:00.000Z"
+    },
+    {
+      "event": {
+        "startsOn": "2026-12-05T09:00:00.000Z",
+        "entryDeadline": null,
+        "entryType": "players",
+        "teamEntry": true,
+        "bidFee": {
+          "dueAt": "2026-11-25T00:00:00.000Z"
+        },
+        "teamFee": {
+          "dueAt": "2026-11-26T00:00:00.000Z"
+        }
+      },
+      "deadline": "2026-11-26T00:00:00.000Z"
+    },
+    {
+      "event": {
+        "startsOn": "2026-12-05T09:00:00.000Z",
+        "entryDeadline": null,
+        "entryType": "players",
+        "teamEntry": true,
+        "bidFee": {
+          "dueAt": "2026-11-25T00:00:00.000Z"
+        },
+        "teamFee": null
+      },
+      "deadline": "2026-11-25T00:00:00.000Z"
+    },
+    {
+      "check": null,
+      "startsOn": "2026-12-05T09:00:00.000Z",
+      "problem": null
+    },
+    {
+      "check": "2026-11-28T23:59:00.000Z",
+      "startsOn": "2026-12-05T09:00:00.000Z",
+      "problem": null
+    },
+    {
+      "check": "2026-12-05T09:00:00.000Z",
+      "startsOn": "2026-12-05T09:00:00.000Z",
+      "problem": null
+    },
+    {
+      "check": "2026-12-05T10:00:00.000Z",
+      "startsOn": "2026-12-05T09:00:00.000Z",
+      "problem": "The entry deadline has to be before the event starts."
+    },
+    {
+      "status": "accepted",
+      "rosterSize": 7,
+      "minRoster": 7,
+      "paid": true,
+      "owes": true,
+      "deadline": "2026-11-28T23:59:00.000Z",
+      "now": "2026-11-20T12:00:00.000Z",
+      "checklist": {
+        "accepted": true,
+        "rosterSet": true,
+        "paid": true,
+        "owes": true,
+        "overdue": false,
+        "complete": true
+      }
+    },
+    {
+      "status": "accepted",
+      "rosterSize": 6,
+      "minRoster": 7,
+      "paid": true,
+      "owes": true,
+      "deadline": "2026-11-28T23:59:00.000Z",
+      "now": "2026-11-20T12:00:00.000Z",
+      "checklist": {
+        "accepted": true,
+        "rosterSet": false,
+        "paid": true,
+        "owes": true,
+        "overdue": false,
+        "complete": false
+      }
+    },
+    {
+      "status": "accepted",
+      "rosterSize": 7,
+      "minRoster": 7,
+      "paid": false,
+      "owes": true,
+      "deadline": "2026-11-28T23:59:00.000Z",
+      "now": "2026-11-20T12:00:00.000Z",
+      "checklist": {
+        "accepted": true,
+        "rosterSet": true,
+        "paid": false,
+        "owes": true,
+        "overdue": false,
+        "complete": false
+      }
+    },
+    {
+      "status": "accepted",
+      "rosterSize": 7,
+      "minRoster": 7,
+      "paid": false,
+      "owes": false,
+      "deadline": "2026-11-28T23:59:00.000Z",
+      "now": "2026-11-20T12:00:00.000Z",
+      "checklist": {
+        "accepted": true,
+        "rosterSet": true,
+        "paid": true,
+        "owes": false,
+        "overdue": false,
+        "complete": true
+      }
+    },
+    {
+      "status": "applied",
+      "rosterSize": 0,
+      "minRoster": 7,
+      "paid": false,
+      "owes": true,
+      "deadline": "2026-11-28T23:59:00.000Z",
+      "now": "2026-11-20T12:00:00.000Z",
+      "checklist": {
+        "accepted": false,
+        "rosterSet": false,
+        "paid": false,
+        "owes": true,
+        "overdue": false,
+        "complete": false
+      }
+    },
+    {
+      "status": "accepted",
+      "rosterSize": 0,
+      "minRoster": 7,
+      "paid": false,
+      "owes": true,
+      "deadline": "2026-11-19T00:00:00.000Z",
+      "now": "2026-11-20T12:00:00.000Z",
+      "checklist": {
+        "accepted": true,
+        "rosterSet": false,
+        "paid": false,
+        "owes": true,
+        "overdue": true,
+        "complete": false
+      }
+    },
+    {
+      "status": "accepted",
+      "rosterSize": 7,
+      "minRoster": 7,
+      "paid": true,
+      "owes": true,
+      "deadline": "2026-11-19T00:00:00.000Z",
+      "now": "2026-11-20T12:00:00.000Z",
+      "checklist": {
+        "accepted": true,
+        "rosterSet": true,
+        "paid": true,
+        "owes": true,
+        "overdue": false,
+        "complete": true
+      }
+    },
+    {
+      "status": "waitlisted",
+      "rosterSize": null,
+      "minRoster": 7,
+      "paid": false,
+      "owes": true,
+      "deadline": null,
+      "now": "2026-11-20T12:00:00.000Z",
+      "checklist": {
+        "accepted": false,
+        "rosterSet": true,
+        "paid": false,
+        "owes": true,
+        "overdue": false,
+        "complete": false
+      }
+    },
+    {
+      "status": "accepted",
+      "rosterSize": null,
+      "minRoster": 7,
+      "paid": true,
+      "owes": true,
+      "deadline": "2026-11-19T00:00:00.000Z",
+      "now": "2026-11-20T12:00:00.000Z",
+      "checklist": {
+        "accepted": true,
+        "rosterSet": true,
+        "paid": true,
+        "owes": true,
+        "overdue": false,
+        "complete": true
+      }
+    }
+  ]
+}

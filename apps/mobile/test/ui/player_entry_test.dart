@@ -1072,6 +1072,14 @@ void main() {
       await tester.tap(find.text('WMP'));
       await tester.tap(find.text('Sign up').last);
       await tester.pumpAndSettle();
+      // A new signup's next steps: Payment (pay now or later), then Done.
+      expect(find.text('Step 2 of 2 · Payment'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('signup-pay-later')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('signup-done-title')), findsOneWidget);
+      expect(find.text('Fee to pay'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Done'));
+      await tester.pumpAndSettle();
       expect(find.text('Your signup'), findsOneWidget);
       expect(find.text('Signed up'), findsOneWidget);
       expect(repo.signups[id]!['pat']!.gender, GenderMatch.wmp);

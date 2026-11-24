@@ -73,6 +73,10 @@ export interface PublicHostedTournament extends PublicHostedCard {
   teamFee: PublicFee | null;
   season: SeasonDoc | null;
   draftMode: DraftMode;
+  /** The tournament director's name; members read their email and phone from the event. */
+  directorName: string | null;
+  /** When rosters and fees are due (effectiveDeadline), ISO; null without one. */
+  entryDeadline: string | null;
 }
 
 /** A division: format, seeds and places. Drafted teams carry only their id and name. */

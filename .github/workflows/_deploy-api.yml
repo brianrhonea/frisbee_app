@@ -20,6 +20,8 @@
 #   API_WEB_SITE_URL_DEV/_PROD  the website's address (https://…), so the API
 #                               expires its cached public pages on changes;
 #                               unset, they refresh within a minute
+#   API_PAYOUT_HOLD_DAYS_DEV/_PROD    days a finished event's fees wait
+#                               before going to hosts (0 to 30; default 3)
 #   GCP_WIF_PROVIDER_DEV/_PROD, GCP_DEPLOYER_SA_DEV/_PROD
 
 name: Deploy API (shared)
@@ -81,6 +83,8 @@ jobs:
           MAX_PROD: ${{ vars.API_MAX_INSTANCES_PROD }}
           SITE_DEV: ${{ vars.API_WEB_SITE_URL_DEV }}
           SITE_PROD: ${{ vars.API_WEB_SITE_URL_PROD }}
+          HOLD_DEV: ${{ vars.API_PAYOUT_HOLD_DAYS_DEV }}
+          HOLD_PROD: ${{ vars.API_PAYOUT_HOLD_DAYS_PROD }}
           WIF_DEV: ${{ vars.GCP_WIF_PROVIDER_DEV }}
           WIF_PROD: ${{ vars.GCP_WIF_PROVIDER_PROD }}
           SA_DEV: ${{ vars.GCP_DEPLOYER_SA_DEV }}
@@ -92,10 +96,10 @@ jobs:
           case "$ENVIRONMENT" in
             dev)  project=frisbee-app-brianrhonea-dev; cors="$CORS_DEV"
                   appcheck="${APP_CHECK_DEV:-false}"; max="${MAX_DEV:-3}"
-                  wif="$WIF_DEV"; sa="$SA_DEV"; site="$SITE_DEV" ;;
+                  wif="$WIF_DEV"; sa="$SA_DEV"; site="$SITE_DEV"; hold="${HOLD_DEV:-3}" ;;
             prod) project=frisbee-app-brianrhonea; cors="$CORS_PROD"
                   appcheck="${APP_CHECK_PROD:-false}"; max="${MAX_PROD:-10}"
-                  wif="$WIF_PROD"; sa="$SA_PROD"; site="$SITE_PROD" ;;
+                  wif="$WIF_PROD"; sa="$SA_PROD"; site="$SITE_PROD"; hold="${HOLD_PROD:-3}" ;;
             *) echo "::error::environment must be dev or prod"; exit 1 ;;
           esac
           # An unset variable reads as empty: dev falls back to localhost.
@@ -104,6 +108,7 @@ jobs:
           [ -z "$site" ] && echo "::notice::API_WEB_SITE_URL_${ENVIRONMENT^^} is empty: the website's cached pages refresh within a minute instead of at once."
           case "$site" in ""|https://*) ;; *) echo "::error::API_WEB_SITE_URL_* must start with https://"; exit 1 ;; esac
           case "$appcheck" in true|false) ;; *) echo "::error::API_ENFORCE_APP_CHECK_* must be true or false"; exit 1 ;; esac
+          case "$hold" in [0-9]|[12][0-9]|30) ;; *) echo "::error::API_PAYOUT_HOLD_DAYS_* must be 0 to 30"; exit 1 ;; esac
           if [ -n "$wif" ]; then
             [ -n "$sa" ] || { echo "::error::GCP_WIF_PROVIDER_${ENVIRONMENT^^} is set but GCP_DEPLOYER_SA_${ENVIRONMENT^^} isn't."; exit 1; }
             auth=wif
@@ -123,6 +128,7 @@ jobs:
             echo "appcheck=$appcheck"
             echo "max=$max"
             echo "site=$site"
+            echo "hold=$hold"
             echo "auth=$auth"
             echo "wif=$wif"
             echo "sa=$sa"
@@ -185,13 +191,18 @@ jobs:
           ENFORCE_APP_CHECK: ${{ steps.cfg.outputs.appcheck }}
           MAX_INSTANCES: ${{ steps.cfg.outputs.max }}
           WEB_SITE_URL: ${{ steps.cfg.outputs.site }}
+          PAYOUT_HOLD_DAYS: ${{ steps.cfg.outputs.hold }}
           IMAGE: ${{ inputs.image || steps.build.outputs.image }}
           REPO: ${{ steps.cfg.outputs.repo }}
         run: |
           case "$IMAGE" in "$REPO@sha256:"*) ;; *)
             echo "::error::Not an image digest from $REPO: '$IMAGE'"; exit 1 ;;
           esac
-          vars='${REGION} ${PROJECT_ID} ${RUNTIME_SA} ${IMAGE} ${CORS_ORIGINS} ${ENFORCE_APP_CHECK} ${MAX_INSTANCES} ${WEB_SITE_URL}'
+          # The payment jobs accept Cloud Scheduler's token only for this
+          # service's own URL and the payments-scheduler account (DEPLOY.md).
+          export JOBS_AUDIENCE="$(gcloud run services describe api --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')"
+          export JOBS_INVOKER="payments-scheduler@$PROJECT_ID.iam.gserviceaccount.com"
+          vars='${REGION} ${PROJECT_ID} ${RUNTIME_SA} ${IMAGE} ${CORS_ORIGINS} ${ENFORCE_APP_CHECK} ${MAX_INSTANCES} ${WEB_SITE_URL} ${PAYOUT_HOLD_DAYS} ${JOBS_AUDIENCE} ${JOBS_INVOKER}'
           envsubst "$vars" < apps/api/deploy/service.yaml > "$RUNNER_TEMP/service.yaml"
           cat "$RUNNER_TEMP/service.yaml"
           gcloud run services replace "$RUNNER_TEMP/service.yaml" \

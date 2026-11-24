@@ -1,7 +1,8 @@
 import '../../../domain/models/payments.dart';
 import '../../../utils/result.dart';
 
-/// Online payments for tournament fees (Stripe Connect), through the API.
+/// Online payments for tournament fees, through the API. Stall 10 takes
+/// each payment and sends the host its fee once the event is over.
 abstract class PaymentRepository {
   /// Whether the API is there: hosts' marks then go through it (and into
   /// the payment history) instead of straight to Firestore.
@@ -32,6 +33,11 @@ abstract class PaymentRepository {
   /// A Stripe page where the owner connects or finishes the account.
   Future<Result<Uri>> payoutLink(String teamId);
 
+  /// A session for Stripe's setup form inside the app (an AccountSession's
+  /// client secret, handed to the website's /embed/payouts page in a
+  /// WebView); owners only.
+  Future<Result<String>> payoutSession(String teamId);
+
   /// Whether the caller can pay online: [teamId]'s bid or spot fee, or
   /// without one their own entry fee.
   Future<Result<PayOptions>> payOptions(String tournamentId, {String? teamId});
@@ -39,10 +45,17 @@ abstract class PaymentRepository {
   /// A Stripe Checkout page for that fee.
   Future<Result<Uri>> checkout(String tournamentId, {String? teamId});
 
-  /// The same fee in the app's own payment sheet (a PaymentIntent on the
-  /// host's account).
+  /// The same fee in the app's own payment sheet (a PaymentIntent on
+  /// Stall 10's account).
   Future<Result<PaymentSheetRequest>> paymentSheet(
     String tournamentId, {
     String? teamId,
   });
+
+  /// The event's organizers refund [payerId]'s fee paid online (the fee
+  /// itself, not the service and processing fees).
+  Future<Result<void>> refund(String tournamentId, String payerId);
+
+  /// The host's fees paid online: held, sent, refunded (its organizers).
+  Future<Result<Earnings>> earnings(String teamId);
 }

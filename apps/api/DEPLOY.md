@@ -419,55 +419,137 @@ gitignored `apps/api/.env` (`.env.example` lists the names).
 ## Payments (Stripe Connect)
 
 Online payments for tournament fees (`src/payments`) need a Stripe
-account for Stall 10 (the platform) with Connect turned on. Until the
-API has all of `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` and a return
+account for Stall 10 (the platform) with Connect turned on. Since 0.47.0
+Stall 10 collects every payment on its own account and transfers each
+host's fee once the event is over (separate charges and transfers).
+Until the API has `STRIPE_SECRET_KEY`, a webhook secret and a return
 address (`PAYMENTS_RETURN_URL`, else `WEB_SITE_URL`), the payment routes
 say payments aren't set up and the app and website hide them.
 
 1. In the Stripe Dashboard (test mode for dev): Connect → get started as
-   a platform, with the **Merchant** configuration. Hosts' accounts are
-   made by the API with Accounts v2 (`POST /v2/core/accounts`,
-   `src/payments/stripe.ts`): the host paying Stripe's fees, Stripe
-   covering losses and the full Dashboard, so pick those when asked. Fill
-   in the platform profile and branding.
-2. Developers → Webhooks → add an endpoint **on connected accounts**
-   ("Events on Connected accounts") at
-   `https://<api host>/v1/payments/stripe/webhook`, with the events
-   `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
-   `checkout.session.async_payment_failed`, `checkout.session.expired`, `charge.refunded`,
-   `charge.dispute.created` and `account.updated`. Its signing secret
-   (`whsec_...`) is `STRIPE_WEBHOOK_SECRET`. A host's readiness doesn't
-   depend on `account.updated`: the payouts page asks Stripe (v2
-   `configuration.merchant.capabilities.card_payments.status`) until it's
-   `active`, and every checkout asks again first.
-3. Store both in Secret Manager and let `api-runtime` read them:
+   a platform, with the **Recipient** configuration (Stall 10 collects
+   and pays out). Hosts' accounts are made by the API with Accounts v2
+   (`POST /v2/core/accounts`, `src/payments/stripe.ts`): no Dashboard,
+   `stripe_transfers` only, Stall 10 paying Stripe's fees and covering
+   losses, so pick those when asked. Fill in the platform profile,
+   branding, statement descriptor and support email: payers see Stall 10
+   on their card statement. Prefer a restricted key (`rk_...`) with
+   PaymentIntents, Checkout Sessions, Charges, Refunds, Transfers,
+   Accounts and Account Sessions.
+2. Developers → Webhooks → two endpoints, both at
+   `https://<api host>/v1/payments/stripe/webhook`:
+   - **Your account** (platform events): `checkout.session.completed`,
+     `checkout.session.async_payment_succeeded`,
+     `checkout.session.async_payment_failed`, `checkout.session.expired`,
+     `payment_intent.succeeded`, `payment_intent.processing`,
+     `payment_intent.payment_failed`, `payment_intent.canceled`,
+     `charge.refunded`,
+     `charge.dispute.created` and `charge.dispute.closed`. Its signing
+     secret is `STRIPE_PLATFORM_WEBHOOK_SECRET`.
+   - **Connected accounts**: `account.updated` (and, while charges made
+     before 0.47.0 can still be refunded or disputed, the same charge
+     events). Its signing secret is `STRIPE_WEBHOOK_SECRET`.
+   The API accepts an event signed with either. A host's readiness
+   doesn't depend on `account.updated`: the payouts page asks Stripe (v2
+   `configuration.recipient.capabilities.stripe_balance.stripe_transfers.status`)
+   until it's `active`, and becoming ready sends anything already due.
+3. Store them in Secret Manager and let `api-runtime` read them:
 
 ```sh
-printf %s "<sk_test_...>" | gcloud secrets create STRIPE_SECRET_KEY --project="$PROJECT" --data-file=-
-printf %s "<whsec_...>" | gcloud secrets create STRIPE_WEBHOOK_SECRET --project="$PROJECT" --data-file=-
-for s in STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET; do
+printf %s "<rk_test_... or sk_test_...>" | gcloud secrets create STRIPE_SECRET_KEY --project="$PROJECT" --data-file=-
+printf %s "<whsec_... (platform)>" | gcloud secrets create STRIPE_PLATFORM_WEBHOOK_SECRET --project="$PROJECT" --data-file=-
+printf %s "<whsec_... (connect)>" | gcloud secrets create STRIPE_WEBHOOK_SECRET --project="$PROJECT" --data-file=-
+for s in STRIPE_SECRET_KEY STRIPE_PLATFORM_WEBHOOK_SECRET STRIPE_WEBHOOK_SECRET; do
   gcloud secrets add-iam-policy-binding "$s" --project="$PROJECT" \
     --member="serviceAccount:$RUNTIME_SA" --role=roles/secretmanager.secretAccessor
 done
 ```
 
-4. Only then add them under `env:` in `deploy/service.yaml`, the same way
-   as LiveKit above (a missing secret fails the whole revision):
-   `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` as `secretKeyRef`s.
-   `WEB_SITE_URL` is already there for the return address. The fee
-   defaults to 1% + $1; set `PLATFORM_FEE_BPS` / `PLATFORM_FEE_FIXED_CENTS`
-   there to change it (new payments only).
+4. `deploy/service.yaml` reads all three as `secretKeyRef`s, so they must
+   exist in a project before the API is deployed there (a missing secret
+   fails the whole revision). `WEB_SITE_URL` is the return address. The
+   fee defaults to 3%; set `PLATFORM_FEE_BPS` / `PLATFORM_FEE_FIXED_CENTS`
+   there to change it (new payments only). `PAYOUT_HOLD_DAYS` (0 to 30)
+   is how long after an event is marked finished its fees wait before
+   going to the host: repository variable `API_PAYOUT_HOLD_DAYS_<ENV>`,
+   default 3 (0 on dev makes testing payouts quicker).
+5. The scheduled jobs (below). The deploy fills in `JOBS_AUDIENCE` (the
+   service's own URL) and `JOBS_INVOKER`
+   (`payments-scheduler@<project>.iam.gserviceaccount.com`).
 
-Bank payments (ACH Direct Debit): the API requests the merchant
-`ach_debit_payments` capability on each host's account. Checkout
-shows bank payment once it's active and the host has it switched on in
-their own Stripe Dashboard (Settings → Payment methods); they clear in up
-to 4 business days (`checkout.session.async_payment_succeeded` or
-`_failed`). Hosts can also have teams cover the fees (`payerCoversFees` on
-the fee): the charge is grossed up with Stripe's card rate
-(`chargeCoveringFees`) and shown as a "Processing fee" line, the same for
-every payment method. Check card-network and state rules on passing fees
-to payers before switching payments on in production.
+Payouts: once an event is finished, its last day has passed (also its
+last day when each fee was paid, so moving an event earlier doesn't pay
+out sooner) and the hold after `finishedAt` (`PAYOUT_HOLD_DAYS`) is
+over, each paid fee is transferred to the host (`source_transaction` = the charge, so it
+waits for the funds). That runs when the event is set to finished, when a
+late payment succeeds, when a host's account becomes ready and when its
+earnings are read, and from the scheduled jobs below. Staff can also
+press **Send what's due to hosts** on the website's `/staff` page
+(`POST /v1/payments/release`). Refunds (`POST /v1/tournaments/:id/payments/:payerId/refund`)
+return the fee only and reverse the transfer if it was sent; what can't
+be reversed is the host's `owedCents` on `payoutAccounts/{team}`, taken
+off the next transfer. An organizer's refund of a fee already paid out
+to the host's bank (the reversal finds the host's balance short) is
+refused; staff refund it instead and the host owes it. Setting up or
+changing payouts (`/payouts/session`, `/payouts/link`) needs a sign-in in
+the last 15 minutes (the ID token's `auth_time`).
+
+### Scheduled payment jobs (Cloud Scheduler)
+
+Two jobs call the API with a Google-signed ID token (OIDC) for a
+dedicated service account; the API accepts only that account, with its
+own URL as the audience (`src/payments/jobs.ts`). Without
+`JOBS_AUDIENCE` and `JOBS_INVOKER` the routes don't exist.
+
+- `POST /v1/jobs/payments/release`: sends hosts what's due (hourly).
+- `POST /v1/jobs/payments/reconcile`: sends what's due, then checks every
+  payment and transfer against Stripe and records problems in
+  `paymentIssues/{charge}` (daily). Staff see them on `/staff`
+  (**Check against Stripe** runs it on demand). Read only towards
+  Stripe: it never moves money for a problem, staff fix what it finds.
+
+```sh
+API_URL="https://<api host>"
+gcloud iam service-accounts create payments-scheduler --project="$PROJECT"   --display-name="Cloud Scheduler: payment jobs"
+SCHED_SA="payments-scheduler@$PROJECT.iam.gserviceaccount.com"
+gcloud scheduler jobs create http payments-release --project="$PROJECT" --location=us-central1   --schedule="0 * * * *" --http-method=POST --uri="$API_URL/v1/jobs/payments/release"   --oidc-service-account-email="$SCHED_SA" --oidc-token-audience="$API_URL"
+gcloud scheduler jobs create http payments-reconcile --project="$PROJECT" --location=us-central1   --schedule="30 6 * * *" --time-zone="America/New_York" --http-method=POST   --uri="$API_URL/v1/jobs/payments/reconcile"   --oidc-service-account-email="$SCHED_SA" --oidc-token-audience="$API_URL"
+```
+
+The deploy sets `JOBS_AUDIENCE=$API_URL` and `JOBS_INVOKER=$SCHED_SA` on
+the service. Add a log-based alert on `"payment problems found"` (warning) so
+open problems reach someone.
+
+Staff approve each host's first payout, and each event once its payouts
+to the host pass $2,000, on `/staff`
+(**Waiting for approval**); until then those fees stay held. Design,
+invariants and threats: `docs/payments-security.md`.
+
+### Hardening checklist (before live)
+
+- A restricted key (`rk_live_...`): PaymentIntents and Checkout Sessions
+  (write), Charges and Disputes (read), Refunds, Transfers and transfer
+  reversals, Accounts v2, Account Sessions and Account Links. Only in
+  Secret Manager; rotate it and both webhook secrets on a schedule.
+- Webhook endpoints list only the events above, on the SDK's API
+  version; turn on Stripe's alerts for failed deliveries.
+- Radar: block on CVC or postal-code failure, require 3D Secure for
+  risky or large payments, velocity rules per card, IP and email.
+- Connected accounts: a payout delay of a few days; review first and
+  large payouts by hand.
+- Dashboard: statement descriptor ("STALL 10") and support email; 2FA
+  for every team member; limit who can refund there; dispute and
+  bank-change emails on.
+- Enforce App Check (`ENFORCE_APP_CHECK=true`) so only the real app and
+  site can start payments.
+
+Bank payments (ACH Direct Debit) are a payment method on Stall 10's own
+account (Settings → Payment methods); they clear in up to 4 business
+days (`checkout.session.async_payment_succeeded` or `_failed`). The
+payer pays Stall 10's fee and Stripe's estimated card fee on top
+(`onlineCharge`), one "Service and processing fees" line for every
+payment method. Check card-network and state rules on passing fees to
+payers before switching payments on in production.
 
 `paymentLog` (the payment history) is never deleted by the API; keep it
 out of any clean-up script. It holds no card or bank details, only who,
@@ -475,8 +557,8 @@ when, amounts and Stripe's ids.
 
 Locally, put test-mode values in the gitignored `apps/api/.env` and
 forward events with the Stripe CLI:
-`stripe listen --forward-connect-to localhost:8787/v1/payments/stripe/webhook`
-(its printed `whsec_...` is the local `STRIPE_WEBHOOK_SECRET`). Use live
+`stripe listen --forward-to localhost:8787/v1/payments/stripe/webhook --forward-connect-to localhost:8787/v1/payments/stripe/webhook`
+(it prints one `whsec_...` for both; put it in `STRIPE_WEBHOOK_SECRET`). Use live
 keys only on prod, and only once the legal pages cover payments.
 
 ## Video transcoding (later)

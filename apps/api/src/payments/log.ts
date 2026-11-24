@@ -19,6 +19,21 @@ export const paymentLogActions = [
   "marked_unpaid",
   "paying_another_way",
   "not_paying_another_way",
+  // Stall 10 collecting (0.47.0): the host's share sent, kept (Stall 10's
+  // own events), taken back after a refund or dispute (or owed when it
+  // couldn't be), and refunds through Stall 10 or Stripe's Dashboard.
+  "released",
+  "kept_by_stall10",
+  "transfer_reversed",
+  "owed_by_host",
+  "refund_started",
+  // An organizer's refund of a fee already paid out to the host's bank: refused, staff sort it out.
+  "refund_blocked",
+  // Staff approved a host's first (or a large) payout.
+  "payout_approved",
+  "refunded",
+  "refunded_on_stripe",
+  "dispute_won",
 ] as const;
 export type PaymentLogAction = (typeof paymentLogActions)[number];
 
@@ -32,7 +47,7 @@ export interface PaymentLogEntry {
   amountCents?: number;
   currency?: string;
   note?: string;
-  /** Stripe's ids, for looking it up in the host's Dashboard. */
+  /** Stripe's ids, for looking it up in the Dashboard (stripeAccount: a direct charge's host account). */
   stripeAccount?: string;
   checkoutSession?: string;
   paymentIntent?: string;

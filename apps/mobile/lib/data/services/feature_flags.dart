@@ -33,6 +33,11 @@ class FeatureFlags extends ChangeNotifier {
     // Profile details, privacy, visibility and username claims through
     // the API when the build has one.
     'use_api_profiles': true,
+    // Tournament status changes, the host's entry decisions, publishing a
+    // division's schedule and deleting events through the API when the
+    // build has one (answering invites, rosters, confirming seeds and
+    // publishing every division always do). Off writes Firestore directly.
+    'use_api_tournaments': true,
   };
 
   /// Flags fixed in code, for tests.
@@ -51,6 +56,7 @@ class FeatureFlags extends ChangeNotifier {
   bool get useApiTeams => _flag('use_api_teams');
   bool get useApiMembership => _flag('use_api_membership');
   bool get useApiProfiles => _flag('use_api_profiles');
+  bool get useApiTournaments => _flag('use_api_tournaments');
 
   bool _flag(String key) => _values[key] ?? defaults[key] ?? false;
 

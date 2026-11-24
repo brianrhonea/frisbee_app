@@ -82,7 +82,6 @@ class TeamHomeViewModel extends ChangeNotifier {
     unpinPost = Command1<void, String>((id) => _posts.unpinPost(teamId, id));
     joinTeam = Command1<String, String>(_joinTeam);
     joinGroup = Command0<void>(_joinGroup);
-    declineInvite = Command1<void, String>(_declineInvite);
     cancelJoinRequest = Command0<void>(
       () => _teams.cancelJoinRequest(teamId, uid),
     );
@@ -223,18 +222,19 @@ class TeamHomeViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  List<TeamTournamentInvite> _invites = const [];
+  TeamTournamentBusiness _business = const TeamTournamentBusiness();
   bool _invitesAsked = false;
 
   /// Tournament and league invites waiting on the team, for its admins
-  /// (manageTeam): the page's Accept / Decline card. Empty for others.
-  List<TeamTournamentInvite> get tournamentInvites => _invites;
+  /// (manageTeam): the page's Respond card. Empty for others.
+  List<TeamTournamentInvite> get tournamentInvites => _business.invites;
+
+  /// The team's entries still missing a roster or fee before the event:
+  /// Finish entry. Empty for others.
+  List<TeamEntryToFinish> get entriesToFinish => _business.toFinish;
 
   /// Run the team's entries: answer invites, enter tournaments.
   bool get canManageTeam => _team?.has(uid, TeamPermission.manageTeam) ?? false;
-
-  /// Turns down a tournament's invite (its id); the card drops it.
-  late final Command1<void, String> declineInvite;
 
   /// Asks once the team (and the user's say on it) is known.
   void _loadInvites({bool again = false}) {
@@ -245,28 +245,14 @@ class TeamHomeViewModel extends ChangeNotifier {
     repo.teamInvites(teamId).then((r) {
       if (_disposed) return;
       if (r case Ok(:final value)) {
-        _invites = value;
+        _business = value;
         notifyListeners();
       }
     });
   }
 
-  /// Fetches the invites again (back from accepting one, say).
+  /// Fetches the invites and entries again (back from the respond flow).
   void refreshInvites() => _loadInvites(again: true);
-
-  Future<Result<void>> _declineInvite(String tournamentId) async {
-    final repo = _hosted;
-    if (repo == null) return Result.error(Exception('Not available.'));
-    final r = await repo.declineInvite(tournamentId, teamId);
-    if (r is Ok) {
-      _invites = [
-        for (final i in _invites)
-          if (i.tournamentId != tournamentId) i,
-      ];
-      notifyListeners();
-    }
-    return r;
-  }
 
   final ChatRepository? _chats;
   StreamSubscription<List<ChatRoom>>? _roomsSub;

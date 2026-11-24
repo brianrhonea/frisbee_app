@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../data/repositories/profile/profile_repository.dart';
+import '../../../domain/models/player_profile.dart';
 import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/hosted_tournament/hosted_tournament_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
@@ -25,13 +27,16 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
     required HostedTournamentRepository tournamentRepository,
     required TeamRepository teamRepository,
     required AuthRepository authRepository,
+    ProfileRepository? profileRepository,
     DateTime Function()? now,
     HostedType? type,
   }) : assert(hostId != null || tournamentId != null),
        _repo = tournamentRepository,
        _teams = teamRepository,
-       _auth = authRepository {
-    final today = (now ?? DateTime.now)();
+       _auth = authRepository,
+       _profiles = profileRepository,
+       _now = now ?? DateTime.now {
+    final today = _now();
     // A month out on a Saturday, like most club events.
     var start = DateTime(today.year, today.month, today.day + 30);
     while (start.weekday != DateTime.saturday) {
@@ -87,6 +92,21 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
   final HostedTournamentRepository _repo;
   final TeamRepository _teams;
   final AuthRepository _auth;
+  final ProfileRepository? _profiles;
+
+  /// Whether the Director step can search members.
+  bool get canSearchPeople => _profiles != null;
+
+  /// Stall 10 members matching [query], for the Director step.
+  Future<List<PlayerProfile>> searchPeople(String query) async {
+    final repo = _profiles;
+    if (repo == null || query.trim().length < 2) return const [];
+    return switch (await repo.searchPlayers(query.trim())) {
+      Ok(:final value) => value,
+      Error() => const [],
+    };
+  }
+
   StreamSubscription<Team?>? _hostSub;
   StreamSubscription<HostedTournament?>? _tournamentSub;
   StreamSubscription<List<TournamentDivision>>? _divisionsSub;
@@ -126,15 +146,24 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
     'When & where',
     'Who can play',
     'Format & divisions',
-    'Fees',
+    'Fees & deadline',
+    'Director',
     'Review',
   ];
+
+  /// Index of the Director step.
+  static const directorStep = 5;
 
   int _step = 0;
 
   /// The step showing (an index into [steps]).
   int get step => _step;
   bool get onReview => _step == steps.length - 1;
+
+  /// Why a draft can't be published yet: registration opens 60 days
+  /// before the start ([registrationWindowProblem]). Save draft still works.
+  String? get publishProblem =>
+      isDraft ? registrationWindowProblem(_startsOn, _now()) : null;
 
   void goTo(int step) {
     final s = step.clamp(0, steps.length - 1);
@@ -171,6 +200,7 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
   String description = '';
   String location = '';
   late DateTime _startsOn;
+  final DateTime Function() _now;
   DateTime? _endsOn;
   TournamentVisibility visibility = TournamentVisibility.public;
 
@@ -180,8 +210,13 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
   String feeAmount = '';
   String currency = 'USD';
   String feeInstructions = '';
+
+  /// The entry deadline: rosters and fees are due (the fee's due date).
   DateTime? _feeDue;
   bool _payerCoversFees = false;
+
+  /// The tournament director, or null for none (a contact; no rights).
+  TournamentDirector? _director;
   HostedKind _kind = HostedKind.tournament;
   TournamentEntryType _entryType = TournamentEntryType.teams;
   DraftMode draftMode = DraftMode.balanced;
@@ -200,6 +235,27 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
   DateTime? get endsOn => _endsOn;
   bool get hasFee => _hasFee;
   DateTime? get feeDue => _feeDue;
+
+  /// When rosters and fees are due (the same as [feeDue]).
+  DateTime? get entryDeadline => _feeDue;
+
+  TournamentDirector? get director => _director;
+
+  void setDirector(TournamentDirector? d) {
+    _director = d;
+    notifyListeners();
+  }
+
+  /// The signed-in member, for "It's me" on the Director step.
+  String? get myUid => _auth.currentUser?.uid;
+
+  /// Their name on the host, else their account's (the website's
+  /// DirectorStep); empty when neither is known.
+  String get myName {
+    final uid = myUid;
+    final onHost = uid == null ? null : _host?.memberNames[uid];
+    return (onHost ?? _auth.currentUser?.displayName ?? '').trim();
+  }
 
   /// Paid online, payers also pay the processing fees so the host gets the
   /// whole fee.
@@ -343,6 +399,8 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
     _kind = t.kind;
     _entryType = t.entryType;
     draftMode = t.draftMode;
+    _director = t.director;
+    _feeDue = t.entryDeadline;
     _teamEntry = t.teamEntry;
     if (t.teamFee case final f?) {
       teamFeeAmount = (f.amountCents / 100).toStringAsFixed(
@@ -359,7 +417,7 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
       );
       currency = fee.currency;
       feeInstructions = fee.instructions;
-      _feeDue = fee.dueAt;
+      _feeDue = t.entryDeadline ?? fee.dueAt;
       _payerCoversFees = fee.payerCoversFees;
     }
   }
@@ -474,6 +532,10 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
     if (_hasFee && teamEntry && teamFeeCents == null) {
       return 'Enter the team spot fee, e.g. 300.';
     }
+    if (HostedTournament.deadlineProblem(_feeDue, _startsOn) case final p?) {
+      return p;
+    }
+    if (_director?.problem case final p?) return p;
     if (_wanted.isEmpty) return 'Open at least one division.';
     if (_wanted.length > HostedTournament.maxDivisions) {
       return 'Up to ${HostedTournament.maxDivisions} divisions.';
@@ -544,6 +606,8 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
       season: () => isLeague ? _season : null,
       draftMode: draftMode,
       inviteReplyDays: () => inviteReplyDays,
+      entryDeadline: () => _feeDue,
+      director: () => _director,
     );
     final format = _format.on(t);
     t = t.copyWith(format: format);

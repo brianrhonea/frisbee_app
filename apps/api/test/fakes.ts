@@ -11,8 +11,9 @@ import { AlreadyExists, type Data, type DocStore, deleteField, serverTime, type 
 export class FakeVerifier implements TokenVerifier {
   async verifyIdToken(token: string): Promise<Caller> {
     const [kind, uid, name] = token.split(":");
-    if ((kind !== "token" && kind !== "staff") || !uid) throw new Error("bad token");
-    return { uid, name, email: `${uid}@x.test`, ...(kind === "staff" && { staff: true }) };
+    if ((kind !== "token" && kind !== "staff" && kind !== "fresh") || !uid) throw new Error("bad token");
+    // "fresh": signed in just now (auth_time in the future of any test clock).
+    return { uid, name, email: `${uid}@x.test`, ...(kind === "staff" && { staff: true }), ...(kind === "fresh" && { authTime: 9_999_999_999 }) };
   }
 
   async verifyAppCheck(token: string): Promise<void> {

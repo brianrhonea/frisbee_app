@@ -4,6 +4,7 @@
 // EventFormatSection in the app). A new event is a tournament or a league,
 // and teams apply or players sign up; that's fixed once it's created.
 import {
+  registrationWindowProblem,
   currencies,
   type DivisionDoc,
   type Division,
@@ -41,12 +42,15 @@ import {
   entryChoiceOf,
   entryChoicesFor,
   entryFields,
+  directorSchema,
+  entryDeadlineProblem,
 } from "@stall10/shared";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
-import { FeeBreakdownNote, usePaymentFees } from "@/components/payments/Payments";
+import { FeeBreakdownNote, PayoutsCard, usePaymentFees } from "@/components/payments/Payments";
+import { DirectorStep } from "./DirectorStep";
 import type { TeamDoc } from "@/components/team/TeamContext";
 import { type Doc, useLiveDoc, useLiveQuery } from "@/lib/live";
 import { tournamentHref } from "./TournamentLists";
@@ -101,6 +105,17 @@ interface FormState {
   teamFeeAmount: string;
   format: FormFormat;
   wanted: Division[];
+  /** When rosters and fees are due (entryDeadline); the fee's due date follows it. */
+  entryDeadline: Date | null;
+  director: DirectorForm | null;
+}
+
+/** The director as the form edits them: a member (uid) or anyone by name. */
+export interface DirectorForm {
+  uid: string | null;
+  name: string;
+  email: string;
+  phone: string;
 }
 
 function blank(type: HostedType | null): FormState {
@@ -129,6 +144,8 @@ function blank(type: HostedType | null): FormState {
     teamFeeAmount: "",
     format: usualFormat({ kind, startsOn: start, endsOn }),
     wanted: ["mixed"],
+    entryDeadline: null,
+    director: null,
   };
 }
 
@@ -164,6 +181,8 @@ function filled(t: TournamentDoc, divisions: Array<Doc<DivisionDoc>>): FormState
     teamFeeAmount: t.teamFee ? amountOf(t.teamFee.amountCents) : "",
     format,
     wanted: divisions.map((d) => d.division),
+    entryDeadline: t.entryDeadline ? new Date(t.entryDeadline) : t.bidFee?.dueAt ? new Date(t.bidFee.dueAt) : null,
+    director: t.director ? { uid: t.director.uid ?? null, name: t.director.name, email: t.director.email ?? "", phone: t.director.phone ?? "" } : null,
   };
 }
 
@@ -177,6 +196,12 @@ function problemOf(f: FormState): string | null {
   if (f.hasFee && centsOf(f.feeAmount) == null) return `Enter the ${players ? "entry fee" : "bid fee"}, e.g. 250.`;
   if (f.hasFee && players && f.teamEntry && centsOf(f.teamFeeAmount) == null) return "Enter the team spot fee, e.g. 300.";
   if (f.wanted.length === 0) return "Open at least one division.";
+  const late = entryDeadlineProblem(f.entryDeadline, f.startsOn);
+  if (late) return late;
+  if (f.director) {
+    const d = directorSchema.safeParse(f.director);
+    if (!d.success) return d.error.issues[0]?.message ?? "Check the director's details.";
+  }
   if (f.kind === "league" && f.season.playoffTeams > 0) {
     if (f.season.playoffWeeks < 1) return "Give the playoffs at least one week.";
     if (f.season.playoffWeeks >= f.season.weeks) return "Leave at least one week for the regular season.";
@@ -190,7 +215,7 @@ function requestOf(f: FormState) {
   const teamEntry = players && f.teamEntry;
   const season = f.kind === "league" ? f.season : null;
   const fee = f.hasFee
-    ? { amountCents: centsOf(f.feeAmount) ?? 0, currency: f.currency, instructions: f.instructions.trim(), dueAt: f.feeDue?.toISOString() ?? null, payerCoversFees: f.payerCoversFees }
+    ? { amountCents: centsOf(f.feeAmount) ?? 0, currency: f.currency, instructions: f.instructions.trim(), dueAt: f.entryDeadline?.toISOString() ?? null, payerCoversFees: f.payerCoversFees }
     : null;
   return {
     name: f.name.trim(),
@@ -207,6 +232,8 @@ function requestOf(f: FormState) {
     inviteReplyDays: takesTeamsOf(f) ? f.inviteReplyDays : null,
     format: formatRequest(formatOn(f.format, { kind: f.kind, startsOn: f.startsOn, endsOn: f.endsOn, season })),
     divisions: allDivisions.filter((d) => f.wanted.includes(d)),
+    entryDeadline: f.entryDeadline?.toISOString() ?? null,
+    director: f.director ? { ...f.director, name: f.director.name.trim(), email: f.director.email.trim(), phone: f.director.phone.trim() } : null,
   };
 }
 
@@ -271,6 +298,8 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
   // Still a draft (or not created yet): Save draft and Publish. A published
   // event has a single Save, so editing it never changes where it stands.
   const isDraft = isNew || existing.data?.status === "draft";
+  // Registration opens 60 days before the start (the app's publishProblem).
+  const tooEarly = registrationWindowProblem(f.startsOn, Date.now());
   const lockedReason = (d: Division): string | null => {
     const div = divRows.data?.find((x) => x.division === d);
     if (!div) return null;
@@ -671,7 +700,23 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
       )}
       {step === 4 && (
         <section className="card settings-form">
-          <h2 className="card-title">Fees</h2>
+          <h2 className="card-title">Fees &amp; deadline</h2>
+          <label>
+            {players ? "Sign-ups and fees due" : "Rosters and fees due"}
+            <input
+              type="date"
+              value={dayValue(f.entryDeadline)}
+              max={dayValue(f.startsOn)}
+              onChange={(e) => {
+                const d = fromDay(e.target.value);
+                set({ entryDeadline: d ? new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59) : null });
+              }}
+            />
+            <small className="muted">
+              {f.entryDeadline ? "" : "Without one, it's the day before the event. "}
+              {players ? "Players" : "Teams"} get a reminder 3 days before, and you see who&apos;s missing.
+            </small>
+          </label>
           <label className="switch-row">
             <input type="checkbox" checked={f.hasFee} onChange={(e) => set({ hasFee: e.target.checked })} />
             <span>
@@ -707,20 +752,11 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
                     <input inputMode="decimal" placeholder="300" value={f.teamFeeAmount} onChange={(e) => set({ teamFeeAmount: e.target.value })} />
                   </label>
                 )}
-                <label>
-                  Due
-                  <input
-                    type="date"
-                    value={dayValue(f.feeDue)}
-                    onChange={(e) => {
-                      const d = fromDay(e.target.value);
-                      set({ feeDue: d ? new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59) : null });
-                    }}
-                  />
-                </label>
               </div>
               <FeeBreakdownNote user={user} amountCents={centsOf(f.feeAmount)} currency={f.currency} />
               {players && f.teamEntry && <FeeBreakdownNote user={user} amountCents={centsOf(f.teamFeeAmount)} currency={f.currency} />}
+              {/* Whether the host can take payments online, with setup right here. */}
+              {user && hostKey && <PayoutsCard user={user} teamId={hostKey} amountCents={centsOf(f.feeAmount) ?? undefined} />}
               {/* With online payments on, these are the other ways (a school's check or PO). */}
               <label>
                 {paymentFees?.available ? "Other ways to pay" : "How to pay"}
@@ -736,12 +772,14 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
           )}
         </section>
       )}
+      {step === directorStep && user && <DirectorStep user={user} f={f} host={host.data} onChange={(director) => set({ director })} />}
       {step === lastStep && <Review f={f} onEdit={setStep} />}
 
       {step === lastStep && isDraft && (
         <p className="muted small">Save draft keeps it to your managers. Publish puts it on the website and opens registration for {players ? "signups" : "teams"}.</p>
       )}
       {step === lastStep && problem && <p className="hosted-form-problem">{problem}</p>}
+      {step === lastStep && isDraft && !problem && tooEarly && <p className="hosted-form-problem">{tooEarly}</p>}
       {error && <p className="form-error">{error}</p>}
       <div className="home-actions hosted-form-nav">
         {step > 0 && (
@@ -754,7 +792,7 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
             Next: {formSteps[step + 1]}
           </button>
         ) : (
-          <button type="button" className="btn btn-primary" disabled={busy || !!problem} onClick={() => void save(isDraft)}>
+          <button type="button" className="btn btn-primary" disabled={busy || !!problem || (isDraft && !!tooEarly)} onClick={() => void save(isDraft)}>
             {isDraft ? "Publish" : "Save"}
           </button>
         )}
@@ -773,7 +811,8 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
 }
 
 /** The form's steps, in order (HostedTournamentFormViewModel.steps in the app); the last is Review. */
-const formSteps = ["Details", "When & where", "Who can play", "Format & divisions", "Fees", "Review"] as const;
+const formSteps = ["Details", "When & where", "Who can play", "Format & divisions", "Fees & deadline", "Director", "Review"] as const;
+const directorStep = 5;
 const lastStep = formSteps.length - 1;
 
 /** "Step 2 of 6 · When & where" over a bar of the steps; a step's segment jumps to it. */
@@ -835,13 +874,14 @@ function Review({ f, onEdit }: { f: FormState; onEdit: (step: number) => void })
     ],
     [
       4,
-      "Fees",
+      "Fees & deadline",
       !f.hasFee
         ? "No fee"
         : [`${players ? "Entry fee" : "Bid fee"}: ${money(f.feeAmount)}`, players && f.teamEntry ? `team spot: ${money(f.teamFeeAmount)}` : ""]
             .filter(Boolean)
-            .join(" · "),
+            .join(" · ") + (f.entryDeadline ? ` · due ${day(f.entryDeadline)}` : ""),
     ],
+    [5, "Director", f.director ? [f.director.name || "Name missing", f.director.uid ? "Stall 10 member" : f.director.email || f.director.phone].filter(Boolean).join(" · ") : "None"],
   ];
   return (
     <section className="card settings-form">

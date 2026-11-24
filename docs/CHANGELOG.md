@@ -13,6 +13,8 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.51  | 2026-11-23 | `feature/platform-payments`             |                     |
+| 0.0.50  | 2026-11-23 | `feature/tournament-flow`               |                     |
 | 0.0.49  | 2026-11-22 | `feature/tournament-invites-pay`        |                     |
 | 0.0.48  | 2026-11-22 | `feature/security-hardening`           |                     |
 | 0.0.47  | 2026-11-22 | `feature/profile-staff`                 |                     |
@@ -62,6 +64,81 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.51 — Stall 10 collects fees and pays hosts out
+
+With web 0.59.0 and API 0.47.0. Firestore rules changed (payments,
+events' `finishedAt` and deletes); no functions changes.
+
+- Payment sheet: PaymentIntents are on Stall 10's account, so
+  `PaymentSheetRequest.account` is null and `Stripe.stripeAccountId` is
+  cleared; the merchant shown is Stall 10.
+- `PaymentRepository.refund` and `.earnings` (`Earnings`, `EarningsItem`,
+  `EarningsStatus`); `EntryPayment.paidOnline` (note `paidOnlineNote`).
+- `RefundButton` (asks first, `refundPolicyNote`) replaces the paid switch
+  for fees paid online, on the event's Teams tab
+  (`HostedTournamentViewModel.refund`) and hat signups
+  (`PlayerSignupsViewModel.refund`).
+- Payouts card: new wording, held/sent/refunded/owed totals, and **Bank
+  account and payouts** (`PayoutsSetupScreen(manage: true)`, the
+  website's `/embed/payouts?view=manage`).
+- Payouts card: **Each fee** (`Earnings.items`). Payouts are sent a few
+  days after the event (`payoutTimingNote`).
+- `PayoutsSetupScreen` only loads the website's `/embed/payouts` at the
+  top (a `NavigationDelegate`), and hands Stripe's session over only to
+  that page.
+- Firestore rules: clients can't set `finishedAt` on an event, and only
+  drafts are deleted directly (others through the API). Registration
+  opens at most 60 days before the start (rules and API).
+- Event form: Publish waits until registration can open, 60 days before
+  the start (`registrationWindowProblem`, `publishProblem`); Save draft
+  still works.
+- Payouts card: says Stall 10 checks a host's first payout, and an
+  event's payouts once they pass $2,000 (`payoutReviewNote`).
+
+## 0.0.50 — Tournament flow: respond, deadline, seeds, director
+
+With web 0.58.0 and API 0.46.0. Firestore rules and functions changed.
+
+- **Respond flow** (`/tournaments/:id/respond?team=&step=`,
+  `RespondViewModel` + `RespondScreen`): Respond (Accept/Decline or
+  Apply, with team, division and captains) → Roster (or set later) →
+  Payment (`PayOnlineButton`, or pay later) → **Request confirmed!** /
+  **Request sent!** with the checklist. Replaces `EnterTeamScreen` and
+  `showApplyDialog`. Accepting an invite puts the team straight in.
+- Team page: one **Respond** button per invite, and **Entries to
+  finish** (`TeamTournamentBusiness.toFinish`) with **Finish entry**.
+  The event page's card has **Respond**, **Roster & fee** and
+  **Captains**.
+- Organizers: the guide's host steps confirm each division's seeds
+  (`confirmSeeds`) and publish every schedule at once (`publishAll`,
+  `PUT /schedule`); the Teams tab has **Confirm seeds** and **Roster
+  missing** flags, and the registration step counts teams missing a
+  roster or fee. Overdue uses the entry deadline (`effectiveDeadline`).
+- Event form: **Fees & deadline** (`entryDeadline`, which the fee's due
+  date follows, with the host's payments card) and a **Director** step
+  (`TournamentDirector`: a member found by name, or anyone by name,
+  email and phone). The event page shows a director card.
+- Payments: `PayoutsCard` shows **Payments: On / Finish setup / Not set
+  up**, tells non-owners who sets it up, and runs Stripe's onboarding in
+  the app (`PayoutsSetupScreen`, a WebView of the website's
+  `/embed/payouts`; `webview_flutter` 4.14.1). Team settings show it to
+  anyone who manages events.
+- A new paid hat signup goes on to Payment, then **You're signed up!**
+  (`signUpWithNextSteps`).
+- Writes the API also takes go through it while `use_api_tournaments`
+  (meta/flags, default on) is on: status, entries, seeds, publishing,
+  delete. Event saves, scores, signups and drafts still write Firestore.
+- Rules: `entryDeadline`, `director` (`validDirector`),
+  `seedsConfirmedAt`, entries' `roster`, `rosterSetAt` and `reason`.
+- Functions: `tournamentInvite` (push to a team's admins when invited),
+  `tournamentScheduled`, `tournamentFinal`, `entryDeadlineReminders`
+  (hourly: 3 days before and when it passes) and `tournamentDeleted`
+  (deletes the event's chats).
+- `firebase/scripts/set-staff.mjs --host <orgId>` lets staff host as the
+  official Stall 10 organization (badge **Stall 10 verified**).
+- Shared fixtures: `entry_checklist` (deadline, deadline check,
+  checklist).
 
 ## 0.0.49 — Tournament invites: reply-by time, team page answers
 

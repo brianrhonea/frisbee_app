@@ -1816,13 +1816,29 @@ service cloud.firestore {
                       && f.minRoster <= 30)));
       }
 
+      // The tournament director (directorSchema): a member by uid, or anyone by name.
+      function validDirector(d) {
+        return d == null
+          || (d is map
+              && d.keys().hasOnly(['uid', 'name', 'email', 'phone'])
+              && (d.get('uid', null) == null || d.uid is string)
+              && d.name is string && d.name.size() > 0 && d.name.size() <= 100
+              && validString(d.get('email', ''), 200)
+              && validString(d.get('phone', ''), 40));
+      }
+
       function validHosted(t) {
         return t.keys().hasOnly([
                  'hostId', 'hostName', 'hostKind', 'name', 'startsOn', 'endsOn',
                  'description', 'location', 'visibility', 'entryType', 'status',
                  'bidFee', 'kind', 'season', 'draftMode', 'divisions',
                  'hostOfficial', 'format', 'teamEntry', 'teamFee',
-                 'inviteReplyDays', 'createdBy', 'createdAt'])
+                 'inviteReplyDays', 'entryDeadline', 'director',
+                 'createdBy', 'createdAt', 'finishedAt'])
+          // Rosters and fees due by (effectiveDeadline); the director is a contact.
+          && (t.get('entryDeadline', null) == null
+              || (t.entryDeadline is timestamp && t.entryDeadline <= t.startsOn))
+          && validDirector(t.get('director', null))
           // Days before the start invited teams answer by (inviteReplyChoices).
           && t.get('inviteReplyDays', null) in [null, 3, 7, 14, 21, 30]
           // Teams reserving spots alongside players who sign up.
@@ -1857,20 +1873,43 @@ service cloud.firestore {
           || get(teamPath(t.hostId)).data.get('official', false) == true;
       }
 
+      // Registration opens at most 60 days before the start
+      // (registrationWindowDays in packages/shared): fees aren't held long.
+      function inWindow(t) {
+        return t.startsOn is timestamp
+          && t.startsOn <= request.time + duration.value(60, 'd');
+      }
       allow read: if signedIn() && visible(resource.data);
       allow create: if signedIn()
+        && (request.resource.data.get('status', 'draft') == 'draft'
+            || inWindow(request.resource.data))
         && manages(request.resource.data)
         && request.resource.data.createdBy == uid()
         && request.resource.data.createdAt == request.time
+        && !('finishedAt' in request.resource.data)
         && validHosted(request.resource.data)
         && officialHost(request.resource.data);
+      // finishedAt is the server's (it starts the payout hold for fees
+      // paid online).
       allow update: if signedIn()
         && manages(resource.data)
         && request.resource.data.hostId == resource.data.hostId
         && !('createdBy' in changed()) && !('createdAt' in changed())
+        // Clients may only drop finishedAt (reopening), never set it.
+        && (!('finishedAt' in changed()) || !('finishedAt' in request.resource.data))
+        && (request.resource.data.get('status', '') == 'finished'
+            || !('finishedAt' in request.resource.data))
+        // Opening registration, or moving a published event's date: within the window.
+        && (request.resource.data.get('status', 'draft') in ['draft', 'finished']
+            || !(('status' in changed() && request.resource.data.status == 'registration')
+                 || 'startsOn' in changed())
+            || inWindow(request.resource.data))
         && validHosted(request.resource.data)
         && officialHost(request.resource.data);
-      allow delete: if signedIn() && manages(resource.data);
+      // Only a draft is deleted here; any other event is deleted through
+      // the API, which refuses while it holds fees paid online.
+      allow delete: if signedIn() && manages(resource.data)
+        && resource.data.get('status', 'draft') == 'draft';
 
       // Divisions: format, seeds and which uids report each team's scores.
       match /divisions/{divisionId} {
@@ -1880,7 +1919,8 @@ service cloud.firestore {
         function validDivision(d) {
           return d.keys().hasOnly(['division', 'level', 'settings', 'maxTeams',
                                    'seeds', 'captains', 'placements',
-                                   'minRoster', 'teams'])
+                                   'minRoster', 'teams', 'seedsConfirmedAt'])
+            && (d.get('seedsConfirmedAt', null) == null || d.seedsConfirmedAt is timestamp)
             && (d.get('minRoster', null) == null
                 || (d.minRoster is int && d.minRoster >= 2
                     && d.minRoster <= 30))
@@ -2016,8 +2056,12 @@ service cloud.firestore {
         function validEntry(e) {
           return e.keys().hasOnly(['teamName', 'divisionId', 'status',
                                    'captainIds', 'teamId', 'replyBy',
+                                   'roster', 'rosterSetAt', 'reason',
                                    'updatedAt'])
             && e.get('teamId', teamId) == teamId
+            // The players named for the event (set through the API) and why a team withdrew.
+            && e.get('roster', []) is list && e.get('roster', []).size() <= 60
+            && e.get('reason', null) in [null, 'declined']
             && (e.get('replyBy', null) == null || e.replyBy is timestamp)
             && e.teamName is string && e.teamName.size() > 0
             && e.teamName.size() <= 100
@@ -2041,6 +2085,9 @@ service cloud.firestore {
             && request.resource.data.status == 'applied'
             && inviteOpen()
             && t.status == 'registration'
+            // The event roster is set through the API (it checks the players).
+            && request.resource.data.get('roster', [])
+                 == (resource == null ? [] : resource.data.get('roster', []))
             // Player-entry events take teams only when they reserve spots.
             && (t.entryType != 'players' || t.get('teamEntry', false))
             && (t.visibility == 'public'
@@ -2055,7 +2102,8 @@ service cloud.firestore {
         function teamWithdraws() {
           return teamAdmin(teamId)
             && request.resource.data.status == 'withdrawn'
-            && changed().hasOnly(['status', 'updatedAt']);
+            // An invite turned down says so (reason "declined").
+            && changed().hasOnly(['status', 'reason', 'updatedAt']);
         }
 
         allow read: if signedIn() && visible(current());
@@ -2166,8 +2214,17 @@ service cloud.firestore {
               || request.resource.data.offlineAt is timestamp)
           && (request.resource.data.paidAt == null
               || request.resource.data.paidAt is timestamp)
-          && validString(request.resource.data.note, 200);
-        allow delete: if signedIn() && manages(current());
+          && validString(request.resource.data.note, 200)
+          // A fee paid online through Stall 10 (the API's note) is
+          // refunded through the API, never unmarked or re-noted here, and
+          // only the API says a fee was paid online.
+          && request.resource.data.note != 'Paid online through Stall 10'
+          && !paidOnline();
+        allow delete: if signedIn() && manages(current()) && !paidOnline();
+        function paidOnline() {
+          return resource != null && resource.data.get('paid', false) == true
+            && resource.data.get('note', '') == 'Paid online through Stall 10';
+        }
       }
     }
 

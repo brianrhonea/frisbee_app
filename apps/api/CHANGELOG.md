@@ -7,6 +7,141 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.47.0 — 2026-11-23
+
+Stall 10 collects every fee and pays hosts out (separate charges and
+transfers). With app 0.0.51 and web 0.59.0.
+
+- **Charges on Stall 10's account.** Checkout Sessions and PaymentIntents
+  no longer use the host's account or an application fee; they carry
+  `transfer_group: tournament_<id>` and the charge doc records
+  `flow: "platform"`, the destination account and `released: false`.
+  Charges made before this (no `flow`) keep the old direct-charge
+  handling, so nothing is paid twice.
+- **Payout accounts are recipients.** New accounts are Accounts v2 with
+  `dashboard: "none"`, the `recipient` configuration (`stripe_transfers`)
+  and Stall 10 as fees and losses collector. `payoutAccounts/{team}`
+  gets `model: "recipient"`; hosts with an old account set up again
+  (the old id is kept as `legacyAccount`).
+- **Release.** Once the event is finished and its last day has passed,
+  each paid fee is transferred to the host (`source_transaction` = the
+  charge, idempotency key `transfer:<session>:<n>`), less anything the
+  host owes. Runs when the event is set to finished, when a late payment
+  succeeds, when the host's account becomes ready, when its earnings are
+  read, and from the staff sweep `POST /v1/payments/release`. Stall 10's
+  own events (official hosts) keep their fees.
+- **Refunds.** `POST /v1/tournaments/:id/payments/:payerId/refund`
+  (organizers or staff) refunds the fee only; service and processing
+  fees aren't refunded. After release the transfer is reversed; what
+  can't be reversed is owed and taken off the next payout.
+- **Disputes.** `charge.dispute.created` marks the fee disputed and
+  claws the transfer back; a won dispute (`charge.dispute.closed`) frees
+  it again.
+- **Earnings.** `GET /v1/teams/:teamId/earnings`: held, sent, refunded,
+  disputed and owed totals with each fee.
+- **Webhooks.** Platform events (charges, refunds, disputes) are signed
+  with `STRIPE_PLATFORM_WEBHOOK_SECRET`, Connect events with
+  `STRIPE_WEBHOOK_SECRET`; either verifies.
+- Deleting an event is refused while it holds fees paid online.
+- **Security (review, 2026-11-23).**
+  - An organizer's refund of a fee already paid out to the host's bank
+    is refused (it was paid from Stall 10's balance); staff can refund it,
+    leaving it owed. A reversal counts as owed only on Stripe's
+    insufficient-balance error (`InsufficientBalance`); any other failure
+    is retried with the same key.
+  - Payout hold: fees go out `PAYOUT_HOLD_DAYS` (default 3) after the
+    server-stamped `finishedAt`, and never before the event's last day
+    as it was when the fee was paid (`eventEndsAt` on the charge), so
+    moving an event earlier doesn't pay out sooner.
+  - Debt a fee paid off (`owedTakenCents`, now kept on the charge) comes
+    back when that fee is refunded or disputed. A dispute won after a
+    reversal that was left owed cancels the debt instead of paying the
+    host twice; what was already recovered is sent back
+    (`credit:<session>`).
+  - A transfer is confirmed only by the run that planned it, and a fee
+    refunded or disputed while its transfer went out is taken back.
+  - Setting up or changing payouts needs a sign-in in the last 15
+    minutes (`Caller.authTime`, `payoutsReauthMessage`).
+  - Organizers can't mark a fee "Paid online through Stall 10" by hand,
+    or change one that was, through either payments route
+    (`paymentProblem` for hat signups too); a refund finds an earlier
+    paid charge when a newer attempt is the latest.
+  - Only `payment_status: "paid"` counts as paid.
+  - Reopening an event clears `finishedAt` (clients must drop it too), so
+    finishing again starts a new hold; the daily check waits for the
+    hold before flagging `payout_overdue`, and flags `credit_unsent`.
+  - Fraud checks: staff approve each host's first payout, and an event's
+    payouts once their total to the host would pass $2,000
+    (`charge.review`, `POST /v1/staff/payments/:session/approve`,
+    `payoutAccounts.approvedAt`, `eventSent`, `approvedEvents`); organizers can't pay online for their
+    own event (`selfPaymentMessage`); a fee paid after the event waits the
+    hold from when it was paid.
+  - Stripe forgets idempotency keys after 24 hours: a release planned over
+    an hour ago is looked up (`findTransfer`, metadata `release`) before
+    it's sent again, and a refund started before checks what Stripe
+    already refunded.
+  - A team holding fees, owed money or an unsent credit can't be deleted.
+- **Registration window.** Registration opens at most 60 days before an
+  event starts (`registrationWindowProblem` in packages/shared, the
+  status route and moving an open event's date; Firestore rules too). The
+  location can be added later; once registration is open, fees can be
+  paid at any time.
+- `docs/payments-security.md`: the design, invariants, threats and gaps.
+- Failure simulation tests (`payments.test.ts`, "failure simulation"; see
+  `docs/payments-failure-testing.md`). Found: a double-clicked refund
+  could start twice; refunds now take a one-minute lock
+  (`refundLease`), freed at once if the refund fails.
+- **Oversight.** `GET /v1/staff/payments` (staff): open problems and the
+  latest payments. `POST /v1/payments/reconcile` (staff) and the Cloud
+  Scheduler jobs `POST /v1/jobs/payments/release` and `/reconcile`
+  (Google OIDC from `JOBS_INVOKER` for `JOBS_AUDIENCE`): the daily check of
+  every payment and transfer against Stripe (`src/payments/reconcile.ts`),
+  recorded in `paymentIssues/{charge}` and `paymentChecks/latest`. New
+  dependency `google-auth-library`.
+- New payment log actions: `released`, `kept_by_stall10`,
+  `transfer_reversed`, `owed_by_host`, `refund_started`, `refunded`,
+  `refunded_on_stripe`, `dispute_won`.
+
+## 0.46.0 — 2026-11-23
+
+Tournament flow: respond, roster, deadline, seeds and publishing, director.
+
+- `PUT /v1/tournaments/:id/entries/:teamId` answers `{ status }`. An
+  invited team that accepts is in straight away (`accepted`, added to the
+  division's seeds and captains), or `waitlisted` when the division is
+  full; the organizer no longer accepts it a second time. The roster
+  minimum is no longer checked here: it moved to the roster.
+- `PUT /v1/tournaments/:id/entries/:teamId/roster` (team admins and
+  captains): the players the team brings (from its roster, at least the
+  division's minimum, up to 60), stored as `roster` and `rosterSetAt`;
+  locked once the event is live.
+- Declining an invite withdraws the entry with `reason: "declined"`;
+  the reason is cleared if the team comes back.
+- `GET /v1/teams/:teamId/tournament-invites` answers
+  `{ invites, toFinish }`: `toFinish` lists the team's entries still
+  missing a roster or fee before the event (`entryChecklist`).
+- Tournaments store `entryDeadline` (rosters and fees due; must be by
+  the start) and `director` (`{ uid?, name, email?, phone? }`; a member
+  must be a real account). The fee's `dueAt` follows the deadline.
+  Shared helpers: `effectiveDeadline`, `entryDeadlineProblem`,
+  `entryChecklist`, `directorSchema` (fixtures/entry_checklist).
+- `PUT .../divisions/:d/seeds` takes `confirm` and sets
+  `seedsConfirmedAt`; changing the order (or a team joining or leaving
+  the seeds) clears it.
+- `PUT /v1/tournaments/:id/schedule`: publishes every division at once
+  (each division's seeds must be confirmed) and makes the event
+  `scheduled`.
+- Deleting a tournament deletes its chats with the organizers first (the
+  Captains' channel and team threads: their conversations and messages,
+  so they leave everyone's inbox); the `tournamentDeleted` function then
+  removes the chat pointers and attachments.
+- Payments: `GET /v1/teams/:id/payouts` is readable by anyone who
+  manages events (`canSetUp`, `ownerName`; only the owner sets it up).
+  `POST /v1/teams/:id/payouts/session` (owner) answers an AccountSession
+  client secret for Stripe's embedded onboarding.
+- Visitors' tournament pages add `directorName` and `entryDeadline`
+  (never the director's email or phone).
+
 ## 0.45.0 — 2026-11-22
 
 - Tournaments store `inviteReplyDays` (null or 3/7/14/21/30). An invite's

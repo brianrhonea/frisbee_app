@@ -10,6 +10,40 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.51
+
+- **Stall 10 now takes fee payments and pays hosts.** Teams and players
+  pay Stall 10, and the host gets the whole fee once the event is over.
+  Hosts add their bank details in Stall 10 and don't need a Stripe
+  account; if you set up payments before, set them up again.
+- **Refunds in the app.** Organizers can refund a fee paid online from
+  the event's Teams tab or the hat signups. The fee comes back; the
+  service and processing fees don't.
+- **See what you've been paid.** The payments card shows what's held,
+  sent and refunded, with your bank account and payouts.
+
+## 0.0.50
+
+**Tournaments**
+- Answer a tournament invite with one **Respond** button: accept or
+  decline first, then pick who's playing (or later), then pay the fee
+  (or later). You get **Request confirmed!** with what's still to do.
+- Your team page lists entries that still need a roster or the fee,
+  with **Finish entry**.
+- Organizers set one deadline for rosters and fees, see which teams
+  are missing either, confirm each division's seeds, and publish every
+  schedule at once.
+- Events can name a tournament director: a Stall 10 member you can
+  message, or anyone with an email and phone.
+- After signing up for a paid hat tournament you can pay right away or
+  later.
+
+**Payments**
+- Setting up payments happens inside the app, and every organizer can
+  see whether payments are on.
+
+---
+
 ## 0.0.49
 
 **Tournaments**

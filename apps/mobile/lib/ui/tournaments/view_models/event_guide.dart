@@ -27,6 +27,12 @@ enum GuideAction {
 
   /// The Schedule tab, on a division, to publish it.
   publishSchedule,
+
+  /// Confirm a division's seeds as they stand (the run sheet).
+  confirmSeeds,
+
+  /// Publish every division's schedule at once.
+  publishAll,
   signUp,
   apply,
 
@@ -132,6 +138,11 @@ class EventGuide {
     final review = players && (pendingPlayers > 0 || pendingTeams == 0)
         ? GuideAction.reviewPlayers
         : GuideAction.reviewTeams;
+    // Accepted teams still missing a roster or their fee (flagged, and
+    // reminded before the deadline).
+    final noRoster = t.takesTeams ? vm.teamsMissingRoster.length : 0;
+    final unpaid = t.takesTeams ? vm.teamsUnpaid.length : 0;
+    final before = status.index < HostedStatus.scheduled.index;
 
     // 1. Divisions.
     final hasDivisions = divisions.isNotEmpty;
@@ -174,6 +185,8 @@ class EventGuide {
           detail: [
             if (pending > 0) '$pending waiting for you',
             '$accepted ${accepted == 1 ? noun.substring(0, noun.length - 1) : noun} accepted',
+            if (noRoster > 0) '$noRoster missing a roster',
+            if (unpaid > 0) '$unpaid unpaid',
           ].join(' · '),
           state: GuideStepState.current,
           button: pending > 0
@@ -186,8 +199,11 @@ class EventGuide {
       default:
         registration = GuideStep(
           title: 'Registration closed',
-          detail:
-              '$accepted ${accepted == 1 ? noun.substring(0, noun.length - 1) : noun} accepted',
+          detail: [
+            '$accepted ${accepted == 1 ? noun.substring(0, noun.length - 1) : noun} accepted',
+            if (noRoster > 0) '$noRoster missing a roster',
+            if (unpaid > 0) '$unpaid unpaid',
+          ].join(' · '),
           state: GuideStepState.done,
           secondary: status == HostedStatus.seeding
               ? _button('Reopen', GuideAction.openRegistration)
@@ -257,23 +273,34 @@ class EventGuide {
               ),
       );
     } else {
-      final unseeded = [
+      final unconfirmed = [
         for (final d in divisions)
-          if (d.seeds.isEmpty) d,
+          if (!d.seedsConfirmed) d,
       ];
-      final done = hasDivisions && unseeded.isEmpty;
+      final done = hasDivisions && (!before || unconfirmed.isEmpty);
+      final next = unconfirmed.firstOrNull;
+      final many = divisions.length > 1;
       teams = GuideStep(
-        title: 'Seed the teams',
+        title: 'Confirm the seeds',
         detail: done
-            ? 'Every division is seeded.'
-            : 'Put each division\'s accepted teams in order, strongest first.',
+            ? 'Every division\'s seeds are confirmed.'
+            : 'Put each division\'s accepted teams in order, strongest '
+                  'first, then confirm. ${divisions.length - unconfirmed.length} '
+                  'of ${divisions.length} confirmed.',
         state: done
             ? GuideStepState.done
-            : after
+            : after || status == HostedStatus.registration
             ? GuideStepState.current
             : GuideStepState.todo,
-        button: after && !done
-            ? _button('Seed teams', GuideAction.reviewTeams)
+        button: !done && next != null && next.seeds.length >= 2
+            ? _button(
+                'Confirm seeds${many ? ' · ${next.label}' : ''}',
+                GuideAction.confirmSeeds,
+                next.id,
+              )
+            : null,
+        secondary: !done && next != null
+            ? _button('Change the order', GuideAction.reviewTeams, next.id)
             : null,
       );
     }
@@ -286,6 +313,11 @@ class EventGuide {
     final scheduleDone = hasDivisions && unpublished.isEmpty;
     final ready = teams.state == GuideStepState.done;
     final many = divisions.length > 1;
+    // Drafted divisions still need their seeds confirmed before publishing.
+    final toConfirm = [
+      for (final d in divisions)
+        if (!d.seedsConfirmed) d,
+    ];
     final schedule = GuideStep(
       title: 'Publish the schedule',
       detail: scheduleDone
@@ -298,11 +330,31 @@ class EventGuide {
           : ready
           ? GuideStepState.current
           : GuideStepState.todo,
-      button: ready && !scheduleDone
+      button: !ready || scheduleDone
+          ? null
+          // Already scheduled: a division still without games is published
+          // on its own (publishing all again would redo the others).
+          : !before
           ? _button(
               'Publish the schedule${many ? ' · ${unpublished.first.label}' : ''}',
               GuideAction.publishSchedule,
               unpublished.first.id,
+            )
+          : toConfirm.isNotEmpty
+          ? _button(
+              'Confirm seeds${many ? ' · ${toConfirm.first.label}' : ''}',
+              GuideAction.confirmSeeds,
+              toConfirm.first.id,
+            )
+          : _button(
+              many ? 'Publish every schedule' : 'Publish the schedule',
+              GuideAction.publishAll,
+            ),
+      secondary: ready && !scheduleDone && before
+          ? _button(
+              'Preview',
+              GuideAction.publishSchedule,
+              (toConfirm.firstOrNull ?? unpublished.firstOrNull)?.id,
             )
           : null,
     );
@@ -490,8 +542,10 @@ class EventGuide {
         return EventGuide(
           eyebrow: invite.teamName,
           title: "You're invited",
-          body: 'Accept to enter ${invite.teamName} and pick its captains.',
-          button: _button('Accept invite', GuideAction.acceptInvite),
+          body:
+              'Accept or decline, then set the roster and pay the fee (now '
+              'or before the deadline).',
+          button: _button('Respond', GuideAction.acceptInvite),
           needsYou: true,
         );
       }

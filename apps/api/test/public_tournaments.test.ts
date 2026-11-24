@@ -479,8 +479,21 @@ describe("visitors' tournament pages", () => {
           "teamFee",
           "season",
           "draftMode",
+          "directorName",
+          "entryDeadline",
         ].sort(),
       );
+    });
+
+    it("shows visitors the director's name only, never their email or phone", async () => {
+      t.repo.tournaments.set(
+        "fall",
+        tournament({ director: { uid: "tdUid", name: "Dana Director", email: "dana@example.com", phone: "555-0100" } }),
+      );
+      const body = (await t.get("/v1/public/tournaments/fall")).json();
+      expect(body.tournament.directorName).toBe("Dana Director");
+      const all = strings(body);
+      for (const hidden of ["tdUid", "dana@example.com", "555-0100"]) expect(all, hidden).not.toContain(hidden);
     });
 
     it("gives drafted teams their id and name only, never a player's name", async () => {

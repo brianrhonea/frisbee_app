@@ -6,9 +6,13 @@ import '../../../data/repositories/payment/payment_repository.dart';
 import '../../../data/services/payment_sheet_service.dart';
 import '../../../domain/models/hosted_tournament.dart';
 import '../../../domain/models/payments.dart';
+import '../../../utils/result.dart';
+import '../../core/themes/theme.dart';
+import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/view_model_host.dart';
 import '../view_models/payments_viewmodels.dart';
+import 'payouts_setup_screen.dart';
 
 /// Stripe's pages open in the browser: entry fees are for real-world
 /// events, which Apple and Google let apps take payment for outside
@@ -68,6 +72,48 @@ void _showError(BuildContext context, Object? error) => ScaffoldMessenger.of(
   context,
 ).showSnackBar(SnackBar(content: Text(errorMessage(error))));
 
+/// "Refund" for a fee paid online (the event's organizers): asks first,
+/// saying what comes back, then shows any error. The payment record says
+/// "Refunded through Stall 10" once it's done.
+class RefundButton extends StatelessWidget {
+  const RefundButton({
+    super.key,
+    required this.name,
+    required this.amountCents,
+    required this.running,
+    required this.onRefund,
+    required this.result,
+  });
+
+  final String name;
+  final int amountCents;
+  final bool running;
+  final Future<void> Function() onRefund;
+  final Result<void>? Function() result;
+
+  @override
+  Widget build(BuildContext context) => TextButton(
+    onPressed: running
+        ? null
+        : () async {
+            final ok = await confirmDialog(
+              context,
+              title: 'Refund ${centsLabel(amountCents)} to $name?',
+              message:
+                  '$refundPolicyNote If Stall 10 already sent you the fee, '
+                  'it comes back out of your payouts.',
+              confirmLabel: 'Refund',
+              destructive: true,
+            );
+            if (!ok || !context.mounted) return;
+            await onRefund();
+            if (!context.mounted) return;
+            if (result() case Error(:final error)) _showError(context, error);
+          },
+    child: const Text('Refund'),
+  );
+}
+
 /// "We'll pay another way" (a school's check or PO), so the host sees it's
 /// coming; or, once said, a way to take it back.
 Widget _offline(BuildContext context, PayOnlineViewModel vm) {
@@ -122,8 +168,10 @@ Widget _offline(BuildContext context, PayOnlineViewModel vm) {
   );
 }
 
-/// The host owner's "Get paid online" card. Shows nothing until the server
-/// says online payments are available (and the user is the owner).
+/// A host's "Payments: On / Finish setup / Not set up" card, with setup
+/// inside the app (Stripe's form in [PayoutsSetupScreen]). The host's
+/// owner sets it up; other managers see the status and who to ask. Shows
+/// nothing until the server says online payments are available.
 class PayoutsCard extends StatelessWidget {
   const PayoutsCard({
     super.key,
@@ -168,24 +216,29 @@ class PayoutsCard extends StatelessWidget {
       PayoutStatus.none => (
         'Take payments online',
         'Let teams and players pay their fees in Stall 10 instead of '
-            'collecting them yourself. Payments go to your own Stripe '
-            'account, and you get the whole fee: payers also pay Stall '
-            "10's ${a.feeLabel} and Stripe's card fee.",
-        'Set up with Stripe',
+            'collecting them yourself. Stall 10 takes the payments and '
+            'sends you the whole fee a few days after each event: payers also '
+            "pay Stall 10's ${a.feeLabel} and Stripe's card fee. Add your "
+            "bank details here; you don't need a Stripe account.",
+        'Set up payments',
       ),
       PayoutStatus.pending => (
         'Finish setting up payments',
-        'Stripe still needs a few details before you can take payments.',
-        'Continue with Stripe',
+        'Stripe needs a few more details before Stall 10 can send you '
+            'your fees.',
+        'Finish setup',
       ),
       PayoutStatus.ready => (
         'Online payments are on',
-        'Teams and players can pay their fees in Stall 10. Refunds and '
-            'payouts are in your Stripe Dashboard. You get the whole fee: '
-            "payers also pay Stall 10's ${a.feeLabel} and Stripe's card fee.",
+        'Teams and players pay their fees in Stall 10, and Stall 10 sends '
+            'you the whole fee a few days after each event. $payoutReviewNote '
+            'Refund a team from '
+            "the event's Teams tab. Payers also pay Stall 10's "
+            "${a.feeLabel} and Stripe's card fee.",
         null,
       ),
     };
+    final e = vm.earnings;
     return Card(
       margin: const EdgeInsets.only(top: 12),
       child: Padding(
@@ -205,6 +258,7 @@ class PayoutsCard extends StatelessWidget {
                 Expanded(
                   child: Text(title, style: theme.textTheme.titleMedium),
                 ),
+                PayoutsStatusChip(status: a.status),
               ],
             ),
             const SizedBox(height: 8),
@@ -214,12 +268,106 @@ class PayoutsCard extends StatelessWidget {
               currency: 'USD',
               compact: true,
             ),
-            if (action != null) ...[
+            if (!e.isEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                key: const Key('payout-totals'),
+                [
+                  'Held ${centsLabel(e.heldCents)}',
+                  'Sent ${centsLabel(e.sentCents)}',
+                  if (e.refundedCents > 0)
+                    'Refunded ${centsLabel(e.refundedCents)}',
+                  if (e.disputedCents > 0)
+                    'Disputed ${centsLabel(e.disputedCents)}',
+                ].join(' · '),
+                style: theme.textTheme.bodyMedium,
+              ),
+              if (e.owedCents > 0)
+                Text(
+                  '${centsLabel(e.owedCents)} taken back after a refund or '
+                  'dispute comes off your next payout.',
+                  style: theme.textTheme.bodySmall,
+                ),
+              if (e.items.isNotEmpty)
+                ExpansionTile(
+                  key: const Key('payout-items'),
+                  tilePadding: EdgeInsets.zero,
+                  childrenPadding: const EdgeInsets.only(bottom: 8),
+                  title: Text(
+                    'Each fee (${e.items.length})',
+                    style: theme.textTheme.titleSmall,
+                  ),
+                  children: [
+                    for (final i in e.items)
+                      ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(i.label),
+                        subtitle: Text(
+                          [
+                            i.status.label,
+                            if (i.at != null)
+                              MaterialLocalizations.of(
+                                context,
+                              ).formatShortMonthDay(i.at!.toLocal()),
+                          ].join(' · '),
+                        ),
+                        trailing: Text(
+                          centsLabel(i.amountCents),
+                          style: const TextStyle(
+                            fontFeatures: [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+            ],
+            if (a.status == PayoutStatus.ready && a.canSetUp) ...[
+              const SizedBox(height: 12),
+              OutlinedButton(
+                key: const Key('manage-payouts'),
+                onPressed: () async {
+                  final payments = _payments(context);
+                  if (payments == null) return;
+                  await PayoutsSetupScreen.open(
+                    context,
+                    payments: payments,
+                    teamId: teamId,
+                    manage: true,
+                  );
+                  await vm.load.execute();
+                },
+                child: const Text('Bank account and payouts'),
+              ),
+            ],
+            if (action != null && !a.canSetUp) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Only ${a.ownerName} can set up payments. Ask them to open '
+                "the team's settings.",
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
+            if (action != null && a.canSetUp) ...[
               const SizedBox(height: 12),
               FilledButton(
+                key: const Key('set-up-payments'),
                 onPressed: vm.connect.running
                     ? null
                     : () async {
+                        // Stripe's form in the app; its own page in the
+                        // browser only for tests' fake [open].
+                        if (open == null) {
+                          final payments = _payments(context);
+                          if (payments == null) return;
+                          await PayoutsSetupScreen.open(
+                            context,
+                            payments: payments,
+                            teamId: teamId,
+                          );
+                          await vm.load.execute();
+                          return;
+                        }
                         await vm.connect.execute();
                         if (context.mounted && vm.connect.error) {
                           _showError(context, vm.connect.result);
@@ -346,6 +494,8 @@ class PayOnlineButton extends StatelessWidget {
                             'service and processing fees.',
                       'Secure checkout by Stripe. It shows as paid here once '
                           'Stripe confirms it.',
+                      payoutTimingNote,
+                      refundPolicyNote,
                     ].join(' '),
                     style: small,
                   ),
@@ -488,6 +638,40 @@ class PaymentsOnBuilder extends StatelessWidget {
       builder: (context, vm) => ListenableBuilder(
         listenable: vm,
         builder: (context, _) => builder(context, vm.fees.available),
+      ),
+    );
+  }
+}
+
+/// "Payments: On" (green), "Payments: Finish setup" or "Payments: Not set
+/// up" (amber: yours to do), for team pages, settings and the event form.
+class PayoutsStatusChip extends StatelessWidget {
+  const PayoutsStatusChip({super.key, required this.status});
+
+  final PayoutStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final on = status == PayoutStatus.ready;
+    final label = switch (status) {
+      PayoutStatus.ready => 'On',
+      PayoutStatus.pending => 'Finish setup',
+      PayoutStatus.none => 'Not set up',
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: on ? c.accentSoft : c.highlightSoft,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        'Payments: $label',
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: on ? c.accentInk : c.highlightInk,
+        ),
       ),
     );
   }

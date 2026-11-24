@@ -4368,7 +4368,8 @@ describe("hosted tournaments", () => {
   );
 
   it("only the host's managers create and edit it", async () => {
-    const fresh = { ...tournament({ status: "draft" }), createdAt: serverTimestamp() };
+    // Within registration's 60 days, so it can open.
+    const fresh = { ...tournament({ status: "draft", startsOn: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) }), createdAt: serverTimestamp() };
     await assertFails(setDoc(tRef(HOST_MEMBER), { ...fresh, createdBy: HOST_MEMBER }));
     await assertFails(setDoc(tRef(OUTSIDER), { ...fresh, createdBy: OUTSIDER }));
     await assertSucceeds(setDoc(tRef(DIRECTOR), fresh));
@@ -4522,6 +4523,32 @@ describe("hosted tournaments", () => {
       setDoc(entryRef(DIRECTOR), entry({ status: "invited", captainIds: [], teamId: TEAM, replyBy: new Date(Date.now() + 86_400_000) })),
     );
     await assertSucceeds(setDoc(entryRef(CAPTAIN), entry({ teamId: TEAM })));
+  });
+
+  it("an entry deadline by the start, and a director who is a member or a named contact", async () => {
+    await seed();
+    await assertSucceeds(setDoc(tRef(DIRECTOR), tournament({ entryDeadline: new Date(2027, 3, 20) })));
+    await assertFails(setDoc(tRef(DIRECTOR), tournament({ entryDeadline: new Date(2027, 4, 2) })));
+    await assertFails(setDoc(tRef(DIRECTOR), tournament({ entryDeadline: "soon" })));
+    await assertSucceeds(setDoc(tRef(DIRECTOR), tournament({ director: { uid: DIRECTOR, name: "Dana", email: "", phone: "" } })));
+    await assertSucceeds(
+      setDoc(tRef(DIRECTOR), tournament({ director: { uid: null, name: "Sam Lee", email: "sam@example.com", phone: "555-0100" } })),
+    );
+    await assertFails(setDoc(tRef(DIRECTOR), tournament({ director: { uid: null, name: "", email: "", phone: "" } })));
+    await assertFails(setDoc(tRef(DIRECTOR), tournament({ director: { name: "Sam", role: "admin" } })));
+    await assertFails(setDoc(tRef(DIRECTOR), tournament({ director: { name: "Sam", email: "x".repeat(201) } })));
+  });
+
+  it("seeds carry when they were confirmed; entries their roster and a decline's reason", async () => {
+    await seed();
+    await assertSucceeds(updateDoc(divRef(DIRECTOR), { seedsConfirmedAt: new Date() }));
+    await assertFails(updateDoc(divRef(DIRECTOR), { seedsConfirmedAt: "yes" }));
+    // The roster goes through the API (it checks the players); managers' writes keep it.
+    await assertFails(setDoc(entryRef(CAPTAIN), entry({ roster: [CAPTAIN, PLAYER], rosterSetAt: new Date() })));
+    await assertSucceeds(setDoc(entryRef(DIRECTOR), entry({ status: "accepted", roster: [CAPTAIN, PLAYER], rosterSetAt: new Date() })));
+    await assertFails(setDoc(entryRef(DIRECTOR), entry({ status: "accepted", roster: Array.from({ length: 61 }, (_, i) => `p${i}`) })));
+    await assertSucceeds(updateDoc(entryRef(CAPTAIN), { status: "withdrawn", reason: "declined", updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(entryRef(CAPTAIN), { reason: "angry", updatedAt: serverTimestamp() }));
   });
 
   it("no applying once registration closes", async () => {

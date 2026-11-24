@@ -208,6 +208,9 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
     );
   };
 
+  // Pages the app shows in a WebView (/embed/*): just the page, no bars or tabs.
+  if (under(path, "/embed")) return <main className="embed-frame">{children}</main>;
+
   return (
     <div className={`frame${aside ? " with-aside" : ""}${fab ? " has-fab" : ""}`}>
       <header className="top-bar">

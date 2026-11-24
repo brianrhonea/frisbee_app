@@ -46,6 +46,11 @@ export class TeamDeletion {
     // transaction; one made while it's being deleted fails without its host.
     const hosted = await this.queries.fields("tournaments", ["status"], hostedReadLimit, { hostId: teamId });
     const hostsUnfinished = hosted.some((t) => t.data.status !== "finished");
+    // Fees Stall 10 holds for it, or still owes it back (a won dispute's credit):
+    // released is absent until sent, so filtered here, not in the query.
+    const unsettled = ["paid", "processing", "refunding", "disputed"];
+    const charges = (await Promise.all(unsettled.map((status) => this.queries.fields("charges", ["status", "released", "kept", "creditCents"], 500, { hostId: teamId, flow: "platform", status })))).flat();
+    const holdsMoney = charges.some((c) => c.data.status !== "paid" || (c.data.released !== true && c.data.kept !== true) || Number(c.data.creditCents) > 0);
     await this.store.transact(async (tx) => {
       const team = await tx.get(`teams/${teamId}`);
       if (!team) throw new ApiError("not_found", "That team doesn't exist.");
@@ -66,6 +71,11 @@ export class TeamDeletion {
       }
       if (hostsUnfinished) {
         throw new ApiError("failed_precondition", "It hosts a tournament or league that hasn't finished. Finish or delete it first.");
+      }
+      // A payout account with money held or owed stays until it's settled.
+      const payout = await tx.get(`payoutAccounts/${teamId}`);
+      if (holdsMoney || Number(payout?.owedCents) > 0) {
+        throw new ApiError("failed_precondition", "Stall 10 still holds or is owed money for its events. Email support@stall10.app to settle it before deleting the team.");
       }
       // The client asks them to type the name; checked here too, so a stray request can't do it.
       if (typed === null || typed.toLowerCase() !== String(team.name ?? "").trim().toLowerCase()) {

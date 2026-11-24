@@ -1,30 +1,48 @@
 "use client";
 // Online payments for tournament fees (packages/shared/src/payments.ts):
-// the host owner's payout card, and the Pay button for a team's bid or
-// spot fee or a player's own entry fee. Both show nothing until the API
-// says online payments are available. With a publishable key
-// (NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY), Checkout opens inside this page
-// (Stripe's embedded Checkout, on the host's account); without one, and
-// for payout onboarding, Stripe's pages open in this tab. Either way they
-// send people back to /payments/*.
+// the host's payouts card (with what it has been paid), the Pay button
+// for a team's bid or spot fee or a player's own entry fee, and the
+// organizers' Refund. Stall 10 takes each payment and sends the host its
+// fee once the event is over. Everything shows nothing until the API says
+// online payments are available. With a publishable key
+// (NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY), Checkout and the payout setup
+// open inside this page (Stripe's embedded components); without one,
+// Stripe's pages open in this tab and send people back to /payments/*.
 import {
   centsLabel,
   type CheckoutResult,
+  type EarningsView,
   onlineCharge,
   onlinePaymentProblem,
   type PaymentFees,
   type PayOptions,
   type PayoutAccountView,
   type PayoutLinkResult,
+  type PayoutSessionResult,
+  payoutStatusLabels,
+  paidOnlineNote,
   paymentNoteMax,
   paymentPaths,
+  payoutReviewNote,
+  payoutsReauthMessage,
+  payoutTimingNote,
   platformFeeLabel,
+  refundPolicyNote,
 } from "@stall10/shared";
 import type { StripeEmbeddedCheckout } from "@stripe/stripe-js";
 import type { User } from "firebase/auth";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PaymentDoc } from "@/components/drafts/data";
 import { callApi, problem } from "@/lib/client";
+
+/** One fee's state on the host's payouts card (EarningsStatus.label in the app). */
+const earningsStatusLabels: Record<EarningsView["items"][number]["status"], string> = {
+  held: "Held until the event is over",
+  sent: "Sent",
+  kept: "Stall 10 event",
+  refunded: "Refunded",
+  disputed: "Disputed",
+};
 
 /** Reloads [load] when the tab comes back into view (back from Stripe in another tab). */
 function useOnVisible(load: () => void) {
@@ -63,11 +81,12 @@ export async function goToStripe(user: User, path: string, body: unknown): Promi
 const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "";
 
 /**
- * Stripe's Checkout inside this page, for the session [clientSecret] on the
- * host's [account]. Paying sends the payer on to /payments/done, as
+ * Stripe's Checkout inside this page, for the session [clientSecret] on
+ * Stall 10's account ([account] null; a host's for a session made before
+ * Stall 10 collected). Paying sends the payer on to /payments/done, as
  * Stripe's own page does; [onClose] puts the Pay button back.
  */
-function EmbeddedPay({ clientSecret, account, onClose }: { clientSecret: string; account: string; onClose: () => void }) {
+function EmbeddedPay({ clientSecret, account, onClose }: { clientSecret: string; account: string | null; onClose: () => void }) {
   const box = useRef<HTMLDivElement>(null);
   const [error, setError] = useState("");
   useEffect(() => {
@@ -76,7 +95,7 @@ function EmbeddedPay({ clientSecret, account, onClose }: { clientSecret: string;
     (async () => {
       try {
         const { loadStripe } = await import("@stripe/stripe-js");
-        const stripe = await loadStripe(publishableKey, { stripeAccount: account });
+        const stripe = await loadStripe(publishableKey, account ? { stripeAccount: account } : undefined);
         if (!stripe) throw new Error("Stripe didn't load.");
         const made = await stripe.createEmbeddedCheckoutPage({ clientSecret });
         if (!live) return made.destroy();
@@ -104,18 +123,103 @@ function EmbeddedPay({ clientSecret, account, onClose }: { clientSecret: string;
   );
 }
 
-/** The host owner's "Take payments online" card; [amountCents] is the event's fee, for the "payers pay…" line ($100 without one). */
+/**
+ * Stripe's own forms inside this page (Connect embedded components), on a
+ * session from POST /v1/teams/:teamId/payouts/session, or from
+ * [clientSecret] when the app's WebView hands one over (/embed/payouts).
+ * [view] "setup": linking the payout account ([onExit] runs when the
+ * person finishes or closes it); "manage": what Stripe needs, the bank
+ * account, and payouts.
+ */
+export function EmbeddedOnboarding({
+  user,
+  teamId,
+  clientSecret,
+  onExit,
+  view = "setup",
+}: {
+  user?: User;
+  teamId?: string;
+  clientSecret?: string;
+  onExit: () => void;
+  view?: "setup" | "manage";
+}) {
+  const box = useRef<HTMLDivElement>(null);
+  const exit = useRef(onExit);
+  exit.current = onExit;
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let live = true;
+    let elements: HTMLElement[] = [];
+    (async () => {
+      try {
+        if (!publishableKey) throw new Error("no key");
+        const { loadConnectAndInitialize } = await import("@stripe/connect-js");
+        const fetchClientSecret = async () => {
+          if (clientSecret) return clientSecret;
+          if (!user || !teamId) throw new Error("no session");
+          const r = await callApi<PayoutSessionResult>(user, paymentPaths.payoutSession(encodeURIComponent(teamId)), { method: "POST", body: {} });
+          return r.clientSecret;
+        };
+        const connect = loadConnectAndInitialize({
+          publishableKey,
+          fetchClientSecret,
+          appearance: { variables: { colorPrimary: "#12805C", fontFamily: "inherit", borderRadius: "10px" } },
+        });
+        if (view === "manage") {
+          elements = [connect.create("notification-banner"), connect.create("account-management"), connect.create("payouts")];
+        } else {
+          const onboarding = connect.create("account-onboarding");
+          onboarding.setOnExit(() => exit.current());
+          elements = [onboarding];
+        }
+        if (!live) return;
+        for (const e of elements) box.current?.appendChild(e);
+      } catch (e) {
+        if (live) setError(e instanceof Error && e.message === payoutsReauthMessage ? payoutsReauthMessage : "Couldn't open Stripe's setup here. Check your connection and try again.");
+      }
+    })();
+    return () => {
+      live = false;
+      for (const e of elements) e.remove();
+    };
+  }, [user, teamId, clientSecret, view]);
+  return error ? <p className="form-error">{error}</p> : <div ref={box} className="embedded-onboarding" aria-busy="true" />;
+}
+
+/**
+ * "Payments: On / Finish setup / Not set up" for a host, with setup right
+ * here (Stripe's form in the page; Stripe's own page only without a
+ * publishable key). The host's owner sets it up; other managers see the
+ * status and who to ask. [amountCents] is the event's fee, for the
+ * "payers pay…" line ($100 without one).
+ */
 export function PayoutsCard({ user, teamId, amountCents }: { user: User; teamId: string; amountCents?: number }) {
   const [account, setAccount] = useState<PayoutAccountView | null>(null);
+  const [earnings, setEarnings] = useState<EarningsView | null>(null);
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState<"setup" | "manage" | null>(null);
   const [error, setError] = useState("");
   const load = useCallback(() => {
-    callApi<PayoutAccountView>(user, paymentPaths.payouts(encodeURIComponent(teamId))).then(setAccount, () => setAccount(null));
+    const id = encodeURIComponent(teamId);
+    callApi<PayoutAccountView>(user, paymentPaths.payouts(id)).then(
+      (a) => {
+        setAccount(a);
+        // What it has been paid, once payouts are linked; the card shows without it.
+        if (a.available && a.status !== "none") callApi<EarningsView>(user, paymentPaths.earnings(id)).then(setEarnings, () => setEarnings(null));
+        else setEarnings(null);
+      },
+      () => setAccount(null),
+    );
   }, [user, teamId]);
   useEffect(load, [load]);
   useOnVisible(load);
   if (!account?.available) return null;
   const connect = async () => {
+    if (publishableKey) {
+      setOpen("setup");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -128,28 +232,109 @@ export function PayoutsCard({ user, teamId, amountCents }: { user: User; teamId:
   const copy = {
     none: {
       title: "Take payments online",
-      body: `Let teams and players pay their fees in Stall 10 instead of collecting them yourself. Payments go to your own Stripe account, and you get the whole fee: payers also pay Stall 10's ${account.feeLabel} and Stripe's card fee.`,
-      action: "Set up with Stripe",
+      body: `Let teams and players pay their fees in Stall 10 instead of collecting them yourself. Stall 10 takes the payments and sends you the whole fee a few days after each event: payers also pay Stall 10's ${account.feeLabel} and Stripe's card fee. Add your bank details here; you don't need a Stripe account.`,
+      action: "Set up payments",
     },
-    pending: { title: "Finish setting up payments", body: "Stripe still needs a few details before you can take payments.", action: "Continue with Stripe" },
+    pending: { title: "Finish setting up payments", body: "Stripe needs a few more details before Stall 10 can send you your fees.", action: "Finish setup" },
     ready: {
       title: "Online payments are on",
-      body: `Teams and players can pay their fees in Stall 10. Refunds and payouts are in your Stripe Dashboard. You get the whole fee: payers also pay Stall 10's ${account.feeLabel} and Stripe's card fee.`,
+      body: `Teams and players pay their fees in Stall 10, and Stall 10 sends you the whole fee a few days after each event. ${payoutReviewNote} Refund a team from the event's Teams tab. Payers also pay Stall 10's ${account.feeLabel} and Stripe's card fee.`,
       action: null,
     },
   }[account.status];
+  const e = earnings;
+  const hasEarnings = !!e && (e.items.length > 0 || e.owedCents > 0);
   return (
     <section className="card payouts-card">
-      <h2 className="card-title">{copy.title}</h2>
+      <div className="card-head">
+        <h2 className="card-title">{copy.title}</h2>
+        <span className={`pill payouts-status payouts-${account.status}`}>Payments: {payoutStatusLabels[account.status].label}</span>
+      </div>
       <p>{copy.body}</p>
       <FeeBreakdownNote user={user} amountCents={amountCents ?? 10_000} currency="USD" compact />
+      {hasEarnings && (
+        <>
+          <p className="payout-totals">
+            {[
+              `Held ${centsLabel(e.heldCents)}`,
+              `Sent ${centsLabel(e.sentCents)}`,
+              ...(e.refundedCents > 0 ? [`Refunded ${centsLabel(e.refundedCents)}`] : []),
+              ...(e.disputedCents > 0 ? [`Disputed ${centsLabel(e.disputedCents)}`] : []),
+            ].join(" · ")}
+          </p>
+          {e.owedCents > 0 && <p className="muted small">{centsLabel(e.owedCents)} taken back after a refund or dispute comes off your next payout.</p>}
+          {e.items.length > 0 && (
+            <details className="payout-items">
+              <summary>Each fee ({e.items.length})</summary>
+              <ul>
+                {e.items.map((i, n) => (
+                  <li key={`${i.tournamentId}-${n}`}>
+                    <span>{i.label}</span>
+                    <span className="num">{centsLabel(i.amountCents)}</span>
+                    <span className="muted small">
+                      {earningsStatusLabels[i.status]}
+                      {i.at ? ` · ${new Date(i.at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : ""}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </>
+      )}
       {error && <p className="form-error">{error}</p>}
-      {copy.action && (
+      {copy.action && !account.canSetUp && <p className="muted small">Only {account.ownerName} can set up payments. Ask them to open this page.</p>}
+      {copy.action && account.canSetUp && !open && (
         <button type="button" className="btn btn-primary btn-small" disabled={busy} onClick={connect}>
           {busy ? "Opening Stripe…" : copy.action}
         </button>
       )}
+      {!copy.action && account.canSetUp && publishableKey && !open && (
+        <button type="button" className="btn btn-small" onClick={() => setOpen("manage")}>
+          Bank account and payouts
+        </button>
+      )}
+      {open && (
+        <div className="embedded-pay">
+          <div className="embedded-pay-head">
+            <strong>{open === "manage" ? "Bank account and payouts" : "Set up payments with Stripe"}</strong>
+            <button
+              type="button"
+              className="text-btn"
+              onClick={() => {
+                setOpen(null);
+                load();
+              }}
+            >
+              Close
+            </button>
+          </div>
+          <EmbeddedOnboarding
+            user={user}
+            teamId={teamId}
+            view={open}
+            onExit={() => {
+              setOpen(null);
+              load();
+            }}
+          />
+        </div>
+      )}
     </section>
+  );
+}
+
+/** "Payments: On" for a team page or settings, for its managers; nothing when online payments are off. */
+export function PayoutsStatus({ user, teamId, href }: { user: User; teamId: string; href: string }) {
+  const [account, setAccount] = useState<PayoutAccountView | null>(null);
+  useEffect(() => {
+    callApi<PayoutAccountView>(user, paymentPaths.payouts(encodeURIComponent(teamId))).then(setAccount, () => setAccount(null));
+  }, [user, teamId]);
+  if (!account?.available) return null;
+  return (
+    <a className={`pill payouts-status payouts-${account.status}`} href={href}>
+      Payments: {payoutStatusLabels[account.status].label}
+    </a>
   );
 }
 
@@ -166,7 +351,7 @@ export function PayOnline({ user, tournamentId, teamId, withStatus = false }: { 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   /** The embedded Checkout open in this page. */
-  const [embedded, setEmbedded] = useState<{ clientSecret: string; account: string } | null>(null);
+  const [embedded, setEmbedded] = useState<{ clientSecret: string; account: string | null } | null>(null);
   const payingKey = `stall10.paying.${tournamentId}.${teamId ?? "me"}`;
   // Each load asks Stripe about the last checkout, so coming back shows it
   // paid without waiting for the webhook. Back from paying (marked when Pay
@@ -245,7 +430,7 @@ export function PayOnline({ user, tournamentId, teamId, withStatus = false }: { 
         return;
       }
       const r = await callApi<CheckoutResult>(user, path, { method: "POST", body: { ...body, ui: "embedded" } });
-      if (!r.clientSecret || !r.account) throw new Error("Stripe sent back no checkout.");
+      if (!r.clientSecret) throw new Error("Stripe sent back no checkout.");
       setEmbedded({ clientSecret: r.clientSecret, account: r.account });
       setBusy(false);
     } catch (e) {
@@ -286,7 +471,7 @@ export function PayOnline({ user, tournamentId, teamId, withStatus = false }: { 
             </button>
             <small className="muted">
               {options.processingCents > 0 ? `Includes ${centsLabel(options.processingCents)} in service and processing fees. ` : ""}
-              Secure checkout by Stripe. It shows as paid here once Stripe confirms it.
+              Secure checkout by Stripe. It shows as paid here once Stripe confirms it. {payoutTimingNote} {refundPolicyNote}
             </small>
           </>
         )
@@ -357,12 +542,58 @@ export function paymentStatusLabel(p: PaymentDoc | undefined, overdue: boolean):
   return overdue ? "Overdue" : "Unpaid";
 }
 
+/** Whether [p] was paid online through Stall 10 (the server's note): refunded, never ticked off by hand. */
+export const isPaidOnline = (p: PaymentDoc | undefined) => p?.paid === true && p.note === paidOnlineNote;
+
+/** "Paid online · Refund" for a fee paid through Stall 10 (the event's organizers); asks first. */
+function RefundControl({ user, tournamentId, payerId, payerName, amountCents }: { user: User; tournamentId: string; payerId: string; payerName?: string; amountCents?: number }) {
+  const [refunding, setRefunding] = useState(false);
+  const [error, setError] = useState("");
+  const refund = async () => {
+    const what = amountCents ? centsLabel(amountCents) : "the fee";
+    if (!window.confirm(`Refund ${what}${payerName ? ` to ${payerName}` : ""}? ${refundPolicyNote} If Stall 10 already sent you the fee, it comes back out of your payouts.`)) return;
+    setRefunding(true);
+    setError("");
+    try {
+      await callApi(user, paymentPaths.refund(encodeURIComponent(tournamentId), encodeURIComponent(payerId)), { method: "POST", body: {} });
+    } catch (e) {
+      setError(problem(e));
+    } finally {
+      setRefunding(false);
+    }
+  };
+  return (
+    <span className="host-payment">
+      <span className="small">Paid online</span>
+      <button type="button" className="text-btn" disabled={refunding} onClick={refund}>
+        {refunding ? "Refunding…" : "Refund"}
+      </button>
+      {error && <small className="form-error">{error}</small>}
+    </span>
+  );
+}
+
 /**
  * The host's controls for one payer's fee: paid or not (shown at once,
  * undone if the save fails), the state, and a note ("Check #1042"). Saves
- * through the API, which keeps the payment history.
+ * through the API, which keeps the payment history. A fee paid online
+ * gets Refund instead.
  */
-export function HostPaymentControls({ user, tournamentId, payerId, payment, overdue }: { user: User; tournamentId: string; payerId: string; payment: PaymentDoc | undefined; overdue: boolean }) {
+export function HostPaymentControls(props: {
+  user: User;
+  tournamentId: string;
+  payerId: string;
+  payment: PaymentDoc | undefined;
+  overdue: boolean;
+  /** For the refund's question: "Refund $400 to Haze?". */
+  payerName?: string;
+  amountCents?: number;
+}) {
+  if (isPaidOnline(props.payment)) return <RefundControl {...props} />;
+  return <MarkPaymentControls {...props} />;
+}
+
+function MarkPaymentControls({ user, tournamentId, payerId, payment, overdue }: { user: User; tournamentId: string; payerId: string; payment: PaymentDoc | undefined; overdue: boolean }) {
   const [shown, setShown] = useState<{ paid: boolean; note: string } | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [error, setError] = useState("");

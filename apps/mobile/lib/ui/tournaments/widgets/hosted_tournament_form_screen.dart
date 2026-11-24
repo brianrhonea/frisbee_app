@@ -10,6 +10,7 @@ import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../../payments/widgets/payment_widgets.dart';
 import '../view_models/hosted_tournament_form_viewmodel.dart';
+import 'director_section.dart';
 import 'event_format_section.dart';
 
 const _currencies = ['USD', 'CAD', 'EUR', 'GBP', 'AUD', 'MXN'];
@@ -108,7 +109,7 @@ class _HostedTournamentFormScreenState
   List<Widget> _review(AppColors c) {
     final f = DateFormat('EEE, MMM d, y');
     final end = vm.endsOn;
-    final why = vm.problem;
+    final why = vm.problem ?? vm.publishProblem;
     String money(int? cents) => cents == null
         ? 'amount missing'
         : '${(cents / 100).toStringAsFixed(cents % 100 == 0 ? 0 : 2)} '
@@ -153,12 +154,25 @@ class _HostedTournamentFormScreenState
       ),
       (
         4,
-        'Fees',
-        !vm.hasFee
-            ? 'No fee'
+        'Fees & deadline',
+        [
+          if (!vm.hasFee) 'No fee' else '${vm.feeName}: ${money(vm.feeCents)}',
+          if (vm.hasFee && vm.teamEntry) 'team spot: ${money(vm.teamFeeCents)}',
+          vm.entryDeadline == null
+              ? 'due the day before'
+              : 'due ${DateFormat.MMMd().format(vm.entryDeadline!)}',
+        ].join(' · '),
+      ),
+      (
+        HostedTournamentFormViewModel.directorStep,
+        'Director',
+        vm.director == null
+            ? 'None'
             : [
-                '${vm.feeName}: ${money(vm.feeCents)}',
-                if (vm.teamEntry) 'team spot: ${money(vm.teamFeeCents)}',
+                vm.director!.name,
+                if (vm.director!.isMember) 'Stall 10 member',
+                if (vm.director!.email.isNotEmpty) vm.director!.email,
+                if (vm.director!.phone.isNotEmpty) vm.director!.phone,
               ].join(' · '),
       ),
     ];
@@ -573,7 +587,10 @@ class _HostedTournamentFormScreenState
                               : vm.isDraft
                               ? FilledButton(
                                   key: const Key('form-publish'),
-                                  onPressed: busy || vm.problem != null
+                                  onPressed:
+                                      busy ||
+                                          vm.problem != null ||
+                                          vm.publishProblem != null
                                       ? null
                                       : vm.publish.execute,
                                   child: const Text('Publish'),
@@ -780,7 +797,7 @@ class _HostedTournamentFormScreenState
                   4 => _formStep(
                     c,
                     number: 5,
-                    title: 'Fees',
+                    title: 'Fees & deadline',
                     children: [
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
@@ -902,42 +919,69 @@ class _HostedTournamentFormScreenState
                             onChanged: (v) => vm.feeInstructions = v,
                           ),
                         ),
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.event_available_outlined),
-                          title: const Text('Due'),
-                          subtitle: Text(
-                            vm.feeDue == null
-                                ? 'No due date'
-                                : DateFormat.yMMMd().format(vm.feeDue!),
-                          ),
-                          trailing: vm.feeDue == null
-                              ? null
-                              : IconButton(
-                                  tooltip: 'Clear',
-                                  icon: const Icon(Icons.close),
-                                  onPressed: () => vm.setFeeDue(null),
-                                ),
-                          onTap: () async {
-                            final d = await showDatePicker(
-                              context: context,
-                              initialDate:
-                                  vm.feeDue ??
+                      ],
+                      const SizedBox(height: 8),
+                      ListTile(
+                        key: const Key('entry-deadline'),
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.event_available_outlined),
+                        title: const Text('Entry deadline'),
+                        subtitle: Text(
+                          vm.entryDeadline == null
+                              ? 'Rosters${vm.hasFee ? ' and fees' : ''} are '
+                                    'due the day before it starts'
+                              : 'Rosters${vm.hasFee ? ' and fees' : ''} are '
+                                    'due ${DateFormat.yMMMd().format(vm.entryDeadline!)}',
+                        ),
+                        trailing: vm.entryDeadline == null
+                            ? null
+                            : IconButton(
+                                tooltip: 'Clear',
+                                icon: const Icon(Icons.close),
+                                onPressed: () => vm.setFeeDue(null),
+                              ),
+                        onTap: () async {
+                          final last = vm.startsOn.subtract(
+                            const Duration(days: 1),
+                          );
+                          final first = DateTime.now();
+                          final d = await showDatePicker(
+                            context: context,
+                            initialDate: () {
+                              final want =
+                                  vm.entryDeadline ??
                                   vm.startsOn.subtract(
                                     const Duration(days: 14),
-                                  ),
-                              firstDate: DateTime(vm.startsOn.year - 1),
-                              lastDate: vm.endsOn ?? vm.startsOn,
+                                  );
+                              if (want.isBefore(first)) return first;
+                              if (want.isAfter(last)) return last;
+                              return want;
+                            }(),
+                            firstDate: first.isAfter(last) ? last : first,
+                            lastDate: last,
+                          );
+                          if (d != null) {
+                            vm.setFeeDue(
+                              DateTime(d.year, d.month, d.day, 23, 59),
                             );
-                            if (d != null) {
-                              vm.setFeeDue(
-                                DateTime(d.year, d.month, d.day, 23, 59),
-                              );
-                            }
-                          },
+                          }
+                        },
+                      ),
+                      // The host's payments, set up here without leaving.
+                      if (vm.hasFee && vm.host != null) ...[
+                        const SizedBox(height: 8),
+                        PayoutsCard(
+                          teamId: vm.host!.id,
+                          amountCents: vm.feeCents,
                         ),
                       ],
                     ],
+                  ),
+                  5 => _formStep(
+                    c,
+                    number: 6,
+                    title: 'Director',
+                    children: [DirectorSection(viewModel: vm)],
                   ),
                   _ => _review(c),
                 },

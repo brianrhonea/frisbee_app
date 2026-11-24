@@ -1,6 +1,6 @@
 {
   "name": "@stall10/web",
-  "version": "0.57.0",
+  "version": "0.59.0",
   "private": true,
   "description": "Stall 10 website (phase 3): Next.js on Vercel; writes through apps/api, member reads from Firestore. Replaced the Flutter web build on Firebase Hosting.",
   "scripts": {
@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@stall10/shared": "workspace:*",
+    "@stripe/connect-js": "3.5.0",
     "@stripe/stripe-js": "10.2.1",
     "firebase": "^13.2.0",
     "livekit-client": "2.23.0",

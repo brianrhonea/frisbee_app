@@ -32,6 +32,25 @@ export const hostedStatusLabels: Record<HostedStatus, string> = {
   finished: "Final",
 };
 export const statusIndex = (s: HostedStatus) => hostedStatuses.indexOf(s);
+
+/**
+ * Where an organizer can move an event's status by hand (PUT .../status):
+ * open registration, close it for seeding or reopen it, back to a draft
+ * while registration is open. Publishing a schedule, the first live score
+ * and the last result move it on by themselves (scheduled, live,
+ * finished); an organizer can also end an event being played, or reopen a
+ * finished one to correct it.
+ */
+export const statusMoves: Record<HostedStatus, readonly HostedStatus[]> = {
+  draft: ["registration"],
+  registration: ["seeding", "draft"],
+  seeding: ["registration"],
+  scheduled: ["live"],
+  live: ["finished"],
+  finished: ["live"],
+};
+/** Whether an organizer may move an event from [from] to [to] by hand (staying put is fine). */
+export const canMoveStatus = (from: HostedStatus, to: HostedStatus) => from === to || statusMoves[from].includes(to);
 export const publishedStatuses = hostedStatuses.filter((s) => s !== "draft");
 
 export const tournamentVisibilities = ["public", "inviteOnly"] as const;
@@ -131,6 +150,32 @@ export interface TeamTournamentInvite {
   expired: boolean;
 }
 
+/**
+ * One of a team's entries still missing its roster or fee before the event
+ * (GET /v1/teams/:teamId/tournament-invites, `toFinish`): the team page's
+ * "Finish entry", for its admins.
+ */
+export interface TeamEntryToFinish {
+  tournamentId: string;
+  name: string;
+  hostName: string;
+  startsOn: string;
+  divisionLabel: string;
+  status: EntryStatus;
+  rosterSet: boolean;
+  /** Paid, or nothing to pay. */
+  paid: boolean;
+  /** When the roster and fee are due (effectiveDeadline). */
+  deadline: string | null;
+  overdue: boolean;
+}
+
+/** GET /v1/teams/:teamId/tournament-invites */
+export interface TeamTournamentInvitesResult {
+  invites: TeamTournamentInvite[];
+  toFinish: TeamEntryToFinish[];
+}
+
 export const tournamentLimits = {
   name: 100,
   hostName: 100,
@@ -163,6 +208,11 @@ export const tournamentLimits = {
   fieldSizes: [3, 4, 5, 6, 7] as const,
   teamCaps: [4, 6, 8, 10, 12, 16, 20, 24, 32] as const,
   maxLaterDays: 6,
+  /** Players a team can name for one event (its tournament roster). */
+  maxEventRoster: 60,
+  directorName: 100,
+  directorEmail: 200,
+  directorPhone: 40,
 } as const;
 
 export const currencies = ["USD", "CAD", "EUR", "GBP", "AUD", "MXN"] as const;
@@ -215,6 +265,25 @@ export const formatSchema = z.strictObject({
   minRoster: z.number().int().min(tournamentLimits.minRoster).max(tournamentLimits.maxMinRoster).nullable().default(null),
 });
 
+/**
+ * The tournament director: the main contact for questions and logistics.
+ * A Stall 10 member (uid, with their name copied for display) or anyone,
+ * by name with an optional email and phone. Not an organizer: they get no
+ * rights over the event unless they also manage it.
+ */
+export const directorSchema = z.strictObject({
+  uid: z.string().min(1).max(128).nullable().default(null),
+  name: clean(z.string().trim().min(1, "Give the director's name.").max(tournamentLimits.directorName)),
+  email: z.union([z.literal(""), z.email("Enter a valid email.").max(tournamentLimits.directorEmail)]).default(""),
+  phone: z
+    .string()
+    .trim()
+    .max(tournamentLimits.directorPhone)
+    .regex(/^[+()\-.\s\d]*$/, "Enter a valid phone number.")
+    .default(""),
+});
+export type DirectorInput = z.output<typeof directorSchema>;
+
 const detailsShape = {
   name: clean(z.string().trim().min(1, "Give it a name.").max(tournamentLimits.name)),
   description: clean(z.string().trim().max(tournamentLimits.description).default("")),
@@ -237,6 +306,14 @@ const detailsShape = {
     .refine((n) => (inviteReplyChoices as readonly number[]).includes(n), "Pick a reply-by choice.")
     .nullable()
     .default(null),
+  /**
+   * When teams must have their roster set and fee paid, and players their
+   * fee (effectiveDeadline); null: the fee's due date, else the day before
+   * it starts. The fees' due dates follow it.
+   */
+  entryDeadline: isoDate.nullable().default(null),
+  /** The tournament director (directorSchema), or none. */
+  director: directorSchema.nullable().default(null),
   format: formatSchema,
   /** The divisions to have open (one per gender division). */
   divisions: z
@@ -265,7 +342,18 @@ export const tournamentStatusRequestSchema = z.strictObject({ status: z.enum(hos
 /** PUT /v1/tournaments/:id/divisions/:divisionId/seeds: the accepted teams, reordered. */
 export const seedsRequestSchema = z.strictObject({
   seeds: z.array(z.string().min(1).max(128)).max(tournamentLimits.maxTeams),
+  /** The host confirms these are the seeds (seedsConfirmedAt); without it, saving a change unconfirms them. */
+  confirm: z.boolean().optional(),
 });
+
+/** PUT /v1/tournaments/:id/schedule: publish every listed division's games at once. */
+export const publishAllRequestSchema = z.strictObject({
+  divisions: z
+    .array(z.strictObject({ divisionId: z.string().min(1).max(tournamentLimits.divisionId), games: z.array(z.lazy(() => publishGameSchema)).min(1).max(tournamentLimits.maxGames) }))
+    .min(1)
+    .max(tournamentLimits.maxDivisions),
+});
+
 
 /** PUT /v1/tournaments/:id/entries/:teamId: a team admin applies, accepts an invite or changes captains. */
 export const entryRequestSchema = z.strictObject({
@@ -276,13 +364,39 @@ export const entryRequestSchema = z.strictObject({
     .max(tournamentLimits.maxCaptains, `Pick up to ${tournamentLimits.maxCaptains} captains.`),
 });
 
+/**
+ * PUT /v1/tournaments/:id/entries/:teamId/roster: the players (ids of the
+ * team's roster, teams/{id}/roster) a team brings to this event.
+ */
+export const entryRosterRequestSchema = z.strictObject({
+  playerIds: z
+    .array(z.string().min(1).max(128))
+    .max(tournamentLimits.maxEventRoster, `Up to ${tournamentLimits.maxEventRoster} players.`)
+    .refine((l) => new Set(l).size === l.length, "Each player once."),
+});
+
+/**
+ * What PUT .../entries/:teamId answers: the entry's status after it. An
+ * invite taken up is accepted (waitlisted when the division is full); an
+ * application waits as applied.
+ */
+export interface EntryAnswer {
+  status: EntryStatus;
+}
+
 /** POST /v1/tournaments/:id/entries/:teamId/invite: the host invites a team. */
 export const inviteRequestSchema = z.strictObject({ divisionId: z.string().min(1).max(tournamentLimits.divisionId) });
 
 /** PUT /v1/tournaments/:id/entries/:teamId/status: the host decides, or the team withdraws. */
 export const entryStatusRequestSchema = z.strictObject({
   status: z.enum(["accepted", "waitlisted", "declined", "withdrawn"]),
+  /** A team withdrawing because it turned the invite down, so organizers see why. */
+  reason: z.enum(["declined"]).optional(),
 });
+
+/** Why a team withdrew, when it said (entries/{id}.reason). */
+export const entryReasons = ["declined"] as const;
+export type EntryReason = (typeof entryReasons)[number];
 
 /** Scores a captain reports, the other captain confirms (the score they saw) or the host sets. */
 export const scoreRequestSchema = z
@@ -394,6 +508,8 @@ export const publishGameSchema = z.strictObject({
   place: z.number().int().min(1).max(tournamentLimits.maxPlace).nullable().optional(),
 });
 
+export type PublishGameInput = z.output<typeof publishGameSchema>;
+
 /** PUT /v1/tournaments/:id/divisions/:divisionId/schedule: publish (or regenerate) the games. */
 export const publishScheduleRequestSchema = z.strictObject({
   games: z.array(publishGameSchema).min(1).max(tournamentLimits.maxGames),
@@ -462,10 +578,20 @@ export interface TournamentDoc {
   draftMode?: DraftMode;
   /** Days before the start invited teams answer by (inviteReplyBy), or none. */
   inviteReplyDays?: number | null;
+  /** Rosters and fees due by (effectiveDeadline), or none set. */
+  entryDeadline?: string | null;
+  /** The tournament director. Email and phone are only sent to signed-in people. */
+  director?: DirectorDoc | null;
   divisions: DivisionSummaryDoc[];
   format?: FormatDoc | null;
   createdBy?: string;
   createdAt?: string;
+}
+export interface DirectorDoc {
+  uid: string | null;
+  name: string;
+  email: string;
+  phone: string;
 }
 export interface DraftedTeamDoc {
   id: string;
@@ -484,6 +610,8 @@ export interface DivisionDoc {
   placements: string[];
   minRoster: number | null;
   teams?: DraftedTeamDoc[];
+  /** When the host confirmed the seeds; any change to them clears it. */
+  seedsConfirmedAt?: string | null;
 }
 export interface EntryDoc {
   teamName: string;
@@ -494,6 +622,11 @@ export interface EntryDoc {
   teamId?: string;
   /** An invite's answer-by time (inviteReplyBy); past it, it's expired (inviteExpired). */
   replyBy?: string | null;
+  /** The players the team brings (ids of teams/{id}/roster), once set. */
+  roster?: string[];
+  rosterSetAt?: string | null;
+  /** Why a team withdrew, if it said. */
+  reason?: EntryReason | null;
   updatedAt?: string;
 }
 export interface GameDoc {
@@ -641,6 +774,99 @@ export const entryFields = (c: EntryChoice): { entryType: TournamentEntryType; t
 /** What a team pays to enter (bid fee or spot fee), if anything. */
 export function spotFee(t: Pick<TournamentDoc, "entryType" | "teamEntry" | "bidFee" | "teamFee">): FeeDoc | null {
   return t.entryType === "players" ? (t.teamEntry ? (t.teamFee ?? null) : null) : t.bidFee;
+}
+
+const dayMs = 24 * 60 * 60 * 1000;
+
+/**
+ * Registration (entries, signups and paying fees) opens at most this many
+ * days before an event starts, so Stall 10 never holds fees for long. The
+ * event can be a draft before then; its location can be added later.
+ */
+export const registrationWindowDays = 60;
+
+/** The first day registration can open for an event starting [startsOn]. */
+export function registrationOpensOn(startsOn: Date): Date {
+  return new Date(startsOn.getTime() - registrationWindowDays * dayMs);
+}
+
+/** Why registration can't open now ([now], ms) for an event starting [startsOn], or null. */
+export function registrationWindowProblem(startsOn: Date | null, now: number): string | null {
+  if (!startsOn) return "Set the event's date first.";
+  const opens = registrationOpensOn(startsOn);
+  if (opens.getTime() <= now) return null;
+  const day = opens.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+  return `Registration opens ${registrationWindowDays} days before the event, on ${day}. Keep it as a draft until then.`;
+}
+
+/**
+ * When rosters and fees are due: the event's entry deadline, else the
+ * fee's due date, else the day before it starts. Null without a start.
+ * HostedTournament.effectiveDeadline in the app.
+ */
+export function effectiveDeadline(t: {
+  entryDeadline?: Date | string | null;
+  startsOn?: Date | string | null;
+  entryType?: TournamentEntryType | string;
+  teamEntry?: boolean;
+  bidFee?: { dueAt?: Date | string | null } | null;
+  teamFee?: { dueAt?: Date | string | null } | null;
+}): Date | null {
+  const set = dateOf(t.entryDeadline ?? null);
+  if (set) return set;
+  const fee = t.entryType === "players" ? ((t.teamEntry ? t.teamFee : null) ?? t.bidFee) : t.bidFee;
+  const due = dateOf(fee?.dueAt ?? null);
+  if (due) return due;
+  const starts = dateOf(t.startsOn ?? null);
+  return starts ? new Date(starts.getTime() - dayMs) : null;
+}
+
+/** Why an entry deadline can't be used, or null: it has to be by the time the event starts. */
+export function entryDeadlineProblem(deadline: Date | null, startsOn: Date): string | null {
+  if (!deadline) return null;
+  if (deadline.getTime() > startsOn.getTime()) return "The entry deadline has to be before the event starts.";
+  return null;
+}
+
+/** A team's (or player's) progress through entering: what's left before the deadline. */
+export interface EntryChecklist {
+  /** In the event (accepted), not still waiting on the organizer. */
+  accepted: boolean;
+  /** The team named enough players (always true for a player signup). */
+  rosterSet: boolean;
+  /** Paid, or nothing to pay. */
+  paid: boolean;
+  /** There's a fee to pay at all. */
+  owes: boolean;
+  deadline: Date | null;
+  /** Past the deadline with something left to do. */
+  overdue: boolean;
+  /** Roster and payment both done. */
+  complete: boolean;
+}
+
+/**
+ * Where an entry stands (entryChecklist in the app): [rosterSize] is how
+ * many players the team named (null for a player signup), [minRoster] how
+ * many the division needs, [paid] whether payments/{payer}.paid, [owes]
+ * whether there's a fee to pay.
+ */
+export function entryChecklist(e: {
+  status: string;
+  rosterSize: number | null;
+  minRoster: number;
+  paid: boolean;
+  owes: boolean;
+  deadline: Date | null;
+  now: Date | number;
+}): EntryChecklist {
+  const accepted = e.status === "accepted";
+  const rosterSet = e.rosterSize == null || e.rosterSize >= e.minRoster;
+  const paid = !e.owes || e.paid;
+  const complete = rosterSet && paid;
+  const t = typeof e.now === "number" ? e.now : e.now.getTime();
+  const overdue = !complete && !!e.deadline && t > e.deadline.getTime();
+  return { accepted, rosterSet, paid, owes: e.owes, deadline: e.deadline, overdue, complete };
 }
 
 /** "$250" or "$250.50". */

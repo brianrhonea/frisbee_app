@@ -9,13 +9,14 @@ import {
   signupLimits,
   signupStatusLabels,
   skillHints,
+  effectiveDeadline,
 } from "@stall10/shared";
 import type { User } from "firebase/auth";
 import Link from "next/link";
 import { type FormEvent, useState } from "react";
 import type { Doc } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
-import { HostPaymentControls, PayOnline } from "../payments/Payments";
+import { HostPaymentControls, isPaidOnline, PayOnline } from "../payments/Payments";
 import {
   attempt,
   dateLabel,
@@ -93,6 +94,8 @@ function MySignup({ user, tournamentId, tournament: t, divisions }: { user: User
   const accepted = mine?.status === "accepted" ? mine.divisionId : null;
   const draft = useLiveDraft(tournamentId, accepted).data;
   const [editing, setEditing] = useState(false);
+  // A new signup's next steps (the app's signup flow): Pay (with a fee), then Done.
+  const [phase, setPhase] = useState<"pay" | "done" | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fee = t.bidFee ?? null;
@@ -127,7 +130,11 @@ function MySignup({ user, tournamentId, tournament: t, divisions }: { user: User
             setError(null);
           }}
           onSave={async (a) => {
-            if (await attempt(setBusy, setError, () => draftApi.saveMySignup(user, tournamentId, a))) setEditing(false);
+            const first = !isIn;
+            if (await attempt(setBusy, setError, () => draftApi.saveMySignup(user, tournamentId, a))) {
+              setEditing(false);
+              if (first) setPhase(fee && fee.amountCents > 0 ? "pay" : "done");
+            }
           }}
         />
       </section>
@@ -155,6 +162,54 @@ function MySignup({ user, tournamentId, tournament: t, divisions }: { user: User
 
   const division = divisions.find((x) => x.id === mine.divisionId);
   const paid = payment?.paid === true;
+  const deadline = effectiveDeadline(t);
+  if (phase === "pay" && fee && !paid) {
+    return (
+      <section className="card settings-form">
+        <small className="muted">Step 2 of 2 · Payment</small>
+        <h2 className="card-title">Entry fee · {feeLabel(fee)}</h2>
+        <p className="muted small">Pay now, or come back and pay{deadline ? ` by ${dateLabel(deadline.toISOString())}` : " later"}.</p>
+        {fee.instructions && <p className="small">{fee.instructions}</p>}
+        <PayOnline user={user} tournamentId={tournamentId} />
+        <div className="home-actions">
+          <button type="button" className="btn btn-quiet btn-small" onClick={() => setPhase("done")}>
+            Pay later
+          </button>
+        </div>
+      </section>
+    );
+  }
+  if (phase === "pay" || phase === "done") {
+    const owes = !!fee && fee.amountCents > 0;
+    return (
+      <section className="card respond-done" aria-live="polite">
+        <div className="respond-done-mark" aria-hidden="true">
+          ✓
+        </div>
+        <h2>You&apos;re signed up!</h2>
+        <p>{mine.status === "accepted" ? `You're in ${t.name}.` : mine.status === "waitlisted" ? "The division is full: you're on the waitlist." : "The host will confirm your spot."}</p>
+        <ul className="respond-checklist">
+          <li className="done">Signed up</li>
+          {owes && (
+            <li className={paid ? "done" : ""}>
+              {paid ? "Paid" : "Fee to pay"}
+              {!paid && (
+                <button type="button" className="text-btn" onClick={() => setPhase("pay")}>
+                  Pay now
+                </button>
+              )}
+            </li>
+          )}
+        </ul>
+        {owes && !paid && deadline && <p className="muted small">Due {dateLabel(deadline.toISOString())}.</p>}
+        <div className="home-actions">
+          <button type="button" className="btn btn-primary btn-small" onClick={() => setPhase(null)}>
+            Done
+          </button>
+        </div>
+      </section>
+    );
+  }
   return (
     <section className="card">
       <h2 className="card-title">
@@ -466,8 +521,16 @@ function SignupList({ user, tournamentId, tournament: t, division: d }: { user: 
                   </td>
                   {fee && (
                     <td>
-                      {owes(s) && (
-                        <HostPaymentControls user={user} tournamentId={tournamentId} payerId={s.id} payment={paymentById.get(s.id)} overdue={overdue(fee, false)} />
+                      {(owes(s) || isPaidOnline(paymentById.get(s.id))) && (
+                        <HostPaymentControls
+                          user={user}
+                          tournamentId={tournamentId}
+                          payerId={s.id}
+                          payment={paymentById.get(s.id)}
+                          overdue={overdue(fee, false)}
+                          payerName={s.name}
+                          amountCents={fee.amountCents}
+                        />
                       )}
                     </td>
                   )}

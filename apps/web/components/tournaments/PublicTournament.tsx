@@ -95,6 +95,8 @@ export function usePublicTournamentState(page: PublicHostedPage, news: PublicTea
       bidFee: p.bidFee ? { ...p.bidFee, instructions: "" } : null,
       teamFee: p.teamFee ? { ...p.teamFee, instructions: "" } : null,
       format: null,
+      // Visitors get the director's name only.
+      director: p.directorName ? { uid: null, name: p.directorName, email: "", phone: "" } : null,
     };
     const divisions: Array<Doc<DivisionDoc>> = page.divisions.map((d) => ({
       ...d,
@@ -113,6 +115,7 @@ export function usePublicTournamentState(page: PublicHostedPage, news: PublicTea
       uid: undefined,
       user: null,
       visitor: true,
+      entriesLoaded: true,
       visitorNext: next,
       publicNews: news,
       loaded: true,

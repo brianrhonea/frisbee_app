@@ -107,6 +107,8 @@ export function useTournament(id: string) {
     /** A visitor's News tab: the host's public posts about this event (members read them live). */
     publicNews: null as PublicTeamPost[] | null,
     loaded: live.data !== undefined || !!live.error,
+    /** The entries and the viewer's teams are in too (what a page that decides once needs). */
+    entriesLoaded: entryRows.data !== undefined && mine.data !== undefined && divRows.data !== undefined,
     error: live.error,
     t,
     manager,

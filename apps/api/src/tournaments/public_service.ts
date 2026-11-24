@@ -22,6 +22,7 @@ import {
   divisions as allDivisions,
   draftedTeams,
   draftModes,
+  effectiveDeadline,
   type DraftMode,
   engineGame,
   engineSeason,
@@ -368,6 +369,8 @@ export class PublicTournamentService {
         teamFee: fee(t.teamFee),
         season: t.kind === "league" ? season(t.season) : null,
         draftMode: oneOf(draftModes, t.draftMode, "balanced") as DraftMode,
+        directorName: str((t.director as { name?: unknown } | null | undefined)?.name) || null,
+        entryDeadline: effectiveDeadline(t as never)?.toISOString() ?? null,
       } satisfies PublicHostedTournament,
       divisions,
       entries: entries

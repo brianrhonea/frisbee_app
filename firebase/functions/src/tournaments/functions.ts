@@ -5,8 +5,9 @@
 // app write the team's schedule; these triggers do it.
 
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 import { logger } from "firebase-functions";
-import { onDocumentUpdated, onDocumentWritten } from "firebase-functions/v2/firestore";
+import { onDocumentDeleted, onDocumentUpdated, onDocumentWritten } from "firebase-functions/v2/firestore";
 
 import {
   changedDetails,
@@ -254,3 +255,27 @@ async function setMembers(conversationId: string, participants: string[]): Promi
   });
   logger.info("tournament chat members", { conversationId, count: participants.length });
 }
+
+/**
+ * A tournament deleted: its chats with the organizers go too (the
+ * Captains' channel and each team's thread: their conversations, messages
+ * and attachments), so they leave everyone's inbox. The API deletes them
+ * first (TournamentService.remove); this catches a deletion any other way.
+ */
+export const tournamentDeleted = onDocumentDeleted("tournaments/{tournamentId}", async (event) => {
+  const { tournamentId } = event.params;
+  const db = getFirestore();
+  const chats = await db.collection(`tournaments/${tournamentId}/chats`).get();
+  for (const chat of chats.docs) {
+    const id = String(chat.get("conversationId") ?? "");
+    if (!/^g-[A-Za-z0-9]+$/.test(id)) continue;
+    const ref = db.doc(`conversations/${id}`);
+    const conv = (await ref.get()).data();
+    // Only the tournament's own chat, never a conversation a pointer names wrongly.
+    if (conv && (conv.kind !== "tournament" || conv.tournamentId !== tournamentId)) continue;
+    await getStorage().bucket().deleteFiles({ prefix: `conversations/${id}/`, force: true });
+    await db.recursiveDelete(ref);
+  }
+  await db.recursiveDelete(db.collection(`tournaments/${tournamentId}/chats`));
+  if (!chats.empty) logger.info("Deleted a tournament's chats", { tournamentId, chats: chats.size });
+});

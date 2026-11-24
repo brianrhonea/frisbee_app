@@ -1727,6 +1727,19 @@ dialog.dialog:has(.scope-dialog) { width: min(100% - 32px, 420px); }
 .payouts-card p {
   margin: 0 0 12px;
 }
+.payout-items summary { cursor: pointer; font-weight: 600; font-size: 0.9rem; }
+.payout-items ul { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 6px; }
+.payout-items li { display: grid; grid-template-columns: 1fr auto; gap: 0 12px; }
+.payout-items li .muted { grid-column: 1 / -1; }
+.num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.staff-payments-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.staff-payments-table th, .staff-payments-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.staff-payments-table td.num { text-align: right; }
+.staff-payment-issue ul { margin: 4px 0; }
+.payouts-card .payout-totals {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
 .host-payment { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
 .host-payment-note { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .host-payment-note input { min-width: 160px; }
@@ -1837,3 +1850,10 @@ mark.mention.mention-me { background: color-mix(in srgb, var(--accent) 24%, tran
 }
 .help-more { list-style: none; padding: 0; display: grid; gap: 8px; }
 .help-more a { color: var(--accent); font-weight: 700; }
+
+/* Payments status (PayoutsCard, PayoutsStatus): green when on, amber while setup is to do. */
+.payouts-status { text-decoration: none; }
+.payouts-status.payouts-none, .payouts-status.payouts-pending { background: var(--disc-soft); color: var(--disc-ink); }
+.embedded-onboarding { min-height: 320px; }
+/* A page inside the app's WebView (/embed/*): nothing but the page. */
+.embed-frame { min-height: 100vh; padding: 16px; background: var(--bg); }

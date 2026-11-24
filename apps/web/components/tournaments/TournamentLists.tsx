@@ -103,7 +103,7 @@ export function TournamentCard({ t, showHost = true }: { t: CardTournament; show
       <span>
         <b>
           {t.name || "Tournament"}
-          {t.hostOfficial ? <span className="hosted-official"> Official</span> : null}
+          {t.hostOfficial ? <span className="hosted-official" title="Hosted by Stall 10"> Stall 10 verified</span> : null}
         </b>
         <small>{[datesLabel(t.startsOn, t.endsOn, zone), t.location].filter(Boolean).join(" · ")}</small>
         {meta.length > 0 && <small>{meta.join(" · ")}</small>}

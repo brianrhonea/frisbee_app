@@ -100,15 +100,153 @@ class FakeHostedTournamentRepository implements HostedTournamentRepository {
   final Map<String, List<TeamTournamentInvite>> invites = {};
   final List<(String, String)> declined = [];
 
+  /// Team id → its accepted entries still to finish ([teamInvites]).
+  final Map<String, List<TeamEntryToFinish>> toFinish = {};
+
   @override
-  Future<Result<List<TeamTournamentInvite>>> teamInvites(String teamId) async =>
-      Result.ok([...?invites[teamId]]);
+  Future<Result<TeamTournamentBusiness>> teamInvites(String teamId) async =>
+      Result.ok(
+        TeamTournamentBusiness(
+          invites: [...?invites[teamId]],
+          toFinish: [...?toFinish[teamId]],
+        ),
+      );
 
   @override
   Future<Result<void>> declineInvite(String tournamentId, String teamId) async {
     declined.add((tournamentId, teamId));
     invites[teamId]?.removeWhere((i) => i.tournamentId == tournamentId);
+    final e = entries[tournamentId]?[teamId];
+    if (e != null) {
+      entries[tournamentId]![teamId] = e.copyWith(
+        status: EntryStatus.withdrawn,
+        reason: 'declined',
+      );
+    }
+    _changed();
     return const Result.ok(null);
+  }
+
+  /// Like the API's PUT entries/:team: an invite is accepted (straight in,
+  /// or waitlisted when the division is full), a new team applies, and an
+  /// entered team's captains change.
+  @override
+  Future<Result<EntryStatus>> respond(
+    String tournamentId,
+    String teamId, {
+    required String divisionId,
+    required List<String> captainIds,
+  }) async {
+    log.add('respond $teamId');
+    final map = entries.putIfAbsent(tournamentId, () => {});
+    final e = map[teamId];
+    final d = divisions[tournamentId]?[divisionId];
+    if (d == null) return Result.error(Exception('Division not found.'));
+    if (e != null && e.status == EntryStatus.invited) {
+      final full = d.seeds.length >= d.maxTeams;
+      final status = full ? EntryStatus.waitlisted : EntryStatus.accepted;
+      map[teamId] = e.copyWith(
+        status: status,
+        captainIds: captainIds,
+        divisionId: divisionId,
+      );
+      if (!full) {
+        divisions[tournamentId]![divisionId] = d.copyWith(
+          seeds: [...d.seeds.where((s) => s != teamId), teamId],
+          captains: {...d.captains, teamId: captainIds},
+        );
+      }
+      _changed();
+      return Result.ok(status);
+    }
+    if (e != null && e.status != EntryStatus.withdrawn) {
+      map[teamId] = e.copyWith(captainIds: captainIds);
+      if (e.status == EntryStatus.accepted) {
+        divisions[tournamentId]![divisionId] = d.copyWith(
+          captains: {...d.captains, teamId: captainIds},
+        );
+      }
+      _changed();
+      return Result.ok(e.status);
+    }
+    map[teamId] = TournamentEntry(
+      teamId: teamId,
+      teamName: teamNames[teamId] ?? teamId,
+      divisionId: divisionId,
+      status: EntryStatus.applied,
+      captainIds: captainIds,
+    );
+    _changed();
+    return const Result.ok(EntryStatus.applied);
+  }
+
+  /// Team names for [respond]'s new entries (tests set them).
+  final Map<String, String> teamNames = {};
+
+  @override
+  Future<Result<void>> saveRoster(
+    String tournamentId,
+    String teamId,
+    List<String> playerIds,
+  ) async {
+    log.add('roster $teamId ${playerIds.length}');
+    final e = entries[tournamentId]?[teamId];
+    if (e == null) return Result.error(Exception('Entry not found.'));
+    entries[tournamentId]![teamId] = e.copyWith(
+      roster: [...playerIds],
+      rosterSetAt: DateTime.now(),
+    );
+    _changed();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> saveSeeds(
+    String tournamentId,
+    String divisionId,
+    List<String> seeds, {
+    bool confirm = false,
+  }) async {
+    log.add('seeds $divisionId${confirm ? ' confirm' : ''}');
+    final d = divisions[tournamentId]?[divisionId];
+    if (d == null) return Result.error(Exception('Division not found.'));
+    final changed = d.seeds.join(',') != seeds.join(',');
+    divisions[tournamentId]![divisionId] = d.copyWith(
+      seeds: seeds,
+      seedsConfirmedAt: () => confirm
+          ? DateTime.now()
+          : changed
+          ? null
+          : d.seedsConfirmedAt,
+    );
+    _changed();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> publishAll(
+    String tournamentId,
+    Map<String, List<GroupGame>> games,
+  ) async {
+    final ds = divisions[tournamentId] ?? const {};
+    if (ds.values.any((d) => !d.seedsConfirmed)) {
+      return Result.error(Exception("Confirm every division's seeds first."));
+    }
+    log.add('publish all ${games.length}');
+    for (final MapEntry(:key, :value) in games.entries) {
+      this.games[_key(tournamentId, key)] = [...value];
+    }
+    _schedule(tournamentId);
+    _changed();
+    return const Result.ok(null);
+  }
+
+  /// Publishing makes the event scheduled, as the API does.
+  void _schedule(String tournamentId) {
+    final t = tournaments[tournamentId];
+    if (t != null && t.status.index < HostedStatus.scheduled.index) {
+      tournaments[tournamentId] = t.copyWith(status: HostedStatus.scheduled);
+    }
   }
 
   @override
@@ -384,6 +522,7 @@ class FakeHostedTournamentRepository implements HostedTournamentRepository {
     this.games[_key(tournamentId, division.id)] = [...games];
     divisions.putIfAbsent(tournamentId, () => {})[division.id] = division
         .copyWith(placements: const []);
+    _schedule(tournamentId);
     _changed();
     return const Result.ok(null);
   }

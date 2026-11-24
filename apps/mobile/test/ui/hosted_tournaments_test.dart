@@ -125,6 +125,36 @@ void main() {
     return id;
   }
 
+  test(
+    'registration opens only within 60 days of the start; a draft can wait',
+    () async {
+      final form = HostedTournamentFormViewModel(
+        hostId: 'host',
+        tournamentRepository: repo,
+        teamRepository: teams,
+        authRepository: as('director'),
+        now: () => DateTime.utc(2027, 3, 1),
+      );
+      await pumpEventQueue();
+      // The usual start, a month out: it can open.
+      expect(form.publishProblem, isNull);
+      form.setDates(DateTime.utc(2027, 6, 5), DateTime.utc(2027, 6, 6));
+      expect(
+        form.publishProblem,
+        'Registration opens 60 days before the event, on Apr 6, 2027. '
+        'Keep it as a draft until then.',
+      );
+      expect(
+        registrationWindowProblem(
+          DateTime.utc(2027, 4, 30),
+          DateTime.utc(2027, 3, 1),
+        ),
+        isNull,
+      );
+      form.dispose();
+    },
+  );
+
   test('only managers can host', () async {
     final form = HostedTournamentFormViewModel(
       hostId: 'host',
@@ -408,7 +438,22 @@ void main() {
     await dir.setPaid.execute((teamId: 't1', paid: false));
     expect(dir.setPaid.error, isTrue);
     expect(dir.isPaid('t1'), isTrue);
+    // A fee paid online is refunded through the API, never switched off.
+    api.fail = false;
+    await dir.refund.execute('t1');
+    expect(api.refunds, ['$id t1']);
     dir.dispose();
+  });
+
+  test('a fee paid online through Stall 10 is told apart from a mark', () {
+    const online = EntryPayment(teamId: 't1', paid: true, note: paidOnlineNote);
+    const cash = EntryPayment(teamId: 't1', paid: true, note: 'Cash');
+    expect(online.paidOnline, isTrue);
+    expect(cash.paidOnline, isFalse);
+    expect(
+      const EntryPayment(teamId: 't1', note: paidOnlineNote).paidOnline,
+      isFalse,
+    );
   });
 
   test('seed, publish, report, confirm and finish with placements', () async {
@@ -752,10 +797,18 @@ void main() {
 /// Records the host's marks, as the API would take them.
 class _MarkingPayments implements PaymentRepository {
   final marks = <String>[];
+  final refunds = <String>[];
   bool fail = false;
 
   @override
   bool get available => true;
+
+  @override
+  Future<Result<void>> refund(String tournamentId, String payerId) async {
+    if (fail) return Result.error(Exception('offline'));
+    refunds.add('$tournamentId $payerId');
+    return const Result.ok(null);
+  }
 
   @override
   Future<Result<void>> mark(

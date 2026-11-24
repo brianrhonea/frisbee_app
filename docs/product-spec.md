@@ -140,12 +140,22 @@ and events; everything else in the hub is for members. A private group
 
 **Tournament fees online (built 2026-11-16, api 0.40.0, web 0.53.0, app
 0.0.44; off until Stripe is set up):**
-- Stripe Connect. The host team's or community's **owner** connects the
-  host's own Stripe account (Stripe collects its card fee from the host
-  and covers losses; the host has the full Stripe Dashboard).
+- **Stall 10 collects every fee and pays hosts out** (decided
+  2026-11-23, api 0.47.0, web 0.59.0, app 0.0.51; Stripe's separate
+  charges and transfers). The host team's or community's **owner** links
+  a payout account inside Stall 10 (Stripe's embedded forms: identity
+  and bank). It's a Stripe account with no dashboard that only receives
+  transfers, so hosts never make a Stripe login; Stall 10 pays Stripe's
+  fees and covers losses. Stall 10 stores only Stripe's ids.
 - A team's admins pay its bid or spot fee and a signed-up player pays
-  their entry fee through Stripe Checkout: a direct charge on the host's
-  account, with Stall 10's fee taken as the application fee. The fee is
+  their entry fee: a charge on Stall 10's account (Stall 10 is the
+  merchant on the card statement), held until the event is finished and
+  its last day has passed, then sent to the host as a transfer of the
+  whole fee, a few days after it's marked finished (`PAYOUT_HOLD_DAYS`,
+  3 by default, for refunds and disputes; changed 2026-11-23 from no
+  hold after the security review) and never before its date as it was
+  when the fee was paid. A fee paid after the event is sent when
+  it's paid. Stall 10's own events keep their fees. The fee is
   a server setting (`PLATFORM_FEE_BPS`, `PLATFORM_FEE_FIXED_CENTS`):
   3% of the fee (decided 2026-11-22), always paid by the payer on top,
   so the host never loses any of their fee. US dollars only; at least 50
@@ -174,12 +184,60 @@ and events; everything else in the hub is for members. A private group
 - Paying marks the same payment record hosts mark by hand, so their
   instructions and the paid switch still work beside it. A second
   payment for something already paid is refunded in full.
-- Refunds and disputes are handled in the host's Stripe Dashboard. A full
-  refund un-marks the fee and Stall 10 gives its fee back.
-- The app opens Stripe's pages in the browser: entry fees are for
-  real-world events, which store rules allow outside in-app purchase.
+- **Refunds** happen in Stall 10: organizers press **Refund** on a fee
+  paid online (the event's Teams tab, hat signups). A refund returns the
+  fee only; the service and processing fees aren't refunded. Already
+  sent to the host, the transfer is reversed; whatever can't be taken
+  back is owed and comes off the host's next payout. Withdrawing still
+  doesn't refund anything by itself (§9).
+- **Disputes** land on Stall 10, which takes the fee back from the host
+  (the transfer is reversed, or owed) and gives it back if the dispute
+  is won. An event can't be deleted while it holds fees paid online.
+- The payouts card shows what's held, sent, refunded and owed, and **Bank
+  account and payouts** (Stripe's embedded account and payouts views).
+- The app takes payment in Stripe's payment sheet and the website in
+  embedded Checkout (Stripe's pages without a publishable key): entry
+  fees are for real-world events, which store rules allow outside
+  in-app purchase.
+- Registration (entries, signups and paying fees) opens at most 60 days
+  before an event starts; an event can be a draft before then, and its
+  location can be added later. Once open, fees can be paid at any time
+  to secure a spot. (2026-11-24.)
+- Staff approve each host's first payout, and an event's payouts once
+  their total to the host passes $2,000 (once per event), before they're
+  sent; organizers can't pay online for their own event. Design and
+  threats: `docs/payments-security.md`.
+- A fee already paid out to the host's bank is refunded by staff only
+  (Stall 10 never pays a host's refund from its own money). Setting up
+  or changing payouts needs a recent sign-in.
+- Staff see every payment and any problem on the website's `/staff`
+  (a staff tool, website only, as the report queue). A daily job checks
+  every payment and transfer against Stripe; an hourly one sends what's
+  due (Cloud Scheduler, `apps/api/DEPLOY.md`).
+- The payouts card lists each fee and where it stands.
 - Not yet: team dues (a dues amount a team sets; today only a paid
-  checkbox), refunding from inside Stall 10, memberships, tax.
+  checkbox), memberships, tax.
+
+**Entering an event (2026-11-23, api 0.46.0, web 0.58.0, app 0.0.50):**
+- An invited team **Responds**: Accept (straight in, or the waitlist when
+  the division is full) or Decline (the organizers see it). Then it names
+  its roster and pays, now or later, by the event's **entry deadline**
+  (`entryDeadline`; else the fee's due date; else the day before it
+  starts). Applying to a public event is the same flow; the organizer
+  still accepts it.
+- Past the deadline nothing is withdrawn: the team is flagged to the
+  organizers (**Roster missing**, **Unpaid**) and reminded (3 days before
+  and when it passes, `entryDeadlineReminders`).
+- Organizers confirm each division's seeds, then publish every schedule
+  at once; the event becomes scheduled and teams are notified.
+- A **tournament director** is a contact (a member, or a name with email
+  and phone), not an organizer.
+- Stall 10 staff host any event as the official Stall 10 organization
+  (`set-staff.mjs --host`), shown **Stall 10 verified**; Stall 10 keeps
+  its fees (no payout account needed).
+- Deleting an event deletes its chats with the organizers.
+- Not yet: refunding automatically when an organizer declines a team
+  that paid (§9), and a server-side list of allowed status changes.
 
 ## 8. Build order
 
@@ -1361,6 +1419,58 @@ Out of scope: payments, meeting recording, USA Ultimate data.
     page without a publishable key. Tests: API `payments.test.ts`
     ("the app's payment sheet", "Checkout in the website's page"), app
     `payments_test.dart` ("payment sheet").
+77. Responding to a tournament a step at a time (2026-11-23): one
+    **Respond** for an invite (Accept or Decline first; accepting puts
+    the team straight in, or on the waitlist when full), then the roster
+    (or **Set later**), the fee (or **Pay later**), then **Request
+    confirmed!** (**Request sent!** when applying) with what's left; the
+    team page's **Entries to finish** with **Finish entry**; a paid hat
+    signup's Payment then **You're signed up!**: [x] app
+    (`/tournaments/:id/respond`, `RespondScreen`); [x] website
+    (`/tournaments/:id/respond` and `/enter`, `EnterTeam`). One rule:
+    shared `entryChecklist` / `effectiveDeadline`, app `EntryChecklist`
+    / `HostedTournament.effectiveDeadline`. Tests: shared
+    `entry_checklist_fixtures.test.ts`, app
+    `entry_checklist_fixtures_test.dart`, `respond_test.dart`,
+    `team_home_test.dart`, `player_entry_test.dart`, API
+    `tournaments.test.ts` (respond, roster, toFinish), rules.
+78. Running an event (2026-11-23): one entry deadline for rosters and
+    fees in the form's **Fees & deadline**; **Roster missing** and
+    **Unpaid** flags; **Confirm seeds** per division (a change needs a new
+    confirm) and **Publish** every schedule at once (`PUT /schedule`):
+    [x] app (the guide's host steps, Teams tab); [x] website (**Run your
+    event**, Teams tab). Tests: app `run_event_test.dart`,
+    `event_guide_test.dart`; API `tournaments.test.ts`; rules.
+79. Tournament director (2026-11-23): the form's **Director** step (a
+    member, or anyone by name, email and phone) and the event page's
+    director (Message for a member; email and phone for signed-in
+    members only, the name for visitors): [x] app (`DirectorSection`,
+    director card); [x] website (`DirectorStep`, `DirectorCard`). Tests:
+    app `tournament_extras_test.dart`; API `public_tournaments.test.ts`;
+    rules.
+80. Payments set up without leaving (2026-11-23): **Payments: On /
+    Finish setup / Not set up** on the payouts card and in team settings
+    for anyone who manages events (only the owner sets up); Stripe's
+    embedded onboarding in the page, and in the app a WebView of the
+    website's `/embed/payouts`: [x] app; [x] website. Tests: API
+    `payments.test.ts`, app `payments_test.dart`.
+81. Stall 10 collects fees and pays hosts out (2026-11-23): payment on
+    Stall 10's account, **Refund** for a fee paid online (Teams tab, hat
+    signups; asks first, fee only), the payouts card's held / sent /
+    refunded / owed totals and **Bank account and payouts**: [x] app
+    (`RefundButton`, `PayoutsCard`, `PayoutsSetupScreen(manage:)`); [x]
+    website (`HostPaymentControls`, `PayoutsCard`,
+    `/embed/payouts?view=manage`). Tests: API `payments.test.ts`; app
+    `payments_test.dart`, `hosted_tournaments_test.dart` (the website
+    has no unit tests).
+82. Registration window and payout review (2026-11-24): Publish waits
+    until 60 days before the start, saying when (Save draft still
+    works); the payouts card says first and large payouts are checked:
+    [x] app (`publishProblem`, `payoutReviewNote`); [x] website
+    (`TournamentForm` `tooEarly`, `payoutReviewNote`). Staff approval is
+    on the website's `/staff` only (staff tools). Tests: shared
+    `registration_window.test.ts`, API `tournaments.test.ts`,
+    `payments.test.ts`; app `hosted_tournaments_test.dart`.
 
 Libraries the website may add (none today): a small data cache for API
 reads and mutations, the Firestore web SDK for listeners, and LiveKit's
@@ -1377,3 +1487,28 @@ web SDK in W7. Components stay hand-written CSS on the site's tokens.
   youth safeguarding for School / youth)?
 - What happens to existing groups and schools/clubs: migrate each to a
   community type automatically, or ask their admins to pick one?
+
+**Known problem: refunds when a team withdraws** (noted 2026-11-23, to
+tackle later; partly solved in api 0.47.0: organizers now refund in
+Stall 10, the fee only, and Stall 10 keeps the service and processing
+fees, so the host is never out of pocket. Still open: warning on
+Withdraw, a refund policy, and refunding automatically when a team
+withdraws or is declined). A team or player that paid online and then withdraws
+gets nothing back automatically: the entry becomes withdrawn, the fee
+stays marked paid, and the money stays with the host unless they
+refund it in their Stripe Dashboard. The Withdraw confirmation ("Withdraw
+Haze?", app and web) says nothing about the payment, so a payer may
+expect a refund. When the host refunds in full, Stall 10 returns its 3%
+but Stripe keeps its card fee, so the host is out about 3% of the
+charge (≈ $12.61 of $424.61); a partial refund leaves the fee marked
+paid and Stall 10 keeps its fee. Options discussed:
+1. Warn on Withdraw when the payer has paid ("Your $424.61 payment isn't
+   refunded automatically; ask the organizers").
+2. A refund policy the host sets on the event (No refunds / Full refund
+   until a date / Refund less fees until a date), shown before paying
+   and on Withdraw.
+3. A Refund button for hosts in Stall 10 (full or part), possibly
+   automatic under the policy when a team withdraws before the date.
+
+Still to decide: whether Stall 10 keeps or returns its 3% on a full
+refund, and whether the payer or host bears Stripe's kept fee.

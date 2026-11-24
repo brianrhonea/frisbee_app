@@ -7,6 +7,7 @@ import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../../core/ui/view_model_host.dart';
 import '../../settings/widgets/settings_widgets.dart';
+import '../../payments/widgets/payment_widgets.dart';
 import '../view_models/team_settings_viewmodel.dart';
 import '../../moderation/widgets/team_reports_screen.dart';
 
@@ -142,6 +143,10 @@ class _TeamSettingsScreenState extends State<TeamSettingsScreen> {
                       ),
                     ],
                   ),
+                if (vm.canSeePayments) ...[
+                  const SizedBox(height: 16),
+                  PayoutsCard(teamId: vm.teamId),
+                ],
                 SettingsGroup(
                   title: 'Sections',
                   footer: vm.isOwner

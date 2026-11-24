@@ -89,6 +89,11 @@ class TeamSettingsViewModel extends ChangeNotifier {
   /// Admins (manageTeam) switch the public page, as they edit the details.
   bool get canManage => _team?.canEdit(_uid) ?? false;
 
+  /// Members who run the team's events see its payments status (only the
+  /// owner sets them up), as on the website's team settings.
+  bool get canSeePayments =>
+      _team?.has(_uid, TeamPermission.manageEvents) ?? false;
+
   /// Who sees the team's reports: the owner and admins, and members who
   /// may moderate or manage the team (the API's reviewsTeamReports).
   bool get canReviewReports {

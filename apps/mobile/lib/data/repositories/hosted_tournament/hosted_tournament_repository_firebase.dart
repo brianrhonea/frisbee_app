@@ -6,28 +6,66 @@ import '../../../domain/models/app_user.dart';
 import '../../../domain/models/group_tournament.dart';
 import '../../../domain/models/hosted_tournament.dart';
 import '../../../domain/models/live_draft.dart';
+import '../../../domain/models/model_utils.dart';
 import '../../../domain/tournament_engine/progress.dart';
 import '../../../utils/result.dart';
 import '../../services/api_client.dart';
 import '../../services/callable_client.dart';
+import '../../services/feature_flags.dart';
 import '../../services/firestore_utils.dart';
 import 'hosted_tournament_repository.dart';
 
 /// `tournaments/{id}` with `divisions/{divisionId}/games`, `entries` and
-/// `payments` subcollections. firestore.rules checks who writes what.
-/// Running scores go through the API ([api]) only.
+/// `payments` subcollections, read from Firestore. Running scores, the
+/// respond flow (answering, rosters), confirming seeds and publishing
+/// every division go through the API ([api]) only; status changes, the
+/// host's entry decisions, publishing one division and deleting go
+/// through it too while the `use_api_tournaments` flag is on, and
+/// straight to Firestore (under firestore.rules) when it's off.
 class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
   HostedTournamentRepositoryFirebase({
     FirebaseFirestore? firestore,
     CallableClient? functions,
     ApiClient? api,
+    FeatureFlags? flags,
   }) : _db = firestore ?? FirebaseFirestore.instance,
        _functions = functions,
-       _api = api;
+       _api = api,
+       _flags = flags;
 
   final FirebaseFirestore _db;
   final CallableClient? _functions;
   final ApiClient? _api;
+  final FeatureFlags? _flags;
+
+  /// The API for writes that also have a Firestore path, while the flag is on.
+  ApiClient? get _writes => (_flags?.useApiTournaments ?? true) ? _api : null;
+
+  static String _t(String id) => '/v1/tournaments/${Uri.encodeComponent(id)}';
+
+  static String _entry(String t, String team) =>
+      '${_t(t)}/entries/${Uri.encodeComponent(team)}';
+
+  static String _division(String t, String d) =>
+      '${_t(t)}/divisions/${Uri.encodeComponent(d)}';
+
+  /// A generated game as the API takes it (publishGameSchema).
+  static Map<String, Object?> _publishGame(GroupGame g) => {
+    'id': g.id,
+    'order': g.order,
+    'stage': g.stage.name,
+    'round': g.round,
+    'label': g.label,
+    'pool': g.poolId,
+    'field': g.field,
+    'startsAt': g.startsAt?.toUtc().toIso8601String(),
+    'teamA': g.teamA,
+    'teamB': g.teamB,
+    'sourceA': g.sourceA?.toMap(),
+    'sourceB': g.sourceB?.toMap(),
+    'ifNeeded': g.ifNeeded,
+    'place': ?g.place,
+  };
 
   static const _noApi =
       "Live scores aren't available in this version of the app. Update "
@@ -113,28 +151,163 @@ class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
       );
 
   @override
-  Future<Result<List<TeamTournamentInvite>>> teamInvites(String teamId) =>
+  Future<Result<TeamTournamentBusiness>> teamInvites(String teamId) =>
       guard(() async {
         final json = await _client.send(
           'GET',
           '/v1/teams/${Uri.encodeComponent(teamId)}/tournament-invites',
         );
-        return [
-          for (final i in (json['invites'] as List?) ?? const [])
-            if (i is Map)
-              TeamTournamentInvite.fromMap(Map<String, dynamic>.from(i)),
-        ];
+        return TeamTournamentBusiness(
+          invites: [
+            for (final i in (json['invites'] as List?) ?? const [])
+              if (i is Map)
+                TeamTournamentInvite.fromMap(Map<String, dynamic>.from(i)),
+          ],
+          toFinish: [
+            for (final i in (json['toFinish'] as List?) ?? const [])
+              if (i is Map)
+                TeamEntryToFinish.fromMap(Map<String, dynamic>.from(i)),
+          ],
+        );
       });
 
   @override
   Future<Result<void>> declineInvite(String tournamentId, String teamId) =>
-      guard(
-        () => _client.put(
-          '/v1/tournaments/${Uri.encodeComponent(tournamentId)}/entries/'
-          '${Uri.encodeComponent(teamId)}/status',
-          {'status': EntryStatus.withdrawn.name},
-        ),
+      guard(() async {
+        final api = _writes;
+        if (api != null) {
+          await api.put('${_entry(tournamentId, teamId)}/status', {
+            'status': EntryStatus.withdrawn.name,
+            'reason': 'declined',
+          });
+          return;
+        }
+        // The flag off: the team withdraws (the rules' teamWithdraws).
+        await _entries(tournamentId).doc(teamId).update({
+          'status': EntryStatus.withdrawn.name,
+          'reason': 'declined',
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      });
+
+  @override
+  Future<Result<EntryStatus>> respond(
+    String tournamentId,
+    String teamId, {
+    required String divisionId,
+    required List<String> captainIds,
+  }) => guard(() async {
+    final api = _writes;
+    if (api != null) {
+      final json = await api.put(_entry(tournamentId, teamId), {
+        'divisionId': divisionId,
+        'captainIds': captainIds,
+      });
+      return enumByName(
+        EntryStatus.values,
+        json['status'],
+        EntryStatus.applied,
       );
+    }
+    // The flag off: the old answer. An invite or a new entry is applied
+    // (the organizer accepts it); an entered team changes its captains.
+    final ref = _entries(tournamentId).doc(teamId);
+    final was = (await ref.get()).data();
+    final status = was == null
+        ? EntryStatus.applied
+        : enumByName(EntryStatus.values, was['status'], EntryStatus.applied);
+    final next =
+        status == EntryStatus.invited ||
+            status == EntryStatus.withdrawn ||
+            status == EntryStatus.declined
+        ? EntryStatus.applied
+        : status;
+    if (was == null) {
+      final team = (await _db.collection('teams').doc(teamId).get()).data();
+      await ref.set({
+        'teamName': (team?['name'] as String?) ?? 'Team',
+        'divisionId': divisionId,
+        'status': next.name,
+        'captainIds': captainIds,
+        'teamId': teamId,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } else {
+      await ref.update({
+        if (next != status) 'status': next.name,
+        if (next != status) 'reason': null,
+        'divisionId': divisionId,
+        'captainIds': captainIds,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    }
+    return next;
+  });
+
+  @override
+  Future<Result<void>> saveRoster(
+    String tournamentId,
+    String teamId,
+    List<String> playerIds,
+  ) => guard(
+    () => _client.put('${_entry(tournamentId, teamId)}/roster', {
+      'playerIds': playerIds,
+    }),
+  );
+
+  @override
+  Future<Result<void>> saveSeeds(
+    String tournamentId,
+    String divisionId,
+    List<String> seeds, {
+    bool confirm = false,
+  }) => guard(() async {
+    final api = _writes;
+    if (api != null) {
+      await api.put('${_division(tournamentId, divisionId)}/seeds', {
+        'seeds': seeds,
+        if (confirm) 'confirm': true,
+      });
+      return;
+    }
+    // The flag off: managers write the division (a change unconfirms).
+    await _divisions(tournamentId).doc(divisionId).update({
+      'seeds': seeds,
+      'seedsConfirmedAt': confirm ? FieldValue.serverTimestamp() : null,
+    });
+  });
+
+  @override
+  Future<Result<void>> publishAll(
+    String tournamentId,
+    Map<String, List<GroupGame>> games,
+  ) => guard(() async {
+    final api = _writes;
+    if (api != null) {
+      await api.put('${_t(tournamentId)}/schedule', {
+        'divisions': [
+          for (final e in games.entries)
+            {
+              'divisionId': e.key,
+              'games': [for (final g in e.value) _publishGame(g)],
+            },
+        ],
+      });
+      return;
+    }
+    // The flag off: one division at a time, as before.
+    for (final e in games.entries) {
+      final snap = await _divisions(tournamentId).doc(e.key).get();
+      final data = snap.data();
+      if (data == null) continue;
+      final r = await publishSchedule(
+        tournamentId,
+        TournamentDivision.fromMap(snap.id, plainData(data)),
+        e.value,
+      );
+      if (r case Error(:final error)) throw error;
+    }
+  });
 
   @override
   Stream<List<HostedTournament>> watchUpcoming({int limit = 50}) {
@@ -459,36 +632,64 @@ class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
   });
 
   @override
-  Future<Result<void>> setStatus(String tournamentId, HostedStatus status) =>
-      guard(() => _doc(tournamentId).update({'status': status.name}));
+  Future<Result<void>> setStatus(
+    String tournamentId,
+    HostedStatus status,
+  ) => guard(() async {
+    final api = _writes;
+    if (api != null) {
+      await api.put('${_t(tournamentId)}/status', {'status': status.name});
+      return;
+    }
+    await _doc(tournamentId).update({
+      'status': status.name,
+      // Reopened: the server stamps a new finish (the payout hold).
+      if (status != HostedStatus.finished) 'finishedAt': FieldValue.delete(),
+    });
+  });
 
   @override
   Future<Result<void>> saveEntry(String tournamentId, TournamentEntry entry) =>
-      guard(
-        () => _entries(tournamentId).doc(entry.teamId).set({
+      guard(() async {
+        final api = _writes;
+        if (api != null) {
+          await api.put(_entry(tournamentId, entry.teamId), {
+            'divisionId': entry.divisionId,
+            'captainIds': entry.captainIds,
+          });
+          return;
+        }
+        await _entries(tournamentId).doc(entry.teamId).set({
           ...entry.toMap(),
           'updatedAt': FieldValue.serverTimestamp(),
-        }),
-      );
+        });
+      });
 
   @override
   Future<Result<void>> acceptEntry(
     String tournamentId,
     TournamentDivision division,
     TournamentEntry entry,
-  ) => guard(
-    () =>
-        (_db.batch()
-              ..set(_entries(tournamentId).doc(entry.teamId), {
-                ...entry.copyWith(status: EntryStatus.accepted).toMap(),
-                'updatedAt': FieldValue.serverTimestamp(),
-              })
-              ..update(_divisions(tournamentId).doc(division.id), {
-                'seeds': FieldValue.arrayUnion([entry.teamId]),
-                'captains.${entry.teamId}': entry.captainIds,
-              }))
-            .commit(),
-  );
+  ) => guard(() async {
+    final api = _writes;
+    if (api != null) {
+      await api.put('${_entry(tournamentId, entry.teamId)}/status', {
+        'status': EntryStatus.accepted.name,
+      });
+      return;
+    }
+    await (_db.batch()
+          ..set(_entries(tournamentId).doc(entry.teamId), {
+            ...entry.copyWith(status: EntryStatus.accepted).toMap(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          })
+          ..update(_divisions(tournamentId).doc(division.id), {
+            'seeds': FieldValue.arrayUnion([entry.teamId]),
+            'captains.${entry.teamId}': entry.captainIds,
+            'seedsConfirmedAt': null,
+          }))
+        .commit();
+  });
 
   @override
   Future<Result<void>> setEntryStatus(
@@ -496,7 +697,14 @@ class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
     TournamentEntry entry,
     EntryStatus status, {
     TournamentDivision? division,
-  }) => guard(() {
+  }) => guard(() async {
+    final api = _writes;
+    if (api != null) {
+      await api.put('${_entry(tournamentId, entry.teamId)}/status', {
+        'status': status.name,
+      });
+      return;
+    }
     final batch = _db.batch()
       ..set(_entries(tournamentId).doc(entry.teamId), {
         ...entry.copyWith(status: status).toMap(),
@@ -506,9 +714,10 @@ class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
       batch.update(_divisions(tournamentId).doc(division.id), {
         'seeds': FieldValue.arrayRemove([entry.teamId]),
         'captains.${entry.teamId}': FieldValue.delete(),
+        'seedsConfirmedAt': null,
       });
     }
-    return batch.commit();
+    await batch.commit();
   });
 
   @override
@@ -570,6 +779,13 @@ class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
     TournamentDivision division,
     List<GroupGame> games,
   ) => guard(() async {
+    final api = _writes;
+    if (api != null) {
+      await api.put('${_division(tournamentId, division.id)}/schedule', {
+        'games': [for (final g in games) _publishGame(g)],
+      });
+      return;
+    }
     final col = _games(tournamentId, division.id);
     final old = await col.get();
     await deleteDocs(_db, [for (final d in old.docs) d.reference]);
@@ -586,6 +802,12 @@ class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
         );
       }
       await batch.commit();
+    }
+    // Publishing makes it scheduled, as the API does.
+    final t = await _doc(tournamentId).get();
+    final status = t.data()?['status'];
+    if (status == 'draft' || status == 'registration' || status == 'seeding') {
+      await _doc(tournamentId).update({'status': HostedStatus.scheduled.name});
     }
   });
 
@@ -749,6 +971,13 @@ class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
 
   @override
   Future<Result<void>> deleteTournament(String tournamentId) => guard(() async {
+    // The API also deletes the captains' chats (and the tournamentDeleted
+    // function cleans up after either path).
+    final api = _writes;
+    if (api != null) {
+      await api.delete(_t(tournamentId));
+      return;
+    }
     final divisions = await _divisions(tournamentId).get();
     final refs = <DocumentReference<Map<String, dynamic>>>[];
     for (final d in divisions.docs) {

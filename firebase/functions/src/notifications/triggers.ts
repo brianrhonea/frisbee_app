@@ -18,6 +18,20 @@ import { invitees, type MeetingDoc, meetingChange, type MeetingTeam, startedReci
 import { isLeagueGameEvent } from "../tournaments/model";
 import { deliver, removeEntry, retract } from "./deliver";
 import { draftDeliveries, signupDecisionNotice } from "./league";
+import { can as teamCan } from "../tournaments/chat_members";
+import {
+  becameFinal,
+  deadlineOf,
+  entryDeadlineNotice,
+  finalNotice,
+  millisOf,
+  missingFor,
+  organizerDeadlineNotice,
+  reminderDue,
+  scheduleCameOut,
+  scheduleNotice,
+  tournamentInviteNotice,
+} from "./tournament";
 import {
   chatNotice,
   commentLikeNotice,
@@ -706,5 +720,167 @@ async function prune(now: number) {
     const batch = db.batch();
     for (const d of old.docs) batch.delete(d.ref);
     await batch.commit();
+  }
+}
+
+// ---- Hosted tournaments: invites, deadlines, the schedule, finals --------
+
+const strs = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
+
+/** A team's admins (teamAdmin() in the rules: manageTeam). */
+const teamAdmins = (team: Data | undefined): string[] =>
+  team ? strs(team.memberIds).filter((u) => teamCan(team, u, "manageTeam")) : [];
+
+/** An entry's captains for the event and its team's admins. */
+async function entryPeople(teamId: string, entry: Data | undefined): Promise<string[]> {
+  const team = (await liveTeam(teamId)) as Data | null | undefined;
+  if (!team) return [];
+  const members = strs(team.memberIds);
+  return [...new Set([...teamAdmins(team), ...strs(entry?.captainIds).filter((u) => members.includes(u))])];
+}
+
+/** A host invited a team (or invited it again): its admins, to respond. */
+export const tournamentInvite = onDocumentWritten("tournaments/{tournamentId}/entries/{teamId}", async (event) => {
+  const before = event.data?.before.data();
+  const after = event.data?.after.data();
+  if (after?.status !== "invited") return;
+  if (before?.status === "invited" && millisOf(before.replyBy) === millisOf(after.replyBy)) return;
+  const { tournamentId, teamId } = event.params;
+  const t = (await getFirestore().doc(`tournaments/${tournamentId}`).get()).data();
+  if (!t || t.status === "draft") return;
+  const team = await liveTeam(teamId);
+  if (!team) return;
+  await deliver(
+    getFirestore(),
+    getMessaging(),
+    teamAdmins(team as Data),
+    tournamentInviteNotice({
+      tournamentId,
+      teamId,
+      eventName: String(t.name ?? ""),
+      teamName: teamName(team),
+      replyBy: millisOf(after.replyBy),
+    }),
+  );
+});
+
+/** The schedule came out: every entered team's captains and admins. */
+export const tournamentScheduled = onDocumentUpdated("tournaments/{tournamentId}", async (event) => {
+  const before = event.data?.before.data();
+  const after = event.data?.after.data();
+  if (!scheduleCameOut(before, after)) return;
+  const { tournamentId } = event.params;
+  const db = getFirestore();
+  const entries = await db.collection(`tournaments/${tournamentId}/entries`).where("status", "==", "accepted").limit(200).get();
+  const people = new Set<string>();
+  for (const e of entries.docs) for (const u of await entryPeople(e.id, e.data())) people.add(u);
+  if (people.size === 0) return;
+  await deliver(db, getMessaging(), people, scheduleNotice({ tournamentId, eventName: String(after?.name ?? "") }));
+});
+
+/**
+ * A game's final score (confirmed, or set by the host): both teams'
+ * captains for the event. Running scores never push.
+ */
+export const tournamentFinal = onDocumentUpdated(
+  "tournaments/{tournamentId}/divisions/{divisionId}/games/{gameId}",
+  async (event) => {
+    const before = event.data?.before.data();
+    const after = event.data?.after.data();
+    if (!after || !becameFinal(before, after)) return;
+    const { tournamentId, divisionId, gameId } = event.params;
+    const db = getFirestore();
+    const [t, d] = await Promise.all([
+      db.doc(`tournaments/${tournamentId}`).get(),
+      db.doc(`tournaments/${tournamentId}/divisions/${divisionId}`).get(),
+    ]);
+    if (!t.exists || !d.exists) return;
+    const teamA = String(after.teamA ?? "");
+    const teamB = String(after.teamB ?? "");
+    const captains = (d.get("captains") ?? {}) as Record<string, unknown>;
+    const drafted = Array.isArray(d.get("teams")) ? (d.get("teams") as Data[]) : [];
+    const nameOf = async (id: string) => {
+      const mine = drafted.find((x) => x.id === id);
+      if (mine?.name) return String(mine.name);
+      const e = await db.doc(`tournaments/${tournamentId}/entries/${id}`).get();
+      return String(e.get("teamName") ?? "Team");
+    };
+    const [nameA, nameB] = await Promise.all([nameOf(teamA), nameOf(teamB)]);
+    const to = [...new Set([...strs(captains[teamA]), ...strs(captains[teamB])])];
+    if (to.length === 0) return;
+    await deliver(
+      db,
+      getMessaging(),
+      to,
+      finalNotice({ tournamentId, gameId, eventName: String(t.get("name") ?? ""), nameA, nameB, scoreA: Number(after.scoreA), scoreB: Number(after.scoreB) }),
+    );
+  },
+);
+
+/**
+ * Hourly: reminds teams (their admins and captains) and players of a
+ * roster or fee still missing, three days before the entry deadline and
+ * once it has passed; the organizers hear once when it passes with entries
+ * still missing something. Each reminder once (sentReminders, pruned by
+ * eventReminders after three days).
+ */
+export const entryDeadlineReminders = onSchedule(
+  { schedule: "15 * * * *", timeZone: "Etc/UTC", timeoutSeconds: 300, retryCount: 1 },
+  async () => {
+    const db = getFirestore();
+    const now = Date.now();
+    const open = await db.collection("tournaments").where("status", "in", ["registration", "seeding", "scheduled"]).limit(500).get();
+    for (const doc of open.docs) {
+      await remindEntries(doc.id, doc.data(), now).catch((e) =>
+        logger.error("Entry reminders failed", { tournamentId: doc.id, error: String(e) }),
+      );
+    }
+  },
+);
+
+/** Records that [key] was sent; false if it already was. */
+async function firstTime(key: string): Promise<boolean> {
+  try {
+    await getFirestore().collection("sentReminders").doc(key).create({ sentAt: Timestamp.now() });
+    return true;
+  } catch (e) {
+    if ((e as { code?: number }).code === 6) return false; // ALREADY_EXISTS
+    throw e;
+  }
+}
+
+async function remindEntries(tournamentId: string, t: Data, now: number) {
+  const deadline = deadlineOf(t);
+  const kind = reminderDue(deadline, now, undefined);
+  if (!kind || deadline == null) return;
+  const db = getFirestore();
+  const messaging = getMessaging();
+  const eventName = String(t.name ?? "");
+  const divisions = await db.collection(`tournaments/${tournamentId}/divisions`).get();
+  const minRoster = new Map(divisions.docs.map((d) => [d.id, typeof d.get("minRoster") === "number" ? Number(d.get("minRoster")) : 7]));
+  const payments = new Map((await db.collection(`tournaments/${tournamentId}/payments`).get()).docs.map((p) => [p.id, p.data()]));
+  const active = ["applied", "accepted", "waitlisted"];
+  let missingTeams = 0;
+  const entries = await db.collection(`tournaments/${tournamentId}/entries`).where("status", "in", active).get();
+  for (const e of entries.docs) {
+    const entry = e.data();
+    const missing = missingFor({ t, entry, minRoster: minRoster.get(String(entry.divisionId ?? "")) ?? 7, payment: payments.get(e.id), player: false });
+    if (missing.length === 0) continue;
+    missingTeams++;
+    if (!(await firstTime(`entry_${tournamentId}_${e.id}_${kind}_${deadline}`))) continue;
+    await deliver(db, messaging, await entryPeople(e.id, entry), entryDeadlineNotice({ tournamentId, teamId: e.id, eventName, kind, missing, deadline }));
+  }
+  if (t.entryType === "players") {
+    const signups = await db.collection(`tournaments/${tournamentId}/signups`).where("status", "in", active).get();
+    for (const s of signups.docs) {
+      const missing = missingFor({ t, entry: s.data(), minRoster: 0, payment: payments.get(s.id), player: true });
+      if (missing.length === 0 || !(await firstTime(`signup_${tournamentId}_${s.id}_${kind}_${deadline}`))) continue;
+      await deliver(db, messaging, [s.id], entryDeadlineNotice({ tournamentId, teamId: null, eventName, kind, missing, deadline }));
+    }
+  }
+  if (kind === "passed" && missingTeams > 0 && (await firstTime(`entryhost_${tournamentId}_${deadline}`))) {
+    const host = (await liveTeam(String(t.hostId ?? ""))) as Data | null | undefined;
+    const organizers = host ? strs(host.memberIds).filter((u) => teamCan(host, u, "manageEvents")) : [];
+    await deliver(db, messaging, organizers, organizerDeadlineNotice({ tournamentId, eventName, teams: missingTeams }));
   }
 }

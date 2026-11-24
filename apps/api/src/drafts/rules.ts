@@ -12,6 +12,7 @@ import { isMap } from "../teams/access.js";
 type Problem = ApiError | null;
 const bad = (m: string) => new ApiError("invalid_argument", m);
 const denied = (m: string) => new ApiError("permission_denied", m);
+const failed = (m: string) => new ApiError("failed_precondition", m);
 const closed = (m: string) => new ApiError("failed_precondition", m);
 
 const isInt = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v);
@@ -122,9 +123,18 @@ export function signupUpdateProblem(c: SignupCtx, before: Data, next: Data): Pro
 
 // ---- payments/{id} ---------------------------------------------------------------
 
-/** allow create, update on payments: manages && the fields. */
-export function paymentProblem(manages: boolean, p: Data): Problem {
+/** The note the payments API sets on a fee paid online (paidOnlineNote in packages/shared). */
+const paidOnline = "Paid online through Stall 10";
+
+/**
+ * allow create, update on payments: manages && the fields, and a fee paid
+ * online ([old]) is refunded through the payments API, never changed here,
+ * and only that API says a fee was paid online.
+ */
+export function paymentProblem(manages: boolean, p: Data, old?: Data | null): Problem {
   if (!manages) return denied("Only the event's organizers can mark fees paid.");
+  if (old?.paid === true && old.note === paidOnline) return failed("This fee was paid online. Refund it instead.");
+  if (p.note === paidOnline) return bad("Use your own note for a fee paid another way.");
   if (!Object.keys(p).every((k) => ["paid", "paidAt", "note", "offlineAt"].includes(k))) return bad("A payment can't have other fields.");
   if (!(p.offlineAt === undefined || p.offlineAt === null || isTimestamp(p.offlineAt))) return bad("offlineAt must be a time.");
   if (typeof p.paid !== "boolean") return bad("Say whether it's paid.");

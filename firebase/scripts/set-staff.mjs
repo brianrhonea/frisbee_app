@@ -11,6 +11,14 @@
 //   node ../scripts/set-staff.mjs you@example.com --project prod  # prod
 //   node ../scripts/set-staff.mjs you@example.com --remove        # take it away
 //   node ../scripts/set-staff.mjs --list                          # who is staff
+//   node ../scripts/set-staff.mjs you@example.com --host <teamId> # also host as Stall 10
+//
+// --host names the official Stall 10 organization (an organization marked
+// official with set-official.mjs; find its id with
+// `set-official.mjs --find "Stall 10"`). Staff join it as coaches, so they
+// can host any event as Stall 10 (listed first under "Official organizer"
+// when hosting), with the "Stall 10 verified" badge, without running any
+// other team or club. With --remove they leave it (its owner stays).
 //
 // Uses Application Default Credentials (`gcloud auth application-default
 // login`); never a service-account key. Other custom claims are kept.
@@ -34,7 +42,13 @@ const name = at >= 0 ? args[at + 1] : "dev";
 const project = projects[name] ?? name;
 const remove = args.includes("--remove");
 const list = args.includes("--list");
-const who = args.find((a, i) => !a.startsWith("--") && (at < 0 || i !== at + 1));
+const hostAt = args.indexOf("--host");
+const hostId = hostAt >= 0 ? args[hostAt + 1] : undefined;
+const who = args.find((a, i) => !a.startsWith("--") && (at < 0 || i !== at + 1) && (hostAt < 0 || i !== hostAt + 1));
+if (hostAt >= 0 && (!hostId || hostId.startsWith("--"))) {
+  console.error("--host needs the Stall 10 organization's team id (set-official.mjs --find \"Stall 10\").");
+  process.exit(2);
+}
 if (!project || project.startsWith("--") || (!who && !list)) {
   console.error("usage: node set-staff.mjs <email or uid> [--remove] [--project dev|prod|<id>]");
   console.error("       node set-staff.mjs --list [--project dev|prod|<id>]");
@@ -73,6 +87,32 @@ await auth.setCustomUserClaims(user.uid, claims);
 const badge = getFirestore().doc(`staff/${user.uid}`);
 if (remove) await badge.delete();
 else await badge.set({ since: FieldValue.serverTimestamp() });
+
+// Hosting as Stall 10: a coach on the official Stall 10 organization
+// (coaches manage its events; can() in apps/api/src/teams/access.ts).
+if (hostId) {
+  const db = getFirestore();
+  const ref = db.doc(`teams/${hostId}`);
+  await db.runTransaction(async (tx) => {
+    const team = (await tx.get(ref)).data();
+    if (!team) throw new Error(`No team ${hostId} on ${project}.`);
+    if (team.official !== true || team.kind !== "organization") {
+      throw new Error(`${team.name ?? hostId} isn't an official organization. Mark it with set-official.mjs first.`);
+    }
+    if (team.ownerId === user.uid) return; // The owner already runs it.
+    if (remove) {
+      tx.update(ref, {
+        [`members.${user.uid}`]: FieldValue.delete(),
+        [`memberPerms.${user.uid}`]: FieldValue.delete(),
+        [`memberRoles.${user.uid}`]: FieldValue.delete(),
+        memberIds: FieldValue.arrayRemove(user.uid),
+      });
+    } else {
+      tx.update(ref, { [`members.${user.uid}`]: "coach", memberIds: FieldValue.arrayUnion(user.uid) });
+    }
+  });
+  console.log(`${remove ? "Took" : "Added"} ${user.email ?? user.uid} ${remove ? "off" : "to"} ${hostId} (host as Stall 10).`);
+}
 console.log(
   `${remove ? "Removed staff from" : "Made staff:"} ${user.email ?? user.uid} on ${project}. ` +
     "They need to sign out and back in.",

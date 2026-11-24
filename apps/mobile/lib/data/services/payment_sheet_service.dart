@@ -74,7 +74,8 @@ class StripePaymentSheetService implements PaymentSheetService {
   @override
   Future<PaymentSheetOutcome> present(PaymentSheetRequest request) async {
     try {
-      // A direct charge: the payment is made on the host's account.
+      // Stall 10's own account (null), so a host's from an older payment
+      // isn't left set.
       Stripe.publishableKey = publishableKey;
       Stripe.stripeAccountId = request.account;
       Stripe.urlScheme = 'stall10';

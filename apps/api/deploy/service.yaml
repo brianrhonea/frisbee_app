@@ -67,6 +67,33 @@ spec:
             # moment they change. Empty: they refresh within a minute.
             - name: WEB_SITE_URL
               value: "${WEB_SITE_URL}"
+            # Payments (DEPLOY.md, Payments): Stripe's key and the two webhook
+            # signing secrets (Stall 10's own account, and hosts' accounts).
+            # Each secret must exist in the project, or the revision fails.
+            - name: STRIPE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: STRIPE_SECRET_KEY
+                  key: latest
+            - name: STRIPE_PLATFORM_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: STRIPE_PLATFORM_WEBHOOK_SECRET
+                  key: latest
+            - name: STRIPE_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: STRIPE_WEBHOOK_SECRET
+                  key: latest
+            # Days a finished event's fees wait before going to hosts (0 to 30).
+            - name: PAYOUT_HOLD_DAYS
+              value: "${PAYOUT_HOLD_DAYS}"
+            # Cloud Scheduler's payment jobs: this API's URL and the
+            # scheduler's service account (DEPLOY.md, Scheduled payment jobs).
+            - name: JOBS_AUDIENCE
+              value: "${JOBS_AUDIENCE}"
+            - name: JOBS_INVOKER
+              value: "${JOBS_INVOKER}"
           resources:
             limits:
               cpu: "1"

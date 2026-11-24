@@ -414,7 +414,7 @@ class Tag extends StatelessWidget {
 /// The mark of an official organizer (Team.official), e.g. Stall 10, and
 /// the events it hosts.
 class OfficialBadge extends StatelessWidget {
-  const OfficialBadge({super.key, this.label = 'Official'});
+  const OfficialBadge({super.key, this.label = 'Stall 10 verified'});
 
   /// Null for the icon alone.
   final String? label;
@@ -424,7 +424,7 @@ class OfficialBadge extends StatelessWidget {
     final c = AppColors.of(context);
     final icon = Icon(Icons.verified, size: 15, color: c.accent);
     final text = label;
-    if (text == null) return Tooltip(message: 'Official', child: icon);
+    if (text == null) return Tooltip(message: 'Stall 10 verified', child: icon);
     return Container(
       padding: const EdgeInsets.fromLTRB(5, 2, 8, 2),
       decoration: BoxDecoration(
