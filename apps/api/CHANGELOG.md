@@ -7,6 +7,80 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.47.0 — 2026-11-23
+
+Stall 10 collects every fee and pays hosts out (separate charges and
+transfers). With app 0.0.51 and web 0.59.0.
+
+- **Charges on Stall 10's account.** Checkout Sessions and PaymentIntents
+  no longer use the host's account or an application fee; they carry
+  `transfer_group: tournament_<id>` and the charge doc records
+  `flow: "platform"`, the destination account and `released: false`.
+  Charges made before this (no `flow`) keep the old direct-charge
+  handling, so nothing is paid twice.
+- **Payout accounts are recipients.** New accounts are Accounts v2 with
+  `dashboard: "none"`, the `recipient` configuration (`stripe_transfers`)
+  and Stall 10 as fees and losses collector. `payoutAccounts/{team}`
+  gets `model: "recipient"`; hosts with an old account set up again
+  (the old id is kept as `legacyAccount`).
+- **Release.** Once the event is finished and its last day has passed,
+  each paid fee is transferred to the host (`source_transaction` = the
+  charge, idempotency key `transfer:<session>:<n>`), less anything the
+  host owes. Runs when the event is set to finished, when a late payment
+  succeeds, when the host's account becomes ready, when its earnings are
+  read, and from the staff sweep `POST /v1/payments/release`. Stall 10's
+  own events (official hosts) keep their fees.
+- **Refunds.** `POST /v1/tournaments/:id/payments/:payerId/refund`
+  (organizers or staff) refunds the fee only; service and processing
+  fees aren't refunded. After release the transfer is reversed; what
+  can't be reversed is owed and taken off the next payout.
+- **Disputes.** `charge.dispute.created` marks the fee disputed and
+  claws the transfer back; a won dispute (`charge.dispute.closed`) frees
+  it again.
+- **Earnings.** `GET /v1/teams/:teamId/earnings`: held, sent, refunded,
+  disputed and owed totals with each fee.
+- **Webhooks.** Platform events (charges, refunds, disputes) are signed
+  with `STRIPE_PLATFORM_WEBHOOK_SECRET`, Connect events with
+  `STRIPE_WEBHOOK_SECRET`; either verifies.
+- Deleting an event is refused while it holds fees paid online.
+- **Security (review, 2026-11-23).**
+  - An organizer's refund of a fee already paid out to the host's bank
+    is refused (it was paid from Stall 10's balance); staff can refund it,
+    leaving it owed. A reversal counts as owed only on Stripe's
+    insufficient-balance error (`InsufficientBalance`); any other failure
+    is retried with the same key.
+  - Payout hold: fees go out `PAYOUT_HOLD_DAYS` (default 3) after the
+    server-stamped `finishedAt`, and never before the event's last day
+    as it was when the fee was paid (`eventEndsAt` on the charge), so
+    moving an event earlier doesn't pay out sooner.
+  - Debt a fee paid off (`owedTakenCents`, now kept on the charge) comes
+    back when that fee is refunded or disputed. A dispute won after a
+    reversal that was left owed cancels the debt instead of paying the
+    host twice; what was already recovered is sent back
+    (`credit:<session>`).
+  - A transfer is confirmed only by the run that planned it, and a fee
+    refunded or disputed while its transfer went out is taken back.
+  - Setting up or changing payouts needs a sign-in in the last 15
+    minutes (`Caller.authTime`, `payoutsReauthMessage`).
+  - Organizers can't mark a fee "Paid online through Stall 10" by hand,
+    or change one that was, through either payments route
+    (`paymentProblem` for hat signups too); a refund finds an earlier
+    paid charge when a newer attempt is the latest.
+  - Only `payment_status: "paid"` counts as paid.
+  - Reopening an event clears `finishedAt` (clients must drop it too), so
+    finishing again starts a new hold; the daily check waits for the
+    hold before flagging `payout_overdue`, and flags `credit_unsent`.
+- **Oversight.** `GET /v1/staff/payments` (staff): open problems and the
+  latest payments. `POST /v1/payments/reconcile` (staff) and the Cloud
+  Scheduler jobs `POST /v1/jobs/payments/release` and `/reconcile`
+  (Google OIDC from `JOBS_INVOKER` for `JOBS_AUDIENCE`): the daily check of
+  every payment and transfer against Stripe (`src/payments/reconcile.ts`),
+  recorded in `paymentIssues/{charge}` and `paymentChecks/latest`. New
+  dependency `google-auth-library`.
+- New payment log actions: `released`, `kept_by_stall10`,
+  `transfer_reversed`, `owed_by_host`, `refund_started`, `refunded`,
+  `refunded_on_stripe`, `dispute_won`.
+
 ## 0.46.0 — 2026-11-23
 
 Tournament flow: respond, roster, deadline, seeds and publishing, director.

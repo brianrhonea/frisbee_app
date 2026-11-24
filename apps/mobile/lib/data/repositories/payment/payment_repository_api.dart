@@ -83,10 +83,16 @@ class PaymentRepositoryApi implements PaymentRepository {
 
   @override
   Future<Result<String>> payoutSession(String teamId) => guard(() async {
-    final json = await _client.post('/v1/teams/${_id(teamId)}/payouts/session', {});
+    final json = await _client.post(
+      '/v1/teams/${_id(teamId)}/payouts/session',
+      {},
+    );
     final secret = json['clientSecret'];
     if (secret is! String || secret.isEmpty) {
-      throw const ApiException('unavailable', "Stripe's setup didn't open. Try again.");
+      throw const ApiException(
+        'unavailable',
+        "Stripe's setup didn't open. Try again.",
+      );
     }
     return secret;
   });
@@ -122,11 +128,28 @@ class PaymentRepositoryApi implements PaymentRepository {
         'teamId': ?teamId,
       }),
     );
-    if (r.clientSecret.isEmpty || r.account.isEmpty) {
+    if (r.clientSecret.isEmpty) {
       throw const ApiException('internal', 'Stripe sent back no payment.');
     }
     return r;
   });
+
+  @override
+  Future<Result<void>> refund(String tournamentId, String payerId) => guard(
+    () async {
+      await _client.post(
+        '/v1/tournaments/${_id(tournamentId)}/payments/${_id(payerId)}/refund',
+        const {},
+      );
+    },
+  );
+
+  @override
+  Future<Result<Earnings>> earnings(String teamId) => guard(
+    () async => Earnings.fromMap(
+      await _client.send('GET', '/v1/teams/${_id(teamId)}/earnings'),
+    ),
+  );
 
   @override
   Future<Result<Uri>> checkout(String tournamentId, {String? teamId}) => guard(

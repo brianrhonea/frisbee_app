@@ -128,6 +128,20 @@ class _FakePayments implements PaymentRepository {
       ),
     );
   }
+
+  Earnings earningsAnswer = Earnings.none;
+
+  @override
+  Future<Result<Earnings>> earnings(String teamId) async {
+    calls.add('earnings $teamId');
+    return Result.ok(earningsAnswer);
+  }
+
+  @override
+  Future<Result<void>> refund(String tournamentId, String payerId) async {
+    calls.add('refund $tournamentId $payerId');
+    return const Result.ok(null);
+  }
 }
 
 /// The payment sheet: [outcome] or [failure], recording what it showed.
@@ -194,6 +208,9 @@ void main() {
         feeLabel: r'1% + $1',
         paid: true,
       );
+      // Payers are told where the money goes and what a refund returns.
+      expect(find.textContaining(payoutTimingNote), findsOneWidget);
+      expect(find.textContaining(refundPolicyNote), findsOneWidget);
       await tester.tap(find.text(r'Pay $400 online'));
       await tester.pumpAndSettle();
       expect(payments.calls, [
@@ -258,7 +275,9 @@ void main() {
       await pump(tester, PayoutsCard(teamId: 'host', open: open));
       expect(find.text('Take payments online'), findsOneWidget);
       expect(
-        find.textContaining("payers also pay Stall 10's 3% and Stripe's card fee"),
+        find.textContaining(
+          "payers also pay Stall 10's 3% and Stripe's card fee",
+        ),
         findsOneWidget,
       );
       await tester.tap(find.text('Set up payments'));
@@ -283,6 +302,50 @@ void main() {
       await pump(tester, PayoutsCard(key: UniqueKey(), teamId: 'host'));
       expect(find.text('Online payments are on'), findsOneWidget);
       expect(find.byType(FilledButton), findsNothing);
+      expect(find.textContaining('a few days after each event'), findsOneWidget);
+      expect(find.textContaining('Stripe Dashboard'), findsNothing);
+    });
+
+    testWidgets("once on, shows what's held, sent and owed, and the owner's "
+        'bank and payouts', (tester) async {
+      payments.account = const PayoutAccount(
+        available: true,
+        status: PayoutStatus.ready,
+        feeLabel: '3%',
+      );
+      payments.earningsAnswer = const Earnings(
+        heldCents: 40000,
+        sentCents: 10000,
+        refundedCents: 2000,
+        owedCents: 500,
+        items: [
+          EarningsItem(
+            tournamentId: 't1',
+            label: 'Bid fee: Spring Fling (Haze)',
+            amountCents: 40000,
+            status: EarningsStatus.held,
+          ),
+        ],
+      );
+      await pump(tester, PayoutsCard(teamId: 'host', open: open));
+      expect(payments.calls, contains('earnings host'));
+      expect(
+        find.text(r'Held $400 · Sent $100 · Refunded $20'),
+        findsOneWidget,
+      );
+      expect(find.textContaining(r'$5 taken back'), findsOneWidget);
+      await tester.tap(find.text('Each fee (1)'));
+      await tester.pumpAndSettle();
+      expect(find.text('Bid fee: Spring Fling (Haze)'), findsOneWidget);
+      expect(find.text('Held until the event is over'), findsOneWidget);
+      expect(find.byKey(const Key('manage-payouts')), findsOneWidget);
+    });
+
+    testWidgets('nothing to show before payouts are linked', (tester) async {
+      await pump(tester, PayoutsCard(teamId: 'host', open: open));
+      expect(payments.calls, isNot(contains('earnings host')));
+      expect(find.byKey(const Key('payout-totals')), findsNothing);
+      expect(find.byKey(const Key('manage-payouts')), findsNothing);
     });
 
     testWidgets("organizers who aren't the owner are told who sets it up", (
@@ -296,7 +359,10 @@ void main() {
         ownerName: 'Dana',
       );
       await pump(tester, PayoutsCard(teamId: 'host', open: open));
-      expect(find.textContaining('Only Dana can set up payments'), findsOneWidget);
+      expect(
+        find.textContaining('Only Dana can set up payments'),
+        findsOneWidget,
+      );
       expect(find.byKey(const Key('set-up-payments')), findsNothing);
     });
 
@@ -628,5 +694,34 @@ void main() {
   test('amounts read as dollars', () {
     expect(centsLabel(40000), r'$400');
     expect(centsLabel(160), r'$1.60');
+  });
+
+  testWidgets('Refund asks first and says what comes back', (tester) async {
+    var refunded = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: RefundButton(
+            name: 'Haze',
+            amountCents: 40000,
+            running: false,
+            onRefund: () async => refunded++,
+            result: () => const Result.ok(null),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Refund'));
+    await tester.pumpAndSettle();
+    expect(find.text(r'Refund $400 to Haze?'), findsOneWidget);
+    expect(find.textContaining(refundPolicyNote), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(refunded, 0);
+    await tester.tap(find.text('Refund'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Refund'));
+    await tester.pumpAndSettle();
+    expect(refunded, 1);
   });
 }

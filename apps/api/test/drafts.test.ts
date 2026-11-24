@@ -573,6 +573,12 @@ describe("payments", () => {
     expect(paymentProblem(true, { ...ok, note: 1 })).not.toBeNull();
     expect(paymentProblem(true, { ...ok, note: "n".repeat(201) })).not.toBeNull();
   });
+  it("a fee paid online is refunded through the payments API, and only it says so", () => {
+    const online = { paid: true, paidAt: serverTime, note: "Paid online through Stall 10" };
+    expect(paymentProblem(true, { ...ok, paid: false }, online)?.code).toBe("failed_precondition");
+    expect(paymentProblem(true, online, null)?.code).toBe("invalid_argument");
+    expect(paymentProblem(true, { ...ok, paid: false }, { ...ok, note: "Cash" })).toBeNull();
+  });
 });
 
 describe("validDivision", () => {

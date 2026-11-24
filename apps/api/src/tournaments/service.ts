@@ -194,11 +194,20 @@ function checkDivision(d: Data) {
 /** A fill as a game update: only the slots it fills. */
 const fillUpdate = (f: SlotFill): Data => ({ ...(f.teamA != null && { teamA: f.teamA }), ...(f.teamB != null && { teamB: f.teamB }) });
 
+/** What tournaments need from payments (PaymentService): fees Stall 10 holds for an event. */
+export interface TournamentPayouts {
+  /** Sends the host its share once the event is finished. Never throws. */
+  releaseTournament(id: string): Promise<void>;
+  /** How many fees paid online Stall 10 still holds for it. */
+  heldFor(id: string): Promise<number>;
+}
+
 export class TournamentService {
   constructor(
     private readonly store: DocStore,
     private readonly queries: DocQueries,
     private readonly now: () => number = Date.now,
+    private readonly payouts?: TournamentPayouts,
   ) {}
 
   // ---- Who's who -----------------------------------------------------------
@@ -464,8 +473,11 @@ export class TournamentService {
             : `It can't go from ${hostedStatusLabels[from]} to ${hostedStatusLabels[status]}.`,
         );
       }
-      tx.update(p.tournament(id), { status });
+      // finishedAt starts the payout hold (payments/service.ts releasable).
+      // Reopened: a later finish starts a new hold.
+      tx.update(p.tournament(id), { status, finishedAt: status === "finished" ? serverTime : deleteField });
     });
+    if (status === "finished") await this.payouts?.releaseTournament(id);
   }
 
   /**
@@ -478,6 +490,14 @@ export class TournamentService {
     const id = docIdParam(rawId);
     const check = (tx: Tx) => this.managed(tx, id, caller.uid);
     await this.store.transact(async (tx) => void (await check(tx)));
+    // Fees Stall 10 holds for it go back to the payers first (the Teams tab's Refund).
+    const held = (await this.payouts?.heldFor(id)) ?? 0;
+    if (held > 0) {
+      throw new ApiError(
+        "failed_precondition",
+        held === 1 ? "Refund the fee paid online first (Teams)." : `Refund the ${held} fees paid online first (Teams).`,
+      );
+    }
     // Its chats with the organizers first (the Captains' channel and each
     // team's thread), so they leave everyone's inbox and nothing that
     // follows (the entries going) updates them. The pointers stay for the
@@ -1331,8 +1351,12 @@ export class TournamentService {
         checkDivision(divisionDoc(d, plan.change));
         tx.update(p.division(id, divId), plan.change);
       }
-      if (plan.status !== statusOf(t)) tx.update(p.tournament(id), { status: plan.status });
+      if (plan.status !== statusOf(t)) tx.update(p.tournament(id), { status: plan.status, finishedAt: plan.status === "finished" ? serverTime : deleteField });
       return { changed: plan.changed };
+    }).then(async (r) => {
+      // The event is over: its hosts' fees go out.
+      if (r.changed.includes("finished")) await this.payouts?.releaseTournament(id);
+      return r;
     });
   }
 }

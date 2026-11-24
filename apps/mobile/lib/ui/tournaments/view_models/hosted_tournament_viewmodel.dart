@@ -106,6 +106,7 @@ class HostedTournamentViewModel extends ChangeNotifier {
     setPaymentNote = Command1<void, ({String teamId, String note})>(
       _setPaymentNote,
     );
+    refund = Command1<void, String>(_refund);
     openChat = Command1<String, String?>(_openChat);
     saveSeeds = Command1<void, List<String>>(_saveSeeds);
     publish = Command0<void>(_publish);
@@ -254,6 +255,10 @@ class HostedTournamentViewModel extends ChangeNotifier {
 
   /// The host's note on a team's payment ("Check #1042").
   late final Command1<void, ({String teamId, String note})> setPaymentNote;
+
+  /// Refunds a team's fee paid online (organizers; the payment record then
+  /// says so).
+  late final Command1<void, String> refund;
   late final Command1<void, List<String>> saveSeeds;
   late final Command0<void> publish;
   late final Command1<void, HostedScore> report;
@@ -936,6 +941,14 @@ class HostedTournamentViewModel extends ChangeNotifier {
         offlineAt: old?.offlineAt,
       ),
     );
+  }
+
+  Future<Result<void>> _refund(String teamId) async {
+    final api = _paymentsApi;
+    if (api == null || !api.available) {
+      return Result.error(Exception("Online payments aren't set up here yet."));
+    }
+    return api.refund(tournamentId, teamId);
   }
 
   Future<Result<void>> _setPaymentNote(({String teamId, String note}) p) {

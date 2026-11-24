@@ -632,15 +632,21 @@ class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
   });
 
   @override
-  Future<Result<void>> setStatus(String tournamentId, HostedStatus status) =>
-      guard(() async {
-        final api = _writes;
-        if (api != null) {
-          await api.put('${_t(tournamentId)}/status', {'status': status.name});
-          return;
-        }
-        await _doc(tournamentId).update({'status': status.name});
-      });
+  Future<Result<void>> setStatus(
+    String tournamentId,
+    HostedStatus status,
+  ) => guard(() async {
+    final api = _writes;
+    if (api != null) {
+      await api.put('${_t(tournamentId)}/status', {'status': status.name});
+      return;
+    }
+    await _doc(tournamentId).update({
+      'status': status.name,
+      // Reopened: the server stamps a new finish (the payout hold).
+      if (status != HostedStatus.finished) 'finishedAt': FieldValue.delete(),
+    });
+  });
 
   @override
   Future<Result<void>> saveEntry(String tournamentId, TournamentEntry entry) =>

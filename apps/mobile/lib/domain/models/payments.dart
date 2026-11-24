@@ -1,5 +1,97 @@
-// Online payments for tournament and league fees (Stripe Connect). The
-// server's answers, as in packages/shared/src/payments.ts.
+// Online payments for tournament and league fees. Stall 10 takes each
+// payment and sends the host its fee once the event is over. The server's
+// answers, as in packages/shared/src/payments.ts.
+
+/// Told to organizers and payers: when hosts get paid, and what a refund
+/// returns (payoutTimingNote, refundPolicyNote in packages/shared).
+const payoutTimingNote =
+    'Fees paid online are held by Stall 10 and sent to the host a few days '
+    'after the event is over.';
+const refundPolicyNote =
+    "A refund returns the fee. The service and processing fees aren't "
+    'refunded.';
+
+/// One fee paid online, as the host's earnings list it.
+enum EarningsStatus {
+  held('Held until the event is over'),
+  sent('Sent'),
+  kept('Stall 10 event'),
+  refunded('Refunded'),
+  disputed('Disputed');
+
+  const EarningsStatus(this.label);
+  final String label;
+
+  static EarningsStatus parse(Object? v) =>
+      values.firstWhere((s) => s.name == v, orElse: () => held);
+}
+
+class EarningsItem {
+  const EarningsItem({
+    required this.tournamentId,
+    required this.label,
+    required this.amountCents,
+    required this.status,
+    this.at,
+  });
+
+  final String tournamentId;
+
+  /// The receipt line, e.g. "Bid fee: Spring Fling (Haze)".
+  final String label;
+  final int amountCents;
+  final EarningsStatus status;
+  final DateTime? at;
+
+  factory EarningsItem.fromMap(Map<String, Object?> m) => EarningsItem(
+    tournamentId: m['tournamentId'] as String? ?? '',
+    label: m['label'] as String? ?? 'Fee paid online',
+    amountCents: (m['amountCents'] as num?)?.toInt() ?? 0,
+    status: EarningsStatus.parse(m['status']),
+    at: DateTime.tryParse(m['at'] as String? ?? ''),
+  );
+}
+
+/// The host's fees paid online (`GET /v1/teams/:id/earnings`).
+class Earnings {
+  const Earnings({
+    this.heldCents = 0,
+    this.sentCents = 0,
+    this.refundedCents = 0,
+    this.disputedCents = 0,
+    this.owedCents = 0,
+    this.items = const [],
+  });
+
+  static const none = Earnings();
+
+  final int heldCents;
+  final int sentCents;
+  final int refundedCents;
+  final int disputedCents;
+
+  /// Taken back after a refund or dispute but not recovered yet: comes off
+  /// the next payout.
+  final int owedCents;
+  final List<EarningsItem> items;
+
+  bool get isEmpty => items.isEmpty && owedCents == 0;
+
+  factory Earnings.fromMap(Map<String, Object?> m) {
+    int c(String k) => (m[k] as num?)?.toInt() ?? 0;
+    return Earnings(
+      heldCents: c('heldCents'),
+      sentCents: c('sentCents'),
+      refundedCents: c('refundedCents'),
+      disputedCents: c('disputedCents'),
+      owedCents: c('owedCents'),
+      items: [
+        for (final i in (m['items'] as List?) ?? const [])
+          if (i is Map) EarningsItem.fromMap(i.cast<String, Object?>()),
+      ],
+    );
+  }
+}
 
 /// Where a host's Stripe account stands.
 enum PayoutStatus {
@@ -69,10 +161,11 @@ class PaymentSheetRequest {
 
   final String clientSecret;
 
-  /// The host's Stripe account the payment is made on.
-  final String account;
+  /// null: the payment is made on Stall 10's own account (API 0.47.0);
+  /// before that, the host's account (a direct charge).
+  final String? account;
 
-  /// The host's name, on the sheet.
+  /// Who takes the payment, on the sheet: "Stall 10".
   final String merchantName;
   final int amountCents;
   final String currency;
@@ -80,7 +173,10 @@ class PaymentSheetRequest {
   factory PaymentSheetRequest.fromMap(Map<String, Object?> m) =>
       PaymentSheetRequest(
         clientSecret: m['clientSecret'] as String? ?? '',
-        account: m['account'] as String? ?? '',
+        account: switch (m['account']) {
+          final String a when a.isNotEmpty => a,
+          _ => null,
+        },
         merchantName: m['merchantName'] as String? ?? 'Stall 10',
         amountCents: (m['amountCents'] as num?)?.toInt() ?? 0,
         currency: m['currency'] as String? ?? 'USD',

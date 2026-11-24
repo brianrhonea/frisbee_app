@@ -22,6 +22,9 @@ importers:
       firebase-admin:
         specifier: ^14.5.0
         version: 14.5.0(@firebase/app-compat@0.5.21)(@firebase/app@0.16.5)
+      google-auth-library:
+        specifier: 11.3.4
+        version: 11.3.4
       livekit-server-sdk:
         specifier: 2.19.2
         version: 2.19.2

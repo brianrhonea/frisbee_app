@@ -408,7 +408,22 @@ void main() {
     await dir.setPaid.execute((teamId: 't1', paid: false));
     expect(dir.setPaid.error, isTrue);
     expect(dir.isPaid('t1'), isTrue);
+    // A fee paid online is refunded through the API, never switched off.
+    api.fail = false;
+    await dir.refund.execute('t1');
+    expect(api.refunds, ['$id t1']);
     dir.dispose();
+  });
+
+  test('a fee paid online through Stall 10 is told apart from a mark', () {
+    const online = EntryPayment(teamId: 't1', paid: true, note: paidOnlineNote);
+    const cash = EntryPayment(teamId: 't1', paid: true, note: 'Cash');
+    expect(online.paidOnline, isTrue);
+    expect(cash.paidOnline, isFalse);
+    expect(
+      const EntryPayment(teamId: 't1', note: paidOnlineNote).paidOnline,
+      isFalse,
+    );
   });
 
   test('seed, publish, report, confirm and finish with placements', () async {
@@ -752,10 +767,18 @@ void main() {
 /// Records the host's marks, as the API would take them.
 class _MarkingPayments implements PaymentRepository {
   final marks = <String>[];
+  final refunds = <String>[];
   bool fail = false;
 
   @override
   bool get available => true;
+
+  @override
+  Future<Result<void>> refund(String tournamentId, String payerId) async {
+    if (fail) return Result.error(Exception('offline'));
+    refunds.add('$tournamentId $payerId');
+    return const Result.ok(null);
+  }
 
   @override
   Future<Result<void>> mark(

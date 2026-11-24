@@ -16,7 +16,7 @@ import Link from "next/link";
 import { type FormEvent, useState } from "react";
 import type { Doc } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
-import { HostPaymentControls, PayOnline } from "../payments/Payments";
+import { HostPaymentControls, isPaidOnline, PayOnline } from "../payments/Payments";
 import {
   attempt,
   dateLabel,
@@ -521,8 +521,16 @@ function SignupList({ user, tournamentId, tournament: t, division: d }: { user: 
                   </td>
                   {fee && (
                     <td>
-                      {owes(s) && (
-                        <HostPaymentControls user={user} tournamentId={tournamentId} payerId={s.id} payment={paymentById.get(s.id)} overdue={overdue(fee, false)} />
+                      {(owes(s) || isPaidOnline(paymentById.get(s.id))) && (
+                        <HostPaymentControls
+                          user={user}
+                          tournamentId={tournamentId}
+                          payerId={s.id}
+                          payment={paymentById.get(s.id)}
+                          overdue={overdue(fee, false)}
+                          payerName={s.name}
+                          amountCents={fee.amountCents}
+                        />
                       )}
                     </td>
                   )}

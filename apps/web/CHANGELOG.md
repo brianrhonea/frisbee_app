@@ -4,6 +4,30 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.59.0 — 2026-11-23
+
+Stall 10 collects every fee and pays hosts out. With app 0.0.51 and API
+0.47.0.
+
+- Embedded Checkout loads on Stall 10's account (no `stripeAccount` when
+  the API sends none).
+- Payouts card: new wording (Stall 10 sends the whole fee once each event
+  is over; no Stripe account needed), held, sent, refunded and owed
+  totals, and **Bank account and payouts** (Stripe's notification banner,
+  account management and payouts components) once it's on.
+  `/embed/payouts?view=manage` shows the same in the app's WebView.
+- **Refund** for a fee paid online, on the event's Teams tab and hat
+  signups, in place of the paid checkbox; it asks first and says the
+  service and processing fees aren't refunded.
+- Payouts card: **Each fee**, the list of fees paid online and where each
+  stands. Payout setup says when a fresh sign-in is needed.
+- `/staff`: **Payments**, problems found by the check against Stripe, the
+  latest payments, **Send what's due to hosts** and **Check against
+  Stripe** (staff only).
+- Terms and privacy: paying fees and getting paid (Stall 10 collects,
+  payout hold, refunds, disputes, owed amounts, Stripe's agreements),
+  payment records and Stripe in the privacy policy.
+
 ## 0.58.0 — 2026-11-23
 
 With app 0.0.50 and API 0.46.0.

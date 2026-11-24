@@ -1,12 +1,14 @@
 // Online payments for tournament and league fees (Stripe Connect).
 //
-// A host (the team or community running the event) connects its own
-// Stripe account once; teams then pay their bid or spot fee, and players
-// their entry fee, through Stripe Checkout. Each payment is a direct
-// charge on the host's account: the host pays Stripe's card fee and keeps
-// the rest, minus Stall 10's platform fee (PlatformFee). Paying marks the
-// same `tournaments/{id}/payments/{payerId}` record the host can still set
-// by hand, so instructions-and-mark-paid keeps working beside it.
+// Stall 10 takes every payment (it's the merchant on the payer's
+// statement) and holds it until the event is over, then sends the host the
+// fee it set: the payer pays that plus Stall 10's service fee and Stripe's
+// processing fee (PlatformFee, stripeCardFeeEstimate). A host links a
+// payout account inside Stall 10 once (no Stripe login); teams pay their
+// bid or spot fee, and players their entry fee, in the app's payment sheet
+// or Checkout. Paying marks the same `tournaments/{id}/payments/{payerId}`
+// record the host can still set by hand, so instructions-and-mark-paid
+// keeps working beside it.
 import { z } from "zod";
 
 /** Stall 10's cut of each payment: a percentage (basis points) plus a fixed amount. */
@@ -137,7 +139,7 @@ export interface PayoutAccountView {
 export const payoutStatusLabels: Record<PayoutStatus, { label: string; summary: string }> = {
   none: { label: "Not set up", summary: "Set up payments to take entry fees online." },
   pending: { label: "Finish setup", summary: "Stripe needs a few more details before you can take payments." },
-  ready: { label: "On", summary: "Fees paid online go straight to your bank account." },
+  ready: { label: "On", summary: "Fees paid online are sent to your bank account a few days after each event." },
 };
 
 /**
@@ -240,7 +242,7 @@ export interface CheckoutResult {
   url: string | null;
   /** An embedded Checkout's client secret; null for a hosted one. */
   clientSecret: string | null;
-  /** The host's Stripe account the charge is made on (Stripe.js needs it for an embedded one). */
+  /** Always null since API 0.47.0 (Stall 10's own account); a host's account before that, for Stripe.js. */
   account: string | null;
 }
 
@@ -255,12 +257,12 @@ export const paymentIntentRequestSchema = z
   })
   .refine((r) => (r.payer === "team") === (r.teamId !== undefined), { message: "Say which team is paying." });
 
-/** What the app's payment sheet needs: the payment, and the host's account it's made on. */
+/** What the app's payment sheet needs: the payment, made on Stall 10's account. */
 export interface PaymentIntentResult {
   clientSecret: string;
-  /** The host's connected Stripe account (a direct charge). */
-  account: string;
-  /** Shown on the sheet: the host's name. */
+  /** Always null since API 0.47.0 (the payment is on Stall 10's own account); a host's account before that. */
+  account: string | null;
+  /** Shown on the sheet: "Stall 10". */
   merchantName: string;
   /** The whole charge, processing fee included. */
   amountCents: number;
@@ -269,8 +271,134 @@ export interface PaymentIntentResult {
 
 /** The note set on the payment record when Stripe confirms it. */
 export const paidOnlineNote = "Paid online through Stall 10";
-/** The note set when the host refunds it in Stripe. */
+/** The note set when a host refunded a direct charge in Stripe (before API 0.47.0). */
 export const refundedOnlineNote = "Refunded through Stripe";
+/** The note set when the fee is refunded through Stall 10. */
+export const refundedNote = "Refunded through Stall 10";
+
+/** Told to organizers and payers: when hosts get paid, and what a refund returns. */
+export const payoutTimingNote = "Fees paid online are held by Stall 10 and sent to the host a few days after the event is over.";
+export const refundPolicyNote = "A refund returns the fee. The service and processing fees aren't refunded.";
+
+/** One fee paid online, as the host's earnings list it. */
+export interface EarningsItem {
+  tournamentId: string;
+  /** The receipt line, e.g. "Bid fee: Spring Fling (Haze)". */
+  label: string;
+  /** What it came to for the host: the fee held, the amount sent, or the amount refunded. */
+  amountCents: number;
+  /**
+   * held: paid, sent a few days after the event; sent: transferred to the
+   * host's payout account; kept: a Stall 10 event's; refunded; disputed:
+   * the payer's bank is reviewing it.
+   */
+  status: "held" | "sent" | "kept" | "refunded" | "disputed";
+  /** When it was paid, sent or refunded (ISO). */
+  at: string | null;
+}
+
+/** GET /v1/teams/:teamId/earnings: the host's fees paid online, for its organizers. */
+export interface EarningsView {
+  currency: string;
+  heldCents: number;
+  sentCents: number;
+  refundedCents: number;
+  disputedCents: number;
+  /** Taken back after a refund or dispute but not yet recovered: comes off the next payout. */
+  owedCents: number;
+  /** The latest 50. */
+  items: EarningsItem[];
+}
+
+/** POST /v1/payments/release (staff): every fee that was due to go out, sent. */
+export interface ReleaseResult {
+  checked: number;
+  sent: number;
+}
+
+/**
+ * What the daily check against Stripe can find wrong with one payment
+ * (paymentIssues/{charge}, server only). Labels for staff.
+ */
+export const paymentIssueLabels = {
+  not_paid_on_stripe: "Marked paid here, but Stripe hasn't taken the payment",
+  paid_not_recorded: "Stripe took the payment, but it isn't marked paid here",
+  amount_mismatch: "Stripe charged a different amount",
+  refund_not_recorded: "Refunded on Stripe, but not here",
+  refund_missing: "Refunded here, but not on Stripe",
+  dispute_not_recorded: "Disputed on Stripe, but not here",
+  dispute_won_not_recorded: "Dispute won on Stripe, but still disputed here",
+  transfer_missing: "Sent to the host here, but Stripe has no transfer",
+  transfer_mismatch: "The transfer's amount or account differs from what's recorded",
+  reversal_missing: "Taken back from the host here, but the transfer isn't reversed",
+  release_stuck: "A payout to the host started but didn't finish",
+  payout_overdue: "The event is over and the host is set up, but the fee hasn't been sent",
+  credit_unsent: "A dispute was won but what the host is owed back wasn't sent",
+  stripe_unreachable: "Couldn't check this payment with Stripe",
+} as const;
+export type PaymentIssueKind = keyof typeof paymentIssueLabels;
+
+/** An open problem with one payment, for staff. */
+export interface PaymentIssueView {
+  /** The charge's id (a Checkout Session or PaymentIntent id). */
+  id: string;
+  tournamentId: string;
+  hostId: string;
+  payerId: string;
+  label: string;
+  kinds: PaymentIssueKind[];
+  /** What was compared, e.g. "Stripe: refunded $400; here: paid". */
+  detail: string;
+  firstSeenAt: string | null;
+  lastSeenAt: string | null;
+}
+
+/** One payment through Stall 10, for staff. Ids only, never card or bank details. */
+export interface StaffChargeView {
+  id: string;
+  tournamentId: string;
+  hostId: string;
+  payerId: string;
+  payerKind: string;
+  label: string;
+  /** open, processing, paid, failed, expired, refunding, refunded, disputed, duplicate. */
+  status: string;
+  amountCents: number;
+  baseCents: number;
+  processingCents: number;
+  released: boolean;
+  kept: boolean;
+  transferCents: number;
+  refundCents: number;
+  reversed: boolean;
+  owedCents: number;
+  createdAt: string | null;
+  paidAt: string | null;
+  releasedAt: string | null;
+  refundedAt: string | null;
+}
+
+/** GET /v1/staff/payments (staff): open problems first, then the latest payments. */
+export interface StaffPaymentsView {
+  available: boolean;
+  issues: PaymentIssueView[];
+  /** The latest 100, newest first; ?tournament= narrows them to one event. */
+  charges: StaffChargeView[];
+  /** When the last check against Stripe ran (ISO), if ever. */
+  checkedAt: string | null;
+}
+
+/** POST /v1/payments/reconcile (staff) or the daily job: the check against Stripe. */
+export interface ReconcileResult {
+  checked: number;
+  /** Payments with a problem now. */
+  issues: number;
+  /** Problems found earlier that are fixed now. */
+  resolved: number;
+}
+
+/** Setting up or changing payouts needs a sign-in in the last 15 minutes (so a left-open session can't move a host's money). */
+export const payoutsReauthMessage = "For your security, sign out and sign in again, then set up or change payouts within 15 minutes.";
 
 export const paymentPaths = {
   payouts: (teamId: string) => `/v1/teams/${teamId}/payouts`,
@@ -281,6 +409,14 @@ export const paymentPaths = {
   intent: (tournamentId: string) => `/v1/tournaments/${tournamentId}/pay/intent`,
   offline: (tournamentId: string) => `/v1/tournaments/${tournamentId}/pay/offline`,
   mark: (tournamentId: string, payerId: string) => `/v1/tournaments/${tournamentId}/payments/${payerId}`,
+  refund: (tournamentId: string, payerId: string) => `/v1/tournaments/${tournamentId}/payments/${payerId}/refund`,
+  earnings: (teamId: string) => `/v1/teams/${teamId}/earnings`,
+  release: "/v1/payments/release",
+  reconcile: "/v1/payments/reconcile",
+  staff: "/v1/staff/payments",
+  /** Cloud Scheduler only (a Google-signed token from the scheduler's service account). */
+  jobRelease: "/v1/jobs/payments/release",
+  jobReconcile: "/v1/jobs/payments/reconcile",
   fees: "/v1/payments/fees",
   webhook: "/v1/payments/stripe/webhook",
 } as const;

@@ -682,6 +682,16 @@ class _PlayersTabState extends State<PlayersTab> {
                         },
                       ),
                     if (fee != null &&
+                        (signups.paymentOf(s.uid)?.paidOnline ?? false))
+                      RefundButton(
+                        key: ValueKey('refund-${s.uid}'),
+                        name: s.name,
+                        amountCents: fee.amountCents,
+                        running: signups.refund.running,
+                        onRefund: () => signups.refund.execute(s.uid),
+                        result: () => signups.refund.result,
+                      )
+                    else if (fee != null &&
                         s.status != SignupStatus.withdrawn &&
                         s.status != SignupStatus.declined)
                       Switch(

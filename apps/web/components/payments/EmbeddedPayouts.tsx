@@ -8,6 +8,7 @@
 // "ready", then calls stall10StartPayouts with the secret from
 // POST /v1/teams/:teamId/payouts/session. "exit" means the person finished
 // or closed Stripe's form: the app closes this view and reloads the status.
+// ?view=manage shows the linked account's bank details and payouts instead.
 import { useEffect, useState } from "react";
 import { EmbeddedOnboarding } from "./Payments";
 
@@ -30,5 +31,6 @@ export function EmbeddedPayouts() {
     };
   }, []);
   if (!secret) return <p className="muted" aria-busy="true">Opening Stripe…</p>;
-  return <EmbeddedOnboarding clientSecret={secret} onExit={() => tell("exit")} />;
+  const view = new URLSearchParams(window.location.search).get("view") === "manage" ? "manage" : "setup";
+  return <EmbeddedOnboarding clientSecret={secret} view={view} onExit={() => tell("exit")} />;
 }

@@ -1,27 +1,58 @@
-// Online payments against FakeStore and a fake Stripe: hosts connecting
-// payouts, payers' Checkout sessions (amount from the tournament, never
-// the body), and the webhook marking fees paid, refunding duplicates and
-// following the host's refunds.
-import { centsLabel, chargeCoveringFees, onlineCharge, onlinePaymentProblem, processingPaymentNote, paidOnlineNote, platformFeeCents, platformFeeLabel, refundedOnlineNote } from "@stall10/shared";
+// Online payments against FakeStore and a fake Stripe. Stall 10 is the
+// merchant (0.47.0): payers' charges are made on Stall 10's account (the
+// amount from the tournament, never the body), held, and the host's share
+// sent as a transfer once the event is over; organizers refund the fee;
+// refunds and disputes after that take the host's share back (or leave it
+// owed, off the next payout). Hosts link a payout-only account. Charges
+// made before 0.47.0 (direct charges on the host's account) keep working.
+import {
+  centsLabel,
+  chargeCoveringFees,
+  onlineCharge,
+  onlinePaymentProblem,
+  processingPaymentNote,
+  paidOnlineNote,
+  platformFeeCents,
+  platformFeeLabel,
+  refundedNote,
+  refundedOnlineNote,
+} from "@stall10/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
-import type { CheckoutInput, GatewayCheckout, GatewayEvent, GatewayIntentStatus, IntentInput, PaymentGateway } from "../src/payments/gateway.js";
-import { platformFeeFromEnv } from "../src/payments/service.js";
+import type {
+  CheckoutInput,
+  GatewayAccount,
+  GatewayCheckout,
+  GatewayEvent,
+  GatewayIntentStatus,
+  GatewayPaymentSummary,
+  IntentInput,
+  PaymentGateway,
+  TransferInput,
+} from "../src/payments/gateway.js";
+import { InsufficientBalance } from "../src/payments/gateway.js";
+import { googleJobVerifier, jobVerifierFromEnv, type JobVerifier } from "../src/payments/jobs.js";
+import { payoutHoldDaysFromEnv, platformFeeFromEnv } from "../src/payments/service.js";
 import { stripeFromEnv } from "../src/payments/stripe.js";
 import Stripe from "stripe";
 import { FakeStore, FakeTeamRepository, FakeUsers, FakeVerifier } from "./fakes.js";
 
 const now = Date.UTC(2026, 10, 16, 12);
+const day = 24 * 60 * 60_000;
 const site = "https://site.test";
 
 class FakeGateway implements PaymentGateway {
-  accounts = new Map<string, { chargesEnabled: boolean; detailsSubmitted: boolean }>();
+  accounts = new Map<string, GatewayAccount>();
   created: Array<{ name: string; idempotencyKey: string }> = [];
   links: Array<{ account: string; refreshUrl: string; returnUrl: string }> = [];
   checkouts: CheckoutInput[] = [];
-  refunds: Array<{ account: string; paymentIntent: string; idempotencyKey: string }> = [];
+  refunds: Array<{ account: string | null; paymentIntent: string; amountCents: number | undefined; idempotencyKey: string }> = [];
   feeRefunds: string[] = [];
   failFeeRefund = false;
+  transfers: TransferInput[] = [];
+  failTransfer = false;
+  reversals: Array<{ transfer: string; amountCents: number; idempotencyKey: string }> = [];
+  failReversal = false;
   /** Each session as Stripe would report it now. */
   sessions = new Map<string, GatewayCheckout>();
   expired: string[] = [];
@@ -31,7 +62,7 @@ class FakeGateway implements PaymentGateway {
   async createAccount(input: { name: string; idempotencyKey: string }) {
     this.created.push(input);
     const id = `acct_${this.created.length}`;
-    this.accounts.set(id, { chargesEnabled: false, detailsSubmitted: false });
+    this.accounts.set(id, { transfersEnabled: false, detailsSubmitted: false });
     return id;
   }
   async onboardingLink(account: string, refreshUrl: string, returnUrl: string) {
@@ -44,7 +75,7 @@ class FakeGateway implements PaymentGateway {
     return `secret_${account}`;
   }
   async account(account: string) {
-    return this.accounts.get(account) ?? { chargesEnabled: false, detailsSubmitted: false };
+    return this.accounts.get(account) ?? { transfersEnabled: false, detailsSubmitted: false };
   }
   async createCheckout(input: CheckoutInput) {
     this.checkouts.push(input);
@@ -56,41 +87,78 @@ class FakeGateway implements PaymentGateway {
   /** Each PaymentIntent as Stripe would report it now. */
   intents = new Map<string, GatewayIntentStatus>();
   cancelled: string[] = [];
+  /** The account each status check was asked of (null: Stall 10's). */
+  askedOf: Array<string | null> = [];
   async createIntent(input: IntentInput) {
     this.intentsMade.push(input);
     const id = `pi_sheet_${this.intentsMade.length}`;
     this.intents.set(id, "open");
     return { id, clientSecret: `${id}_secret` };
   }
-  async intent(_account: string, id: string) {
+  async intent(account: string | null, id: string) {
+    this.askedOf.push(account);
     if (this.down) throw new Error("stripe down");
     return { status: this.intents.get(id) ?? ("open" as const), clientSecret: `${id}_secret` };
   }
-  async cancelIntent(_account: string, id: string) {
+  async cancelIntent(_account: string | null, id: string) {
     if (this.intents.get(id) !== "open") throw new Error("can't cancel");
     this.intents.set(id, "canceled");
     this.cancelled.push(id);
   }
-  async checkout(_account: string, id: string) {
+  async checkout(account: string | null, id: string) {
+    this.askedOf.push(account);
     if (this.down) throw new Error("stripe down");
     return this.sessions.get(id) ?? { status: "open" as const, paymentStatus: "unpaid" as const, paymentIntent: null, paymentFailed: false };
   }
-  async expireCheckout(_account: string, id: string) {
+  async expireCheckout(_account: string | null, id: string) {
     const now = this.sessions.get(id);
     if (now?.status !== "open") throw new Error("not open");
     this.sessions.set(id, { ...now, status: "expired" });
     this.expired.push(id);
   }
+  async chargeOf(paymentIntent: string) {
+    return `ch_${paymentIntent}`;
+  }
   /** The payer finished on Stripe's page (a card, or a bank payment still clearing). */
   pay(id: string, pi: string, paymentStatus: "paid" | "unpaid" = "paid", paymentFailed = false) {
     this.sessions.set(id, { status: "complete", paymentStatus, paymentIntent: pi, paymentFailed });
   }
-  async refund(account: string, paymentIntent: string, idempotencyKey: string) {
-    this.refunds.push({ account, paymentIntent, idempotencyKey });
+  async refund(account: string | null, paymentIntent: string, amountCents: number | undefined, idempotencyKey: string) {
+    this.refunds.push({ account, paymentIntent, amountCents, idempotencyKey });
   }
   async refundApplicationFee(feeId: string) {
     if (this.failFeeRefund) throw new Error("stripe down");
     this.feeRefunds.push(feeId);
+  }
+  async transfer(input: TransferInput) {
+    if (this.failTransfer) throw new Error("stripe down");
+    // Stripe's idempotency: the same key is the same transfer.
+    const i = this.transfers.findIndex((t) => t.idempotencyKey === input.idempotencyKey);
+    if (i >= 0) return `tr_${i + 1}`;
+    this.transfers.push(input);
+    return `tr_${this.transfers.length}`;
+  }
+  /** Stripe failing for another reason (a timeout): never counted as owed. */
+  breakReversal = false;
+  async reverseTransfer(transfer: string, amountCents: number, idempotencyKey: string) {
+    if (this.breakReversal) throw new Error("timeout");
+    if (this.failReversal) throw new InsufficientBalance();
+    this.reversals.push({ transfer, amountCents, idempotencyKey });
+  }
+  /** Each payment as the daily check would find it on Stripe (unset: Stripe doesn't answer). */
+  summaries = new Map<string, GatewayPaymentSummary>();
+  async paymentSummary(paymentIntent: string) {
+    const v = this.summaries.get(paymentIntent);
+    if (!v) throw new Error("stripe down");
+    return v;
+  }
+  /** Overrides what Stripe says about a transfer. */
+  transferOverrides = new Map<string, { destination?: string; amountCents?: number }>();
+  async transferSummary(transferId: string) {
+    const t = this.transfers[Number(transferId.slice(3)) - 1];
+    if (!t) throw new Error("no such transfer");
+    const reversedCents = this.reversals.filter((r) => r.transfer === transferId).reduce((sum, r) => sum + r.amountCents, 0);
+    return { destination: t.destination, amountCents: t.amountCents, reversedCents, ...this.transferOverrides.get(transferId) };
   }
   /** The body is the event as JSON; the signature must be "signed". */
   verifyEvent(rawBody: Buffer, signature: string): GatewayEvent {
@@ -99,7 +167,7 @@ class FakeGateway implements PaymentGateway {
   }
 }
 
-function setup(gateway: FakeGateway | null = new FakeGateway()) {
+function setup(gateway: FakeGateway | null = new FakeGateway(), jobs?: JobVerifier, holdDays = 0) {
   const store = new FakeStore(() => now);
   const teams = new FakeTeamRepository();
   teams.store = store;
@@ -109,14 +177,16 @@ function setup(gateway: FakeGateway | null = new FakeGateway()) {
     teams,
     store,
     now: () => now,
-    payments: gateway ? { gateway, fee: { percentBps: 300, fixedCents: 0 }, returnUrl: site } : undefined,
+    payments: gateway ? { gateway, fee: { percentBps: 300, fixedCents: 0 }, returnUrl: site, holdDays } : undefined,
+    jobs,
   });
-  const call = async (method: "GET" | "POST" | "PUT", url: string, body?: object, uid: string | null = "owner") => {
-    const res = await app.inject({ method, url, ...(body && { payload: body }), headers: uid ? { authorization: `Bearer token:${uid}` } : {} });
+  const call = async (method: "GET" | "POST" | "PUT" | "DELETE", url: string, body?: object, uid: string | null = "owner", kind = "token") => {
+    const res = await app.inject({ method, url, ...(body && { payload: body }), headers: uid ? { authorization: `Bearer ${kind}:${uid}` } : {} });
     return { status: res.statusCode, json: () => res.json(), message: () => res.json()?.error?.message as string | undefined };
   };
   let n = 0;
-  const hook = async (type: string, object: Record<string, unknown>, account: string | null = "acct_1", signature = "signed") => {
+  /** A webhook event; null: Stall 10's own account (charges), else a host's (Connect). */
+  const hook = async (type: string, object: Record<string, unknown>, account: string | null = null, signature = "signed") => {
     n++;
     const event: GatewayEvent = { id: `evt_${n}`, type, account, object };
     const res = await app.inject({
@@ -127,7 +197,12 @@ function setup(gateway: FakeGateway | null = new FakeGateway()) {
     });
     return { status: res.statusCode, id: event.id };
   };
-  return { store, call, hook, gateway: gateway! };
+  /** A call with a raw Authorization header (Cloud Scheduler's jobs). */
+  const raw = async (url: string, authorization?: string) => {
+    const res = await app.inject({ method: "POST", url, headers: authorization ? { authorization } : {} });
+    return { status: res.statusCode, json: () => res.json() };
+  };
+  return { store, call, hook, raw, gateway: gateway! };
 }
 
 let s: ReturnType<typeof setup>;
@@ -140,18 +215,37 @@ beforeEach(() => {
   s.store.put("teams/host", { name: "Fling Crew", ownerId: "owner", members: { owner: "owner", coach: "coach" }, memberIds: ["owner", "coach"] });
   // A paying team: "captain" can manage it, "player" can't.
   s.store.put("teams/haze", { name: "Haze", ownerId: "captain", members: { captain: "owner", player: "player" }, memberIds: ["captain", "player"] });
-  s.store.put("tournaments/t1", { hostId: "host", name: "Spring Fling", status: "registration", entryType: "teams", visibility: "public", bidFee: fee(40000) });
+  s.store.put("tournaments/t1", { hostId: "host", name: "Spring Fling", status: "registration", entryType: "teams", visibility: "public", bidFee: fee(40000), startsOn: new Date(now + 7 * day) });
   s.store.put("tournaments/t1/entries/haze", { teamName: "Haze", divisionId: "d1", status: "accepted" });
-  s.store.put("tournaments/hat", { hostId: "host", name: "Hat", status: "registration", entryType: "players", visibility: "public", bidFee: fee(6000) });
+  s.store.put("tournaments/hat", { hostId: "host", name: "Hat", status: "registration", entryType: "players", visibility: "public", bidFee: fee(6000), startsOn: new Date(now + 7 * day) });
   s.store.put("tournaments/hat/signups/player", { name: "Pat", status: "applied", divisionId: "d1" });
 });
 
-/** The host's account, connected and able to take payments. */
+/** The host's payout account, linked and able to receive transfers. */
 function ready() {
-  s.store.put("payoutAccounts/host", { account: "acct_1", status: "ready" });
+  s.store.put("payoutAccounts/host", { account: "acct_1", model: "recipient", status: "ready" });
   s.store.put("stripeAccounts/acct_1", { teamId: "host" });
-  s.gateway.accounts.set("acct_1", { chargesEnabled: true, detailsSubmitted: true });
+  s.gateway.accounts.set("acct_1", { transfersEnabled: true, detailsSubmitted: true });
 }
+
+const team = { payer: "team", teamId: "haze" };
+const completed = (session = "cs_1", pi = "pi_1") => ({ id: session, payment_status: "paid", payment_intent: pi, metadata: {} });
+
+/** Haze pays Spring Fling's $400 bid fee on Checkout. */
+async function paid(tournament = "t1", session = "cs_1", pi = "pi_1") {
+  await s.call("POST", `/v1/tournaments/${tournament}/checkout`, team, "captain");
+  await s.hook("checkout.session.completed", completed(session, pi));
+}
+
+/** The event is over: its day has come and gone (for the fees paid too) and it was finished a day ago. */
+function finish(tournament = "t1") {
+  s.store.put(`tournaments/${tournament}`, { ...s.store.doc(`tournaments/${tournament}`), status: "finished", startsOn: new Date(now - day), finishedAt: new Date(now - day) });
+  for (const [path, data] of [...s.store.docs.entries()]) {
+    if (path.startsWith("charges/") && data.tournamentId === tournament) s.store.put(path, { ...data, eventEndsAt: new Date(now - day) });
+  }
+}
+
+const earnings = async (uid = "owner") => (await s.call("GET", "/v1/teams/host/earnings", undefined, uid)).json();
 
 describe("the fee", () => {
   it("is 3% by default, rounded to the cent", () => {
@@ -195,7 +289,7 @@ describe("fees for hosts", () => {
   });
 });
 
-describe("payouts", () => {
+describe("payout accounts", () => {
   it("only the owner sets them up; event managers see where they stand and who to ask; others nothing", async () => {
     s.store.put("profiles/owner", { name: "Olive Owner" });
     const coach = await s.call("GET", "/v1/teams/host/payouts", undefined, "coach");
@@ -209,56 +303,51 @@ describe("payouts", () => {
     expect(r.json()).toEqual({ available: true, status: "none", feeLabel: "3%", canSetUp: true, ownerName: "Olive Owner" });
   });
 
-  it("onboarding inside the app and website: an AccountSession on the same one account", async () => {
-    const r = await s.call("POST", "/v1/teams/host/payouts/session");
+  it("are linked inside the app and website: one payout-only account, shown in an AccountSession", async () => {
+    const r = await s.call("POST", "/v1/teams/host/payouts/session", undefined, "owner", "fresh");
     expect(r.status).toBe(200);
     expect(r.json()).toEqual({ clientSecret: "secret_acct_1" });
-    await s.call("POST", "/v1/teams/host/payouts/link");
-    expect(s.gateway.created).toHaveLength(1);
+    await s.call("POST", "/v1/teams/host/payouts/link", undefined, "owner", "fresh");
+    expect(s.gateway.created).toEqual([{ email: "owner@x.test", name: "Fling Crew", idempotencyKey: "account-recipient:host" }]);
     expect(s.gateway.accountSessions).toEqual(["acct_1"]);
+    expect(s.store.doc("payoutAccounts/host")).toMatchObject({ account: "acct_1", model: "recipient", status: "pending", owedCents: 0, createdBy: "owner" });
+    expect(s.store.doc("stripeAccounts/acct_1")).toEqual({ teamId: "host" });
     expect((await s.call("GET", "/v1/teams/host/payouts")).json().status).toBe("pending");
-  });
-
-  it("a v2 account's event without v1 fields asks Stripe", async () => {
-    await s.call("POST", "/v1/teams/host/payouts/session");
-    s.gateway.accounts.set("acct_1", { chargesEnabled: true, detailsSubmitted: true });
-    await s.hook("account.updated", { id: "acct_1" });
-    expect(s.store.doc("payoutAccounts/host")?.status).toBe("ready");
-  });
-
-  it("says they aren't available without Stripe", async () => {
-    s = setup(null);
-    s.store.put("teams/host", { name: "Fling Crew", ownerId: "owner", members: { owner: "owner" }, memberIds: ["owner"] });
-    expect((await s.call("GET", "/v1/teams/host/payouts")).json().available).toBe(false);
-    expect((await s.call("POST", "/v1/teams/host/payouts/link")).status).toBe(412);
-  });
-
-  it("makes one account per host and links back to the website", async () => {
-    const r = await s.call("POST", "/v1/teams/host/payouts/link");
-    expect(r.json()).toEqual({ url: "https://connect.test/acct_1" });
-    await s.call("POST", "/v1/teams/host/payouts/link");
-    expect(s.gateway.created).toEqual([{ email: "owner@x.test", name: "Fling Crew", idempotencyKey: "account-v2:host" }]);
-    expect(s.gateway.links[1]).toEqual({
+    expect(s.gateway.links[0]).toEqual({
       account: "acct_1",
       returnUrl: `${site}/payments/payouts?team=host`,
       refreshUrl: `${site}/payments/payouts?team=host&retry=1`,
     });
-    expect(s.store.doc("payoutAccounts/host")).toMatchObject({ account: "acct_1", status: "pending", createdBy: "owner" });
-    expect(s.store.doc("stripeAccounts/acct_1")).toEqual({ teamId: "host" });
   });
 
-  it("asks Stripe until onboarding is done, then the webhook keeps it current", async () => {
-    await s.call("POST", "/v1/teams/host/payouts/link");
+  it("an old merchant account (before Stall 10 collected) counts as not set up; setting up makes a new one", async () => {
+    s.store.put("payoutAccounts/host", { account: "acct_old", status: "ready", owedCents: 500 });
+    expect((await s.call("GET", "/v1/teams/host/payouts")).json().status).toBe("none");
+    expect((await s.call("GET", "/v1/tournaments/t1/pay?team=haze", undefined, "captain")).json()).toMatchObject({ online: false });
+    await s.call("POST", "/v1/teams/host/payouts/session", undefined, "owner", "fresh");
+    expect(s.store.doc("payoutAccounts/host")).toMatchObject({ account: "acct_1", model: "recipient", legacyAccount: "acct_old", owedCents: 500 });
+  });
+
+  it("asks Stripe until they can be paid out, then account events keep it current", async () => {
+    await s.call("POST", "/v1/teams/host/payouts/link", undefined, "owner", "fresh");
     expect((await s.call("GET", "/v1/teams/host/payouts")).json().status).toBe("pending");
-    s.gateway.accounts.set("acct_1", { chargesEnabled: true, detailsSubmitted: true });
+    s.gateway.accounts.set("acct_1", { transfersEnabled: true, detailsSubmitted: true });
     expect((await s.call("GET", "/v1/teams/host/payouts")).json().status).toBe("ready");
-    await s.hook("account.updated", { id: "acct_1", charges_enabled: false, details_submitted: true });
+    s.gateway.accounts.set("acct_1", { transfersEnabled: false, detailsSubmitted: false });
+    await s.hook("account.updated", { id: "acct_1", charges_enabled: true }, "acct_1");
     expect(s.store.doc("payoutAccounts/host")?.status).toBe("pending");
+  });
+
+  it("say they aren't available without Stripe", async () => {
+    s = setup(null);
+    s.store.put("teams/host", { name: "Fling Crew", ownerId: "owner", members: { owner: "owner" }, memberIds: ["owner"] });
+    expect((await s.call("GET", "/v1/teams/host/payouts")).json().available).toBe(false);
+    expect((await s.call("POST", "/v1/teams/host/payouts/link", undefined, "owner", "fresh")).status).toBe(412);
   });
 });
 
 describe("paying", () => {
-  it("shows the fee, and why it can't be paid online until the host connects", async () => {
+  it("shows the fee, and why it can't be paid online until the host links payouts", async () => {
     const r = await s.call("GET", "/v1/tournaments/t1/pay?team=haze", undefined, "captain");
     expect(r.json()).toMatchObject({ online: false, amountCents: 40000, chargeCents: 42461, processingCents: 2461, feeCents: 1200, paid: false, pending: null });
     expect(r.json().reason).toMatch(/instructions/);
@@ -266,10 +355,10 @@ describe("paying", () => {
     expect((await s.call("GET", "/v1/tournaments/t1/pay?team=haze", undefined, "captain")).json()).toMatchObject({ online: true, reason: null });
   });
 
-  it("asks Stripe before Checkout, and stops if the host can't take cards any more", async () => {
+  it("asks Stripe before Checkout, and stops if the host can't be paid out any more", async () => {
     ready();
-    s.gateway.accounts.set("acct_1", { chargesEnabled: false, detailsSubmitted: false });
-    const r = await s.call("POST", "/v1/tournaments/t1/checkout", { payer: "team", teamId: "haze" }, "captain");
+    s.gateway.accounts.set("acct_1", { transfersEnabled: false, detailsSubmitted: false });
+    const r = await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
     expect(r.status).toBe(412);
     expect(r.json().error.message).toContain("can't take payments online right now");
     expect(s.gateway.checkouts).toHaveLength(0);
@@ -281,20 +370,18 @@ describe("paying", () => {
     s.gateway.account = async () => {
       throw new Error("stripe down");
     };
-    const r = await s.call("POST", "/v1/tournaments/t1/checkout", { payer: "team", teamId: "haze" }, "captain");
-    expect(r.json()).toEqual({ url: "https://checkout.test/cs_1", clientSecret: null, account: "acct_1" });
+    const r = await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
+    expect(r.json()).toEqual({ url: "https://checkout.test/cs_1", clientSecret: null, account: null });
   });
 
-  it("makes a direct charge on the host's account with Stall 10's fee", async () => {
+  it("charges Stall 10's own account and holds it for the host", async () => {
     ready();
-    const r = await s.call("POST", "/v1/tournaments/t1/checkout", { payer: "team", teamId: "haze" }, "captain");
-    expect(r.json()).toEqual({ url: "https://checkout.test/cs_1", clientSecret: null, account: "acct_1" });
+    const r = await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
+    expect(r.json()).toEqual({ url: "https://checkout.test/cs_1", clientSecret: null, account: null });
     const c = s.gateway.checkouts[0];
-    expect(c).toMatchObject({
-      account: "acct_1",
+    expect(c).toEqual({
       amountCents: 42461,
       currency: "USD",
-      feeCents: 1200,
       items: [
         { name: "Bid fee: Spring Fling (Haze)", amountCents: 40000 },
         { name: "Service and processing fees", amountCents: 2461 },
@@ -303,9 +390,24 @@ describe("paying", () => {
       cancelUrl: `${site}/tournaments/t1`,
       email: "captain@x.test",
       expiresAt: now / 1000 + 3600,
+      metadata: expect.objectContaining({ tournamentId: "t1", payerKind: "team", payerId: "haze", hostId: "host" }),
+      transferGroup: "tournament_t1",
+      idempotencyKey: expect.stringMatching(/^checkout:/),
+      embedded: false,
     });
-    expect(c.metadata).toMatchObject({ tournamentId: "t1", payerKind: "team", payerId: "haze", hostId: "host" });
-    expect(s.store.doc("charges/cs_1")).toMatchObject({ status: "open", amountCents: 42461, baseCents: 40000, processingCents: 2461, feeCents: 1200, createdBy: "captain" });
+    expect(s.store.doc("charges/cs_1")).toMatchObject({
+      flow: "platform",
+      destination: "acct_1",
+      released: false,
+      label: "Bid fee: Spring Fling (Haze)",
+      status: "open",
+      amountCents: 42461,
+      baseCents: 40000,
+      processingCents: 2461,
+      feeCents: 1200,
+      createdBy: "captain",
+    });
+    expect(s.store.doc("charges/cs_1")?.account).toBeUndefined();
   });
 
   it("players pay their own entry fee", async () => {
@@ -314,7 +416,6 @@ describe("paying", () => {
     expect(r.status).toBe(200);
     expect(s.gateway.checkouts[0]).toMatchObject({
       amountCents: 6395,
-      feeCents: 180,
       items: [
         { name: "Entry fee: Hat", amountCents: 6000 },
         { name: "Service and processing fees", amountCents: 395 },
@@ -323,9 +424,15 @@ describe("paying", () => {
     expect(s.gateway.checkouts[0].metadata.payerId).toBe("player");
   });
 
+  it("Stall 10's own events take fees online with no payout account", async () => {
+    s.store.put("teams/host", { ...s.store.doc("teams/host"), official: true });
+    expect((await s.call("GET", "/v1/tournaments/t1/pay?team=haze", undefined, "captain")).json()).toMatchObject({ online: true });
+    expect((await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain")).status).toBe(200);
+    expect(s.store.doc("charges/cs_1")).toMatchObject({ flow: "platform", official: true });
+  });
+
   it("turns away people who can't pay this fee", async () => {
     ready();
-    const team = { payer: "team", teamId: "haze" };
     expect((await s.call("POST", "/v1/tournaments/t1/checkout", team, "player")).status).toBe(403);
     expect((await s.call("POST", "/v1/tournaments/t1/checkout", { payer: "player" }, "player")).status).toBe(412);
     expect((await s.call("POST", "/v1/tournaments/hat/checkout", { payer: "player" }, "captain")).status).toBe(412);
@@ -340,7 +447,7 @@ describe("paying", () => {
 
   it("ignores any amount in the request", async () => {
     ready();
-    const r = await s.call("POST", "/v1/tournaments/t1/checkout", { payer: "team", teamId: "haze", amountCents: 1 }, "captain");
+    const r = await s.call("POST", "/v1/tournaments/t1/checkout", { ...team, amountCents: 1 }, "captain");
     expect(r.status).toBe(400);
     expect(s.gateway.checkouts).toHaveLength(0);
   });
@@ -348,125 +455,385 @@ describe("paying", () => {
   it("won't take a fee that's already paid, or one with nothing to pay", async () => {
     ready();
     s.store.put("tournaments/t1/payments/haze", { paid: true, paidAt: new Date(now), note: "Venmo" });
-    expect((await s.call("POST", "/v1/tournaments/t1/checkout", { payer: "team", teamId: "haze" }, "captain")).message()).toBe("That's already paid.");
+    expect((await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain")).message()).toBe("That's already paid.");
     s.store.put("tournaments/hat", { hostId: "host", name: "Hat", status: "registration", entryType: "players", bidFee: null });
     expect((await s.call("POST", "/v1/tournaments/hat/checkout", { payer: "player" }, "player")).status).toBe(412);
   });
 });
 
 describe("the webhook", () => {
-  async function checkout() {
-    ready();
-    await s.call("POST", "/v1/tournaments/t1/checkout", { payer: "team", teamId: "haze" }, "captain");
-    return s.gateway.checkouts[0].metadata;
-  }
-  const completed = (metadata: Record<string, string>, session = "cs_1", pi = "pi_1") => ({ id: session, payment_status: "paid", payment_intent: pi, metadata });
-
   it("refuses unsigned events", async () => {
-    expect((await s.hook("checkout.session.completed", {}, "acct_1", "forged")).status).toBe(400);
+    expect((await s.hook("checkout.session.completed", {}, null, "forged")).status).toBe(400);
   });
 
   it("marks the fee paid with the host's three fields, once", async () => {
-    const md = await checkout();
-    const r = await s.hook("checkout.session.completed", completed(md));
+    ready();
+    await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
+    const r = await s.hook("checkout.session.completed", completed());
     expect(r.status).toBe(200);
     expect(s.store.doc("tournaments/t1/payments/haze")).toEqual({ paid: true, paidAt: new Date(now), note: paidOnlineNote });
-    expect(s.store.doc("charges/cs_1")).toMatchObject({ status: "paid", paymentIntent: "pi_1" });
+    expect(s.store.doc("charges/cs_1")).toMatchObject({ status: "paid", paymentIntent: "pi_1", released: false });
     expect(s.store.doc("stripePayments/pi_1")).toEqual({ charge: "cs_1" });
     expect(s.store.doc(`stripeEvents/${r.id}`)).toBeDefined();
-    // Stripe sends it again: nothing changes, nothing refunded.
-    await s.hook("checkout.session.completed", completed(md));
+    // Stripe sends it again: nothing changes, nothing refunded or sent.
+    await s.hook("checkout.session.completed", completed());
     expect(s.gateway.refunds).toHaveLength(0);
+    expect(s.gateway.transfers).toHaveLength(0);
   });
 
   it("waits for delayed payment methods", async () => {
-    const md = await checkout();
-    await s.hook("checkout.session.completed", { ...completed(md), payment_status: "unpaid" });
+    ready();
+    await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
+    await s.hook("checkout.session.completed", { ...completed(), payment_status: "unpaid" });
     expect(s.store.doc("tournaments/t1/payments/haze")).toBeUndefined();
-    await s.hook("checkout.session.async_payment_succeeded", completed(md));
+    await s.hook("checkout.session.async_payment_succeeded", completed());
     expect(s.store.doc("tournaments/t1/payments/haze")?.paid).toBe(true);
   });
 
   it("refunds a second payment for the same fee in full", async () => {
-    const md = await checkout();
+    ready();
+    await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
     // Two requests racing: each made its own session before either was stored.
     s.store.put("payerCharges/t1~haze", {});
-    await s.call("POST", "/v1/tournaments/t1/checkout", { payer: "team", teamId: "haze" }, "captain");
-    await s.hook("checkout.session.completed", completed(md));
-    await s.hook("checkout.session.completed", completed({ ...md, chargeId: "other" }, "cs_2", "pi_2"));
-    expect(s.gateway.refunds).toEqual([{ account: "acct_1", paymentIntent: "pi_2", idempotencyKey: "duplicate:cs_2" }]);
+    await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
+    await s.hook("checkout.session.completed", completed());
+    await s.hook("checkout.session.completed", completed("cs_2", "pi_2"));
+    expect(s.gateway.refunds).toEqual([{ account: null, paymentIntent: "pi_2", amountCents: undefined, idempotencyKey: "duplicate:cs_2" }]);
     expect(s.store.doc("charges/cs_2")?.status).toBe("refunded");
     expect(s.store.doc("tournaments/t1/payments/haze")?.note).toBe(paidOnlineNote);
   });
 
-  it("the host's refund un-marks it and gives Stall 10's fee back", async () => {
-    const md = await checkout();
-    await s.hook("checkout.session.completed", completed(md));
-    await s.hook("charge.refunded", { id: "ch_1", payment_intent: "pi_1", refunded: true, amount_refunded: 40000, application_fee: "fee_1" });
-    expect(s.store.doc("tournaments/t1/payments/haze")).toEqual({ paid: false, paidAt: null, note: refundedOnlineNote });
-    expect(s.gateway.feeRefunds).toEqual(["fee_1"]);
-    expect(s.store.doc("charges/cs_1")).toMatchObject({ status: "refunded", feeRefunded: true });
-  });
-
-  it("retries the fee refund if Stripe failed the first time", async () => {
-    const md = await checkout();
-    await s.hook("checkout.session.completed", completed(md));
-    s.gateway.failFeeRefund = true;
-    const refund = { id: "ch_1", payment_intent: "pi_1", refunded: true, amount_refunded: 40000, application_fee: "fee_1" };
-    const first = await s.hook("charge.refunded", refund);
-    expect(first.status).toBe(500);
-    s.gateway.failFeeRefund = false;
-    await s.hook("charge.refunded", refund);
-    expect(s.gateway.feeRefunds).toEqual(["fee_1"]);
-  });
-
-  it("leaves a partial refund paid", async () => {
-    const md = await checkout();
-    await s.hook("checkout.session.completed", completed(md));
-    await s.hook("charge.refunded", { id: "ch_1", payment_intent: "pi_1", refunded: false, amount_refunded: 1000, application_fee: "fee_1" });
-    expect(s.store.doc("tournaments/t1/payments/haze")?.paid).toBe(true);
-    expect(s.store.doc("charges/cs_1")?.amountRefundedCents).toBe(1000);
-    expect(s.gateway.feeRefunds).toEqual([]);
-  });
-
-  it("keeps a mark the host has since made by hand", async () => {
-    const md = await checkout();
-    await s.hook("checkout.session.completed", completed(md));
-    s.store.put("tournaments/t1/payments/haze", { paid: true, paidAt: new Date(now), note: "Paid cash" });
-    await s.hook("charge.refunded", { id: "ch_1", payment_intent: "pi_1", refunded: true, amount_refunded: 40000, application_fee: "fee_1" });
-    expect(s.store.doc("tournaments/t1/payments/haze")?.note).toBe("Paid cash");
-  });
-
   it("ignores sessions it didn't make, whatever their metadata says", async () => {
-    // Another host makes its own 50-cent session naming this team's fee.
     ready();
     const forged = { tournamentId: "t1", payerKind: "team", payerId: "haze", hostId: "host", chargeId: "x" };
-    expect((await s.hook("checkout.session.completed", completed(forged, "cs_forged", "pi_x"), "acct_2")).status).toBe(200);
+    expect((await s.hook("checkout.session.completed", { ...completed("cs_forged", "pi_x"), metadata: forged })).status).toBe(200);
     expect(s.store.doc("tournaments/t1/payments/haze")).toBeUndefined();
     expect(s.gateway.refunds).toHaveLength(0);
   });
 
-  it("ignores events about this charge from another account", async () => {
-    const md = await checkout();
-    await s.hook("checkout.session.completed", completed(md), "acct_2");
+  it("ignores events about Stall 10's charges sent from a connected account", async () => {
+    ready();
+    await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
+    await s.hook("checkout.session.completed", completed(), "acct_1");
     expect(s.store.doc("tournaments/t1/payments/haze")).toBeUndefined();
-    await s.hook("checkout.session.completed", completed(md));
-    await s.hook("charge.refunded", { id: "ch_1", payment_intent: "pi_1", refunded: true, application_fee: "fee_1" }, "acct_2");
-    await s.hook("charge.dispute.created", { id: "dp_1", payment_intent: "pi_1" }, "acct_2");
-    await s.hook("checkout.session.expired", { id: "cs_1" }, null);
+    await s.hook("checkout.session.completed", completed());
+    await s.hook("charge.refunded", { id: "ch_1", payment_intent: "pi_1", refunded: true, amount_refunded: 42461 }, "acct_1");
+    await s.hook("charge.dispute.created", { id: "dp_1", payment_intent: "pi_1" }, "acct_1");
+    await s.hook("checkout.session.expired", { id: "cs_1" }, "acct_1");
     expect(s.store.doc("tournaments/t1/payments/haze")?.paid).toBe(true);
     expect(s.store.doc("charges/cs_1")?.status).toBe("paid");
-    expect(s.gateway.feeRefunds).toEqual([]);
   });
 
-  it("records expired sessions and disputes", async () => {
-    const md = await checkout();
+  it("records expired sessions", async () => {
+    ready();
+    await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
     await s.hook("checkout.session.expired", { id: "cs_1" });
     expect(s.store.doc("charges/cs_1")?.status).toBe("expired");
-    s.store.put("charges/cs_1", { ...s.store.doc("charges/cs_1"), status: "open" });
-    await s.hook("checkout.session.completed", completed(md));
+  });
+});
+
+describe("paying hosts out", () => {
+  it("holds the fee until the event is over", async () => {
+    ready();
+    await paid();
+    expect(s.gateway.transfers).toHaveLength(0);
+    expect(await earnings()).toMatchObject({ heldCents: 40000, sentCents: 0, items: [{ tournamentId: "t1", label: "Bid fee: Spring Fling (Haze)", amountCents: 40000, status: "held" }] });
+    expect(s.gateway.transfers).toHaveLength(0);
+  });
+
+  it("finishing the event sends the host its fee, once", async () => {
+    ready();
+    s.store.put("tournaments/t1", { ...s.store.doc("tournaments/t1"), startsOn: new Date(now - day) });
+    await paid();
+    s.store.put("tournaments/t1", { ...s.store.doc("tournaments/t1"), status: "live" });
+    expect((await s.call("PUT", "/v1/tournaments/t1/status", { status: "finished" })).status).toBe(204);
+    expect(s.gateway.transfers).toEqual([
+      {
+        destination: "acct_1",
+        amountCents: 40000,
+        currency: "USD",
+        sourceTransaction: "ch_pi_1",
+        transferGroup: "tournament_t1",
+        metadata: { chargeId: "cs_1", tournamentId: "t1", payerId: "haze", hostId: "host" },
+        idempotencyKey: "transfer:cs_1:1",
+      },
+    ]);
+    expect(s.store.doc("charges/cs_1")).toMatchObject({ status: "paid", released: true, transfer: "tr_1", transferCents: 40000, releases: 1, release: null, stripeCharge: "ch_pi_1" });
+    // Reopened and finished again, the earnings page, staff's sweep: nothing more goes out.
+    await s.call("PUT", "/v1/tournaments/t1/status", { status: "live" });
+    await s.call("PUT", "/v1/tournaments/t1/status", { status: "finished" });
+    expect(await earnings()).toMatchObject({ heldCents: 0, sentCents: 40000, items: [{ status: "sent", amountCents: 40000 }] });
+    await s.call("POST", "/v1/payments/release", undefined, "admin", "staff");
+    expect(s.gateway.transfers).toHaveLength(1);
+  });
+
+  it("never before the event's last day, even if it's marked finished early", async () => {
+    ready();
+    // A two-day event, on now.
+    s.store.put("tournaments/t1", { ...s.store.doc("tournaments/t1"), startsOn: new Date(now - day), endsOn: new Date(now + day) });
+    await paid();
+    s.store.put("tournaments/t1", { ...s.store.doc("tournaments/t1"), status: "live" });
+    await s.call("PUT", "/v1/tournaments/t1/status", { status: "finished" });
+    expect((await earnings()).heldCents).toBe(40000);
+    expect(s.gateway.transfers).toHaveLength(0);
+    // Its last day comes.
+    s.store.put("tournaments/t1", { ...s.store.doc("tournaments/t1"), endsOn: new Date(now) });
+    s.store.put("charges/cs_1", { ...s.store.doc("charges/cs_1"), eventEndsAt: new Date(now) });
+    expect((await earnings()).sentCents).toBe(40000);
+  });
+
+  it("a payment made after the event is sent when it succeeds", async () => {
+    ready();
+    finish();
+    await paid();
+    expect(s.gateway.transfers.map((t) => t.idempotencyKey)).toEqual(["transfer:cs_1:1"]);
+  });
+
+  it("holds it while the host's payouts need attention, and sends it once they're fixed", async () => {
+    ready();
+    await paid();
+    s.gateway.accounts.set("acct_1", { transfersEnabled: false, detailsSubmitted: false });
+    s.store.put("payoutAccounts/host", { ...s.store.doc("payoutAccounts/host"), status: "pending" });
+    finish();
+    expect((await earnings()).heldCents).toBe(40000);
+    s.gateway.accounts.set("acct_1", { transfersEnabled: true, detailsSubmitted: true });
+    await s.hook("account.updated", { id: "acct_1" }, "acct_1");
+    expect(s.gateway.transfers).toHaveLength(1);
+  });
+
+  it("a transfer Stripe didn't take is tried again for the same amount, with the same key", async () => {
+    ready();
+    await paid();
+    finish();
+    s.gateway.failTransfer = true;
+    expect((await earnings()).heldCents).toBe(40000);
+    expect(s.store.doc("charges/cs_1")?.release).toMatchObject({ n: 1, cents: 40000, destination: "acct_1" });
+    s.gateway.failTransfer = false;
+    expect((await earnings()).sentCents).toBe(40000);
+    expect(s.gateway.transfers.map((t) => t.idempotencyKey)).toEqual(["transfer:cs_1:1"]);
+  });
+
+  it("Stall 10's own events keep their fees", async () => {
+    s.store.put("teams/host", { ...s.store.doc("teams/host"), official: true });
+    await paid();
+    finish();
+    expect((await earnings()).items).toMatchObject([{ status: "kept", amountCents: 40000 }]);
+    expect(s.gateway.transfers).toHaveLength(0);
+  });
+
+  it("staff's sweep sends whatever was missed; nobody else may run it", async () => {
+    ready();
+    await paid();
+    finish();
+    expect((await s.call("POST", "/v1/payments/release", undefined, "owner")).status).toBe(403);
+    const r = await s.call("POST", "/v1/payments/release", undefined, "admin", "staff");
+    expect(r.json()).toEqual({ checked: 1, sent: 1 });
+    expect(s.gateway.transfers).toHaveLength(1);
+  });
+});
+
+describe("refunds", () => {
+  const refund = (uid = "coach", kind = "token") => s.call("POST", "/v1/tournaments/t1/payments/haze/refund", undefined, uid, kind);
+
+  it("the organizers refund the fee, not the service and processing fees", async () => {
+    ready();
+    await paid();
+    expect((await refund("captain")).status).toBe(403);
+    expect((await refund()).status).toBe(204);
+    expect(s.gateway.refunds).toEqual([{ account: null, paymentIntent: "pi_1", amountCents: 40000, idempotencyKey: "refund:cs_1" }]);
+    expect(s.store.doc("tournaments/t1/payments/haze")).toEqual({ paid: false, paidAt: null, note: refundedNote });
+    expect(s.store.doc("charges/cs_1")).toMatchObject({ status: "refunded", refundedBy: "host", refundCents: 40000, refundBy: "coach" });
+    expect((await refund()).message()).toBe("That's already refunded.");
+    // Nothing goes to the host for it.
+    finish();
+    expect(await earnings()).toMatchObject({ heldCents: 0, refundedCents: 40000, items: [{ status: "refunded", amountCents: 40000 }] });
+    expect(s.gateway.transfers).toHaveLength(0);
+  });
+
+  it("staff can refund too; there must be an online payment", async () => {
+    ready();
+    expect((await refund()).message()).toBe("There's no online payment to refund.");
+    await paid();
+    expect((await refund("admin", "staff")).status).toBe(204);
+  });
+
+  it("after the host was paid, its share is taken back first", async () => {
+    ready();
+    await paid();
+    finish();
+    await earnings();
+    expect((await refund()).status).toBe(204);
+    expect(s.gateway.reversals).toEqual([{ transfer: "tr_1", amountCents: 40000, idempotencyKey: "reverse:cs_1:1" }]);
+    expect(s.gateway.refunds).toHaveLength(1);
+    expect(s.store.doc("charges/cs_1")).toMatchObject({ status: "refunded", reversed: true, reversedFor: "refund" });
+  });
+
+  it("what can't be taken back is owed, and comes off the host's next payout", async () => {
+    ready();
+    await paid();
+    finish();
+    await earnings();
+    s.gateway.failReversal = true;
+    // An organizer's refund isn't paid from Stall 10's money.
+    const blocked = await refund();
+    expect(blocked.status).toBe(412);
+    expect(blocked.message()).toContain("already paid out to your bank");
+    expect(s.gateway.refunds).toHaveLength(0);
+    expect(s.store.doc("charges/cs_1")).toMatchObject({ status: "paid", reversed: false });
+    expect(s.store.doc("payoutAccounts/host")?.owedCents ?? 0).toBe(0);
+    // Staff refund it, and the host owes it.
+    expect((await refund("admin", "staff")).status).toBe(204);
+    expect(s.gateway.refunds).toHaveLength(1);
+    expect(s.store.doc("payoutAccounts/host")?.owedCents).toBe(40000);
+    expect((await earnings()).owedCents).toBe(40000);
+    // The next event: $500 paid, $100 sent.
+    s.store.put("tournaments/t2", { hostId: "host", name: "Fall Fling", status: "registration", entryType: "teams", visibility: "public", bidFee: fee(50000), startsOn: new Date(now + day) });
+    s.store.put("tournaments/t2/entries/haze", { teamName: "Haze", divisionId: "d1", status: "accepted" });
+    await paid("t2", "cs_2", "pi_2");
+    finish("t2");
+    await earnings();
+    expect(s.gateway.transfers[1]).toMatchObject({ amountCents: 10000, idempotencyKey: "transfer:cs_2:1" });
+    expect(s.store.doc("payoutAccounts/host")?.owedCents).toBe(0);
+  });
+
+  it("a refund made in Stall 10's Stripe Dashboard is followed", async () => {
+    ready();
+    await paid();
+    finish();
+    await earnings();
+    await s.hook("charge.refunded", { id: "ch_pi_1", payment_intent: "pi_1", refunded: true, amount_refunded: 42461 });
+    expect(s.store.doc("tournaments/t1/payments/haze")).toEqual({ paid: false, paidAt: null, note: refundedNote });
+    expect(s.store.doc("charges/cs_1")).toMatchObject({ status: "refunded", refundedBy: "stripe" });
+    expect(s.gateway.reversals).toHaveLength(1);
+    // A part of the service fee only: still paid.
+    s.store.put("charges/cs_1", { ...s.store.doc("charges/cs_1"), status: "paid" });
+    await s.hook("charge.refunded", { id: "ch_pi_1", payment_intent: "pi_1", refunded: false, amount_refunded: 500 });
+    expect(s.store.doc("charges/cs_1")?.status).toBe("paid");
+  });
+
+  it("our own refund's event changes nothing more", async () => {
+    ready();
+    await paid();
+    await refund();
+    await s.hook("charge.refunded", { id: "ch_pi_1", payment_intent: "pi_1", refunded: false, amount_refunded: 40000 });
+    expect(s.store.doc("charges/cs_1")).toMatchObject({ status: "refunded", refundedBy: "host" });
+  });
+});
+
+describe("disputes", () => {
+  it("a dispute after the host was paid takes its share back; winning sends it again", async () => {
+    ready();
+    await paid();
+    finish();
+    await earnings();
     await s.hook("charge.dispute.created", { id: "dp_1", payment_intent: "pi_1" });
-    expect(s.store.doc("charges/cs_1")?.status).toBe("disputed");
+    expect(s.store.doc("charges/cs_1")).toMatchObject({ status: "disputed", reversed: true, reversedFor: "dispute" });
+    expect(s.gateway.reversals).toEqual([{ transfer: "tr_1", amountCents: 40000, idempotencyKey: "reverse:cs_1:1" }]);
+    expect((await earnings()).disputedCents).toBe(40000);
+    expect((await s.call("POST", "/v1/tournaments/t1/payments/haze/refund", undefined, "coach")).status).toBe(412);
+    await s.hook("charge.dispute.closed", { id: "dp_1", payment_intent: "pi_1", status: "won" });
+    expect(s.store.doc("charges/cs_1")).toMatchObject({ status: "paid", released: true, transfer: "tr_2", releases: 2 });
+    expect(s.gateway.transfers.map((t) => t.idempotencyKey)).toEqual(["transfer:cs_1:1", "transfer:cs_1:2"]);
+  });
+
+  it("a dispute before the event holds the fee; lost, it never goes out", async () => {
+    ready();
+    await paid();
+    await s.hook("charge.dispute.created", { id: "dp_1", payment_intent: "pi_1" });
+    finish();
+    expect((await earnings()).items).toMatchObject([{ status: "disputed" }]);
+    await s.hook("charge.dispute.closed", { id: "dp_1", payment_intent: "pi_1", status: "lost" });
+    expect(s.gateway.transfers).toHaveLength(0);
+    expect(s.gateway.reversals).toHaveLength(0);
+  });
+
+  it("what can't be clawed back is owed", async () => {
+    ready();
+    await paid();
+    finish();
+    await earnings();
+    s.gateway.failReversal = true;
+    await s.hook("charge.dispute.created", { id: "dp_1", payment_intent: "pi_1" });
+    expect(s.store.doc("payoutAccounts/host")?.owedCents).toBe(40000);
+    expect(s.store.doc("charges/cs_1")).toMatchObject({ owedCents: 40000, reversed: true });
+  });
+});
+
+describe("the host's earnings", () => {
+  it("are for its organizers only", async () => {
+    expect((await s.call("GET", "/v1/teams/host/earnings", undefined, "coach")).status).toBe(200);
+    expect((await s.call("GET", "/v1/teams/host/earnings", undefined, "captain")).status).toBe(403);
+    expect(await earnings()).toEqual({ currency: "USD", heldCents: 0, sentCents: 0, refundedCents: 0, disputedCents: 0, owedCents: 0, items: [] });
+  });
+});
+
+describe("deleting an event", () => {
+  it("waits until fees Stall 10 holds for it are refunded", async () => {
+    ready();
+    await paid();
+    const del = await s.call("DELETE", "/v1/tournaments/t1");
+    expect(del.status).toBe(412);
+    expect(del.message()).toBe("Refund the fee paid online first (Teams).");
+    expect(s.store.doc("tournaments/t1")).toBeDefined();
+    await s.call("POST", "/v1/tournaments/t1/payments/haze/refund", undefined, "coach");
+    expect((await s.call("DELETE", "/v1/tournaments/t1")).status).toBe(204);
+  });
+});
+
+describe("older direct charges (before Stall 10 collected)", () => {
+  // A Checkout session made on the host's own account, with Stall 10's application fee.
+  function legacy(status = "open") {
+    s.store.put("charges/cs_old", { tournamentId: "t1", payerKind: "team", payerId: "haze", hostId: "host", mode: "hosted", account: "acct_old", amountCents: 42461, baseCents: 40000, currency: "USD", status });
+    s.store.put("payerCharges/t1~haze", { session: "cs_old", mode: "hosted", url: "https://checkout.test/cs_old", chargeCents: 42461, expiresAt: now + 3600_000 });
+  }
+
+  it("are asked of, and settled by, the host's account only", async () => {
+    legacy();
+    await s.call("GET", "/v1/tournaments/t1/pay?team=haze", undefined, "captain");
+    expect(s.gateway.askedOf).toEqual(["acct_old"]);
+    await s.hook("checkout.session.completed", { ...completed("cs_old", "pi_old") });
+    expect(s.store.doc("tournaments/t1/payments/haze")).toBeUndefined();
+    await s.hook("checkout.session.completed", completed("cs_old", "pi_old"), "acct_old");
+    expect(s.store.doc("tournaments/t1/payments/haze")?.paid).toBe(true);
+  });
+
+  it("the host's refund in Stripe un-marks it and gives Stall 10's fee back", async () => {
+    legacy();
+    await s.hook("checkout.session.completed", completed("cs_old", "pi_old"), "acct_old");
+    await s.hook("charge.refunded", { id: "ch_1", payment_intent: "pi_old", refunded: true, amount_refunded: 42461, application_fee: "fee_1" }, "acct_old");
+    expect(s.store.doc("tournaments/t1/payments/haze")).toEqual({ paid: false, paidAt: null, note: refundedOnlineNote });
+    expect(s.gateway.feeRefunds).toEqual(["fee_1"]);
+    expect(s.store.doc("charges/cs_old")).toMatchObject({ status: "refunded", feeRefunded: true });
+  });
+
+  it("retries the fee refund if Stripe failed the first time", async () => {
+    legacy();
+    await s.hook("checkout.session.completed", completed("cs_old", "pi_old"), "acct_old");
+    s.gateway.failFeeRefund = true;
+    const refund = { id: "ch_1", payment_intent: "pi_old", refunded: true, amount_refunded: 42461, application_fee: "fee_1" };
+    expect((await s.hook("charge.refunded", refund, "acct_old")).status).toBe(500);
+    s.gateway.failFeeRefund = false;
+    await s.hook("charge.refunded", refund, "acct_old");
+    expect(s.gateway.feeRefunds).toEqual(["fee_1"]);
+  });
+
+  it("are never sent to the host again, and can't be refunded through Stall 10", async () => {
+    legacy();
+    await s.hook("checkout.session.completed", completed("cs_old", "pi_old"), "acct_old");
+    ready();
+    finish();
+    await earnings();
+    expect(s.gateway.transfers).toHaveLength(0);
+    expect((await s.call("POST", "/v1/tournaments/t1/payments/haze/refund", undefined, "coach")).status).toBe(412);
+  });
+
+  it("a payer with one open is given a new charge on Stall 10's account", async () => {
+    legacy();
+    s.gateway.sessions.set("cs_old", { status: "open", paymentStatus: "unpaid", paymentIntent: null, paymentFailed: false });
+    ready();
+    await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
+    expect(s.gateway.expired).toEqual(["cs_old"]);
+    expect(s.store.doc("charges/cs_1")?.flow).toBe("platform");
   });
 });
 
@@ -492,7 +859,6 @@ describe("payers pay the fees on top", () => {
 });
 
 describe("a payer who lost their connection", () => {
-  const team = { payer: "team", teamId: "haze" };
   const pay = () => s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
   const options = async () => (await s.call("GET", "/v1/tournaments/t1/pay?team=haze", undefined, "captain")).json();
 
@@ -504,11 +870,11 @@ describe("a payer who lost their connection", () => {
     expect(s.gateway.checkouts).toHaveLength(1);
   });
 
-  it("gets a fresh checkout when the old one is nearly out or the fee changed, and the old one is closed", async () => {
+  it("gets a fresh checkout when the fee changed, and the old one is closed", async () => {
     ready();
     await pay();
     s.store.put("tournaments/t1", { ...s.store.doc("tournaments/t1"), bidFee: fee(45_000) });
-    expect((await pay()).json()).toEqual({ url: "https://checkout.test/cs_2", clientSecret: null, account: "acct_1" });
+    expect((await pay()).json()).toEqual({ url: "https://checkout.test/cs_2", clientSecret: null, account: null });
     expect(s.gateway.expired).toEqual(["cs_1"]);
     expect(s.store.doc("charges/cs_1")?.status).toBe("expired");
     expect(s.gateway.checkouts[1].amountCents).toBe(onlineCharge({ amountCents: 45_000 }, { percentBps: 300, fixedCents: 0 }).chargeCents);
@@ -519,9 +885,9 @@ describe("a payer who lost their connection", () => {
     await pay();
     s.gateway.pay("cs_1", "pi_1");
     expect(await options()).toMatchObject({ paid: true, online: false, pending: null });
+    expect(s.gateway.askedOf).toEqual([null]);
     expect(s.store.doc("tournaments/t1/payments/haze")).toEqual({ paid: true, paidAt: new Date(now), note: paidOnlineNote });
-    // The webhook then lands: nothing more happens.
-    await s.hook("checkout.session.completed", { id: "cs_1", payment_status: "paid", payment_intent: "pi_1", metadata: {} });
+    await s.hook("checkout.session.completed", completed());
     expect(s.gateway.refunds).toHaveLength(0);
     expect((await pay()).message()).toBe("That's already paid.");
   });
@@ -540,12 +906,11 @@ describe("a payer who lost their connection", () => {
     await pay();
     s.gateway.down = true;
     expect(await options()).toMatchObject({ paid: false, online: true });
-    expect((await pay()).json()).toEqual({ url: "https://checkout.test/cs_1", clientSecret: null, account: "acct_1" });
+    expect((await pay()).json()).toEqual({ url: "https://checkout.test/cs_1", clientSecret: null, account: null });
   });
 });
 
 describe("bank payments", () => {
-  const team = { payer: "team", teamId: "haze" };
   const options = async () => (await s.call("GET", "/v1/tournaments/t1/pay?team=haze", undefined, "captain")).json();
   const session = (pi = "pi_1") => ({ id: "cs_1", payment_status: "unpaid", payment_intent: pi, metadata: {} });
 
@@ -561,11 +926,13 @@ describe("bank payments", () => {
     expect(s.store.doc("tournaments/t1/payments/haze")?.paid).toBe(true);
   });
 
-  it("sees processing on coming back even before the webhook", async () => {
+  it("never sends the host a payment still clearing", async () => {
     ready();
     await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
-    s.gateway.pay("cs_1", "pi_1", "unpaid");
-    expect((await options()).pending).toBe("processing");
+    await s.hook("checkout.session.completed", session());
+    finish();
+    expect((await earnings()).heldCents).toBe(0);
+    expect(s.gateway.transfers).toHaveLength(0);
   });
 
   it("lets them pay again when the bank payment fails", async () => {
@@ -576,7 +943,7 @@ describe("bank payments", () => {
     await s.hook("checkout.session.async_payment_failed", session());
     expect(s.store.doc("charges/cs_1")?.status).toBe("failed");
     expect(await options()).toMatchObject({ online: true, pending: null, paid: false });
-    expect((await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain")).json()).toEqual({ url: "https://checkout.test/cs_2", clientSecret: null, account: "acct_1" });
+    expect((await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain")).json()).toEqual({ url: "https://checkout.test/cs_2", clientSecret: null, account: null });
   });
 
   it("sees a failed bank payment even if the webhook never came", async () => {
@@ -589,17 +956,16 @@ describe("bank payments", () => {
     expect(s.store.doc("charges/cs_1")?.status).toBe("failed");
   });
 
-  it("ignores a failure from another account", async () => {
+  it("ignores a failure sent from a connected account", async () => {
     ready();
     await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
     await s.hook("checkout.session.completed", session());
-    await s.hook("checkout.session.async_payment_failed", session(), "acct_other");
+    await s.hook("checkout.session.async_payment_failed", session(), "acct_1");
     expect(s.store.doc("charges/cs_1")?.status).toBe("processing");
   });
 });
 
 describe("paying another way", () => {
-  const team = { payer: "team", teamId: "haze" };
   const offline = (on: boolean, uid = "captain", body: object = team) => s.call("PUT", "/v1/tournaments/t1/pay/offline", { ...body, offline: on }, uid);
   const options = async () => (await s.call("GET", "/v1/tournaments/t1/pay?team=haze", undefined, "captain")).json();
 
@@ -637,6 +1003,16 @@ describe("paying another way", () => {
     expect((await mark({ paid: true, note: "x" }, "captain")).status).toBe(403);
     expect((await mark({ paid: true, note: "x".repeat(201) })).status).toBe(400);
   });
+
+  it("a fee paid online can't be unmarked or re-noted by hand: it's refunded", async () => {
+    s.store.put("tournaments/t1/payments/haze", { paid: true, paidAt: new Date(now), note: "Paid online through Stall 10" });
+    const mark = (body: object) => s.call("PUT", "/v1/tournaments/t1/payments/haze", body, "coach");
+    const off = await mark({ paid: false, note: "" });
+    expect(off.status).toBe(412);
+    expect(off.message()).toBe("This fee was paid online. Refund it instead.");
+    expect((await mark({ paid: true, note: "Cash too" })).status).toBe(412);
+    expect(s.store.doc("tournaments/t1/payments/haze")).toMatchObject({ paid: true, note: "Paid online through Stall 10" });
+  });
 });
 
 describe("the payment history", () => {
@@ -645,19 +1021,21 @@ describe("the payment history", () => {
       .filter(([k]) => k.startsWith("paymentLog/"))
       .map(([, v]) => v)
       .map(({ at, ...rest }) => ({ ...rest, at: at instanceof Date ? "t" : at }) as Record<string, unknown>);
-  const team = { payer: "team", teamId: "haze" };
 
-  it("records each step of an online payment and a refund, with Stripe's ids", async () => {
+  it("records each step of an online payment, its payout and a refund, with Stripe's ids", async () => {
     ready();
-    await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
-    await s.hook("checkout.session.completed", { id: "cs_1", payment_status: "paid", payment_intent: "pi_1", metadata: {} });
-    await s.hook("charge.refunded", { payment_intent: "pi_1", refunded: true, amount_refunded: 40000, application_fee: "fee_1" });
-    // The whole charge, fees included.
-    const ids = { tournamentId: "t1", payerId: "haze", amountCents: 42461, currency: "USD", stripeAccount: "acct_1", checkoutSession: "cs_1", at: "t" };
+    await paid();
+    finish();
+    await earnings();
+    await s.call("POST", "/v1/tournaments/t1/payments/haze/refund", undefined, "coach");
+    const ids = { tournamentId: "t1", payerId: "haze", currency: "USD", at: "t" };
     expect(log()).toEqual([
-      { ...ids, action: "checkout_started", by: "captain" },
-      { ...ids, action: "paid_online", by: "stripe", paymentIntent: "pi_1" },
-      { ...ids, action: "refunded_by_host", by: "stripe", paymentIntent: "pi_1" },
+      { ...ids, action: "checkout_started", by: "captain", amountCents: 42461, checkoutSession: "cs_1" },
+      { ...ids, action: "paid_online", by: "stripe", amountCents: 42461, checkoutSession: "cs_1", paymentIntent: "pi_1" },
+      { ...ids, action: "released", by: "stripe", amountCents: 40000, checkoutSession: "cs_1", paymentIntent: "pi_1" },
+      { ...ids, action: "refund_started", by: "coach", amountCents: 40000, paymentIntent: "pi_1" },
+      { ...ids, action: "transfer_reversed", by: "stripe", amountCents: 40000, checkoutSession: "cs_1", paymentIntent: "pi_1" },
+      { ...ids, action: "refunded", by: "coach", amountCents: 40000, paymentIntent: "pi_1" },
     ]);
   });
 
@@ -680,17 +1058,17 @@ describe("the payment history", () => {
 });
 
 describe("the app's payment sheet", () => {
-  const sheet = (uid = "captain") => s.call("POST", "/v1/tournaments/t1/pay/intent", { payer: "team", teamId: "haze" }, uid);
+  const sheet = (uid = "captain") => s.call("POST", "/v1/tournaments/t1/pay/intent", team, uid);
 
-  it("makes a direct-charge PaymentIntent for the tournament's amount, and reuses it", async () => {
+  it("makes a PaymentIntent on Stall 10's account for the tournament's amount, and reuses it", async () => {
     ready();
     const r = await sheet();
     expect(r.status).toBe(200);
-    expect(r.json()).toEqual({ clientSecret: "pi_sheet_1_secret", account: "acct_1", merchantName: "Fling Crew", amountCents: 42461, currency: "USD" });
-    expect(s.gateway.intentsMade[0]).toMatchObject({ account: "acct_1", amountCents: 42461, feeCents: 1200, currency: "USD" });
+    expect(r.json()).toEqual({ clientSecret: "pi_sheet_1_secret", account: null, merchantName: "Stall 10", amountCents: 42461, currency: "USD" });
+    expect(s.gateway.intentsMade[0]).toMatchObject({ amountCents: 42461, currency: "USD", transferGroup: "tournament_t1" });
+    expect(s.gateway.intentsMade[0]).not.toHaveProperty("account");
     expect(s.gateway.intentsMade[0].metadata).toMatchObject({ tournamentId: "t1", payerKind: "team", payerId: "haze" });
-    expect(s.store.doc("charges/pi_sheet_1")).toMatchObject({ mode: "intent", status: "open", account: "acct_1", amountCents: 42461, baseCents: 40000 });
-    // Tapped again: the same one.
+    expect(s.store.doc("charges/pi_sheet_1")).toMatchObject({ mode: "intent", flow: "platform", status: "open", destination: "acct_1", amountCents: 42461, baseCents: 40000 });
     expect((await sheet()).json().clientSecret).toBe("pi_sheet_1_secret");
     expect(s.gateway.intentsMade).toHaveLength(1);
   });
@@ -705,26 +1083,28 @@ describe("the app's payment sheet", () => {
 
   it("closes an open Checkout page first, and the page closes the sheet's", async () => {
     ready();
-    await s.call("POST", "/v1/tournaments/t1/checkout", { payer: "team", teamId: "haze" }, "captain");
+    await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
     await sheet();
     expect(s.gateway.expired).toEqual(["cs_1"]);
     expect(s.store.doc("charges/cs_1")?.status).toBe("expired");
-    await s.call("POST", "/v1/tournaments/t1/checkout", { payer: "team", teamId: "haze" }, "captain");
+    await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
     expect(s.gateway.cancelled).toEqual(["pi_sheet_1"]);
     expect(s.store.doc("charges/pi_sheet_1")?.status).toBe("expired");
   });
 
-  it("is marked paid by the webhook, only for its own account", async () => {
+  it("is marked paid by Stall 10's own events only, and its fee sent like any other", async () => {
     ready();
     await sheet();
-    await s.hook("payment_intent.succeeded", { id: "pi_sheet_1" }, "acct_other");
+    await s.hook("payment_intent.succeeded", { id: "pi_sheet_1" }, "acct_1");
     expect(s.store.doc("tournaments/t1/payments/haze")).toBeUndefined();
     await s.hook("payment_intent.succeeded", { id: "pi_sheet_1" });
     expect(s.store.doc("tournaments/t1/payments/haze")).toEqual({ paid: true, paidAt: new Date(now), note: paidOnlineNote });
     expect(s.store.doc("charges/pi_sheet_1")).toMatchObject({ status: "paid", paymentIntent: "pi_sheet_1" });
-    // Checkout's own intents (not the sheet's) are left to the session events.
     await s.hook("payment_intent.succeeded", { id: "pi_checkout" });
     expect(s.store.doc("charges/pi_checkout")).toBeUndefined();
+    finish();
+    await earnings();
+    expect(s.gateway.transfers[0]).toMatchObject({ sourceTransaction: "ch_pi_sheet_1", idempotencyKey: "transfer:pi_sheet_1:1" });
   });
 
   it("follows a bank payment clearing, then failing", async () => {
@@ -732,7 +1112,6 @@ describe("the app's payment sheet", () => {
     await sheet();
     await s.hook("payment_intent.processing", { id: "pi_sheet_1" });
     expect(s.store.doc("charges/pi_sheet_1")?.status).toBe("processing");
-    // While it clears, nothing else can be started.
     s.gateway.intents.set("pi_sheet_1", "processing");
     expect((await sheet()).status).toBe(412);
     await s.hook("payment_intent.payment_failed", { id: "pi_sheet_1" });
@@ -755,40 +1134,39 @@ describe("the app's payment sheet", () => {
     expect(r.json()).toMatchObject({ paid: true });
   });
 
-  it("a second payment for something paid is refunded", async () => {
+  it("a second payment for something paid is refunded in full", async () => {
     ready();
     await sheet();
     s.store.put("tournaments/t1/payments/haze", { paid: true, paidAt: new Date(now), note: "Cash" });
     await s.hook("payment_intent.succeeded", { id: "pi_sheet_1" });
-    expect(s.gateway.refunds).toEqual([{ account: "acct_1", paymentIntent: "pi_sheet_1", idempotencyKey: "duplicate:pi_sheet_1" }]);
+    expect(s.gateway.refunds).toEqual([{ account: null, paymentIntent: "pi_sheet_1", amountCents: undefined, idempotencyKey: "duplicate:pi_sheet_1" }]);
     expect(s.store.doc("charges/pi_sheet_1")?.status).toBe("refunded");
   });
 });
 
 describe("Checkout in the website's page", () => {
-  it("gives the client secret and account, and a hosted request a new session", async () => {
+  it("gives the client secret, and a hosted request a new session", async () => {
     ready();
-    const r = await s.call("POST", "/v1/tournaments/t1/checkout", { payer: "team", teamId: "haze", ui: "embedded" }, "captain");
-    expect(r.json()).toEqual({ url: null, clientSecret: "cs_1_secret", account: "acct_1" });
+    const r = await s.call("POST", "/v1/tournaments/t1/checkout", { ...team, ui: "embedded" }, "captain");
+    expect(r.json()).toEqual({ url: null, clientSecret: "cs_1_secret", account: null });
     expect(s.gateway.checkouts[0].embedded).toBe(true);
-    // Again: the same one.
-    expect((await s.call("POST", "/v1/tournaments/t1/checkout", { payer: "team", teamId: "haze", ui: "embedded" }, "captain")).json().clientSecret).toBe("cs_1_secret");
-    // The hosted page instead: the embedded one is closed first.
-    expect((await s.call("POST", "/v1/tournaments/t1/checkout", { payer: "team", teamId: "haze" }, "captain")).json().url).toBe("https://checkout.test/cs_2");
+    expect((await s.call("POST", "/v1/tournaments/t1/checkout", { ...team, ui: "embedded" }, "captain")).json().clientSecret).toBe("cs_1_secret");
+    expect((await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain")).json().url).toBe("https://checkout.test/cs_2");
     expect(s.gateway.expired).toEqual(["cs_1"]);
   });
 });
 
 describe("the real Stripe gateway", () => {
   // Dummy values, never real keys: nothing here calls Stripe.
-  const env = { STRIPE_SECRET_KEY: "sk_test_dummy", STRIPE_WEBHOOK_SECRET: "whsec_dummy" };
+  const env = { STRIPE_SECRET_KEY: "sk_test_dummy", STRIPE_PLATFORM_WEBHOOK_SECRET: "whsec_one", STRIPE_WEBHOOK_SECRET: "whsec_two" };
 
-  it("is off without both secrets", () => {
+  it("is off without the key and a webhook secret", () => {
     expect(stripeFromEnv({})).toBeUndefined();
     expect(stripeFromEnv({ STRIPE_SECRET_KEY: "sk_test_dummy" })).toBeUndefined();
+    expect(stripeFromEnv({ STRIPE_SECRET_KEY: "sk_test_dummy", STRIPE_PLATFORM_WEBHOOK_SECRET: "whsec_one" })).toBeDefined();
   });
 
-  it("checks Stripe's signature on the raw body through the route, App Check or not", async () => {
+  it("checks Stripe's signature on the raw body through the route, for either endpoint's secret", async () => {
     const gateway = stripeFromEnv(env)!;
     const store = new FakeStore(() => now);
     const app = buildApp({
@@ -798,23 +1176,325 @@ describe("the real Stripe gateway", () => {
       store,
       now: () => now,
       enforceAppCheck: true,
-      payments: { gateway, fee: { percentBps: 100, fixedCents: 100 }, returnUrl: site },
+      payments: { gateway, fee: { percentBps: 300, fixedCents: 0 }, returnUrl: site },
     });
-    store.put("payoutAccounts/host", { account: "acct_9", status: "pending" });
-    store.put("stripeAccounts/acct_9", { teamId: "host" });
-    // Spacing Stripe's way: re-serializing would break the signature.
-    const payload = JSON.stringify(
-      { id: "evt_real", object: "event", type: "account.updated", account: "acct_9", data: { object: { id: "acct_9", object: "account", charges_enabled: true, details_submitted: true } } },
-      null,
-      2,
-    );
-    const header = new Stripe("sk_test_dummy").webhooks.generateTestHeaderString({ payload, secret: env.STRIPE_WEBHOOK_SECRET });
-    const post = (signature: string) =>
+    for (const id of ["cs_a", "cs_b"]) store.put(`charges/${id}`, { flow: "platform", status: "open", tournamentId: "t1", payerId: "haze" });
+    const event = (id: string, session: string) =>
+      // Spacing Stripe's way: re-serializing would break the signature.
+      JSON.stringify({ id, object: "event", type: "checkout.session.expired", data: { object: { id: session, object: "checkout.session" } } }, null, 2);
+    const signed = (payload: string, secret: string) => new Stripe("sk_test_dummy").webhooks.generateTestHeaderString({ payload, secret });
+    const post = (payload: string, signature: string) =>
       app.inject({ method: "POST", url: "/v1/payments/stripe/webhook", payload, headers: { "content-type": "application/json", "stripe-signature": signature } });
-    expect((await post(header.replace(/v1=[0-9a-f]+/, "v1=00"))).statusCode).toBe(400);
-    expect(store.doc("payoutAccounts/host")?.status).toBe("pending");
-    expect((await post(header)).statusCode).toBe(200);
-    expect(store.doc("payoutAccounts/host")?.status).toBe("ready");
-    expect(store.doc("stripeEvents/evt_real")).toMatchObject({ type: "account.updated" });
+    const a = event("evt_a", "cs_a");
+    expect((await post(a, signed(a, "whsec_other"))).statusCode).toBe(400);
+    expect((await post(a, signed(a, env.STRIPE_PLATFORM_WEBHOOK_SECRET).replace(/v1=[0-9a-f]+/, "v1=00"))).statusCode).toBe(400);
+    expect(store.doc("charges/cs_a")?.status).toBe("open");
+    expect((await post(a, signed(a, env.STRIPE_PLATFORM_WEBHOOK_SECRET))).statusCode).toBe(200);
+    expect(store.doc("charges/cs_a")?.status).toBe("expired");
+    const b = event("evt_b", "cs_b");
+    expect((await post(b, signed(b, env.STRIPE_WEBHOOK_SECRET))).statusCode).toBe(200);
+    expect(store.doc("charges/cs_b")?.status).toBe("expired");
+    expect(store.doc("stripeEvents/evt_a")).toMatchObject({ type: "checkout.session.expired" });
+  });
+});
+
+describe("the check against Stripe", () => {
+  const staffView = async (q = "") => (await s.call("GET", `/v1/staff/payments${q}`, undefined, "admin", "staff")).json();
+  const check = async () => (await s.call("POST", "/v1/payments/reconcile", undefined, "admin", "staff")).json();
+  /** Stripe agrees: Haze's payment went through for what was charged. */
+  const agree = (patch: Partial<GatewayPaymentSummary> = {}) =>
+    s.gateway.summaries.set("pi_1", { status: "succeeded", amountCents: s.store.doc("charges/cs_1")!.amountCents as number, refundedCents: 0, dispute: "none", ...patch });
+
+  it("is for staff only", async () => {
+    expect((await s.call("POST", "/v1/payments/reconcile", undefined, "owner")).status).toBe(403);
+    expect((await s.call("GET", "/v1/staff/payments", undefined, "owner")).status).toBe(403);
+  });
+
+  it("finds nothing wrong when Stripe agrees, and staff see the payment", async () => {
+    ready();
+    await paid();
+    finish();
+    await s.call("POST", "/v1/payments/release", undefined, "admin", "staff");
+    agree();
+    expect(await check()).toEqual({ checked: 1, issues: 0, resolved: 0 });
+    const view = await staffView();
+    expect(view.issues).toEqual([]);
+    expect(view.checkedAt).toBeTruthy();
+    expect(view.charges).toHaveLength(1);
+    expect(view.charges[0]).toMatchObject({ id: "cs_1", tournamentId: "t1", hostId: "host", payerId: "haze", status: "paid", baseCents: 40000, released: true, transferCents: 40000 });
+    // Ids and amounts only: nothing about the card or bank.
+    expect(JSON.stringify(view)).not.toMatch(/secret|card|bank/i);
+  });
+
+  it("flags a refund made on Stripe but not here, until it's fixed", async () => {
+    ready();
+    await paid();
+    agree({ refundedCents: 40000 });
+    expect(await check()).toMatchObject({ issues: 1 });
+    const [issue] = (await staffView()).issues;
+    expect(issue).toMatchObject({ id: "cs_1", tournamentId: "t1", hostId: "host", kinds: ["refund_not_recorded"] });
+    expect(issue.detail).toContain("$400.00");
+    agree();
+    expect(await check()).toMatchObject({ issues: 0, resolved: 1 });
+    expect((await staffView()).issues).toEqual([]);
+  });
+
+  it("flags a transfer Stripe has for a different amount or account", async () => {
+    ready();
+    await paid();
+    finish();
+    await s.call("POST", "/v1/payments/release", undefined, "admin", "staff");
+    agree();
+    s.gateway.transferOverrides.set("tr_1", { amountCents: 100 });
+    await check();
+    expect((await staffView()).issues[0].kinds).toEqual(["transfer_mismatch"]);
+  });
+
+  it("flags a fee that should have gone to the host by now, and a payment Stripe can't confirm", async () => {
+    ready();
+    await paid();
+    finish(); // set straight in the database: nothing sent it
+    agree();
+    await check();
+    expect((await staffView()).issues[0].kinds).toEqual(["payout_overdue"]);
+    s.gateway.summaries.clear();
+    await check();
+    expect((await staffView()).issues[0].kinds).toEqual(["stripe_unreachable", "payout_overdue"]);
+  });
+
+  it("flags an open dispute Stall 10 didn't hear about, and an amount that differs", async () => {
+    ready();
+    await paid();
+    agree({ dispute: "open", amountCents: 1 });
+    await check();
+    expect((await staffView("?tournament=t1")).issues[0].kinds).toEqual(["amount_mismatch", "dispute_not_recorded"]);
+    expect((await staffView("?tournament=hat")).issues).toEqual([]);
+  });
+});
+
+describe("Cloud Scheduler's payment jobs", () => {
+  /** Accepts "Bearer scheduler", as Google's check would for the scheduler's own token. */
+  const verifier: JobVerifier = {
+    async verify(req) {
+      if (req.headers.authorization !== "Bearer scheduler") throw Object.assign(new Error("no"), { statusCode: 403 });
+    },
+  };
+
+  it("are off without the scheduler's settings", async () => {
+    // No route: the sign-in check refuses a token that isn't a Firebase one.
+    expect([401, 404]).toContain((await s.raw("/v1/jobs/payments/release", "Bearer scheduler")).status);
+    expect(jobVerifierFromEnv({})).toBeUndefined();
+    expect(jobVerifierFromEnv({ JOBS_AUDIENCE: "https://api.test" })).toBeUndefined();
+    expect(jobVerifierFromEnv({ JOBS_AUDIENCE: "https://api.test", JOBS_INVOKER: "scheduler@p.iam.gserviceaccount.com" })).toBeDefined();
+  });
+
+  it("send what's due and check against Stripe, for the scheduler only", async () => {
+    const gateway = new FakeGateway();
+    const store = s.store;
+    s = setup(gateway, verifier);
+    for (const [path, data] of store.docs) s.store.put(path, data);
+    ready();
+    await paid();
+    finish();
+    // A user's ID token is not the scheduler's.
+    expect((await s.raw("/v1/jobs/payments/release", "Bearer token:admin")).status).not.toBe(200);
+    expect((await s.raw("/v1/jobs/payments/release")).status).not.toBe(200);
+    expect(s.gateway.transfers).toHaveLength(0);
+    s.gateway.summaries.set("pi_1", { status: "succeeded", amountCents: s.store.doc("charges/cs_1")!.amountCents as number, refundedCents: 0, dispute: "none" });
+    const r = await s.raw("/v1/jobs/payments/reconcile", "Bearer scheduler");
+    expect(r.status).toBe(200);
+    expect(r.json()).toEqual({ checked: 1, issues: 0, resolved: 0 });
+    expect(s.gateway.transfers).toHaveLength(1);
+    expect((await s.raw("/v1/jobs/payments/release", "Bearer scheduler")).json()).toEqual({ checked: 0, sent: 0 });
+  });
+
+  it("accept only Google's token for this API from the scheduler's account", async () => {
+    const ticket = (payload: object | undefined) => ({ getPayload: () => payload });
+    let payload: object | undefined;
+    const asked: unknown[] = [];
+    const client = {
+      verifyIdToken: async (o: { idToken: string; audience: string }) => {
+        asked.push(o);
+        if (o.idToken === "forged") throw new Error("bad signature");
+        return ticket(payload);
+      },
+    };
+    const v = googleJobVerifier("https://api.test", "Scheduler@p.iam.gserviceaccount.com", client as never);
+    const req = (authorization?: string) => ({ headers: authorization ? { authorization } : {} }) as never;
+    const good = { iss: "https://accounts.google.com", email: "scheduler@p.iam.gserviceaccount.com", email_verified: true };
+    payload = good;
+    await expect(v.verify(req("Bearer t"))).resolves.toBeUndefined();
+    expect(asked[0]).toEqual({ idToken: "t", audience: "https://api.test" });
+    await expect(v.verify(req())).rejects.toMatchObject({ code: "unauthenticated" });
+    await expect(v.verify(req("Bearer forged"))).rejects.toMatchObject({ code: "unauthenticated" });
+    for (const bad of [
+      { ...good, email: "someone@gmail.com" },
+      { ...good, email_verified: false },
+      { ...good, iss: "https://evil.test" },
+      undefined,
+    ]) {
+      payload = bad;
+      await expect(v.verify(req("Bearer t"))).rejects.toMatchObject({ code: expect.stringMatching(/permission_denied|unauthenticated/) });
+    }
+  });
+});
+
+describe("security: holding and protecting payouts", () => {
+  it("holds fees for a few days after the event is finished (PAYOUT_HOLD_DAYS)", async () => {
+    const gateway = new FakeGateway();
+    const docs = [...s.store.docs.entries()];
+    s = setup(gateway, undefined, 3);
+    for (const [path, data] of docs) s.store.put(path, data);
+    ready();
+    s.store.put("tournaments/t1", { ...s.store.doc("tournaments/t1"), startsOn: new Date(now - day) });
+    await paid();
+    s.store.put("tournaments/t1", { ...s.store.doc("tournaments/t1"), status: "live" });
+    await s.call("PUT", "/v1/tournaments/t1/status", { status: "finished" });
+    expect(s.store.doc("tournaments/t1")?.finishedAt).toBeTruthy();
+    expect(s.gateway.transfers).toHaveLength(0);
+    expect((await earnings()).heldCents).toBe(40000);
+    // Three days on, it goes.
+    s.store.put("tournaments/t1", { ...s.store.doc("tournaments/t1"), finishedAt: new Date(now - 3 * day) });
+    await earnings();
+    expect(s.gateway.transfers).toHaveLength(1);
+    expect(payoutHoldDaysFromEnv({})).toBe(3);
+    expect(payoutHoldDaysFromEnv({ PAYOUT_HOLD_DAYS: "0" })).toBe(0);
+    expect(payoutHoldDaysFromEnv({ PAYOUT_HOLD_DAYS: "-1" })).toBe(3);
+    expect(payoutHoldDaysFromEnv({ PAYOUT_HOLD_DAYS: "99" })).toBe(3);
+  });
+
+  it("reopening clears the finish, so finishing again starts a new hold; the daily check waits for it too", async () => {
+    const gateway = new FakeGateway();
+    const docs = [...s.store.docs.entries()];
+    s = setup(gateway, undefined, 3);
+    for (const [path, data] of docs) s.store.put(path, data);
+    ready();
+    s.store.put("tournaments/t1", { ...s.store.doc("tournaments/t1"), startsOn: new Date(now - 10 * day) });
+    await paid();
+    // Finished long ago, then reopened.
+    s.store.put("tournaments/t1", { ...s.store.doc("tournaments/t1"), status: "finished", finishedAt: new Date(now - 9 * day) });
+    await s.call("PUT", "/v1/tournaments/t1/status", { status: "live" });
+    expect(s.store.doc("tournaments/t1")?.finishedAt).toBeUndefined();
+    await s.call("PUT", "/v1/tournaments/t1/status", { status: "finished" });
+    expect(s.gateway.transfers).toHaveLength(0);
+    // Held, not overdue.
+    s.gateway.summaries.set("pi_1", { status: "succeeded", amountCents: s.store.doc("charges/cs_1")!.amountCents as number, refundedCents: 0, dispute: "none" });
+    expect((await s.call("POST", "/v1/payments/reconcile", undefined, "admin", "staff")).json()).toMatchObject({ issues: 0 });
+  });
+
+  it("moving the event earlier after people paid doesn't pay out sooner", async () => {
+    ready();
+    // Paid for an event a month away.
+    s.store.put("tournaments/t1", { ...s.store.doc("tournaments/t1"), startsOn: new Date(now + 30 * day) });
+    await paid();
+    expect(s.store.doc("charges/cs_1")?.eventEndsAt).toEqual(new Date(now + 30 * day));
+    // The host moves it to yesterday and finishes it.
+    s.store.put("tournaments/t1", { ...s.store.doc("tournaments/t1"), status: "finished", startsOn: new Date(now - day), finishedAt: new Date(now - day) });
+    await earnings();
+    await s.call("POST", "/v1/payments/release", undefined, "admin", "staff");
+    expect(s.gateway.transfers).toHaveLength(0);
+    expect((await earnings()).heldCents).toBe(40000);
+  });
+
+  it("an event finished without the server noticing starts its hold when it's first seen", async () => {
+    ready();
+    await paid();
+    s.store.put("tournaments/t1", { ...s.store.doc("tournaments/t1"), status: "finished", startsOn: new Date(now - day) });
+    await earnings();
+    expect(s.gateway.transfers).toHaveLength(0);
+    expect(s.store.doc("tournaments/t1")?.finishedAt).toBeTruthy();
+  });
+
+  it("setting up or changing payouts needs a recent sign-in", async () => {
+    const stale = await s.call("POST", "/v1/teams/host/payouts/session");
+    expect(stale.status).toBe(412);
+    expect(stale.message()).toContain("sign in again");
+    expect(s.gateway.accountSessions).toHaveLength(0);
+    expect((await s.call("POST", "/v1/teams/host/payouts/link")).status).toBe(412);
+    expect((await s.call("POST", "/v1/teams/host/payouts/session", undefined, "owner", "fresh")).status).toBe(200);
+  });
+
+  it("a reversal that fails for another reason is retried, never counted as owed", async () => {
+    ready();
+    await paid();
+    finish();
+    await earnings();
+    s.gateway.breakReversal = true;
+    expect((await s.call("POST", "/v1/tournaments/t1/payments/haze/refund", undefined, "coach")).status).toBe(500);
+    expect(s.store.doc("payoutAccounts/host")?.owedCents ?? 0).toBe(0);
+    expect(s.gateway.refunds).toHaveLength(0);
+    s.gateway.breakReversal = false;
+    expect((await s.call("POST", "/v1/tournaments/t1/payments/haze/refund", undefined, "coach")).status).toBe(204);
+    expect(s.gateway.reversals).toHaveLength(1);
+    expect(s.store.doc("charges/cs_1")).toMatchObject({ status: "refunded", reversed: true, owedCents: 0 });
+  });
+
+  it("a debt a fee paid off comes back if that fee is refunded", async () => {
+    ready();
+    s.store.put("payoutAccounts/host", { ...s.store.doc("payoutAccounts/host"), owedCents: 3000 });
+    await paid();
+    finish();
+    await earnings();
+    expect(s.gateway.transfers[0].amountCents).toBe(37000);
+    expect(s.store.doc("charges/cs_1")).toMatchObject({ transferCents: 37000, owedTakenCents: 3000 });
+    expect(s.store.doc("payoutAccounts/host")?.owedCents).toBe(0);
+    expect((await s.call("POST", "/v1/tournaments/t1/payments/haze/refund", undefined, "coach")).status).toBe(204);
+    expect(s.gateway.reversals[0].amountCents).toBe(37000);
+    expect(s.store.doc("payoutAccounts/host")?.owedCents).toBe(3000);
+  });
+
+  it("winning a dispute that was left owed cancels the debt instead of paying twice", async () => {
+    ready();
+    await paid();
+    finish();
+    await earnings();
+    s.gateway.failReversal = true;
+    await s.hook("charge.dispute.created", { id: "dp_1", payment_intent: "pi_1" });
+    expect(s.store.doc("payoutAccounts/host")?.owedCents).toBe(40000);
+    await s.hook("charge.dispute.closed", { id: "dp_1", payment_intent: "pi_1", status: "won" });
+    expect(s.gateway.transfers).toHaveLength(1);
+    expect(s.store.doc("payoutAccounts/host")?.owedCents).toBe(0);
+    expect(s.store.doc("charges/cs_1")).toMatchObject({ status: "paid", released: true, reversed: false, transfer: "tr_1" });
+  });
+
+  it("winning it after part of the debt was taken off a later payout sends that part back", async () => {
+    ready();
+    await paid();
+    finish();
+    await earnings();
+    s.gateway.failReversal = true;
+    await s.hook("charge.dispute.created", { id: "dp_1", payment_intent: "pi_1" });
+    // A later payout took $100 of it.
+    s.store.put("payoutAccounts/host", { ...s.store.doc("payoutAccounts/host"), owedCents: 30000 });
+    await s.hook("charge.dispute.closed", { id: "dp_1", payment_intent: "pi_1", status: "won" });
+    expect(s.store.doc("payoutAccounts/host")?.owedCents).toBe(0);
+    expect(s.gateway.transfers[1]).toMatchObject({ amountCents: 10000, destination: "acct_1", idempotencyKey: "credit:cs_1" });
+    expect(s.gateway.transfers[1].sourceTransaction).toBeUndefined();
+  });
+
+  it("a credit Stripe didn't take is flagged for staff", async () => {
+    ready();
+    await paid();
+    s.store.put("charges/cs_1", { ...s.store.doc("charges/cs_1"), creditCents: 10000 });
+    s.gateway.summaries.set("pi_1", { status: "succeeded", amountCents: s.store.doc("charges/cs_1")!.amountCents as number, refundedCents: 0, dispute: "none" });
+    await s.call("POST", "/v1/payments/reconcile", undefined, "admin", "staff");
+    const view = (await s.call("GET", "/v1/staff/payments", undefined, "admin", "staff")).json();
+    expect(view.issues[0].kinds).toContain("credit_unsent");
+  });
+
+  it("organizers can't claim a fee was paid online", async () => {
+    const r = await s.call("PUT", "/v1/tournaments/t1/payments/haze", { paid: true, note: paidOnlineNote }, "coach");
+    expect(r.status).toBe(400);
+    expect(s.store.doc("tournaments/t1/payments/haze")).toBeUndefined();
+  });
+
+  it("an earlier payment can still be refunded when a newer attempt is the latest", async () => {
+    ready();
+    await paid();
+    // A newer attempt (e.g. after the fee was unmarked elsewhere) is the latest.
+    s.store.put("payerCharges/t1~haze", { ...s.store.doc("payerCharges/t1~haze"), session: "cs_9" });
+    s.store.put("charges/cs_9", { ...s.store.doc("charges/cs_1"), status: "expired" });
+    expect((await s.call("POST", "/v1/tournaments/t1/payments/haze/refund", undefined, "coach")).status).toBe(204);
+    expect(s.store.doc("charges/cs_1")?.status).toBe("refunded");
   });
 });

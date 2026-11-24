@@ -869,7 +869,9 @@ function TeamsTab({ s }: { s: TournamentState }) {
                   )}
                 </span>
               </span>
-              {s.manager && s.user && owes(id) && <HostPaymentControls user={s.user} tournamentId={s.id} payerId={id} payment={paymentById.get(id)} overdue={overdue(id)} />}
+              {s.manager && s.user && owes(id) && (
+                <HostPaymentControls user={s.user} tournamentId={s.id} payerId={id} payment={paymentById.get(id)} overdue={overdue(id)} payerName={s.teamName(id)} amountCents={fee?.amountCents} />
+              )}
               {s.manager && s.user && s.t?.status !== "draft" && inChats(s.entries.find((e) => e.id === id)) && <TeamChatButton user={s.user} tournamentId={s.id} teamId={id} teamName={s.teamName(id)} />}
               {seedable && (
                 <span className="home-actions">

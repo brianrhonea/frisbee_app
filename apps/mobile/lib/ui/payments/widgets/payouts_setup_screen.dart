@@ -19,26 +19,35 @@ import '../../../utils/result.dart';
 /// ([PaymentRepository.payoutSession]) and goes to the page through the
 /// channel, never in the URL, so the page needs no website sign-in.
 /// Pops with true once the person finishes or closes Stripe's form.
+/// [manage]: the linked account's bank details and payouts instead of
+/// setup (`/embed/payouts?view=manage`).
 class PayoutsSetupScreen extends StatefulWidget {
   const PayoutsSetupScreen({
     super.key,
     required this.payments,
     required this.teamId,
+    this.manage = false,
   });
 
   final PaymentRepository payments;
   final String teamId;
+  final bool manage;
 
   /// Opens it full screen; true when Stripe's form was finished or closed.
   static Future<bool> open(
     BuildContext context, {
     required PaymentRepository payments,
     required String teamId,
+    bool manage = false,
   }) async =>
       await Navigator.of(context, rootNavigator: true).push<bool>(
         MaterialPageRoute(
           fullscreenDialog: true,
-          builder: (_) => PayoutsSetupScreen(payments: payments, teamId: teamId),
+          builder: (_) => PayoutsSetupScreen(
+            payments: payments,
+            teamId: teamId,
+            manage: manage,
+          ),
         ),
       ) ??
       false;
@@ -57,14 +66,45 @@ class _PayoutsSetupScreenState extends State<PayoutsSetupScreen> {
     super.initState();
     _web = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      // Only the website's payouts page loads at the top: the session's
+      // secret is handed to nothing else. Stripe's forms run in frames
+      // inside it.
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onNavigationRequest: (r) =>
+              !r.isMainFrame || _isPayoutsPage(Uri.tryParse(r.url))
+              ? NavigationDecision.navigate
+              : NavigationDecision.prevent,
+        ),
+      )
       ..addJavaScriptChannel('Stall10Payouts', onMessageReceived: _onMessage)
-      ..loadRequest(Uri.https(InviteLinks.host, '/embed/payouts'));
+      ..loadRequest(
+        Uri.https(
+          InviteLinks.host,
+          '/embed/payouts',
+          widget.manage ? const {'view': 'manage'} : null,
+        ),
+      );
   }
+
+  /// The website's `/embed/payouts`, over HTTPS.
+  static bool _isPayoutsPage(Uri? u) =>
+      u != null &&
+      u.scheme == 'https' &&
+      u.host == InviteLinks.host &&
+      u.path == '/embed/payouts';
 
   Future<void> _onMessage(JavaScriptMessage m) async {
     switch (m.message) {
       case 'ready':
         if (_started) return;
+        // Asked by the page we loaded, not one it was replaced with.
+        if (!_isPayoutsPage(Uri.tryParse(await _web.currentUrl() ?? ''))) {
+          if (mounted) {
+            setState(() => _error = "Stripe's setup didn't open. Try again.");
+          }
+          return;
+        }
         _started = true;
         final r = await widget.payments.payoutSession(widget.teamId);
         if (!mounted) return;
@@ -101,7 +141,9 @@ class _PayoutsSetupScreenState extends State<PayoutsSetupScreen> {
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.of(context).pop(true),
         ),
-        title: const Text('Set up payments'),
+        title: Text(
+          widget.manage ? 'Bank account and payouts' : 'Set up payments',
+        ),
       ),
       body: _error != null
           ? Center(

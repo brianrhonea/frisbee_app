@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { MembersOnly } from "@/components/MembersOnly";
 import { StaffQueue } from "@/components/StaffQueue";
+import { StaffPayments } from "@/components/payments/StaffPayments";
 
-export const metadata: Metadata = { title: "Reports", robots: { index: false } };
+export const metadata: Metadata = { title: "Staff", robots: { index: false } };
 
-/** Stall 10 staff's review queue (the `staff` claim; firebase/scripts/set-staff.mjs). */
+/** Stall 10 staff's review queue and payments (the `staff` claim; firebase/scripts/set-staff.mjs). */
 export default function StaffPage() {
   return (
     <div className="page">
@@ -13,6 +14,8 @@ export default function StaffPage() {
       </header>
       <MembersOnly next="/staff">
         <StaffQueue />
+        <h2 className="section-title">Payments</h2>
+        <StaffPayments />
       </MembersOnly>
     </div>
   );

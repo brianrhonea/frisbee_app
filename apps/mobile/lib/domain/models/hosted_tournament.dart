@@ -452,7 +452,9 @@ class HostedTournament {
   /// packages/shared).
   DateTime get effectiveDeadline {
     if (entryDeadline != null) return entryDeadline!;
-    final fee = takesPlayers ? ((teamEntry ? teamFee : null) ?? bidFee) : bidFee;
+    final fee = takesPlayers
+        ? ((teamEntry ? teamFee : null) ?? bidFee)
+        : bidFee;
     return fee?.dueAt ?? startsOn.subtract(const Duration(days: 1));
   }
 
@@ -465,6 +467,7 @@ class HostedTournament {
     }
     return null;
   }
+
   bool get isLeague => kind == HostedKind.league;
 
   /// Individuals sign up and teams are generated (a hat tournament, or a
@@ -1232,9 +1235,7 @@ class TournamentEntry {
   /// An invite nobody answered by its reply-by time (inviteExpired in
   /// packages/shared): it can't be accepted; the host can invite again.
   bool isExpired(DateTime now) =>
-      status == EntryStatus.invited &&
-      replyBy != null &&
-      now.isAfter(replyBy!);
+      status == EntryStatus.invited && replyBy != null && now.isAfter(replyBy!);
 
   TournamentEntry copyWith({
     String? divisionId,
@@ -1295,6 +1296,9 @@ class TournamentEntry {
 /// Whether a team has paid its bid fee, at
 /// `tournaments/{id}/payments/{teamId}`. Only the host's managers and the
 /// team's admins can see it.
+/// The note the server sets when a fee is paid online (packages/shared).
+const paidOnlineNote = 'Paid online through Stall 10';
+
 class EntryPayment {
   const EntryPayment({
     required this.teamId,
@@ -1319,6 +1323,10 @@ class EntryPayment {
 
   /// Unpaid, but the payer said they'll pay another way.
   bool get payingAnotherWay => !paid && offlineAt != null;
+
+  /// Paid online through Stall 10 (the server's note, paidOnlineNote):
+  /// refunded through Stall 10, not switched off by hand.
+  bool get paidOnline => paid && note == paidOnlineNote;
 
   factory EntryPayment.fromMap(String teamId, Map<String, dynamic> map) =>
       EntryPayment(
@@ -1581,7 +1589,11 @@ class TeamEntryToFinish {
         hostName: map['hostName'] as String? ?? '',
         startsOn: parseDate(map['startsOn']) ?? DateTime(2000),
         divisionLabel: map['divisionLabel'] as String? ?? '',
-        status: enumByName(EntryStatus.values, map['status'], EntryStatus.applied),
+        status: enumByName(
+          EntryStatus.values,
+          map['status'],
+          EntryStatus.applied,
+        ),
         rosterSet: map['rosterSet'] == true,
         paid: map['paid'] == true,
         deadline: parseDate(map['deadline']),

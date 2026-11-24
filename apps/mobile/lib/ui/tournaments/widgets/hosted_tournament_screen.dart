@@ -1450,8 +1450,19 @@ class _TeamsTabState extends State<_TeamsTab> {
                 ),
               ),
               if (vm.isManager) ...[
-                if (fee != null) _noteButton(context, id),
-                if (fee != null) _paidSwitch(id),
+                if (fee != null && !(vm.paymentOf(id)?.paidOnline ?? false))
+                  _noteButton(context, id),
+                if (fee != null && (vm.paymentOf(id)?.paidOnline ?? false))
+                  RefundButton(
+                    key: ValueKey('refund-$id'),
+                    name: vm.teamName(id),
+                    amountCents: fee.amountCents,
+                    running: vm.refund.running,
+                    onRefund: () => vm.refund.execute(id),
+                    result: () => vm.refund.result,
+                  )
+                else if (fee != null)
+                  _paidSwitch(id),
                 PopupMenuButton<EntryStatus>(
                   onSelected: (s) async {
                     final e = vm.entryOf(id);

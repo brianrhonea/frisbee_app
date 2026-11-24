@@ -170,7 +170,7 @@ export class DraftService {
       const { manages } = await this.manages((x) => tx.get(x), tournament, caller.uid);
       const old = await tx.get(p.payment(tournamentId, userId));
       const doc = { paid, paidAt: paid ? serverTime : null, note: typeof old?.note === "string" ? old.note : "", ...(old?.offlineAt instanceof Date && { offlineAt: old.offlineAt }) };
-      const problem = paymentProblem(manages, doc);
+      const problem = paymentProblem(manages, doc, old);
       if (problem) throw problem;
       tx.set(p.payment(tournamentId, userId), doc);
       logPayment(this.store, tx, { tournamentId, payerId: userId, action: paid ? "marked_paid" : "marked_unpaid", by: caller.uid, note: doc.note });

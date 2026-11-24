@@ -38,6 +38,7 @@ class PlayerSignupsViewModel extends ChangeNotifier {
     withdraw = Command0<void>(_withdraw);
     decide = Command1<void, SignupDecision>(_decide);
     setPaid = Command1<void, ({String uid, bool paid})>(_setPaid);
+    refund = Command1<void, String>(_refund);
     setPaymentNote = Command1<void, ({String uid, String note})>(
       _setPaymentNote,
     );
@@ -80,10 +81,19 @@ class PlayerSignupsViewModel extends ChangeNotifier {
   late final Command1<void, SignupDecision> decide;
   late final Command1<void, ({String uid, bool paid})> setPaid;
 
+  /// Refunds a player's entry fee paid online (organizers).
+  late final Command1<void, String> refund;
+
   /// The host's note on a player's payment ("Cash at check-in").
   late final Command1<void, ({String uid, String note})> setPaymentNote;
 
-  List<Command<void>> get commands => [signUp, withdraw, decide, setPaid];
+  List<Command<void>> get commands => [
+    signUp,
+    withdraw,
+    decide,
+    setPaid,
+    refund,
+  ];
 
   String get uid => _uid;
   bool get isManager => _manager;
@@ -226,6 +236,17 @@ class PlayerSignupsViewModel extends ChangeNotifier {
       return Result.error(Exception('Only the host can do that.'));
     }
     return _repo.setSignupStatus(tournamentId, d.uid, d.status);
+  }
+
+  Future<Result<void>> _refund(String uid) async {
+    final api = _paymentsApi;
+    if (!_manager) {
+      return Result.error(Exception('Only the host can do that.'));
+    }
+    if (api == null || !api.available) {
+      return Result.error(Exception("Online payments aren't set up here yet."));
+    }
+    return api.refund(tournamentId, uid);
   }
 
   Future<Result<void>> _setPaid(({String uid, bool paid}) p) async {

@@ -30,7 +30,8 @@ import { LocalCipher, type PersonalCipher } from "./personal/cipher.js";
 import { KmsCipher } from "./personal/kms.js";
 import { webRevalidator } from "./web/revalidate.js";
 import { livekitFromEnv } from "./meetings/livekit.js";
-import { platformFeeFromEnv } from "./payments/service.js";
+import { jobVerifierFromEnv } from "./payments/jobs.js";
+import { payoutHoldDaysFromEnv, platformFeeFromEnv } from "./payments/service.js";
 import { stripeFromEnv } from "./payments/stripe.js";
 
 const projectId = process.env.FIREBASE_PROJECT_ID ?? "frisbee-app-brianrhonea-dev";
@@ -54,6 +55,8 @@ const imageUrl = storageUrl(process.env.STORAGE_BUCKET || `${projectId}.firebase
 const app = buildApp({
   logger: cloudLoggingOptions(),
   enforceAppCheck: process.env.ENFORCE_APP_CHECK === "true",
+  // Cloud Scheduler's payment jobs (JOBS_AUDIENCE, JOBS_INVOKER).
+  jobs: jobVerifierFromEnv(),
   corsOrigins: parseCorsOrigins(process.env.CORS_ORIGINS),
   trustProxy: trustProxyHops > 0 ? trustHops(trustProxyHops) : false,
   traceProjectId: projectId,
@@ -67,7 +70,7 @@ const app = buildApp({
   verifier: {
     async verifyIdToken(token) {
       const t = await auth.verifyIdToken(token);
-      return { uid: t.uid, name: t.name as string | undefined, email: t.email, ...(t.staff === true && { staff: true }) };
+      return { uid: t.uid, name: t.name as string | undefined, email: t.email, authTime: t.auth_time, ...(t.staff === true && { staff: true }) };
     },
     async verifyAppCheck(token) {
       await appCheck.verifyToken(token);
@@ -145,7 +148,7 @@ function paymentsConfig() {
   const gateway = stripeFromEnv();
   const returnUrl = (process.env.PAYMENTS_RETURN_URL || process.env.WEB_SITE_URL || "").trim().replace(/\/+$/, "");
   if (!gateway || !returnUrl) return undefined;
-  return { gateway, fee: platformFeeFromEnv(), returnUrl };
+  return { gateway, fee: platformFeeFromEnv(), returnUrl, holdDays: payoutHoldDaysFromEnv() };
 }
 
 /**

@@ -9,6 +9,8 @@ export interface Caller {
   email?: string;
   /** Stall 10 staff (the ID token's `staff` claim): reviews every report. */
   staff?: boolean;
+  /** When the person last signed in (the ID token's auth_time, seconds). */
+  authTime?: number;
 }
 
 /** Checks tokens; the Firebase Admin SDK in production, a fake in tests. */

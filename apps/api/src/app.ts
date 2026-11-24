@@ -7,6 +7,7 @@ import { ChatAdmin, chatAdminRoutes } from "./hub/rooms.js";
 import { DiscordService, discordRoutes } from "./discord/service.js";
 import { PlaybookService, playbookRoutes } from "./playbook/service.js";
 import { MeetingService, meetingRoutes } from "./meetings/service.js";
+import { type JobVerifier, paymentJobRoutes } from "./payments/jobs.js";
 import { PaymentService, type PaymentsConfig, paymentRoutes } from "./payments/service.js";
 import { tournamentChatRoutes } from "./tournament_chats/routes.js";
 import { TournamentChatService } from "./tournament_chats/service.js";
@@ -126,6 +127,8 @@ export interface AppDeps {
   /** true for Fastify's default logger, or pino options (cloudLoggingOptions). */
   logger?: boolean | LoggerOptions;
   now?: () => number;
+  /** Checks Cloud Scheduler's calls to the payment jobs (payments/jobs.ts); without it they're off. */
+  jobs?: JobVerifier;
   /** Per-caller write limits (registerWriteLimits); off only in tests that make many writes as one caller. */
   writeLimits?: boolean;
   /** Origins browsers may call from (CORS_ORIGINS); none when omitted. */
@@ -238,8 +241,11 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     draftRoutes(app, new DraftService(deps.store, deps.draftQueries ?? listDraftQueries(deps.store)), writes);
     statsRoutes(app, new StatsService(deps.store, queries), writes);
     groupTournamentRoutes(app, new GroupTournamentService(deps.store, deps.teams, queries), writes);
-    tournamentRoutes(app, new TournamentService(deps.store, queries, deps.now), writes);
-    paymentRoutes(app, new PaymentService(deps.store, deps.payments, deps.now), deps.writeLimits !== false ? writes : undefined);
+    // Payments first: finishing an event sends its hosts' fees, and deleting one waits for refunds.
+    const payments = new PaymentService(deps.store, deps.payments, deps.now, queries);
+    tournamentRoutes(app, new TournamentService(deps.store, queries, deps.now, payments), writes);
+    paymentRoutes(app, payments, deps.writeLimits !== false ? writes : undefined);
+    paymentJobRoutes(app, payments, deps.jobs);
     tournamentChatRoutes(app, new TournamentChatService(deps.store), deps.writeLimits !== false ? writes : undefined);
     const conversations = new ConversationService(deps.store, deps.users, deps.media, deps.now);
     conversationRoutes(app, conversations, writes);

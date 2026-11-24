@@ -10,6 +10,18 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.51
+
+- **Stall 10 now takes fee payments and pays hosts.** Teams and players
+  pay Stall 10, and the host gets the whole fee once the event is over.
+  Hosts add their bank details in Stall 10 and don't need a Stripe
+  account; if you set up payments before, set them up again.
+- **Refunds in the app.** Organizers can refund a fee paid online from
+  the event's Teams tab or the hat signups. The fee comes back; the
+  service and processing fees don't.
+- **See what you've been paid.** The payments card shows what's held,
+  sent and refunded, with your bank account and payouts.
+
 ## 0.0.50
 
 **Tournaments**

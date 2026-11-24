@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.51  | 2026-11-23 | `feature/platform-payments`             |                     |
 | 0.0.50  | 2026-11-23 | `feature/tournament-flow`               |                     |
 | 0.0.49  | 2026-11-22 | `feature/tournament-invites-pay`        |                     |
 | 0.0.48  | 2026-11-22 | `feature/security-hardening`           |                     |
@@ -63,6 +64,31 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.51 — Stall 10 collects fees and pays hosts out
+
+With web 0.59.0 and API 0.47.0. Firestore rules changed (payments,
+events' `finishedAt` and deletes); no functions changes.
+
+- Payment sheet: PaymentIntents are on Stall 10's account, so
+  `PaymentSheetRequest.account` is null and `Stripe.stripeAccountId` is
+  cleared; the merchant shown is Stall 10.
+- `PaymentRepository.refund` and `.earnings` (`Earnings`, `EarningsItem`,
+  `EarningsStatus`); `EntryPayment.paidOnline` (note `paidOnlineNote`).
+- `RefundButton` (asks first, `refundPolicyNote`) replaces the paid switch
+  for fees paid online, on the event's Teams tab
+  (`HostedTournamentViewModel.refund`) and hat signups
+  (`PlayerSignupsViewModel.refund`).
+- Payouts card: new wording, held/sent/refunded/owed totals, and **Bank
+  account and payouts** (`PayoutsSetupScreen(manage: true)`, the
+  website's `/embed/payouts?view=manage`).
+- Payouts card: **Each fee** (`Earnings.items`). Payouts are sent a few
+  days after the event (`payoutTimingNote`).
+- `PayoutsSetupScreen` only loads the website's `/embed/payouts` at the
+  top (a `NavigationDelegate`), and hands Stripe's session over only to
+  that page.
+- Firestore rules: clients can't set `finishedAt` on an event, and only
+  drafts are deleted directly (others through the API).
 
 ## 0.0.50 — Tournament flow: respond, deadline, seeds, director
 
