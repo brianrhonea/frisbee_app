@@ -316,6 +316,20 @@ describe("closing a division with many games", () => {
 });
 
 describe("status and delete", () => {
+  it("registration opens only within 60 days of the start (the location can come later)", async () => {
+    const far = iso(2027, 1, 1);
+    const { id } = await host({ startsOn: far, location: "", format: { settings: { ...settings, startsAt: far }, level: "club", maxTeams: 8, minRoster: null } });
+    const r = await call("PUT", `/v1/tournaments/${id}/status`, { status: "registration" });
+    expect(r.status).toBe(412);
+    expect(r.json().error.message).toContain("Registration opens 60 days before the event, on Dec 3, 2026");
+    expect(store.doc(`tournaments/${id}`)?.status).toBe("draft");
+    // Open (no location yet), it can't be moved out of the window.
+    const near = await open({ location: "" });
+    const moved = await call("PATCH", `/v1/tournaments/${near.id}`, details({ startsOn: far }));
+    expect(moved.status).toBe(412);
+    expect(moved.json().error.message).toContain("Move it back to a draft first");
+  });
+
   it("managers set any listed status", async () => {
     const { id } = await host();
     expect((await call("PUT", `/v1/tournaments/${id}/status`, { status: "registration" }, "fan")).status).toBe(404);

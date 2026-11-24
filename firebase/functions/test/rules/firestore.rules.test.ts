@@ -4368,7 +4368,8 @@ describe("hosted tournaments", () => {
   );
 
   it("only the host's managers create and edit it", async () => {
-    const fresh = { ...tournament({ status: "draft" }), createdAt: serverTimestamp() };
+    // Within registration's 60 days, so it can open.
+    const fresh = { ...tournament({ status: "draft", startsOn: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) }), createdAt: serverTimestamp() };
     await assertFails(setDoc(tRef(HOST_MEMBER), { ...fresh, createdBy: HOST_MEMBER }));
     await assertFails(setDoc(tRef(OUTSIDER), { ...fresh, createdBy: OUTSIDER }));
     await assertSucceeds(setDoc(tRef(DIRECTOR), fresh));

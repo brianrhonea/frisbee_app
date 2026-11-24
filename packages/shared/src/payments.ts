@@ -376,7 +376,28 @@ export interface StaffChargeView {
   paidAt: string | null;
   releasedAt: string | null;
   refundedAt: string | null;
+  /** Waiting for staff to approve its payout: the host's first, or a large one. */
+  review: PayoutReview | null;
 }
+
+/**
+ * Payouts staff approve before they go out (fraud: a host paying their own
+ * event with stolen cards): each host's first, and any over
+ * [payoutReviewOverCents].
+ */
+export const payoutReviews = ["first_payout", "large"] as const;
+export type PayoutReview = (typeof payoutReviews)[number];
+export const payoutReviewLabels: Record<PayoutReview, string> = {
+  first_payout: "Host's first payout",
+  large: "Large payout",
+};
+export const payoutReviewOverCents = 200_000;
+
+/** On the host's payouts card (both platforms). */
+export const payoutReviewNote = "Stall 10 checks your first payout, and any over $2,000, before it's sent.";
+
+/** Why an event's organizers don't pay online for it. */
+export const selfPaymentMessage = "You run this event, so mark your own fee paid instead of paying it online.";
 
 /** GET /v1/staff/payments (staff): open problems first, then the latest payments. */
 export interface StaffPaymentsView {
@@ -414,6 +435,7 @@ export const paymentPaths = {
   release: "/v1/payments/release",
   reconcile: "/v1/payments/reconcile",
   staff: "/v1/staff/payments",
+  approve: (session: string) => `/v1/staff/payments/${encodeURIComponent(session)}/approve`,
   /** Cloud Scheduler only (a Google-signed token from the scheduler's service account). */
   jobRelease: "/v1/jobs/payments/release",
   jobReconcile: "/v1/jobs/payments/reconcile",

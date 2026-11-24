@@ -73,6 +73,16 @@ describe("deleting a team", () => {
     expect(store.doc("tournaments/open")).toMatchObject({ status: "finished" });
   });
 
+  it("waits while Stall 10 holds fees for its events or it owes money back", async () => {
+    store.put("charges/cs_1", { hostId: "t1", flow: "platform", status: "paid" });
+    expect(await del("t1", { name: "Haze" })).toBe(412);
+    store.put("charges/cs_1", { hostId: "t1", flow: "platform", status: "paid", released: true });
+    store.put("payoutAccounts/t1", { account: "acct_1", owedCents: 500 });
+    expect(await del("t1", { name: "Haze" })).toBe(412);
+    store.put("payoutAccounts/t1", { account: "acct_1", owedCents: 0 });
+    expect(await del("t1", { name: "Haze" })).toBe(204);
+  });
+
   it("deletes everything under it and its files, and leaves its community's list", async () => {
     expect(await del("t1", { name: " haze " })).toBe(204);
     expect(teams.deleted).toEqual(["t1"]);

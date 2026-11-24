@@ -199,6 +199,13 @@ and events; everything else in the hub is for members. A private group
   embedded Checkout (Stripe's pages without a publishable key): entry
   fees are for real-world events, which store rules allow outside
   in-app purchase.
+- Registration (entries, signups and paying fees) opens at most 60 days
+  before an event starts; an event can be a draft before then, and its
+  location can be added later. Once open, fees can be paid at any time
+  to secure a spot. (2026-11-24.)
+- Staff approve each host's first payout and any over $2,000 before it's
+  sent; organizers can't pay online for their own event. Design and
+  threats: `docs/payments-security.md`.
 - A fee already paid out to the host's bank is refunded by staff only
   (Stall 10 never pays a host's refund from its own money). Setting up
   or changing payouts needs a recent sign-in.
@@ -1455,6 +1462,14 @@ Out of scope: payments, meeting recording, USA Ultimate data.
     `/embed/payouts?view=manage`). Tests: API `payments.test.ts`; app
     `payments_test.dart`, `hosted_tournaments_test.dart` (the website
     has no unit tests).
+82. Registration window and payout review (2026-11-24): Publish waits
+    until 60 days before the start, saying when (Save draft still
+    works); the payouts card says first and large payouts are checked:
+    [x] app (`publishProblem`, `payoutReviewNote`); [x] website
+    (`TournamentForm` `tooEarly`, `payoutReviewNote`). Staff approval is
+    on the website's `/staff` only (staff tools). Tests: shared
+    `registration_window.test.ts`, API `tournaments.test.ts`,
+    `payments.test.ts`; app `hosted_tournaments_test.dart`.
 
 Libraries the website may add (none today): a small data cache for API
 reads and mutations, the Firestore web SDK for listeners, and LiveKit's

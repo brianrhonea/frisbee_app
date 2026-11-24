@@ -34,8 +34,9 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
        _repo = tournamentRepository,
        _teams = teamRepository,
        _auth = authRepository,
-       _profiles = profileRepository {
-    final today = (now ?? DateTime.now)();
+       _profiles = profileRepository,
+       _now = now ?? DateTime.now {
+    final today = _now();
     // A month out on a Saturday, like most club events.
     var start = DateTime(today.year, today.month, today.day + 30);
     while (start.weekday != DateTime.saturday) {
@@ -159,6 +160,11 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
   int get step => _step;
   bool get onReview => _step == steps.length - 1;
 
+  /// Why a draft can't be published yet: registration opens 60 days
+  /// before the start ([registrationWindowProblem]). Save draft still works.
+  String? get publishProblem =>
+      isDraft ? registrationWindowProblem(_startsOn, _now()) : null;
+
   void goTo(int step) {
     final s = step.clamp(0, steps.length - 1);
     if (s == _step) return;
@@ -194,6 +200,7 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
   String description = '';
   String location = '';
   late DateTime _startsOn;
+  final DateTime Function() _now;
   DateTime? _endsOn;
   TournamentVisibility visibility = TournamentVisibility.public;
 
@@ -241,6 +248,7 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
 
   /// The signed-in member, for "It's me" on the Director step.
   String? get myUid => _auth.currentUser?.uid;
+
   /// Their name on the host, else their account's (the website's
   /// DirectorStep); empty when neither is known.
   String get myName {

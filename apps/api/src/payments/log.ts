@@ -29,6 +29,8 @@ export const paymentLogActions = [
   "refund_started",
   // An organizer's refund of a fee already paid out to the host's bank: refused, staff sort it out.
   "refund_blocked",
+  // Staff approved a host's first (or a large) payout.
+  "payout_approved",
   "refunded",
   "refunded_on_stripe",
   "dispute_won",

@@ -125,6 +125,36 @@ void main() {
     return id;
   }
 
+  test(
+    'registration opens only within 60 days of the start; a draft can wait',
+    () async {
+      final form = HostedTournamentFormViewModel(
+        hostId: 'host',
+        tournamentRepository: repo,
+        teamRepository: teams,
+        authRepository: as('director'),
+        now: () => DateTime.utc(2027, 3, 1),
+      );
+      await pumpEventQueue();
+      // The usual start, a month out: it can open.
+      expect(form.publishProblem, isNull);
+      form.setDates(DateTime.utc(2027, 6, 5), DateTime.utc(2027, 6, 6));
+      expect(
+        form.publishProblem,
+        'Registration opens 60 days before the event, on Apr 6, 2027. '
+        'Keep it as a draft until then.',
+      );
+      expect(
+        registrationWindowProblem(
+          DateTime.utc(2027, 4, 30),
+          DateTime.utc(2027, 3, 1),
+        ),
+        isNull,
+      );
+      form.dispose();
+    },
+  );
+
   test('only managers can host', () async {
     final form = HostedTournamentFormViewModel(
       hostId: 'host',

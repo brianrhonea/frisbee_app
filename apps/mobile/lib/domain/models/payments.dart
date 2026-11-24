@@ -4,6 +4,10 @@
 
 /// Told to organizers and payers: when hosts get paid, and what a refund
 /// returns (payoutTimingNote, refundPolicyNote in packages/shared).
+/// On the host's payouts card (payoutReviewNote in packages/shared).
+const payoutReviewNote =
+    "Stall 10 checks your first payout, and any over \$2,000, before it's sent.";
+
 const payoutTimingNote =
     'Fees paid online are held by Stall 10 and sent to the host a few days '
     'after the event is over.';

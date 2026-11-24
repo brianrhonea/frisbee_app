@@ -779,6 +779,27 @@ export function spotFee(t: Pick<TournamentDoc, "entryType" | "teamEntry" | "bidF
 const dayMs = 24 * 60 * 60 * 1000;
 
 /**
+ * Registration (entries, signups and paying fees) opens at most this many
+ * days before an event starts, so Stall 10 never holds fees for long. The
+ * event can be a draft before then; its location can be added later.
+ */
+export const registrationWindowDays = 60;
+
+/** The first day registration can open for an event starting [startsOn]. */
+export function registrationOpensOn(startsOn: Date): Date {
+  return new Date(startsOn.getTime() - registrationWindowDays * dayMs);
+}
+
+/** Why registration can't open now ([now], ms) for an event starting [startsOn], or null. */
+export function registrationWindowProblem(startsOn: Date | null, now: number): string | null {
+  if (!startsOn) return "Set the event's date first.";
+  const opens = registrationOpensOn(startsOn);
+  if (opens.getTime() <= now) return null;
+  const day = opens.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+  return `Registration opens ${registrationWindowDays} days before the event, on ${day}. Keep it as a draft until then.`;
+}
+
+/**
  * When rosters and fees are due: the event's entry deadline, else the
  * fee's due date, else the day before it starts. Null without a start.
  * HostedTournament.effectiveDeadline in the app.

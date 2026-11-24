@@ -138,6 +138,11 @@ class FakeGateway implements PaymentGateway {
     this.transfers.push(input);
     return `tr_${this.transfers.length}`;
   }
+  /** Transfers Stripe made whose keys it has since forgotten (looked up by metadata). */
+  async findTransfer(transferGroup: string, chargeId: string, n: number) {
+    const i = this.transfers.findIndex((t) => t.transferGroup === transferGroup && t.metadata.chargeId === chargeId && t.metadata.release === String(n));
+    return i >= 0 ? `tr_${i + 1}` : null;
+  }
   /** Stripe failing for another reason (a timeout): never counted as owed. */
   breakReversal = false;
   async reverseTransfer(transfer: string, amountCents: number, idempotencyKey: string) {
@@ -222,8 +227,9 @@ beforeEach(() => {
 });
 
 /** The host's payout account, linked and able to receive transfers. */
-function ready() {
-  s.store.put("payoutAccounts/host", { account: "acct_1", model: "recipient", status: "ready" });
+/** The host's payouts are set up (and staff approved its first payout before). */
+function ready(approved = true) {
+  s.store.put("payoutAccounts/host", { account: "acct_1", model: "recipient", status: "ready", ...(approved && { approvedAt: new Date(now - 30 * day) }) });
   s.store.put("stripeAccounts/acct_1", { teamId: "host" });
   s.gateway.accounts.set("acct_1", { transfersEnabled: true, detailsSubmitted: true });
 }
@@ -554,7 +560,7 @@ describe("paying hosts out", () => {
         currency: "USD",
         sourceTransaction: "ch_pi_1",
         transferGroup: "tournament_t1",
-        metadata: { chargeId: "cs_1", tournamentId: "t1", payerId: "haze", hostId: "host" },
+        metadata: { chargeId: "cs_1", tournamentId: "t1", payerId: "haze", hostId: "host", release: "1" },
         idempotencyKey: "transfer:cs_1:1",
       },
     ]);
@@ -1353,8 +1359,9 @@ describe("security: holding and protecting payouts", () => {
     expect(s.store.doc("tournaments/t1")?.finishedAt).toBeTruthy();
     expect(s.gateway.transfers).toHaveLength(0);
     expect((await earnings()).heldCents).toBe(40000);
-    // Three days on, it goes.
+    // Three days on (since it was finished, and paid), it goes.
     s.store.put("tournaments/t1", { ...s.store.doc("tournaments/t1"), finishedAt: new Date(now - 3 * day) });
+    s.store.put("charges/cs_1", { ...s.store.doc("charges/cs_1"), paidAt: new Date(now - 3 * day) });
     await earnings();
     expect(s.gateway.transfers).toHaveLength(1);
     expect(payoutHoldDaysFromEnv({})).toBe(3);
@@ -1424,6 +1431,8 @@ describe("security: holding and protecting payouts", () => {
     expect(s.store.doc("payoutAccounts/host")?.owedCents ?? 0).toBe(0);
     expect(s.gateway.refunds).toHaveLength(0);
     s.gateway.breakReversal = false;
+    // Retried: Stripe hasn't refunded it yet.
+    s.gateway.summaries.set("pi_1", { status: "succeeded", amountCents: 42461, refundedCents: 0, dispute: "none" });
     expect((await s.call("POST", "/v1/tournaments/t1/payments/haze/refund", undefined, "coach")).status).toBe(204);
     expect(s.gateway.reversals).toHaveLength(1);
     expect(s.store.doc("charges/cs_1")).toMatchObject({ status: "refunded", reversed: true, owedCents: 0 });
@@ -1496,5 +1505,116 @@ describe("security: holding and protecting payouts", () => {
     s.store.put("charges/cs_9", { ...s.store.doc("charges/cs_1"), status: "expired" });
     expect((await s.call("POST", "/v1/tournaments/t1/payments/haze/refund", undefined, "coach")).status).toBe(204);
     expect(s.store.doc("charges/cs_1")?.status).toBe("refunded");
+  });
+});
+
+describe("security: fraud checks on payouts", () => {
+  const approve = (session = "cs_1", kind = "staff") => s.call("POST", `/v1/staff/payments/${session}/approve`, undefined, "admin", kind);
+
+  it("a host's first payout waits for staff; after that they go out by themselves", async () => {
+    ready(false);
+    await paid();
+    finish();
+    await earnings();
+    expect(s.gateway.transfers).toHaveLength(0);
+    expect(s.store.doc("charges/cs_1")?.review).toBe("first_payout");
+    const view = (await s.call("GET", "/v1/staff/payments", undefined, "admin", "staff")).json();
+    expect(view.charges[0].review).toBe("first_payout");
+    expect((await approve("cs_1", "token")).status).toBe(403);
+    const r = await approve();
+    expect(r.status).toBe(200);
+    expect(r.json()).toEqual({ status: "sent" });
+    expect(s.gateway.transfers).toHaveLength(1);
+    expect(s.store.doc("charges/cs_1")).toMatchObject({ review: null, approvedBy: "admin" });
+    expect(s.store.doc("payoutAccounts/host")?.approvedAt).toBeTruthy();
+    expect(s.store.doc("paymentLog/charges-new1")).toBeUndefined();
+  });
+
+  it("a large payout waits for staff too", async () => {
+    ready();
+    s.store.put("tournaments/t1", { ...s.store.doc("tournaments/t1"), bidFee: fee(250000) });
+    await paid();
+    finish();
+    await earnings();
+    expect(s.gateway.transfers).toHaveLength(0);
+    expect(s.store.doc("charges/cs_1")?.review).toBe("large");
+    await approve();
+    expect(s.gateway.transfers[0].amountCents).toBe(250000);
+  });
+
+  it("a fee paid after the event waits the hold from when it was paid", async () => {
+    const gateway = new FakeGateway();
+    const docs = [...s.store.docs.entries()];
+    s = setup(gateway, undefined, 3);
+    for (const [path, data] of docs) s.store.put(path, data);
+    ready();
+    s.store.put("tournaments/t1", { ...s.store.doc("tournaments/t1"), status: "finished", startsOn: new Date(now - 10 * day), finishedAt: new Date(now - 9 * day) });
+    await paid();
+    await earnings();
+    expect(s.gateway.transfers).toHaveLength(0);
+    s.store.put("charges/cs_1", { ...s.store.doc("charges/cs_1"), paidAt: new Date(now - 3 * day) });
+    await earnings();
+    expect(s.gateway.transfers).toHaveLength(1);
+  });
+
+  it("organizers can't pay online for their own event", async () => {
+    ready();
+    // Haze's captain also runs the host team.
+    s.store.put("teams/host", { ...s.store.doc("teams/host"), members: { owner: "owner", coach: "coach", captain: "coach" }, memberIds: ["owner", "coach", "captain"] });
+    const r = await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
+    expect(r.status).toBe(412);
+    expect(r.message()).toContain("You run this event");
+  });
+
+  it("an old release is looked up on Stripe before it's sent again", async () => {
+    ready();
+    await paid();
+    finish();
+    await earnings();
+    expect(s.gateway.transfers).toHaveLength(1);
+    // The run died after Stripe made it; hours later Stripe has forgotten the key.
+    s.store.put("charges/cs_1", { ...s.store.doc("charges/cs_1"), released: false, transfer: null, release: { n: 1, cents: 40000, destination: "acct_1", owedTakenCents: 0, plannedAt: now - 2 * 60 * 60 * 1000 } });
+    s.gateway.transfers[0] = { ...s.gateway.transfers[0], idempotencyKey: "forgotten" };
+    await s.call("POST", "/v1/payments/release", undefined, "admin", "staff");
+    expect(s.gateway.transfers).toHaveLength(1);
+    expect(s.store.doc("charges/cs_1")).toMatchObject({ released: true, transfer: "tr_1", release: null });
+  });
+
+  it("a refund started before isn't made twice", async () => {
+    ready();
+    await paid();
+    s.store.put("charges/cs_1", { ...s.store.doc("charges/cs_1"), status: "refunding", refundCents: 40000 });
+    s.gateway.summaries.set("pi_1", { status: "succeeded", amountCents: 42461, refundedCents: 40000, dispute: "none" });
+    expect((await s.call("POST", "/v1/tournaments/t1/payments/haze/refund", undefined, "coach")).status).toBe(204);
+    expect(s.gateway.refunds).toHaveLength(0);
+    expect(s.store.doc("charges/cs_1")?.status).toBe("refunded");
+  });
+});
+
+describe("one payment system for every event fee", () => {
+  it("a league's player fee and its team fee go through the same checkout, hold and payout", async () => {
+    ready();
+    s.store.put("tournaments/lg", {
+      hostId: "host",
+      name: "Fall League",
+      kind: "league",
+      status: "registration",
+      entryType: "players",
+      teamEntry: true,
+      visibility: "public",
+      bidFee: fee(3000),
+      teamFee: fee(20000),
+      startsOn: new Date(now + 7 * day),
+    });
+    s.store.put("tournaments/lg/signups/player", { name: "Pat", status: "applied", divisionId: "d1" });
+    s.store.put("tournaments/lg/entries/haze", { teamName: "Haze", divisionId: "d1", status: "accepted" });
+    expect((await s.call("POST", "/v1/tournaments/lg/checkout", { payer: "player" }, "player")).status).toBe(200);
+    expect((await s.call("POST", "/v1/tournaments/lg/checkout", team, "captain")).status).toBe(200);
+    expect(s.gateway.checkouts.map((c) => c.items[0])).toEqual([
+      { name: "Entry fee: Fall League", amountCents: 3000 },
+      { name: "Team fee: Fall League (Haze)", amountCents: 20000 },
+    ]);
+    // Both are Stall 10's charges, for the league's group of transfers.
+    expect(s.gateway.checkouts.every((c) => c.transferGroup === "tournament_lg")).toBe(true);
   });
 });

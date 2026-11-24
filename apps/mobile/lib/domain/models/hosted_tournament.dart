@@ -315,6 +315,37 @@ class DivisionSummary {
 
 /// A tournament a team, group or school/club hosts, at `tournaments/{id}`.
 /// Members of the host with Manage events run it.
+/// Registration (entries, signups and paying fees) opens at most this many
+/// days before an event starts, so Stall 10 never holds fees for long
+/// (registrationWindowDays in packages/shared). The location can come later.
+const registrationWindowDays = 60;
+
+/// Why registration can't open at [now] for an event starting [startsOn],
+/// or null (registrationWindowProblem on the website and API).
+String? registrationWindowProblem(DateTime startsOn, DateTime now) {
+  final opens = startsOn.toUtc().subtract(
+    const Duration(days: registrationWindowDays),
+  );
+  if (!opens.isAfter(now.toUtc())) return null;
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  final day = '${months[opens.month - 1]} ${opens.day}, ${opens.year}';
+  return 'Registration opens $registrationWindowDays days before the event, '
+      'on $day. Keep it as a draft until then.';
+}
+
 class HostedTournament {
   const HostedTournament({
     required this.id,

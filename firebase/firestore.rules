@@ -1873,8 +1873,16 @@ service cloud.firestore {
           || get(teamPath(t.hostId)).data.get('official', false) == true;
       }
 
+      // Registration opens at most 60 days before the start
+      // (registrationWindowDays in packages/shared): fees aren't held long.
+      function inWindow(t) {
+        return t.startsOn is timestamp
+          && t.startsOn <= request.time + duration.value(60, 'd');
+      }
       allow read: if signedIn() && visible(resource.data);
       allow create: if signedIn()
+        && (request.resource.data.get('status', 'draft') == 'draft'
+            || inWindow(request.resource.data))
         && manages(request.resource.data)
         && request.resource.data.createdBy == uid()
         && request.resource.data.createdAt == request.time
@@ -1891,6 +1899,9 @@ service cloud.firestore {
         && (!('finishedAt' in changed()) || !('finishedAt' in request.resource.data))
         && (request.resource.data.get('status', '') == 'finished'
             || !('finishedAt' in request.resource.data))
+        && (request.resource.data.get('status', 'draft') != 'registration'
+            || !('status' in changed() || 'startsOn' in changed())
+            || inWindow(request.resource.data))
         && validHosted(request.resource.data)
         && officialHost(request.resource.data);
       // Only a draft is deleted here; any other event is deleted through

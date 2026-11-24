@@ -88,7 +88,13 @@ events' `finishedAt` and deletes); no functions changes.
   top (a `NavigationDelegate`), and hands Stripe's session over only to
   that page.
 - Firestore rules: clients can't set `finishedAt` on an event, and only
-  drafts are deleted directly (others through the API).
+  drafts are deleted directly (others through the API). Registration
+  opens at most 60 days before the start (rules and API).
+- Event form: Publish waits until registration can open, 60 days before
+  the start (`registrationWindowProblem`, `publishProblem`); Save draft
+  still works.
+- Payouts card: says Stall 10 checks a host's first payout and any over
+  $2,000 (`payoutReviewNote`).
 
 ## 0.0.50 — Tournament flow: respond, deadline, seeds, director
 

@@ -174,6 +174,12 @@ export function stripeFromEnv(env: NodeJS.ProcessEnv = process.env): PaymentGate
       );
       return t.id;
     },
+    async findTransfer(transferGroup, chargeId, n) {
+      for await (const t of stripe.transfers.list({ transfer_group: transferGroup, limit: 100 })) {
+        if (t.metadata?.chargeId === chargeId && t.metadata?.release === String(n)) return t.id;
+      }
+      return null;
+    },
     async reverseTransfer(transferId, amountCents, idempotencyKey) {
       try {
         await stripe.transfers.createReversal(transferId, { amount: amountCents }, { idempotencyKey });

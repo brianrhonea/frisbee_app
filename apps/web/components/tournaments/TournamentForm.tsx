@@ -4,6 +4,7 @@
 // EventFormatSection in the app). A new event is a tournament or a league,
 // and teams apply or players sign up; that's fixed once it's created.
 import {
+  registrationWindowProblem,
   currencies,
   type DivisionDoc,
   type Division,
@@ -297,6 +298,8 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
   // Still a draft (or not created yet): Save draft and Publish. A published
   // event has a single Save, so editing it never changes where it stands.
   const isDraft = isNew || existing.data?.status === "draft";
+  // Registration opens 60 days before the start (the app's publishProblem).
+  const tooEarly = registrationWindowProblem(f.startsOn, Date.now());
   const lockedReason = (d: Division): string | null => {
     const div = divRows.data?.find((x) => x.division === d);
     if (!div) return null;
@@ -776,6 +779,7 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
         <p className="muted small">Save draft keeps it to your managers. Publish puts it on the website and opens registration for {players ? "signups" : "teams"}.</p>
       )}
       {step === lastStep && problem && <p className="hosted-form-problem">{problem}</p>}
+      {step === lastStep && isDraft && !problem && tooEarly && <p className="hosted-form-problem">{tooEarly}</p>}
       {error && <p className="form-error">{error}</p>}
       <div className="home-actions hosted-form-nav">
         {step > 0 && (
@@ -788,7 +792,7 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
             Next: {formSteps[step + 1]}
           </button>
         ) : (
-          <button type="button" className="btn btn-primary" disabled={busy || !!problem} onClick={() => void save(isDraft)}>
+          <button type="button" className="btn btn-primary" disabled={busy || !!problem || (isDraft && !!tooEarly)} onClick={() => void save(isDraft)}>
             {isDraft ? "Publish" : "Save"}
           </button>
         )}

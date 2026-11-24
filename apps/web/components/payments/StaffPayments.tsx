@@ -10,6 +10,7 @@ import {
   type PaymentIssueKind,
   paymentIssueLabels,
   paymentPaths,
+  payoutReviewLabels,
   type ReconcileResult,
   type ReleaseResult,
   type StaffChargeView,
@@ -38,6 +39,7 @@ function payoutLabel(c: StaffChargeView): string {
   if (c.kept) return "Stall 10 event";
   if (c.reversed) return c.owedCents > 0 ? `Owed ${centsLabel(c.owedCents)}` : "Taken back";
   if (c.released) return `Sent ${centsLabel(c.transferCents)}`;
+  if (c.review) return `Held: ${payoutReviewLabels[c.review]}`;
   return c.status === "paid" ? "Held" : "—";
 }
 
@@ -45,7 +47,7 @@ export function StaffPayments() {
   const { user } = useAuth();
   const [view, setView] = useState<StaffPaymentsView | null>(null);
   const [tournament, setTournament] = useState("");
-  const [busy, setBusy] = useState<"release" | "check" | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
 
@@ -62,6 +64,24 @@ export function StaffPayments() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /** Staff approve a host's first (or a large) payout; it goes out if it's due. */
+  async function approve(c: StaffChargeView) {
+    if (!user) return;
+    const ask = `Send ${centsLabel(c.baseCents)} for "${c.label || c.payerId}" to the host? Check the host and the event look genuine first.`;
+    if (!window.confirm(ask)) return;
+    setBusy(c.id);
+    setError("");
+    try {
+      const r = await callApi<{ status: "sent" | "held" }>(user, paymentPaths.approve(c.id), { method: "POST", body: {} });
+      setNote(r.status === "sent" ? "Approved and sent." : "Approved. It goes out once it's due.");
+      await load();
+    } catch (e) {
+      setError(problem(e));
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function run(what: "release" | "check") {
     if (!user) return;
@@ -99,6 +119,32 @@ export function StaffPayments() {
       </div>
       {note && <p className="muted small">{note}</p>}
       {error && <p className="form-error">{error}</p>}
+
+      {view.charges.some((c) => c.review) && (
+        <section className="card">
+          <h2 className="card-title">Waiting for approval</h2>
+          <p className="muted small">A host&apos;s first payout and large ones wait for staff. Check the host team and event are real (and the payers aren&apos;t all new cards) before approving.</p>
+          <ul className="stack">
+            {view.charges
+              .filter((c) => c.review)
+              .map((c) => (
+                <li key={c.id} className="staff-payment-issue">
+                  <strong>{c.label || c.payerId}</strong> · {centsLabel(c.baseCents)} · {payoutReviewLabels[c.review!]} ·{" "}
+                  <a className="text-btn" href={`/tournaments/${encodeURIComponent(c.tournamentId)}`}>
+                    event
+                  </a>{" "}
+                  <button type="button" className="btn btn-small" disabled={busy !== null} onClick={() => void approve(c)}>
+                    {busy === c.id ? "Approving…" : "Approve"}
+                  </button>
+                  <br />
+                  <small className="muted">
+                    Host <code>{c.hostId}</code> · <code>{c.id}</code>
+                  </small>
+                </li>
+              ))}
+          </ul>
+        </section>
+      )}
 
       <section className="card">
         <h2 className="card-title">Problems ({view.issues.length})</h2>

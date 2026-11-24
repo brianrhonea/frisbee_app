@@ -231,7 +231,8 @@ class PayoutsCard extends StatelessWidget {
       PayoutStatus.ready => (
         'Online payments are on',
         'Teams and players pay their fees in Stall 10, and Stall 10 sends '
-            'you the whole fee a few days after each event. Refund a team from '
+            'you the whole fee a few days after each event. $payoutReviewNote '
+            'Refund a team from '
             "the event's Teams tab. Payers also pay Stall 10's "
             "${a.feeLabel} and Stripe's card fee.",
         null,

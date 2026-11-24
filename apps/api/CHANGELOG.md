@@ -70,6 +70,22 @@ transfers). With app 0.0.51 and web 0.59.0.
   - Reopening an event clears `finishedAt` (clients must drop it too), so
     finishing again starts a new hold; the daily check waits for the
     hold before flagging `payout_overdue`, and flags `credit_unsent`.
+  - Fraud checks: staff approve each host's first payout and any over
+    $2,000 (`charge.review`, `POST /v1/staff/payments/:session/approve`,
+    `payoutAccounts.approvedAt`); organizers can't pay online for their
+    own event (`selfPaymentMessage`); a fee paid after the event waits the
+    hold from when it was paid.
+  - Stripe forgets idempotency keys after 24 hours: a release planned over
+    an hour ago is looked up (`findTransfer`, metadata `release`) before
+    it's sent again, and a refund started before checks what Stripe
+    already refunded.
+  - A team holding fees, owed money or an unsent credit can't be deleted.
+- **Registration window.** Registration opens at most 60 days before an
+  event starts (`registrationWindowProblem` in packages/shared, the
+  status route and moving an open event's date; Firestore rules too). The
+  location can be added later; once registration is open, fees can be
+  paid at any time.
+- `docs/payments-security.md`: the design, invariants, threats and gaps.
 - **Oversight.** `GET /v1/staff/payments` (staff): open problems and the
   latest payments. `POST /v1/payments/reconcile` (staff) and the Cloud
   Scheduler jobs `POST /v1/jobs/payments/release` and `/reconcile`

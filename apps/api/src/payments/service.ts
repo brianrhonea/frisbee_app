@@ -66,7 +66,10 @@ import {
   onlinePaymentProblem,
   centsLabel,
   paidOnlineNote,
+  type PayoutReview,
+  payoutReviewOverCents,
   payoutsReauthMessage,
+  selfPaymentMessage,
   type PayerKind,
   type PaymentFees,
   type PayOptions,
@@ -127,6 +130,8 @@ export interface PaymentsConfig {
    * before the money leaves Stall 10.
    */
   holdDays?: number;
+  /** Payouts over this (cents) wait for staff (default payoutReviewOverCents). */
+  reviewOverCents?: number;
 }
 
 /** PAYOUT_HOLD_DAYS (0 to 30), else 3. */
@@ -135,6 +140,9 @@ export function payoutHoldDaysFromEnv(env: NodeJS.ProcessEnv = process.env): num
   return env.PAYOUT_HOLD_DAYS !== undefined && env.PAYOUT_HOLD_DAYS.trim() !== "" && Number.isInteger(n) && n >= 0 && n <= 30 ? n : defaultHoldDays;
 }
 const defaultHoldDays = 3;
+
+/** A release planned longer ago than this is looked up on Stripe before it's retried. */
+const retryLookupMs = 60 * 60 * 1000;
 
 /** How recent a sign-in must be to set up or change where payouts go. */
 const recentSignInSec = 15 * 60;
@@ -174,7 +182,7 @@ const reconcileFields = [
 const issueFields = ["kinds", "detail", "tournamentId", "hostId", "payerId", "label", "firstSeenAt", "lastSeenAt"] as const;
 const staffChargeFields = [
   "tournamentId", "hostId", "payerId", "payerKind", "label", "status", "amountCents", "baseCents", "processingCents", "released", "kept",
-  "transferCents", "refundCents", "amountRefundedCents", "reversed", "owedCents", "createdAt", "paidAt", "releasedAt", "refundedAt",
+  "transferCents", "refundCents", "amountRefundedCents", "reversed", "owedCents", "createdAt", "paidAt", "releasedAt", "refundedAt", "review",
 ] as const;
 
 /** How far back the daily check looks at payments that weren't completed. */
@@ -417,7 +425,8 @@ export class PaymentService {
     const payer = await this.payer(this.store, caller, id, t, kind, rawTeam);
     const host = storedId(t.hostId);
     // Stall 10's own events keep their fees: no payout account needed.
-    const official = host ? (await this.store.get(p.team(host)))?.official === true : false;
+    const hostTeam = host ? await this.store.get(p.team(host)) : null;
+    const official = hostTeam?.official === true;
     const payout = host && !official ? await this.store.get(p.payout(host)) : null;
     // Ask Stripe about the payer's last checkout first: someone back from
     // paying sees it paid even if the webhook hasn't landed yet.
@@ -433,6 +442,9 @@ export class PaymentService {
     if (!this.config) reason = "Online payments aren't set up here yet.";
     else if (!payer.fee || amountCents <= 0) reason = "There's no fee to pay.";
     else if (!official && payoutOf(payout) !== "ready") reason = "The host doesn't take payments through Stall 10. Follow their instructions.";
+    // Paying your own event with a card would be paid straight back to you
+    // (the pattern of stolen-card fraud): organizers mark it paid instead.
+    else if (!official && hostTeam && can(hostTeam, caller.uid, "manageEvents")) reason = selfPaymentMessage;
     else if (pending) reason = processingPaymentNote;
     else reason = onlinePaymentProblem(chargeCents, currency, this.fee);
     const options: PayOptions = {
@@ -1050,7 +1062,9 @@ export class PaymentService {
     const finished = dateOf(t.finishedAt);
     if (!last || !finished) return false;
     const booked = charge ? dateOf(charge.eventEndsAt) : null;
-    const due = Math.max(last.getTime(), finished.getTime() + this.holdMs, booked?.getTime() ?? 0);
+    // A fee paid after the event waits the hold from when it was paid.
+    const paidAt = charge ? dateOf(charge.paidAt) : null;
+    const due = Math.max(last.getTime(), finished.getTime() + this.holdMs, booked?.getTime() ?? 0, paidAt ? paidAt.getTime() + this.holdMs : 0);
     return due <= this.now();
   }
 
@@ -1116,7 +1130,8 @@ export class PaymentService {
       const pending = charge.release;
       if (pending && typeof pending === "object") {
         const r = pending as Data;
-        return { ...meta, n: Number(r.n) || 1, cents: cents(r.cents), destination: str(r.destination), owedTakenCents: cents(r.owedTakenCents) };
+        const plannedAt = typeof r.plannedAt === "number" ? r.plannedAt : 0;
+        return { ...meta, n: Number(r.n) || 1, cents: cents(r.cents), destination: str(r.destination), owedTakenCents: cents(r.owedTakenCents), retry: this.now() - plannedAt > retryLookupMs };
       }
       const t = meta.tournamentId ? await tx.get(p.tournament(meta.tournamentId)) : null;
       if (!t) return null;
@@ -1139,6 +1154,12 @@ export class PaymentService {
       // Held until the host finishes setting up payouts.
       if (payoutOf(payout) !== "ready") return null;
       const base = cents(charge.baseCents);
+      // Staff approve a host's first payout and large ones (fraud).
+      const review = this.reviewFor(payout!, charge, base);
+      if (review) {
+        if (charge.review !== review) tx.update(p.charge(session), { review, updatedAt: serverTime });
+        return null;
+      }
       const owed = cents(payout!.owedCents);
       const taken = Math.min(owed, base);
       const amount = base - taken;
@@ -1150,20 +1171,25 @@ export class PaymentService {
         return null;
       }
       const destination = str(payout!.account);
-      tx.update(p.charge(session), { release: { n, cents: amount, destination, owedTakenCents: taken }, updatedAt: serverTime });
-      return { ...meta, n, cents: amount, destination, owedTakenCents: taken };
+      tx.update(p.charge(session), { release: { n, cents: amount, destination, owedTakenCents: taken, plannedAt: this.now() }, review: null, updatedAt: serverTime });
+      return { ...meta, n, cents: amount, destination, owedTakenCents: taken, retry: false };
     });
     if (!plan || plan.cents === 0 || !plan.destination || !plan.paymentIntent) return "held";
     const source = await config.gateway.chargeOf(plan.paymentIntent);
-    const transfer = await config.gateway.transfer({
-      destination: plan.destination,
-      amountCents: plan.cents,
-      currency: plan.currency,
-      sourceTransaction: source,
-      transferGroup: groupOf(plan.tournamentId),
-      metadata: { chargeId: session, tournamentId: plan.tournamentId, payerId: plan.payerId, hostId: plan.hostId },
-      idempotencyKey: `transfer:${session}:${plan.n}`,
-    });
+    // An old plan (a run that died after asking Stripe): Stripe may have
+    // forgotten the key, so look for the transfer it made before sending.
+    const made = plan.retry ? await config.gateway.findTransfer(groupOf(plan.tournamentId), session, plan.n) : null;
+    const transfer =
+      made ??
+      (await config.gateway.transfer({
+        destination: plan.destination,
+        amountCents: plan.cents,
+        currency: plan.currency,
+        sourceTransaction: source,
+        transferGroup: groupOf(plan.tournamentId),
+        metadata: { chargeId: session, tournamentId: plan.tournamentId, payerId: plan.payerId, hostId: plan.hostId, release: String(plan.n) },
+        idempotencyKey: `transfer:${session}:${plan.n}`,
+      }));
     const status = await this.store.transact(async (tx) => {
       const charge = await tx.get(p.charge(session));
       // Only the run that planned this transfer confirms it (a slower
@@ -1188,6 +1214,33 @@ export class PaymentService {
     // Disputed or refunded while the transfer went out: take it back.
     if (status && status !== "paid") await this.clawBack(session, status === "disputed" ? "dispute" : "refund");
     return "sent";
+  }
+
+  /** Whether this payout waits for staff: the host's first ever, or a large one not yet approved. */
+  private reviewFor(payout: Data, charge: Data, base: number): PayoutReview | null {
+    if (!dateOf(payout.approvedAt)) return "first_payout";
+    if (base > (this.config?.reviewOverCents ?? payoutReviewOverCents) && !dateOf(charge.approvedAt)) return "large";
+    return null;
+  }
+
+  /**
+   * Staff approve [session]'s payout (and with it the host, whose later
+   * payouts under the limit go out by themselves), then it's sent if due.
+   */
+  async approvePayout(caller: Caller, rawSession: unknown): Promise<{ status: "sent" | "held" }> {
+    requireStaff(caller);
+    const session = docIdParam(rawSession);
+    await this.store.transact(async (tx) => {
+      const charge = await tx.get(p.charge(session));
+      if (!charge || !isPlatform(charge)) throw new ApiError("not_found", "That payment doesn't exist.");
+      if (charge.status !== "paid" || charge.released === true) throw new ApiError("failed_precondition", "Only a paid fee that hasn't been sent can be approved.");
+      const hostId = storedId(charge.hostId);
+      const payout = hostId ? await tx.get(p.payout(hostId)) : null;
+      tx.update(p.charge(session), { approvedAt: serverTime, approvedBy: caller.uid, review: null, updatedAt: serverTime });
+      if (hostId && payout && !dateOf(payout.approvedAt)) tx.update(p.payout(hostId), { approvedAt: serverTime, approvedBy: caller.uid, updatedAt: serverTime });
+      this.logCharge(tx, session, charge, "payout_approved", { amountCents: cents(charge.baseCents) });
+    });
+    return { status: await this.releaseQuietly(session) };
   }
 
   /**
@@ -1328,7 +1381,7 @@ export class PaymentService {
         tx.update(p.charge(session), { status: "refunding", refundCents: amount, refundBy: caller.uid, updatedAt: serverTime });
         logPayment(this.store, tx, { tournamentId: id, payerId, action: "refund_started", by: caller.uid, amountCents: amount, currency: str(charge.currency) || undefined, paymentIntent: str(charge.paymentIntent) || undefined });
       }
-      return { amount, pi: str(charge.paymentIntent) };
+      return { amount, pi: str(charge.paymentIntent), retry: status === "refunding" };
     });
     // The host's share first, so a refund never goes out while the host
     // still has it. Already paid out to the host's bank: only staff can
@@ -1345,7 +1398,10 @@ export class PaymentService {
         "This fee was already paid out to your bank, so Stall 10 can't take it back for a refund. Email support@stall10.app and we'll sort it out with you.",
       );
     }
-    await this.config.gateway.refund(null, start.pi, start.amount, `refund:${session}`);
+    // A refund that was started before: if Stripe already made it, don't
+    // make another (its idempotency key lasts 24 hours only).
+    const done = start.retry ? (await this.config.gateway.paymentSummary(start.pi)).refundedCents >= start.amount : false;
+    if (!done) await this.config.gateway.refund(null, start.pi, start.amount, `refund:${session}`);
     await this.store.transact(async (tx) => {
       const charge = await tx.get(p.charge(session));
       const payment = await tx.get(p.payment(id, payerId));
@@ -1612,9 +1668,11 @@ export class PaymentService {
         paidAt: iso(d.paidAt),
         releasedAt: iso(d.releasedAt),
         refundedAt: iso(d.refundedAt),
+        review: d.review === "first_payout" || d.review === "large" ? d.review : null,
       }))
-      .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""))
-      .slice(0, 100);
+      .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+    // The latest 100, plus every payout waiting for approval however old.
+    view.charges = [...view.charges.slice(0, 100), ...view.charges.slice(100).filter((c) => c.review)];
     return view;
   }
 
@@ -1655,6 +1713,7 @@ export function paymentRoutes(app: FastifyInstance, payments: PaymentService, li
   app.get<T>(paymentPaths.earnings(":teamId"), async (req) => payments.earnings(caller(req, "status"), req.params.teamId));
   app.post(paymentPaths.release, async (req) => payments.releaseAll(caller(req, "money")));
   app.post(paymentPaths.reconcile, async (req) => payments.reconcileFor(caller(req, "money")));
+  app.post<{ Params: { session: string } }>("/v1/staff/payments/:session/approve", async (req) => payments.approvePayout(caller(req, "money"), req.params.session));
   app.get<{ Querystring: { tournament?: string } }>(paymentPaths.staff, async (req) => payments.staffPayments(caller(req, "status"), req.query));
 
   // Stripe signs the exact bytes it sent, so this route reads the raw body

@@ -165,6 +165,12 @@ export interface PaymentGateway {
   refundApplicationFee(feeId: string, idempotencyKey: string): Promise<void>;
   /** Sends a host its share; the transfer's id. */
   transfer(input: TransferInput): Promise<string>;
+  /**
+   * A transfer already made for release [n] of [chargeId] in [transferGroup]
+   * (its metadata), or null: checked before retrying an old release, as
+   * Stripe forgets idempotency keys after 24 hours.
+   */
+  findTransfer(transferGroup: string, chargeId: string, n: number): Promise<string | null>;
   /** Takes [amountCents] of a transfer back from the host (a refund or a dispute); InsufficientBalance when it isn't there. */
   reverseTransfer(transferId: string, amountCents: number, idempotencyKey: string): Promise<void>;
   /** A payment's state on Stripe (Stall 10's account), for the daily check. */

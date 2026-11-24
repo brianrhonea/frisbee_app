@@ -11,6 +11,8 @@
 // maths is in local time, as on the phone) and the API checks each game.
 // Results that move teams on are worked out here from the stored games.
 import {
+  registrationWindowDays,
+  registrationWindowProblem,
   type CreateTournamentInput,
   createTournamentRequestSchema,
   type Division,
@@ -453,6 +455,12 @@ export class TournamentService {
       if (summaries.length > tournamentLimits.maxDivisions) {
         throw new ApiError("invalid_argument", `Up to ${tournamentLimits.maxDivisions} divisions.`);
       }
+      // Moving an open event's date further out than the window isn't allowed.
+      const newStart = dateOf(r.startsOn);
+      if (statusOf(t) === "registration" && newStart && newStart.getTime() !== dateOf(t.startsOn)?.getTime()) {
+        const problem = registrationWindowProblem(newStart, this.now());
+        if (problem) throw new ApiError("failed_precondition", `Registration is open, so the event can start at most ${registrationWindowDays} days from now. Move it back to a draft first.`);
+      }
       // hostId, createdBy and createdAt stay as they are.
       tx.update(p.tournament(id), this.hostedFields(host, hostId, kind, entryType, statusOf(t), r, summaries));
       for (const w of writes) w();
@@ -472,6 +480,12 @@ export class TournamentService {
             ? "Publish the schedule to make it scheduled."
             : `It can't go from ${hostedStatusLabels[from]} to ${hostedStatusLabels[status]}.`,
         );
+      }
+      // Registration (entries, signups, fees) opens only within
+      // registrationWindowDays of the start: fees aren't held for long.
+      if (status === "registration") {
+        const problem = registrationWindowProblem(dateOf(t.startsOn), this.now());
+        if (problem) throw new ApiError("failed_precondition", problem);
       }
       // finishedAt starts the payout hold (payments/service.ts releasable).
       // Reopened: a later finish starts a new hold.

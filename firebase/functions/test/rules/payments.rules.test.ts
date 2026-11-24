@@ -108,6 +108,17 @@ describe("events holding fees", () => {
     await assertFails(updateDoc(doc(db(HOST), "tournaments", "t1"), { finishedAt: new Date() }));
   });
 
+  it("registration opens only within 60 days of the start", async () => {
+    const day = 24 * 60 * 60 * 1000;
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), "tournaments", "t1"), { status: "draft", startsOn: new Date(Date.now() + 90 * day) });
+    });
+    await assertFails(updateDoc(doc(db(HOST), "tournaments", "t1"), { status: "registration" }));
+    await assertSucceeds(updateDoc(doc(db(HOST), "tournaments", "t1"), { status: "registration", startsOn: new Date(Date.now() + 30 * day) }));
+    // Open: not moved out of the window.
+    await assertFails(updateDoc(doc(db(HOST), "tournaments", "t1"), { startsOn: new Date(Date.now() + 90 * day) }));
+  });
+
   it("reopening a finished event drops its finish", async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
       await updateDoc(doc(ctx.firestore(), "tournaments", "t1"), { status: "finished", finishedAt: new Date() });

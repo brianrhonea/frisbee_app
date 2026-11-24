@@ -109,7 +109,7 @@ class _HostedTournamentFormScreenState
   List<Widget> _review(AppColors c) {
     final f = DateFormat('EEE, MMM d, y');
     final end = vm.endsOn;
-    final why = vm.problem;
+    final why = vm.problem ?? vm.publishProblem;
     String money(int? cents) => cents == null
         ? 'amount missing'
         : '${(cents / 100).toStringAsFixed(cents % 100 == 0 ? 0 : 2)} '
@@ -587,7 +587,10 @@ class _HostedTournamentFormScreenState
                               : vm.isDraft
                               ? FilledButton(
                                   key: const Key('form-publish'),
-                                  onPressed: busy || vm.problem != null
+                                  onPressed:
+                                      busy ||
+                                          vm.problem != null ||
+                                          vm.publishProblem != null
                                       ? null
                                       : vm.publish.execute,
                                   child: const Text('Publish'),
