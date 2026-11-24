@@ -25,6 +25,7 @@ import {
   paymentPaths,
   payoutReviewNote,
   payoutsReauthMessage,
+  payoutsSetupNote,
   payoutTimingNote,
   platformFeeLabel,
   refundPolicyNote,
@@ -263,7 +264,7 @@ export function PayoutsCard({ user, teamId, amountCents }: { user: User; teamId:
     none: {
       title: "Take payments online",
       body: `Let teams and players pay their fees in Stall 10 instead of collecting them yourself. Stall 10 takes the payments and sends you the whole fee a few days after each event: payers also pay Stall 10's ${account.feeLabel} and Stripe's card fee. Add your bank details here; you don't need a Stripe account.`,
-      action: "Set up payments",
+      action: "Set up payouts",
     },
     pending: { title: "Finish setting up payments", body: "Stripe needs a few more details before Stall 10 can send you your fees.", action: "Finish setup" },
     ready: {
@@ -316,7 +317,7 @@ export function PayoutsCard({ user, teamId, amountCents }: { user: User; teamId:
       {copy.action && !account.canSetUp && <p className="muted small">Only {account.ownerName} can set up payments. Ask them to open this page.</p>}
       {copy.action && account.canSetUp && !open && (
         <button type="button" className="btn btn-primary btn-small" disabled={busy} onClick={connect}>
-          {busy ? "Opening Stripe…" : copy.action}
+          {busy ? "Opening…" : copy.action}
         </button>
       )}
       {!copy.action && account.canSetUp && publishableKey && !open && (
@@ -327,7 +328,7 @@ export function PayoutsCard({ user, teamId, amountCents }: { user: User; teamId:
       {open && (
         <div className="embedded-pay">
           <div className="embedded-pay-head">
-            <strong>{open === "manage" ? "Bank account and payouts" : "Set up payments with Stripe"}</strong>
+            <strong>{open === "manage" ? "Bank account and payouts" : "Set up payouts"}</strong>
             <button
               type="button"
               className="text-btn"
@@ -339,6 +340,7 @@ export function PayoutsCard({ user, teamId, amountCents }: { user: User; teamId:
               Close
             </button>
           </div>
+          {open === "setup" && <p className="muted small">{payoutsSetupNote}</p>}
           <EmbeddedOnboarding
             user={user}
             teamId={teamId}

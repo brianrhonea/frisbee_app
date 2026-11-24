@@ -220,7 +220,7 @@ class PayoutsCard extends StatelessWidget {
             'sends you the whole fee a few days after each event: payers also '
             "pay Stall 10's ${a.feeLabel} and Stripe's card fee. Add your "
             "bank details here; you don't need a Stripe account.",
-        'Set up payments',
+        'Set up payouts',
       ),
       PayoutStatus.pending => (
         'Finish setting up payments',

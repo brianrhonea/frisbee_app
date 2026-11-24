@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { EmbeddedPayouts } from "@/components/payments/EmbeddedPayouts";
 
-export const metadata: Metadata = { title: "Set up payments", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Set up payouts", robots: { index: false, follow: false } };
 
 /**
  * Stripe's payments setup for the app, shown in its WebView (PayoutsSetupScreen):

@@ -9,6 +9,13 @@ const payoutReviewNote =
     "Stall 10 checks your first payout, and an event's payouts once they "
     "pass \$2,000, before they're sent.";
 
+/// Above Stripe's setup form, so hosts know they aren't opening a Stripe
+/// account (payoutsSetupNote in packages/shared).
+const payoutsSetupNote =
+    'Stall 10 pays you through Stripe, our payment processor. They confirm '
+    'who you are and where to send your money; Stall 10 never sees these '
+    'details.';
+
 /// The API's answer when payouts are set up or changed without a sign-in
 /// in the last 15 minutes (payoutsReauthMessage in packages/shared): the
 /// app asks the owner to confirm it's them, then tries again.

@@ -425,6 +425,10 @@ export interface ReconcileResult {
  * sign-in in the last 15 minutes. The app and website then ask the owner
  * to confirm it's them (their password, Google or Apple) and try again.
  */
+/** Above Stripe's setup form, so hosts know they aren't opening a Stripe account. */
+export const payoutsSetupNote =
+  "Stall 10 pays you through Stripe, our payment processor. They confirm who you are and where to send your money; Stall 10 never sees these details.";
+
 export const payoutsReauthMessage = "For your security, confirm it's you before setting up or changing payouts.";
 
 export const paymentPaths = {

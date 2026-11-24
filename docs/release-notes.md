@@ -15,6 +15,9 @@ Firebase project; App Store builds come from `main` and use production.
 - **Setting up payments asks you to confirm it's you.** If you signed in
   a while ago, enter your password (or continue with Google or Apple)
   and Stripe's form opens, instead of an "auth failed" message.
+- **"Set up payouts"** explains that Stall 10 pays you through Stripe, its
+  payment processor: you're not opening a Stripe account, and Stall 10
+  never sees your bank or ID details.
 
 ## 0.0.51
 

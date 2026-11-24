@@ -73,6 +73,9 @@ Plain-language notes for testers are in
   password, Google or Apple, gets a fresh ID token, and opens Stripe's
   form. Same on the website (`ConfirmSignIn`). Test: the app's message
   matches packages/shared.
+- "Set up payouts" (was "Set up payments"), with `payoutsSetupNote` above
+  Stripe's form: Stall 10 pays hosts through Stripe and never sees their
+  details.
 
 ## 0.0.51 — Stall 10 collects fees and pays hosts out
 

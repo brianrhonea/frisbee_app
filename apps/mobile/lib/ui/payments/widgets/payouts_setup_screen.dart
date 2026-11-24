@@ -213,7 +213,7 @@ class _PayoutsSetupScreenState extends State<PayoutsSetupScreen> {
           onPressed: () => Navigator.of(context).pop(true),
         ),
         title: Text(
-          widget.manage ? 'Bank account and payouts' : 'Set up payments',
+          widget.manage ? 'Bank account and payouts' : 'Set up payouts',
         ),
       ),
       body: _error != null
@@ -225,7 +225,20 @@ class _PayoutsSetupScreenState extends State<PayoutsSetupScreen> {
             )
           : _reauth
           ? _confirmView(context)
-          : WebViewWidget(controller: _web),
+          : widget.manage
+          ? WebViewWidget(controller: _web)
+          : Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  child: Text(
+                    payoutsSetupNote,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+                Expanded(child: WebViewWidget(controller: _web)),
+              ],
+            ),
     );
   }
 

@@ -274,6 +274,7 @@ void main() {
     // owner to confirm it's them.
     final ts = File('../../packages/shared/src/payments.ts').readAsStringSync();
     expect(ts, contains('payoutsReauthMessage = "$payoutsReauthMessage"'));
+    expect(ts, contains('"$payoutsSetupNote"'));
   });
 
   group('payouts card', () {
@@ -288,7 +289,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      await tester.tap(find.text('Set up payments'));
+      await tester.tap(find.text('Set up payouts'));
       expect(find.text('Payments: Not set up'), findsOneWidget);
       await tester.pumpAndSettle();
       expect(opened, [Uri.parse('https://connect.test/host')]);

@@ -9,6 +9,9 @@ here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 - Setting up payouts more than 15 minutes after signing in asks you to
   confirm it's you (password, Google or Apple) and then opens Stripe's
   form, instead of Stripe's form saying it couldn't sign in.
+- "Set up payouts" (was "Set up payments with Stripe"), with a line saying
+  Stall 10 pays hosts through Stripe and never sees their details
+  (`payoutsSetupNote`), so hosts know they aren't opening a Stripe account.
 
 ## 0.59.0 — 2026-11-23
 
