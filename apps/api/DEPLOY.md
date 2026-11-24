@@ -465,17 +465,17 @@ for s in STRIPE_SECRET_KEY STRIPE_PLATFORM_WEBHOOK_SECRET STRIPE_WEBHOOK_SECRET;
 done
 ```
 
-4. Only then add them under `env:` in `deploy/service.yaml`, the same way
-   as LiveKit above (a missing secret fails the whole revision):
-   `STRIPE_SECRET_KEY`, `STRIPE_PLATFORM_WEBHOOK_SECRET` and
-   `STRIPE_WEBHOOK_SECRET` as `secretKeyRef`s.
-   `WEB_SITE_URL` is already there for the return address. The fee
-   defaults to 3%; set `PLATFORM_FEE_BPS` / `PLATFORM_FEE_FIXED_CENTS`
-   there to change it (new payments only). `PAYOUT_HOLD_DAYS` (0 to 30,
-   default 3) is how long after an event is marked finished its fees wait
-   before going to the host.
-5. The scheduled jobs (below): `JOBS_AUDIENCE` and `JOBS_INVOKER` as plain
-   `env:` values.
+4. `deploy/service.yaml` reads all three as `secretKeyRef`s, so they must
+   exist in a project before the API is deployed there (a missing secret
+   fails the whole revision). `WEB_SITE_URL` is the return address. The
+   fee defaults to 3%; set `PLATFORM_FEE_BPS` / `PLATFORM_FEE_FIXED_CENTS`
+   there to change it (new payments only). `PAYOUT_HOLD_DAYS` (0 to 30)
+   is how long after an event is marked finished its fees wait before
+   going to the host: repository variable `API_PAYOUT_HOLD_DAYS_<ENV>`,
+   default 3 (0 on dev makes testing payouts quicker).
+5. The scheduled jobs (below). The deploy fills in `JOBS_AUDIENCE` (the
+   service's own URL) and `JOBS_INVOKER`
+   (`payments-scheduler@<project>.iam.gserviceaccount.com`).
 
 Payouts: once an event is finished, its last day has passed (also its
 last day when each fee was paid, so moving an event earlier doesn't pay
@@ -516,8 +516,8 @@ gcloud scheduler jobs create http payments-release --project="$PROJECT" --locati
 gcloud scheduler jobs create http payments-reconcile --project="$PROJECT" --location=us-central1   --schedule="30 6 * * *" --time-zone="America/New_York" --http-method=POST   --uri="$API_URL/v1/jobs/payments/reconcile"   --oidc-service-account-email="$SCHED_SA" --oidc-token-audience="$API_URL"
 ```
 
-Then set `JOBS_AUDIENCE=$API_URL` and `JOBS_INVOKER=$SCHED_SA` on the
-service. Add a log-based alert on `"payment problems found"` (warning) so
+The deploy sets `JOBS_AUDIENCE=$API_URL` and `JOBS_INVOKER=$SCHED_SA` on
+the service. Add a log-based alert on `"payment problems found"` (warning) so
 open problems reach someone.
 
 Staff approve each host's first payout, and each event once its payouts
