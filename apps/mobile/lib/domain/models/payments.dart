@@ -6,7 +6,8 @@
 /// returns (payoutTimingNote, refundPolicyNote in packages/shared).
 /// On the host's payouts card (payoutReviewNote in packages/shared).
 const payoutReviewNote =
-    "Stall 10 checks your first payout, and any over \$2,000, before it's sent.";
+    "Stall 10 checks your first payout, and an event's payouts once they "
+    "pass \$2,000, before they're sent.";
 
 const payoutTimingNote =
     'Fees paid online are held by Stall 10 and sent to the host a few days '

@@ -203,7 +203,8 @@ and events; everything else in the hub is for members. A private group
   before an event starts; an event can be a draft before then, and its
   location can be added later. Once open, fees can be paid at any time
   to secure a spot. (2026-11-24.)
-- Staff approve each host's first payout and any over $2,000 before it's
+- Staff approve each host's first payout, and an event's payouts once
+  their total to the host passes $2,000 (once per event), before they're
   sent; organizers can't pay online for their own event. Design and
   threats: `docs/payments-security.md`.
 - A fee already paid out to the host's bank is refunded by staff only

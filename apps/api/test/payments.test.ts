@@ -1542,6 +1542,35 @@ describe("security: fraud checks on payouts", () => {
     expect(s.gateway.transfers[0].amountCents).toBe(250000);
   });
 
+  it("an event's payouts to one host add up: past $2,000 the rest wait until staff approve the event", async () => {
+    ready();
+    // $1,700 of this event already sent; this $400 would pass $2,000.
+    s.store.put("payoutAccounts/host", { ...s.store.doc("payoutAccounts/host"), eventSent: { t1: 170000 } });
+    await paid();
+    finish();
+    await earnings();
+    expect(s.gateway.transfers).toHaveLength(0);
+    expect(s.store.doc("charges/cs_1")?.review).toBe("large");
+    // The daily check doesn't call it overdue: it's waiting for staff.
+    s.gateway.summaries.set("pi_1", { status: "succeeded", amountCents: s.store.doc("charges/cs_1")!.amountCents as number, refundedCents: 0, dispute: "none" });
+    expect((await s.call("POST", "/v1/payments/reconcile", undefined, "admin", "staff")).json()).toMatchObject({ issues: 0 });
+    await approve();
+    expect(s.gateway.transfers).toHaveLength(1);
+    expect(s.store.doc("payoutAccounts/host")).toMatchObject({ eventSent: { t1: 210000 }, approvedEvents: { t1: true } });
+  });
+
+  it("the daily check doesn't call a fee still in its hold (paid late) overdue", async () => {
+    const gateway = new FakeGateway();
+    const docs = [...s.store.docs.entries()];
+    s = setup(gateway, undefined, 3);
+    for (const [path, data] of docs) s.store.put(path, data);
+    ready();
+    s.store.put("tournaments/t1", { ...s.store.doc("tournaments/t1"), status: "finished", startsOn: new Date(now - 10 * day), finishedAt: new Date(now - 9 * day) });
+    await paid();
+    s.gateway.summaries.set("pi_1", { status: "succeeded", amountCents: s.store.doc("charges/cs_1")!.amountCents as number, refundedCents: 0, dispute: "none" });
+    expect((await s.call("POST", "/v1/payments/reconcile", undefined, "admin", "staff")).json()).toMatchObject({ issues: 0 });
+  });
+
   it("a fee paid after the event waits the hold from when it was paid", async () => {
     const gateway = new FakeGateway();
     const docs = [...s.store.docs.entries()];

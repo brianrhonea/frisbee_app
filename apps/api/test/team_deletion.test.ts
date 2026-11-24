@@ -74,9 +74,12 @@ describe("deleting a team", () => {
   });
 
   it("waits while Stall 10 holds fees for its events or it owes money back", async () => {
+    // Held (not sent yet), and disputed even after it was sent: unsettled.
     store.put("charges/cs_1", { hostId: "t1", flow: "platform", status: "paid" });
+    store.put("charges/cs_2", { hostId: "t1", flow: "platform", status: "disputed", released: true });
     expect(await del("t1", { name: "Haze" })).toBe(412);
     store.put("charges/cs_1", { hostId: "t1", flow: "platform", status: "paid", released: true });
+    store.put("charges/cs_2", { hostId: "t1", flow: "platform", status: "refunded", released: true });
     store.put("payoutAccounts/t1", { account: "acct_1", owedCents: 500 });
     expect(await del("t1", { name: "Haze" })).toBe(412);
     store.put("payoutAccounts/t1", { account: "acct_1", owedCents: 0 });

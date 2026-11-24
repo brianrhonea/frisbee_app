@@ -457,7 +457,8 @@ export class TournamentService {
       }
       // Moving an open event's date further out than the window isn't allowed.
       const newStart = dateOf(r.startsOn);
-      if (statusOf(t) === "registration" && newStart && newStart.getTime() !== dateOf(t.startsOn)?.getTime()) {
+      const live = statusOf(t) !== "draft" && statusOf(t) !== "finished";
+      if (live && newStart && newStart.getTime() !== dateOf(t.startsOn)?.getTime()) {
         const problem = registrationWindowProblem(newStart, this.now());
         if (problem) throw new ApiError("failed_precondition", `Registration is open, so the event can start at most ${registrationWindowDays} days from now. Move it back to a draft first.`);
       }

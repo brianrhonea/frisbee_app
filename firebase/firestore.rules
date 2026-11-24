@@ -1899,8 +1899,10 @@ service cloud.firestore {
         && (!('finishedAt' in changed()) || !('finishedAt' in request.resource.data))
         && (request.resource.data.get('status', '') == 'finished'
             || !('finishedAt' in request.resource.data))
-        && (request.resource.data.get('status', 'draft') != 'registration'
-            || !('status' in changed() || 'startsOn' in changed())
+        // Opening registration, or moving a published event's date: within the window.
+        && (request.resource.data.get('status', 'draft') in ['draft', 'finished']
+            || !(('status' in changed() && request.resource.data.status == 'registration')
+                 || 'startsOn' in changed())
             || inWindow(request.resource.data))
         && validHosted(request.resource.data)
         && officialHost(request.resource.data);

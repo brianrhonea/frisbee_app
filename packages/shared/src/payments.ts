@@ -382,8 +382,9 @@ export interface StaffChargeView {
 
 /**
  * Payouts staff approve before they go out (fraud: a host paying their own
- * event with stolen cards): each host's first, and any over
- * [payoutReviewOverCents].
+ * event with stolen cards): each host's first, and an event's once its
+ * payouts to the host would pass [payoutReviewOverCents] (staff approve the
+ * event once).
  */
 export const payoutReviews = ["first_payout", "large"] as const;
 export type PayoutReview = (typeof payoutReviews)[number];
@@ -394,7 +395,7 @@ export const payoutReviewLabels: Record<PayoutReview, string> = {
 export const payoutReviewOverCents = 200_000;
 
 /** On the host's payouts card (both platforms). */
-export const payoutReviewNote = "Stall 10 checks your first payout, and any over $2,000, before it's sent.";
+export const payoutReviewNote = "Stall 10 checks your first payout, and an event's payouts once they pass $2,000, before they're sent.";
 
 /** Why an event's organizers don't pay online for it. */
 export const selfPaymentMessage = "You run this event, so mark your own fee paid instead of paying it online.";

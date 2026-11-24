@@ -55,15 +55,16 @@ stay as they are.
 6. A payout needs: the event finished (`finishedAt`, stamped by the
    server, cleared on reopening), its last day passed (also as it was
    when the fee was paid), the hold over (`PAYOUT_HOLD_DAYS`, default 3,
-   after both finishing and paying), the host's payouts set up, and,
-   for a host's first payout or one over $2,000, staff approval.
+   after both finishing and paying), the host's payouts set up, and
+   staff approval for a host's first payout and for an event once its
+   payouts to the host pass $2,000 (`eventSent`, `approvedEvents`).
 
 ## Threats and controls
 
 | Threat | Controls |
 |---|---|
 | Stolen cards used to pay (card testing) | Stripe Radar (rules in DEPLOY.md); per-user rate limits on checkout and intents; App Check (`ENFORCE_APP_CHECK`); new-account gates; payments only for real entries or signups |
-| A host paying their own event with stolen cards and cashing out before the chargebacks | Organizers can't pay online for their own event; staff approve each host's first payout and large ones; 3-day hold; registration opens at most 60 days before the start, so fees aren't held long; disputes claw back from the host, and what can't be taken back is owed |
+| A host paying their own event with stolen cards and cashing out before the chargebacks | Organizers can't pay online for their own event; staff approve each host's first payout and each event past $2,000 paid out; 3-day hold; registration opens at most 60 days before the start, so fees aren't held long; disputes claw back from the host, and what can't be taken back is owed |
 | A host collecting fees for an event that never happens | Fees are held until the event is finished and its date has passed; moving the date earlier, or finishing early, doesn't pay out sooner; refunds come from Stall 10's balance before release |
 | A stolen or left-open session moving payouts to another bank | Only the team's owner sets up payouts; setting up or changing them needs a sign-in in the last 15 minutes; Stripe emails bank changes |
 | An organizer marking fees paid, or undoing a payment | Server-only payment records; paid-online lock in the API and rules |
@@ -87,6 +88,12 @@ stay as they are.
   unnecessary, so it can be removed once the jobs run everywhere.
 - Errors from Stripe in background steps (a credit transfer) are left
   for the daily check rather than logged on the spot.
+- Staff approval of a host isn't reset when the host changes its bank
+  account in Stripe's form. Follow Stripe's external-account events and
+  clear `approvedAt` on a change (Stripe also emails the host).
+- The self-payment block stops an organizer's own account; someone
+  using a second account to pay their own event is left to the payout
+  review, the hold and Radar.
 - A team's owner change is the main account-takeover path for payouts;
   consider requiring a fresh sign-in for handing a team on too.
 - The Stripe API version follows the SDK's pinned version; upgrade both

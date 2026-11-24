@@ -24,8 +24,8 @@ Stall 10 collects every fee and pays hosts out. With app 0.0.51 and API
 - `/staff`: **Payments**, problems found by the check against Stripe, the
   latest payments, **Send what's due to hosts** and **Check against
   Stripe** (staff only).
-- `/staff` Payments: **Waiting for approval** (a host's first payout and
-  ones over $2,000) with **Approve**.
+- `/staff` Payments: **Waiting for approval** (a host's first payout, and
+  an event's once its payouts pass $2,000) with **Approve**.
 - The event form's Publish waits until registration can open, 60 days
   before the start (Save draft still works), and says when.
 - Terms and privacy: paying fees and getting paid (Stall 10 collects,

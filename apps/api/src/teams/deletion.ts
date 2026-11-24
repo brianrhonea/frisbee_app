@@ -48,8 +48,9 @@ export class TeamDeletion {
     const hostsUnfinished = hosted.some((t) => t.data.status !== "finished");
     // Fees Stall 10 holds for it, or still owes it back (a won dispute's credit):
     // released is absent until sent, so filtered here, not in the query.
-    const charges = await this.queries.fields("charges", ["released", "kept", "creditCents"], 500, { hostId: teamId, flow: "platform", status: "paid" });
-    const holdsMoney = charges.some((c) => (c.data.released !== true && c.data.kept !== true) || Number(c.data.creditCents) > 0);
+    const unsettled = ["paid", "processing", "refunding", "disputed"];
+    const charges = (await Promise.all(unsettled.map((status) => this.queries.fields("charges", ["status", "released", "kept", "creditCents"], 500, { hostId: teamId, flow: "platform", status })))).flat();
+    const holdsMoney = charges.some((c) => c.data.status !== "paid" || (c.data.released !== true && c.data.kept !== true) || Number(c.data.creditCents) > 0);
     await this.store.transact(async (tx) => {
       const team = await tx.get(`teams/${teamId}`);
       if (!team) throw new ApiError("not_found", "That team doesn't exist.");

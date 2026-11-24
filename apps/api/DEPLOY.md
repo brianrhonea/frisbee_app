@@ -520,7 +520,8 @@ Then set `JOBS_AUDIENCE=$API_URL` and `JOBS_INVOKER=$SCHED_SA` on the
 service. Add a log-based alert on `"payment problems found"` (warning) so
 open problems reach someone.
 
-Staff approve each host's first payout and any over $2,000 on `/staff`
+Staff approve each host's first payout, and each event once its payouts
+to the host pass $2,000, on `/staff`
 (**Waiting for approval**); until then those fees stay held. Design,
 invariants and threats: `docs/payments-security.md`.
 

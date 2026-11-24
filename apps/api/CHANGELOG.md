@@ -70,9 +70,10 @@ transfers). With app 0.0.51 and web 0.59.0.
   - Reopening an event clears `finishedAt` (clients must drop it too), so
     finishing again starts a new hold; the daily check waits for the
     hold before flagging `payout_overdue`, and flags `credit_unsent`.
-  - Fraud checks: staff approve each host's first payout and any over
-    $2,000 (`charge.review`, `POST /v1/staff/payments/:session/approve`,
-    `payoutAccounts.approvedAt`); organizers can't pay online for their
+  - Fraud checks: staff approve each host's first payout, and an event's
+    payouts once their total to the host would pass $2,000
+    (`charge.review`, `POST /v1/staff/payments/:session/approve`,
+    `payoutAccounts.approvedAt`, `eventSent`, `approvedEvents`); organizers can't pay online for their
     own event (`selfPaymentMessage`); a fee paid after the event waits the
     hold from when it was paid.
   - Stripe forgets idempotency keys after 24 hours: a release planned over

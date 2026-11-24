@@ -93,8 +93,8 @@ events' `finishedAt` and deletes); no functions changes.
 - Event form: Publish waits until registration can open, 60 days before
   the start (`registrationWindowProblem`, `publishProblem`); Save draft
   still works.
-- Payouts card: says Stall 10 checks a host's first payout and any over
-  $2,000 (`payoutReviewNote`).
+- Payouts card: says Stall 10 checks a host's first payout, and an
+  event's payouts once they pass $2,000 (`payoutReviewNote`).
 
 ## 0.0.50 — Tournament flow: respond, deadline, seeds, director
 

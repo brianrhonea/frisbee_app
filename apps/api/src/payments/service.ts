@@ -141,6 +141,9 @@ export function payoutHoldDaysFromEnv(env: NodeJS.ProcessEnv = process.env): num
 }
 const defaultHoldDays = 3;
 
+/** A stored map (or {}). */
+const mapOf = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) && !(v instanceof Date) ? (v as Record<string, unknown>) : {});
+
 /** A release planned longer ago than this is looked up on Stripe before it's retried. */
 const retryLookupMs = 60 * 60 * 1000;
 
@@ -177,7 +180,7 @@ const p = {
 /** What the host's earnings read of each charge. */
 const reconcileFields = [
   "status", "paymentIntent", "amountCents", "refundCents", "amountRefundedCents", "released", "kept", "transfer", "transferCents",
-  "destination", "reversed", "owedCents", "release", "updatedAt", "createdAt", "tournamentId", "hostId", "payerId", "label", "official", "eventEndsAt", "creditCents",
+  "destination", "reversed", "owedCents", "release", "updatedAt", "createdAt", "tournamentId", "hostId", "payerId", "label", "official", "eventEndsAt", "creditCents", "paidAt", "approvedAt", "baseCents",
 ] as const;
 const issueFields = ["kinds", "detail", "tournamentId", "hostId", "payerId", "label", "firstSeenAt", "lastSeenAt"] as const;
 const staffChargeFields = [
@@ -1163,7 +1166,9 @@ export class PaymentService {
       const owed = cents(payout!.owedCents);
       const taken = Math.min(owed, base);
       const amount = base - taken;
-      if (taken > 0) tx.update(p.payout(meta.hostId), { owedCents: owed - taken, updatedAt: serverTime });
+      // Counted towards the event's total for review (planned counts: it's going).
+      const eventSent = { ...mapOf(payout!.eventSent), [meta.tournamentId]: cents(mapOf(payout!.eventSent)[meta.tournamentId]) + base };
+      tx.update(p.payout(meta.hostId), { owedCents: owed - taken, eventSent, updatedAt: serverTime });
       if (amount === 0) {
         // All of it paid back what the host owed.
         tx.update(p.charge(session), { released: true, releasedAt: serverTime, transferCents: 0, owedTakenCents: taken, releases: n, updatedAt: serverTime });
@@ -1219,7 +1224,12 @@ export class PaymentService {
   /** Whether this payout waits for staff: the host's first ever, or a large one not yet approved. */
   private reviewFor(payout: Data, charge: Data, base: number): PayoutReview | null {
     if (!dateOf(payout.approvedAt)) return "first_payout";
-    if (base > (this.config?.reviewOverCents ?? payoutReviewOverCents) && !dateOf(charge.approvedAt)) return "large";
+    // An event's payouts to this host add up: past the limit, staff
+    // approve the event once (or this fee).
+    const t = str(charge.tournamentId);
+    const sent = cents(mapOf(payout.eventSent)[t]);
+    const approved = mapOf(payout.approvedEvents)[t] === true || !!dateOf(charge.approvedAt);
+    if (sent + base > (this.config?.reviewOverCents ?? payoutReviewOverCents) && !approved) return "large";
     return null;
   }
 
@@ -1237,7 +1247,10 @@ export class PaymentService {
       const hostId = storedId(charge.hostId);
       const payout = hostId ? await tx.get(p.payout(hostId)) : null;
       tx.update(p.charge(session), { approvedAt: serverTime, approvedBy: caller.uid, review: null, updatedAt: serverTime });
-      if (hostId && payout && !dateOf(payout.approvedAt)) tx.update(p.payout(hostId), { approvedAt: serverTime, approvedBy: caller.uid, updatedAt: serverTime });
+      if (hostId && payout) {
+        const approvedEvents = { ...mapOf(payout.approvedEvents), [str(charge.tournamentId)]: true };
+        tx.update(p.payout(hostId), { ...(!dateOf(payout.approvedAt) && { approvedAt: serverTime, approvedBy: caller.uid }), approvedEvents, updatedAt: serverTime });
+      }
       this.logCharge(tx, session, charge, "payout_approved", { amountCents: cents(charge.baseCents) });
     });
     return { status: await this.releaseQuietly(session) };
@@ -1583,7 +1596,7 @@ export class PaymentService {
         const hostId = str(c.hostId);
         const t = await cached(tournaments, p.tournament(str(c.tournamentId)), str(c.tournamentId));
         const payout = hostId ? await cached(payouts, p.payout(hostId), hostId) : null;
-        if (t && this.releasable(t, c) && c.official !== true && payoutOf(payout) === "ready") {
+        if (t && this.releasable(t, c) && c.official !== true && payoutOf(payout) === "ready" && !this.reviewFor(payout!, c, cents(c.baseCents))) {
           kinds.push("payout_overdue");
           detail.push("The event is over and the host's payouts are set up");
         }
