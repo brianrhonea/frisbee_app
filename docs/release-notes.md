@@ -10,6 +10,12 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.52
+
+- **Setting up payments asks you to confirm it's you.** If you signed in
+  a while ago, enter your password (or continue with Google or Apple)
+  and Stripe's form opens, instead of an "auth failed" message.
+
 ## 0.0.51
 
 - **Stall 10 now takes fee payments and pays hosts.** Teams and players

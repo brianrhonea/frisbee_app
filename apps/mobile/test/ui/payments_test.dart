@@ -2,6 +2,7 @@
 // fake PaymentRepository (the API's own tests cover Stripe and the
 // webhook: apps/api/test/payments.test.ts).
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -268,6 +269,13 @@ void main() {
     expect(isStripeReturn(Uri.parse('/teams/t1')), isFalse);
   });
 
+  test('the re-sign-in message matches the API (packages/shared)', () {
+    // The setup screen spots the API's answer by this text, then asks the
+    // owner to confirm it's them.
+    final ts = File('../../packages/shared/src/payments.ts').readAsStringSync();
+    expect(ts, contains('payoutsReauthMessage = "$payoutsReauthMessage"'));
+  });
+
   group('payouts card', () {
     testWidgets('offers Stripe with the fee, and opens its page', (
       tester,
@@ -302,7 +310,10 @@ void main() {
       await pump(tester, PayoutsCard(key: UniqueKey(), teamId: 'host'));
       expect(find.text('Online payments are on'), findsOneWidget);
       expect(find.byType(FilledButton), findsNothing);
-      expect(find.textContaining('a few days after each event'), findsOneWidget);
+      expect(
+        find.textContaining('a few days after each event'),
+        findsOneWidget,
+      );
       expect(find.textContaining('Stripe Dashboard'), findsNothing);
     });
 

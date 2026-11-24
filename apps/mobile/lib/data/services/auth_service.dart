@@ -80,6 +80,8 @@ class AuthService {
       case null:
         throw Exception("Your sign-in method can't confirm it's you here.");
     }
+    // A new ID token, so the API sees the new sign-in time.
+    await _auth.currentUser?.getIdToken(true);
   }
 
   /// Confirms [current] and sets [next] as the password. Firebase wants a

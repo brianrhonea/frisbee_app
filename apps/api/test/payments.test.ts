@@ -12,6 +12,7 @@ import {
   onlinePaymentProblem,
   processingPaymentNote,
   paidOnlineNote,
+  payoutsReauthMessage,
   platformFeeCents,
   platformFeeLabel,
   refundedNote,
@@ -1438,8 +1439,10 @@ describe("security: holding and protecting payouts", () => {
   it("setting up or changing payouts needs a recent sign-in", async () => {
     const stale = await s.call("POST", "/v1/teams/host/payouts/session");
     expect(stale.status).toBe(412);
-    expect(stale.message()).toContain("sign in again");
+    expect(stale.message()).toBe(payoutsReauthMessage);
     expect(s.gateway.accountSessions).toHaveLength(0);
+    // A stale session can't even make the host's Stripe account.
+    expect(s.gateway.created).toHaveLength(0);
     expect((await s.call("POST", "/v1/teams/host/payouts/link")).status).toBe(412);
     expect((await s.call("POST", "/v1/teams/host/payouts/session", undefined, "owner", "fresh")).status).toBe(200);
   });

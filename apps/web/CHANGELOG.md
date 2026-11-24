@@ -4,6 +4,12 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.59.1 — 2026-11-24
+
+- Setting up payouts more than 15 minutes after signing in asks you to
+  confirm it's you (password, Google or Apple) and then opens Stripe's
+  form, instead of Stripe's form saying it couldn't sign in.
+
 ## 0.59.0 — 2026-11-23
 
 Stall 10 collects every fee and pays hosts out. With app 0.0.51 and API

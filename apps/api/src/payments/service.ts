@@ -344,6 +344,9 @@ export class PaymentService {
   private async ensureAccount(caller: Caller, teamId: string): Promise<string> {
     const team = await this.owned(teamId, caller.uid);
     if (!this.config) throw notSetUp();
+    // The owner, then a recent sign-in, before anything is made: a stale
+    // session can't even create the account.
+    this.requireRecentSignIn(caller);
     const record = await this.store.get(p.payout(teamId));
     if (isRecipient(record)) return str(record!.account);
     // Keyed by team: two owners' clicks (or a retry) make one account. A
@@ -376,7 +379,6 @@ export class PaymentService {
   async payoutLink(caller: Caller, rawTeam: unknown): Promise<PayoutLinkResult> {
     const teamId = docIdParam(rawTeam);
     const account = await this.ensureAccount(caller, teamId);
-    this.requireRecentSignIn(caller);
     const page = `${this.config!.returnUrl}/payments/payouts?team=${encodeURIComponent(teamId)}`;
     return { url: await this.config!.gateway.onboardingLink(account, `${page}&retry=1`, page) };
   }
@@ -389,7 +391,6 @@ export class PaymentService {
   async payoutSession(caller: Caller, rawTeam: unknown): Promise<PayoutSessionResult> {
     const teamId = docIdParam(rawTeam);
     const account = await this.ensureAccount(caller, teamId);
-    this.requireRecentSignIn(caller);
     return { clientSecret: await this.config!.gateway.accountSession(account) };
   }
 

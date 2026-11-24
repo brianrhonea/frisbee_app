@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.52  | 2026-11-24 | `development`                           |                     |
 | 0.0.51  | 2026-11-23 | `feature/platform-payments`             |                     |
 | 0.0.50  | 2026-11-23 | `feature/tournament-flow`               |                     |
 | 0.0.49  | 2026-11-22 | `feature/tournament-invites-pay`        |                     |
@@ -64,6 +65,14 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.52 — Confirm it's you before setting up payouts
+
+- Set up payments / Bank account and payouts: when the API wants a recent
+  sign-in (`payoutsReauthMessage`, 412), the screen asks for the
+  password, Google or Apple, gets a fresh ID token, and opens Stripe's
+  form. Same on the website (`ConfirmSignIn`). Test: the app's message
+  matches packages/shared.
 
 ## 0.0.51 — Stall 10 collects fees and pays hosts out
 

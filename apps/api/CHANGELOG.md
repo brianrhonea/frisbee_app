@@ -7,6 +7,16 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.47.1 — 2026-11-24
+
+- Setting up payouts checks the recent sign-in before anything else, so a
+  stale session can't even create the host's Stripe account. The answer
+  (412) now says "confirm it's you", and the app and website ask for the
+  password, Google or Apple right there.
+- Deploy: `service.yaml` reads the Stripe key and both webhook secrets,
+  the payout hold (`API_PAYOUT_HOLD_DAYS_<ENV>`) and the payment jobs'
+  audience and invoker.
+
 ## 0.47.0 — 2026-11-23
 
 Stall 10 collects every fee and pays hosts out (separate charges and

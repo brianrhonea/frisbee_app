@@ -420,7 +420,12 @@ export interface ReconcileResult {
 }
 
 /** Setting up or changing payouts needs a sign-in in the last 15 minutes (so a left-open session can't move a host's money). */
-export const payoutsReauthMessage = "For your security, sign out and sign in again, then set up or change payouts within 15 minutes.";
+/**
+ * The API's answer (412) when payouts are set up or changed without a
+ * sign-in in the last 15 minutes. The app and website then ask the owner
+ * to confirm it's them (their password, Google or Apple) and try again.
+ */
+export const payoutsReauthMessage = "For your security, confirm it's you before setting up or changing payouts.";
 
 export const paymentPaths = {
   payouts: (teamId: string) => `/v1/teams/${teamId}/payouts`,

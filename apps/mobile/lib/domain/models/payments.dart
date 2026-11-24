@@ -9,6 +9,13 @@ const payoutReviewNote =
     "Stall 10 checks your first payout, and an event's payouts once they "
     "pass \$2,000, before they're sent.";
 
+/// The API's answer when payouts are set up or changed without a sign-in
+/// in the last 15 minutes (payoutsReauthMessage in packages/shared): the
+/// app asks the owner to confirm it's them, then tries again.
+const payoutsReauthMessage =
+    "For your security, confirm it's you before setting up or changing "
+    'payouts.';
+
 const payoutTimingNote =
     'Fees paid online are held by Stall 10 and sent to the host a few days '
     'after the event is over.';

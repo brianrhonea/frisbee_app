@@ -34,6 +34,7 @@ import type { User } from "firebase/auth";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PaymentDoc } from "@/components/drafts/data";
 import { callApi, problem } from "@/lib/client";
+import { ConfirmSignIn } from "./ConfirmSignIn";
 
 /** One fee's state on the host's payouts card (EarningsStatus.label in the app). */
 const earningsStatusLabels: Record<EarningsView["items"][number]["status"], string> = {
@@ -148,18 +149,36 @@ export function EmbeddedOnboarding({
   const exit = useRef(onExit);
   exit.current = onExit;
   const [error, setError] = useState("");
+  // The API wants a sign-in from the last 15 minutes first (ConfirmSignIn).
+  const [reauth, setReauth] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let live = true;
     let elements: HTMLElement[] = [];
     (async () => {
       try {
         if (!publishableKey) throw new Error("no key");
-        const { loadConnectAndInitialize } = await import("@stripe/connect-js");
-        const fetchClientSecret = async () => {
+        const session = async () => {
           if (clientSecret) return clientSecret;
           if (!user || !teamId) throw new Error("no session");
           const r = await callApi<PayoutSessionResult>(user, paymentPaths.payoutSession(encodeURIComponent(teamId)), { method: "POST", body: {} });
           return r.clientSecret;
+        };
+        // Asked for here, before Stripe's form loads, so a refusal shows our
+        // message (Stripe's form would only say it couldn't sign in).
+        let first: string | null;
+        try {
+          first = await session();
+        } catch (e) {
+          if (live && e instanceof Error && e.message === payoutsReauthMessage && user) return setReauth(true);
+          throw e;
+        }
+        const { loadConnectAndInitialize } = await import("@stripe/connect-js");
+        // Stripe asks again when the session runs out.
+        const fetchClientSecret = async () => {
+          const s = first ?? (await session());
+          first = null;
+          return s;
         };
         const connect = loadConnectAndInitialize({
           publishableKey,
@@ -176,14 +195,25 @@ export function EmbeddedOnboarding({
         if (!live) return;
         for (const e of elements) box.current?.appendChild(e);
       } catch (e) {
-        if (live) setError(e instanceof Error && e.message === payoutsReauthMessage ? payoutsReauthMessage : "Couldn't open Stripe's setup here. Check your connection and try again.");
+        if (live) setError("Couldn't open Stripe's setup here. Check your connection and try again.");
       }
     })();
     return () => {
       live = false;
       for (const e of elements) e.remove();
     };
-  }, [user, teamId, clientSecret, view]);
+  }, [user, teamId, clientSecret, view, attempt]);
+  if (reauth && user) {
+    return (
+      <ConfirmSignIn
+        user={user}
+        onConfirmed={() => {
+          setReauth(false);
+          setAttempt((n) => n + 1);
+        }}
+      />
+    );
+  }
   return error ? <p className="form-error">{error}</p> : <div ref={box} className="embedded-onboarding" aria-busy="true" />;
 }
 
