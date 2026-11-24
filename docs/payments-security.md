@@ -75,7 +75,14 @@ stay as they are.
 | Leaked keys | Secrets only in Secret Manager; a restricted live key; rotation (DEPLOY.md) |
 | Scheduler routes called by anyone | Google-signed OIDC tokens for one service account and this API's URL only |
 
+Failure testing: `docs/payments-failure-testing.md`. Fraud ideas to
+decide on: `docs/payments-fraud-ideas.md`.
+
 ## Known gaps (to do)
+
+- A payout uses the host's stored readiness (kept current by Stripe's
+  `account.updated` webhook); Stripe refuses a transfer to an account
+  that can't take one, and the fee stays held.
 
 - Rate limits are per server instance (in memory). Before launch, put
   checkout and intents behind a shared limit (Firestore or Redis) and

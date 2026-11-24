@@ -144,6 +144,9 @@ const defaultHoldDays = 3;
 /** A stored map (or {}). */
 const mapOf = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) && !(v instanceof Date) ? (v as Record<string, unknown>) : {});
 
+/** How long a refund that's under way keeps others from starting it again. */
+const refundLeaseMs = 60 * 1000;
+
 /** A release planned longer ago than this is looked up on Stripe before it's retried. */
 const retryLookupMs = 60 * 60 * 1000;
 
@@ -1390,12 +1393,31 @@ export class PaymentService {
       if (charge.release && typeof charge.release === "object") throw new ApiError("failed_precondition", "Its payout is going out right now. Try again in a minute.");
       const amount = status === "refunding" ? cents(charge.refundCents) : cents(charge.baseCents);
       if (amount === 0) throw nothing();
+      // One refund at a time (a double click, two organizers): a retry of a
+      // failed one waits a minute, then takes over.
+      const lease = typeof charge.refundLease === "number" ? charge.refundLease : 0;
+      if (status === "refunding" && this.now() - lease < refundLeaseMs) throw new ApiError("failed_precondition", "This refund is already going through. Check back in a minute.");
+      tx.update(p.charge(session), { refundLease: this.now() });
       if (status === "paid") {
         tx.update(p.charge(session), { status: "refunding", refundCents: amount, refundBy: caller.uid, updatedAt: serverTime });
         logPayment(this.store, tx, { tournamentId: id, payerId, action: "refund_started", by: caller.uid, amountCents: amount, currency: str(charge.currency) || undefined, paymentIntent: str(charge.paymentIntent) || undefined });
       }
       return { amount, pi: str(charge.paymentIntent), retry: status === "refunding" };
     });
+    try {
+      await this.finishRefund(caller, id, payerId, session, start);
+    } catch (e) {
+      // Failed part way: free it for a retry straight away (it carries on
+      // from where it stopped, with the same keys).
+      await this.store.transact(async (tx) => {
+        if (await tx.get(p.charge(session))) tx.update(p.charge(session), { refundLease: 0 });
+      });
+      throw e;
+    }
+  }
+
+  private async finishRefund(caller: Caller, id: string, payerId: string, session: string, start: { amount: number; pi: string; retry: boolean }): Promise<void> {
+    const config = this.config!;
     // The host's share first, so a refund never goes out while the host
     // still has it. Already paid out to the host's bank: only staff can
     // refund then (the rest is owed); an organizer is told to ask.
@@ -1413,8 +1435,8 @@ export class PaymentService {
     }
     // A refund that was started before: if Stripe already made it, don't
     // make another (its idempotency key lasts 24 hours only).
-    const done = start.retry ? (await this.config.gateway.paymentSummary(start.pi)).refundedCents >= start.amount : false;
-    if (!done) await this.config.gateway.refund(null, start.pi, start.amount, `refund:${session}`);
+    const done = start.retry ? (await config.gateway.paymentSummary(start.pi)).refundedCents >= start.amount : false;
+    if (!done) await config.gateway.refund(null, start.pi, start.amount, `refund:${session}`);
     await this.store.transact(async (tx) => {
       const charge = await tx.get(p.charge(session));
       const payment = await tx.get(p.payment(id, payerId));

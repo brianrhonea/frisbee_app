@@ -77,7 +77,10 @@ class FakeGateway implements PaymentGateway {
   async account(account: string) {
     return this.accounts.get(account) ?? { transfersEnabled: false, detailsSubmitted: false };
   }
+  /** Stripe failing to create a checkout. */
+  failCheckout = false;
   async createCheckout(input: CheckoutInput) {
+    if (this.failCheckout) throw new Error("stripe down");
     this.checkouts.push(input);
     const id = `cs_${this.checkouts.length}`;
     this.sessions.set(id, { status: "open", paymentStatus: "unpaid", paymentIntent: null, paymentFailed: false });
@@ -123,15 +126,27 @@ class FakeGateway implements PaymentGateway {
   pay(id: string, pi: string, paymentStatus: "paid" | "unpaid" = "paid", paymentFailed = false) {
     this.sessions.set(id, { status: "complete", paymentStatus, paymentIntent: pi, paymentFailed });
   }
+  /** Stripe failing the refund call (a timeout or an error). */
+  failRefund = false;
   async refund(account: string | null, paymentIntent: string, amountCents: number | undefined, idempotencyKey: string) {
+    if (this.failRefund) throw new Error("stripe down");
+    // Stripe's idempotency: the same key is the same refund.
+    if (this.refunds.some((r) => r.idempotencyKey === idempotencyKey)) return;
     this.refunds.push({ account, paymentIntent, amountCents, idempotencyKey });
   }
   async refundApplicationFee(feeId: string) {
     if (this.failFeeRefund) throw new Error("stripe down");
     this.feeRefunds.push(feeId);
   }
+  /** Runs while a transfer is in flight (a webhook landing mid-payout). */
+  duringTransfer: (() => Promise<void>) | null = null;
   async transfer(input: TransferInput) {
     if (this.failTransfer) throw new Error("stripe down");
+    if (this.duringTransfer) {
+      const run = this.duringTransfer;
+      this.duringTransfer = null;
+      await run();
+    }
     // Stripe's idempotency: the same key is the same transfer.
     const i = this.transfers.findIndex((t) => t.idempotencyKey === input.idempotencyKey);
     if (i >= 0) return `tr_${i + 1}`;
@@ -143,11 +158,19 @@ class FakeGateway implements PaymentGateway {
     const i = this.transfers.findIndex((t) => t.transferGroup === transferGroup && t.metadata.chargeId === chargeId && t.metadata.release === String(n));
     return i >= 0 ? `tr_${i + 1}` : null;
   }
+  /** Runs while a reversal is in flight (a second click). */
+  duringReversal: (() => Promise<void>) | null = null;
   /** Stripe failing for another reason (a timeout): never counted as owed. */
   breakReversal = false;
   async reverseTransfer(transfer: string, amountCents: number, idempotencyKey: string) {
+    if (this.duringReversal) {
+      const run = this.duringReversal;
+      this.duringReversal = null;
+      await run();
+    }
     if (this.breakReversal) throw new Error("timeout");
     if (this.failReversal) throw new InsufficientBalance();
+    if (this.reversals.some((r) => r.idempotencyKey === idempotencyKey)) return;
     this.reversals.push({ transfer, amountCents, idempotencyKey });
   }
   /** Each payment as the daily check would find it on Stripe (unset: Stripe doesn't answer). */
@@ -191,9 +214,9 @@ function setup(gateway: FakeGateway | null = new FakeGateway(), jobs?: JobVerifi
   };
   let n = 0;
   /** A webhook event; null: Stall 10's own account (charges), else a host's (Connect). */
-  const hook = async (type: string, object: Record<string, unknown>, account: string | null = null, signature = "signed") => {
+  const hook = async (type: string, object: Record<string, unknown>, account: string | null = null, signature = "signed", id?: string) => {
     n++;
-    const event: GatewayEvent = { id: `evt_${n}`, type, account, object };
+    const event: GatewayEvent = { id: id ?? `evt_${n}`, type, account, object };
     const res = await app.inject({
       method: "POST",
       url: "/v1/payments/stripe/webhook",
@@ -1645,5 +1668,288 @@ describe("one payment system for every event fee", () => {
     ]);
     // Both are Stall 10's charges, for the league's group of transfers.
     expect(s.gateway.checkouts.every((c) => c.transferGroup === "tournament_lg")).toBe(true);
+  });
+});
+
+/**
+ * Failure simulation: each step of taking and paying out a fee, broken in
+ * turn (Stripe down, a crash between steps, duplicate and out-of-order
+ * webhooks, double clicks, races), checking money is never lost, sent
+ * twice or refunded twice. See docs/payments-failure-testing.md.
+ */
+describe("failure simulation", () => {
+  /** The next [n]th store transaction throws, as if the server died there. */
+  function crashTransaction(n = 1) {
+    const real = s.store.transact.bind(s.store);
+    let left = n;
+    s.store.transact = (async (fn: Parameters<typeof real>[0]) => {
+      left--;
+      if (left === 0) {
+        s.store.transact = real;
+        throw new Error("server crashed");
+      }
+      return real(fn);
+    }) as typeof real;
+  }
+  const refund = (uid = "coach", kind = "token") => s.call("POST", "/v1/tournaments/t1/payments/haze/refund", undefined, uid, kind);
+  const sweep = () => s.call("POST", "/v1/payments/release", undefined, "admin", "staff");
+  const stripeSays = (patch: Partial<GatewayPaymentSummary> = {}) =>
+    s.gateway.summaries.set("pi_1", { status: "succeeded", amountCents: s.store.doc("charges/cs_1")!.amountCents as number, refundedCents: 0, dispute: "none", ...patch });
+
+  describe("taking the payment", () => {
+    it("Stripe down when checkout starts: nothing is recorded as paid", async () => {
+      ready();
+      s.gateway.failCheckout = true;
+      expect((await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain")).status).toBeGreaterThanOrEqual(500);
+      expect(s.store.doc("tournaments/t1/payments/haze")).toBeUndefined();
+      s.gateway.failCheckout = false;
+      expect((await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain")).status).toBe(200);
+    });
+
+    it("a forged webhook changes nothing", async () => {
+      ready();
+      await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
+      expect((await s.hook("checkout.session.completed", completed(), null, "forged")).status).toBe(400);
+      expect(s.store.doc("tournaments/t1/payments/haze")).toBeUndefined();
+      expect(s.store.doc("charges/cs_1")?.status).toBe("open");
+    });
+
+    it("the same webhook delivered twice, or two events for one payment, record it once", async () => {
+      ready();
+      await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
+      await s.hook("checkout.session.completed", completed(), null, "signed", "evt_same");
+      await s.hook("checkout.session.completed", completed(), null, "signed", "evt_same");
+      await s.hook("checkout.session.completed", completed());
+      await s.hook("payment_intent.succeeded", { id: "pi_1", status: "succeeded", metadata: { chargeId: "cs_1" } });
+      const log = [...s.store.docs.entries()].filter(([k, d]) => k.startsWith("paymentLog/") && d.action === "paid_online");
+      expect(log).toHaveLength(1);
+      expect(s.store.doc("charges/cs_1")?.status).toBe("paid");
+    });
+
+    it("a crash while recording a payment: Stripe redelivers the webhook and it's recorded then", async () => {
+      ready();
+      await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
+      crashTransaction();
+      expect((await s.hook("checkout.session.completed", completed(), null, "signed", "evt_crash")).status).toBeGreaterThanOrEqual(500);
+      expect(s.store.doc("stripeEvents/evt_crash")).toBeUndefined();
+      expect((await s.hook("checkout.session.completed", completed(), null, "signed", "evt_crash")).status).toBe(200);
+      expect(s.store.doc("charges/cs_1")?.status).toBe("paid");
+    });
+
+    it("a checkout expiring after it was paid doesn't undo the payment", async () => {
+      ready();
+      await paid();
+      await s.hook("checkout.session.expired", { id: "cs_1", payment_status: "unpaid", metadata: {} });
+      expect(s.store.doc("charges/cs_1")?.status).toBe("paid");
+      expect(s.store.doc("tournaments/t1/payments/haze")?.paid).toBe(true);
+    });
+
+    it("paying twice (two tabs) refunds the second payment in full", async () => {
+      ready();
+      await paid();
+      // A second checkout the payer had open completes too.
+      s.store.put("charges/cs_2", { ...s.store.doc("charges/cs_1"), status: "open", paymentIntent: "pi_2" });
+      await s.hook("checkout.session.completed", completed("cs_2", "pi_2"));
+      // Marked a duplicate, refunded in full (Stall 10's fee too).
+      expect(s.store.doc("charges/cs_2")?.status).toBe("refunded");
+      expect([...s.store.docs.values()].some((d) => d.action === "duplicate_payment")).toBe(true);
+      expect(s.gateway.refunds.map((r) => r.paymentIntent)).toEqual(["pi_2"]);
+      expect(s.store.doc("charges/cs_1")?.status).toBe("paid");
+    });
+  });
+
+  describe("paying the host", () => {
+    it("Stripe down at payout: held, then sent once for the same amount", async () => {
+      ready();
+      await paid();
+      finish();
+      s.gateway.failTransfer = true;
+      await sweep();
+      expect(s.gateway.transfers).toHaveLength(0);
+      s.gateway.failTransfer = false;
+      await sweep();
+      await sweep();
+      expect(s.gateway.transfers).toHaveLength(1);
+      expect(s.gateway.transfers[0].amountCents).toBe(40000);
+    });
+
+    it("a crash after Stripe sent the transfer but before it was recorded: never sent twice", async () => {
+      ready();
+      await paid();
+      finish();
+      // The transaction after the transfer (recording it) dies.
+      s.gateway.duringTransfer = async () => crashTransaction();
+      await sweep();
+      expect(s.gateway.transfers).toHaveLength(1);
+      expect(s.store.doc("charges/cs_1")?.released).not.toBe(true);
+      await sweep();
+      await sweep();
+      expect(s.gateway.transfers).toHaveLength(1);
+      expect(s.store.doc("charges/cs_1")).toMatchObject({ released: true, transfer: "tr_1" });
+    });
+
+    it("three payout runs at once send one transfer", async () => {
+      ready();
+      await paid();
+      finish();
+      await Promise.all([sweep(), sweep(), earnings()]);
+      await sweep();
+      expect(s.gateway.transfers).toHaveLength(1);
+    });
+
+    it("a dispute landing while the transfer is in flight: the transfer is taken back", async () => {
+      ready();
+      await paid();
+      finish();
+      s.gateway.duringTransfer = async () => {
+        await s.hook("charge.dispute.created", { id: "dp_1", payment_intent: "pi_1" });
+      };
+      await sweep();
+      expect(s.gateway.transfers).toHaveLength(1);
+      expect(s.gateway.reversals).toHaveLength(1);
+      expect(s.store.doc("charges/cs_1")).toMatchObject({ status: "disputed", reversed: true });
+    });
+
+    it("a refund landing while the transfer is in flight: the transfer is taken back", async () => {
+      ready();
+      await paid();
+      finish();
+      s.gateway.duringTransfer = async () => {
+        await s.hook("charge.refunded", { id: "ch_pi_1", payment_intent: "pi_1", refunded: true, amount_refunded: 42461 });
+      };
+      await sweep();
+      expect(s.gateway.reversals).toHaveLength(1);
+      expect(s.store.doc("charges/cs_1")).toMatchObject({ status: "refunded", reversed: true });
+    });
+
+    it("the host's Stripe account is restricted: fees wait", async () => {
+      ready();
+      await paid();
+      // Then Stripe needs more from the host (its account can't take transfers), and says so.
+      s.gateway.accounts.set("acct_1", { transfersEnabled: false, detailsSubmitted: true });
+      await s.hook("account.updated", { id: "acct_1" }, "acct_1");
+      finish();
+      await sweep();
+      expect(s.gateway.transfers).toHaveLength(0);
+      expect((await earnings()).heldCents).toBe(40000);
+    });
+  });
+
+  describe("refunds", () => {
+    it("a double click refunds once", async () => {
+      ready();
+      await paid();
+      finish();
+      await sweep();
+      // The second click lands while the first is taking the host's share back.
+      let second = 0;
+      s.gateway.duringReversal = async () => {
+        second = (await refund()).status;
+      };
+      expect((await refund()).status).toBe(204);
+      expect(second).toBe(412);
+      expect(s.gateway.refunds).toHaveLength(1);
+      expect(s.gateway.reversals).toHaveLength(1);
+      expect(s.gateway.refunds[0].amountCents).toBe(40000);
+    });
+
+    it("Stripe fails the refund after the host's share was taken back: retrying refunds once, never reverses twice", async () => {
+      ready();
+      await paid();
+      finish();
+      await sweep();
+      s.gateway.failRefund = true;
+      expect((await refund()).status).toBeGreaterThanOrEqual(500);
+      expect(s.gateway.reversals).toHaveLength(1);
+      expect(s.store.doc("charges/cs_1")).toMatchObject({ status: "refunding", reversed: true });
+      s.gateway.failRefund = false;
+      stripeSays();
+      expect((await refund()).status).toBe(204);
+      expect((await refund()).status).toBe(412);
+      expect(s.gateway.reversals).toHaveLength(1);
+      expect(s.gateway.refunds).toHaveLength(1);
+      expect(s.store.doc("charges/cs_1")?.status).toBe("refunded");
+    });
+
+    it("refunding while its payout is going out waits", async () => {
+      ready();
+      await paid();
+      finish();
+      let during = 0;
+      s.gateway.duringTransfer = async () => {
+        during = (await refund()).status;
+      };
+      await sweep();
+      expect(during).toBe(412);
+      expect(s.gateway.refunds).toHaveLength(0);
+      expect((await refund()).status).toBe(204);
+      expect(s.gateway.reversals).toHaveLength(1);
+    });
+
+    it("a refund never returns more than the fee, and a refunded fee can't be refunded again", async () => {
+      ready();
+      await paid();
+      expect((await refund()).status).toBe(204);
+      expect((await refund()).status).toBe(412);
+      expect(s.gateway.refunds).toEqual([expect.objectContaining({ amountCents: 40000 })]);
+    });
+
+    it("only the host's organizers and staff can refund", async () => {
+      ready();
+      await paid();
+      for (const uid of ["captain", "player", "fan"]) expect((await refund(uid)).status).toBe(403);
+      expect(s.gateway.refunds).toHaveLength(0);
+    });
+  });
+
+  describe("disputes", () => {
+    it("lost after the host was paid and spent it: owed, taken off the next payout, the books balance", async () => {
+      ready();
+      await paid();
+      finish();
+      await sweep();
+      s.gateway.failReversal = true;
+      await s.hook("charge.dispute.created", { id: "dp_1", payment_intent: "pi_1" });
+      await s.hook("charge.dispute.closed", { id: "dp_1", payment_intent: "pi_1", status: "lost" });
+      expect(s.store.doc("payoutAccounts/host")?.owedCents).toBe(40000);
+      s.gateway.failReversal = false;
+      // The next event's $500 pays back the $400 first.
+      s.store.put("tournaments/t2", { hostId: "host", name: "Fall Fling", status: "registration", entryType: "teams", visibility: "public", bidFee: fee(50000), startsOn: new Date(now + day) });
+      s.store.put("tournaments/t2/entries/haze", { teamName: "Haze", divisionId: "d1", status: "accepted" });
+      await paid("t2", "cs_2", "pi_2");
+      finish("t2");
+      await sweep();
+      expect(s.gateway.transfers.map((t) => t.amountCents)).toEqual([40000, 10000]);
+      expect(s.store.doc("payoutAccounts/host")?.owedCents).toBe(0);
+    });
+
+    it("the same dispute webhook twice takes the host's share back once", async () => {
+      ready();
+      await paid();
+      finish();
+      await sweep();
+      await s.hook("charge.dispute.created", { id: "dp_1", payment_intent: "pi_1" });
+      await s.hook("charge.dispute.created", { id: "dp_1", payment_intent: "pi_1" });
+      expect(s.gateway.reversals).toHaveLength(1);
+    });
+  });
+
+  describe("the daily check catches what slipped through", () => {
+    it("a refund made in Stripe whose webhook never arrived is flagged", async () => {
+      ready();
+      await paid();
+      stripeSays({ refundedCents: 40000 });
+      await s.call("POST", "/v1/payments/reconcile", undefined, "admin", "staff");
+      expect((await s.call("GET", "/v1/staff/payments", undefined, "admin", "staff")).json().issues[0].kinds).toContain("refund_not_recorded");
+    });
+
+    it("a payment whose webhook never arrived is flagged while the attempt is recent", async () => {
+      ready();
+      await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain");
+      s.store.put("charges/cs_1", { ...s.store.doc("charges/cs_1"), paymentIntent: "pi_1" });
+      s.gateway.summaries.set("pi_1", { status: "succeeded", amountCents: 41236, refundedCents: 0, dispute: "none" });
+      await s.call("POST", "/v1/payments/reconcile", undefined, "admin", "staff");
+      expect((await s.call("GET", "/v1/staff/payments", undefined, "admin", "staff")).json().issues[0].kinds).toContain("paid_not_recorded");
+    });
   });
 });

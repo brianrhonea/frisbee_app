@@ -87,6 +87,10 @@ transfers). With app 0.0.51 and web 0.59.0.
   location can be added later; once registration is open, fees can be
   paid at any time.
 - `docs/payments-security.md`: the design, invariants, threats and gaps.
+- Failure simulation tests (`payments.test.ts`, "failure simulation"; see
+  `docs/payments-failure-testing.md`). Found: a double-clicked refund
+  could start twice; refunds now take a one-minute lock
+  (`refundLease`), freed at once if the refund fails.
 - **Oversight.** `GET /v1/staff/payments` (staff): open problems and the
   latest payments. `POST /v1/payments/reconcile` (staff) and the Cloud
   Scheduler jobs `POST /v1/jobs/payments/release` and `/reconcile`
