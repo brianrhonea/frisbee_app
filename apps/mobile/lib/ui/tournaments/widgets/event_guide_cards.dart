@@ -385,7 +385,9 @@ IconData _icon(GuideAction a) => switch (a) {
   GuideAction.captainsDraft ||
   GuideAction.watchDraft => Icons.how_to_reg_outlined,
   GuideAction.createTeams => Icons.group_add_outlined,
+  GuideAction.confirmSeeds => Icons.format_list_numbered,
   GuideAction.publishSchedule ||
+  GuideAction.publishAll ||
   GuideAction.schedule => Icons.calendar_month_outlined,
   GuideAction.reserveTeam => Icons.group_add_outlined,
   GuideAction.signUp ||

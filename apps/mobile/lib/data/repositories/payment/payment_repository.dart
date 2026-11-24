@@ -32,6 +32,11 @@ abstract class PaymentRepository {
   /// A Stripe page where the owner connects or finishes the account.
   Future<Result<Uri>> payoutLink(String teamId);
 
+  /// A session for Stripe's setup form inside the app (an AccountSession's
+  /// client secret, handed to the website's /embed/payouts page in a
+  /// WebView); owners only.
+  Future<Result<String>> payoutSession(String teamId);
+
   /// Whether the caller can pay online: [teamId]'s bid or spot fee, or
   /// without one their own entry fee.
   Future<Result<PayOptions>> payOptions(String tournamentId, {String? teamId});

@@ -376,31 +376,76 @@ void main() {
         clock: () => now,
       );
 
-      testWidgets('admins see them with Accept and Decline, and decline one', (
+      testWidgets('admins get one Respond button that opens the respond flow', (
         tester,
       ) async {
         addTeam({testUser.uid: TeamRole.owner});
         final vm = invitesVm();
-        await pump(tester, vm);
+        final opened = <String>[];
+        tester.view.physicalSize = const Size(800, 1400);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(
+          MaterialApp.router(
+            theme: AppTheme.light,
+            routerConfig: GoRouter(
+              routes: [
+                GoRoute(
+                  path: '/',
+                  builder: (_, _) => TeamHomeScreen(viewModel: vm),
+                ),
+                GoRoute(
+                  path: '/tournaments/:id/respond',
+                  builder: (_, state) {
+                    opened.add(state.uri.toString());
+                    return const Text('respond');
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
         expect(find.byKey(const ValueKey('tournament-invites')), findsOneWidget);
         expect(find.text('Tournament invites · 2'), findsOneWidget);
         expect(find.text('Spring Fling'), findsOneWidget);
         expect(find.textContaining('Reply by'), findsOneWidget);
-        expect(find.byKey(const ValueKey('accept-invite-spring')), findsOneWidget);
+        // One button: Accept or Decline come first in the flow.
+        expect(find.byKey(const ValueKey('respond-invite-spring')), findsOneWidget);
+        expect(find.widgetWithText(FilledButton, 'Decline'), findsNothing);
         // An expired one says so, with nothing to press.
         expect(find.textContaining('Expired.'), findsOneWidget);
-        expect(find.byKey(const ValueKey('accept-invite-late')), findsNothing);
+        expect(find.byKey(const ValueKey('respond-invite-late')), findsNothing);
 
         await tester.ensureVisible(
-          find.byKey(const ValueKey('decline-invite-spring')),
+          find.byKey(const ValueKey('respond-invite-spring')),
         );
-        await tester.tap(find.byKey(const ValueKey('decline-invite-spring')));
+        await tester.tap(find.byKey(const ValueKey('respond-invite-spring')));
         await tester.pumpAndSettle();
-        await tester.tap(find.widgetWithText(FilledButton, 'Decline'));
-        await tester.pumpAndSettle();
-        expect(hosted.declined, [('spring', 't1')]);
-        expect(find.text('Spring Fling'), findsNothing);
-        expect(find.text('Tournament invite'), findsOneWidget);
+        expect(opened, ['/tournaments/spring/respond?team=t1']);
+      });
+
+      testWidgets('accepted entries missing a roster or fee get Finish entry', (
+        tester,
+      ) async {
+        addTeam({testUser.uid: TeamRole.owner});
+        hosted.invites['t1'] = [];
+        hosted.toFinish['t1'] = [
+          TeamEntryToFinish(
+            tournamentId: 'fall',
+            name: 'Fall Classic',
+            startsOn: now.add(const Duration(days: 20)),
+            status: EntryStatus.accepted,
+            rosterSet: true,
+            deadline: now.add(const Duration(days: 5)),
+          ),
+        ];
+        await pump(tester, invitesVm());
+        expect(find.byKey(const ValueKey('entries-to-finish')), findsOneWidget);
+        expect(find.text('Entry to finish'), findsOneWidget);
+        expect(find.text('Fall Classic'), findsOneWidget);
+        expect(find.textContaining('Fee due'), findsOneWidget);
+        expect(find.byKey(const ValueKey('finish-entry-fall')), findsOneWidget);
       });
 
       testWidgets("players don't see them", (tester) async {

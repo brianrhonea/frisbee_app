@@ -49,6 +49,7 @@ import {
   type PayOptions,
   type PayoutAccountView,
   type PayoutLinkResult,
+  type PayoutSessionResult,
   type PayoutStatus,
   paymentLimits,
   paymentPaths,
@@ -187,12 +188,21 @@ export class PaymentService {
     return team;
   }
 
-  /** The host's payout account; asks Stripe again while onboarding isn't finished. */
+  /**
+   * The host's payout account, for its owner and anyone who manages its
+   * events (so they can see whether fees can be paid online, and who to
+   * ask); asks Stripe again while onboarding isn't finished.
+   */
   async payouts(caller: Caller, rawTeam: unknown): Promise<PayoutAccountView> {
     const teamId = docIdParam(rawTeam);
-    await this.owned(teamId, caller.uid);
+    const team = await this.store.get(p.team(teamId));
+    if (!team) throw new ApiError("not_found", "That team doesn't exist.");
+    const canSetUp = isOwner(team, caller.uid);
+    if (!canSetUp && !can(team, caller.uid, "manageEvents")) throw ownersOnly();
+    const ownerId = str(team.ownerId);
+    const ownerName = ownerId ? str((await this.store.get(`profiles/${ownerId}`))?.name) || "the owner" : "the owner";
     const feeLabel = platformFeeLabel(this.fee);
-    if (!this.config) return { available: false, status: "none", feeLabel };
+    if (!this.config) return { available: false, status: "none", feeLabel, canSetUp, ownerName };
     const record = await this.store.get(p.payout(teamId));
     let status = statusOf(record?.status);
     const account = str(record?.account);
@@ -200,7 +210,7 @@ export class PaymentService {
       status = payoutStatus(await this.config.gateway.account(account));
       await this.store.transact(async (tx) => tx.merge(p.payout(teamId), { status, updatedAt: serverTime }));
     }
-    return { available: true, status, feeLabel };
+    return { available: true, status, feeLabel, canSetUp, ownerName };
   }
 
   /**
@@ -224,26 +234,44 @@ export class PaymentService {
     throw new ApiError("failed_precondition", "The host can't take payments online right now. Follow their instructions to pay another way.");
   }
 
-  /** A Stripe onboarding link, making the host's account the first time. */
-  async payoutLink(caller: Caller, rawTeam: unknown): Promise<PayoutLinkResult> {
-    const teamId = docIdParam(rawTeam);
+  /** The host's connected account, made the first time (owners only). */
+  private async ensureAccount(caller: Caller, teamId: string): Promise<string> {
     const team = await this.owned(teamId, caller.uid);
     if (!this.config) throw notSetUp();
-    const { gateway, returnUrl } = this.config;
-    let account = str((await this.store.get(p.payout(teamId)))?.account);
-    if (!account) {
-      // Keyed by team: two owners' clicks (or a retry) make one account.
-      const made = await gateway.createAccount({ email: caller.email, name: str(team.name).slice(0, 100) || "Stall 10 host", idempotencyKey: `account-v2:${teamId}` });
-      account = await this.store.transact(async (tx) => {
-        const existing = str((await tx.get(p.payout(teamId)))?.account);
-        if (existing) return existing;
-        tx.set(p.payout(teamId), { account: made, status: "pending", createdBy: caller.uid, createdAt: serverTime, updatedAt: serverTime });
-        tx.set(p.account(made), { teamId });
-        return made;
-      });
-    }
-    const page = `${returnUrl}/payments/payouts?team=${encodeURIComponent(teamId)}`;
-    return { url: await gateway.onboardingLink(account, `${page}&retry=1`, page) };
+    const account = str((await this.store.get(p.payout(teamId)))?.account);
+    if (account) return account;
+    // Keyed by team: two owners' clicks (or a retry) make one account.
+    const made = await this.config.gateway.createAccount({
+      email: caller.email,
+      name: str(team.name).slice(0, 100) || "Stall 10 host",
+      idempotencyKey: `account-v2:${teamId}`,
+    });
+    return this.store.transact(async (tx) => {
+      const existing = str((await tx.get(p.payout(teamId)))?.account);
+      if (existing) return existing;
+      tx.set(p.payout(teamId), { account: made, status: "pending", createdBy: caller.uid, createdAt: serverTime, updatedAt: serverTime });
+      tx.set(p.account(made), { teamId });
+      return made;
+    });
+  }
+
+  /** A Stripe onboarding link (the fallback when the embedded form can't load), making the host's account the first time. */
+  async payoutLink(caller: Caller, rawTeam: unknown): Promise<PayoutLinkResult> {
+    const teamId = docIdParam(rawTeam);
+    const account = await this.ensureAccount(caller, teamId);
+    const page = `${this.config!.returnUrl}/payments/payouts?team=${encodeURIComponent(teamId)}`;
+    return { url: await this.config!.gateway.onboardingLink(account, `${page}&retry=1`, page) };
+  }
+
+  /**
+   * Stripe's onboarding shown inside the app and the website (an
+   * AccountSession for Connect embedded components), making the host's
+   * account the first time. Owners only.
+   */
+  async payoutSession(caller: Caller, rawTeam: unknown): Promise<PayoutSessionResult> {
+    const teamId = docIdParam(rawTeam);
+    const account = await this.ensureAccount(caller, teamId);
+    return { clientSecret: await this.config!.gateway.accountSession(account) };
   }
 
   // ---- Payers ---------------------------------------------------------------
@@ -801,7 +829,18 @@ export class PaymentService {
     const pointer = await this.store.get(p.account(acct));
     const teamId = storedId(pointer?.teamId);
     if (!teamId) return;
-    const status = payoutStatus({ chargesEnabled: event.object.charges_enabled === true, detailsSubmitted: event.object.details_submitted === true });
+    // A v1-shaped event carries charges_enabled; one for an Accounts v2
+    // account may not, so then ask Stripe for the capability's status.
+    let status: PayoutStatus;
+    if (typeof event.object.charges_enabled === "boolean") {
+      status = payoutStatus({ chargesEnabled: event.object.charges_enabled, detailsSubmitted: event.object.details_submitted === true });
+    } else {
+      try {
+        status = payoutStatus(await this.config!.gateway.account(acct));
+      } catch {
+        return;
+      }
+    }
     await this.store.transact(async (tx) => {
       const record = await tx.get(p.payout(teamId));
       if (record?.account === acct) tx.update(p.payout(teamId), { status, updatedAt: serverTime });
@@ -823,6 +862,7 @@ export function paymentRoutes(app: FastifyInstance, payments: PaymentService, li
   });
   app.get<T>(paymentPaths.payouts(":teamId"), async (req) => payments.payouts(caller(req, "status"), req.params.teamId));
   app.post<T>(paymentPaths.payoutLink(":teamId"), async (req) => payments.payoutLink(caller(req, "link"), req.params.teamId));
+  app.post<T>(paymentPaths.payoutSession(":teamId"), async (req) => payments.payoutSession(caller(req, "link"), req.params.teamId));
   app.get<Id & { Querystring: { team?: string } }>(paymentPaths.payOptions(":id"), async (req) =>
     payments.payOptions(caller(req, "status"), req.params.id, req.query),
   );

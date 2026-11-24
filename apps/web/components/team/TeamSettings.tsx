@@ -1,4 +1,5 @@
 "use client";
+import { PayoutsCard } from "@/components/payments/Payments";
 import {
   allowJoinRequestsDescription,
   competitionLevels,
@@ -49,11 +50,14 @@ const levelLabels: Record<string, string> = { club: "Club", college: "College", 
 export function TeamSettings() {
   const { teamId, kind, viewer } = useTeamHub();
   const invite = useInvite();
+  const { user } = useAuth();
   if (viewer.state !== "member") return <MembersOnlySection what="settings" />;
   const owner = viewer.tier === "owner";
   return (
     <div className="stack settings-stack">
       {viewer.can("manageTeam") && <DetailsForm />}
+      {/* Payments: On / Finish setup / Not set up, with setup in the page (the owner's to do). */}
+      {viewer.can("manageEvents") && user && <PayoutsCard user={user} teamId={teamId} />}
       {/* A league team has only its chat and members (TeamSection.forKind in the app). */}
       {kind === "team" && !viewer.team.leagueId && <SectionsCard />}
       {kind === "team" && !viewer.team.leagueId && <PublicPageCard />}

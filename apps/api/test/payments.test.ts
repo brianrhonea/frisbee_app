@@ -38,6 +38,11 @@ class FakeGateway implements PaymentGateway {
     this.links.push({ account, refreshUrl, returnUrl });
     return `https://connect.test/${account}`;
   }
+  accountSessions: string[] = [];
+  async accountSession(account: string) {
+    this.accountSessions.push(account);
+    return `secret_${account}`;
+  }
   async account(account: string) {
     return this.accounts.get(account) ?? { chargesEnabled: false, detailsSubmitted: false };
   }
@@ -191,12 +196,34 @@ describe("fees for hosts", () => {
 });
 
 describe("payouts", () => {
-  it("only the owner sees or sets them up", async () => {
-    expect((await s.call("GET", "/v1/teams/host/payouts", undefined, "coach")).status).toBe(403);
+  it("only the owner sets them up; event managers see where they stand and who to ask; others nothing", async () => {
+    s.store.put("profiles/owner", { name: "Olive Owner" });
+    const coach = await s.call("GET", "/v1/teams/host/payouts", undefined, "coach");
+    expect(coach.status).toBe(200);
+    expect(coach.json()).toEqual({ available: true, status: "none", feeLabel: "3%", canSetUp: false, ownerName: "Olive Owner" });
     expect((await s.call("POST", "/v1/teams/host/payouts/link", undefined, "coach")).status).toBe(403);
+    expect((await s.call("POST", "/v1/teams/host/payouts/session", undefined, "coach")).status).toBe(403);
+    expect((await s.call("GET", "/v1/teams/host/payouts", undefined, "stranger")).status).toBe(403);
     const r = await s.call("GET", "/v1/teams/host/payouts");
     expect(r.status).toBe(200);
-    expect(r.json()).toEqual({ available: true, status: "none", feeLabel: "3%" });
+    expect(r.json()).toEqual({ available: true, status: "none", feeLabel: "3%", canSetUp: true, ownerName: "Olive Owner" });
+  });
+
+  it("onboarding inside the app and website: an AccountSession on the same one account", async () => {
+    const r = await s.call("POST", "/v1/teams/host/payouts/session");
+    expect(r.status).toBe(200);
+    expect(r.json()).toEqual({ clientSecret: "secret_acct_1" });
+    await s.call("POST", "/v1/teams/host/payouts/link");
+    expect(s.gateway.created).toHaveLength(1);
+    expect(s.gateway.accountSessions).toEqual(["acct_1"]);
+    expect((await s.call("GET", "/v1/teams/host/payouts")).json().status).toBe("pending");
+  });
+
+  it("a v2 account's event without v1 fields asks Stripe", async () => {
+    await s.call("POST", "/v1/teams/host/payouts/session");
+    s.gateway.accounts.set("acct_1", { chargesEnabled: true, detailsSubmitted: true });
+    await s.hook("account.updated", { id: "acct_1" });
+    expect(s.store.doc("payoutAccounts/host")?.status).toBe("ready");
   });
 
   it("says they aren't available without Stripe", async () => {

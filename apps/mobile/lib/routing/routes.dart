@@ -219,6 +219,16 @@ abstract final class Routes {
       '${type == null ? '' : '&type=$type'}';
   static String editTournament(String id) => '$tournaments/$id/edit';
 
+  /// The respond flow (the website's same path): an invite's Accept or
+  /// Decline (or applying, or a team's captains), then roster, payment and
+  /// "Request confirmed!". [step] (`roster`, `pay` or `captains`) opens an
+  /// entered team at that step.
+  static String tournamentRespond(String id, {String? teamId, String? step}) {
+    final query = {'team': ?teamId, 'step': ?step};
+    return '$tournaments/$id/respond'
+        '${query.isEmpty ? '' : '?${Uri(queryParameters: query).query}'}';
+  }
+
   /// The host turns a division's signed-up players into teams.
   static String tournamentDraft(String id, String divisionId) =>
       '$tournaments/$id/draft/$divisionId';

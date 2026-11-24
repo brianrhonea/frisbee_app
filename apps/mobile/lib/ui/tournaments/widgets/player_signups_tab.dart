@@ -14,7 +14,7 @@ import '../../group_tournaments/widgets/hat_parts.dart'
 import '../../payments/widgets/payment_widgets.dart';
 import '../view_models/hosted_tournament_viewmodel.dart';
 import '../view_models/player_signups_viewmodel.dart';
-import 'tournament_dialogs.dart';
+import 'signup_next_steps.dart';
 import 'tournament_parts.dart' show Pill, PillTone, RowsCard, StatTile;
 
 /// Accepted is settled (turf); everything else is a plain fact. A new
@@ -47,18 +47,8 @@ class PlayerSignupCard extends StatelessWidget {
   /// then only shows an existing signup.
   final bool showSignUp;
 
-  Future<void> _signUp(BuildContext context) async {
-    final t = viewModel.tournament!;
-    final a = await showPlayerSignupDialog(
-      context,
-      divisions: viewModel.divisions,
-      initial: signups.mine?.status == SignupStatus.withdrawn
-          ? null
-          : signups.mine,
-      fee: t.entryFee,
-    );
-    if (a != null) signups.signUp.execute(a);
-  }
+  Future<void> _signUp(BuildContext context) =>
+      signUpWithNextSteps(context, event: viewModel, signups: signups);
 
   @override
   Widget build(BuildContext context) {

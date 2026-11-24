@@ -42,6 +42,16 @@ export function stripeFromEnv(env: NodeJS.ProcessEnv = process.env): PaymentGate
       });
       return link.url;
     },
+    async accountSession(account) {
+      // Connect embedded components: onboarding (and later, managing the
+      // account and payouts) inside the app and website, not on Stripe's pages.
+      const session = await stripe.accountSessions.create({
+        account,
+        // Hosts have the full Dashboard, so bank details stay in Stripe's own forms.
+        components: { account_onboarding: { enabled: true }, notification_banner: { enabled: true } },
+      });
+      return session.client_secret;
+    },
     async account(account) {
       // v2's capability status, not v1's charges_enabled.
       const a = await stripe.v2.core.accounts.retrieve(account, { include: ["configuration.merchant", "requirements"] });

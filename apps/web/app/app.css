@@ -1837,3 +1837,10 @@ mark.mention.mention-me { background: color-mix(in srgb, var(--accent) 24%, tran
 }
 .help-more { list-style: none; padding: 0; display: grid; gap: 8px; }
 .help-more a { color: var(--accent); font-weight: 700; }
+
+/* Payments status (PayoutsCard, PayoutsStatus): green when on, amber while setup is to do. */
+.payouts-status { text-decoration: none; }
+.payouts-status.payouts-none, .payouts-status.payouts-pending { background: var(--disc-soft); color: var(--disc-ink); }
+.embedded-onboarding { min-height: 320px; }
+/* A page inside the app's WebView (/embed/*): nothing but the page. */
+.embed-frame { min-height: 100vh; padding: 16px; background: var(--bg); }

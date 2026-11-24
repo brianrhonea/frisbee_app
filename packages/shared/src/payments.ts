@@ -116,7 +116,10 @@ const trimZeros = (s: string) => s.replace(/\.?0+$/, "");
 export const payoutStatuses = ["none", "pending", "ready"] as const;
 export type PayoutStatus = (typeof payoutStatuses)[number];
 
-/** GET /v1/teams/:teamId/payouts: the host's payout account (owners only). */
+/**
+ * GET /v1/teams/:teamId/payouts: the host's payout account, for anyone who
+ * manages its events (only the owner sets it up: [canSetUp]).
+ */
 export interface PayoutAccountView {
   /** false: online payments aren't set up on this server; hide the section. */
   available: boolean;
@@ -124,6 +127,26 @@ export interface PayoutAccountView {
   status: PayoutStatus;
   /** Stall 10's fee, e.g. "3%". */
   feeLabel: string;
+  /** The caller is the owner, who sets payments up; others see the status and who to ask. */
+  canSetUp: boolean;
+  /** The owner's name, for "Ask <owner> to set up payments". */
+  ownerName: string;
+}
+
+/** What the payments status says, for every place that shows it (team settings, the event form, the event page). */
+export const payoutStatusLabels: Record<PayoutStatus, { label: string; summary: string }> = {
+  none: { label: "Not set up", summary: "Set up payments to take entry fees online." },
+  pending: { label: "Finish setup", summary: "Stripe needs a few more details before you can take payments." },
+  ready: { label: "On", summary: "Fees paid online go straight to your bank account." },
+};
+
+/**
+ * POST /v1/teams/:teamId/payouts/session: Stripe's onboarding shown inside
+ * the app or website (Connect embedded components, an AccountSession).
+ * [clientSecret] is a credential: never log or store it.
+ */
+export interface PayoutSessionResult {
+  clientSecret: string;
 }
 
 /** POST /v1/teams/:teamId/payouts/link: the Stripe page to open (single use, expires in minutes). */
@@ -252,6 +275,7 @@ export const refundedOnlineNote = "Refunded through Stripe";
 export const paymentPaths = {
   payouts: (teamId: string) => `/v1/teams/${teamId}/payouts`,
   payoutLink: (teamId: string) => `/v1/teams/${teamId}/payouts/link`,
+  payoutSession: (teamId: string) => `/v1/teams/${teamId}/payouts/session`,
   payOptions: (tournamentId: string) => `/v1/tournaments/${tournamentId}/pay`,
   checkout: (tournamentId: string) => `/v1/tournaments/${tournamentId}/checkout`,
   intent: (tournamentId: string) => `/v1/tournaments/${tournamentId}/pay/intent`,

@@ -116,7 +116,6 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
     vm.pinPost,
     vm.unpinPost,
     vm.joinGroup,
-    vm.declineInvite,
     vm.cancelJoinRequest,
     vm.setNextRsvp,
   ];
@@ -1143,111 +1142,149 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
 
   /// A group's tournaments, which anyone can open and follow. Members
   /// have the full list in the Tournaments tab.
-  /// Tournament and league invites waiting on the team, for its admins:
-  /// Accept opens the event (its "Your teams" card picks the captains),
-  /// Decline turns it down here. Nothing when there are none.
+  /// The team's tournament business, for its admins: invites waiting on
+  /// it, each with Respond (the respond flow: accept or decline, then
+  /// roster and payment), and entries still missing a roster or fee, each
+  /// with Finish entry. Nothing when there's nothing to do.
   List<Widget> _invites(BuildContext context) {
     final invites = vm.tournamentInvites;
-    if (invites.isEmpty) return const [];
+    final toFinish = vm.entriesToFinish;
+    if (invites.isEmpty && toFinish.isEmpty) return const [];
     final c = AppColors.of(context);
     final day = DateFormat('EEE, MMM d');
+    Future<void> open(String route) async {
+      await context.push(route);
+      vm.refreshInvites();
+    }
+
+    Widget title(String text) => Text(
+      text,
+      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.ink),
+    );
+    Widget meta(List<String> parts) => Text(
+      parts.where((p) => p.isNotEmpty).join(' · '),
+      style: TextStyle(fontSize: 12.5, color: c.muted),
+    );
     return [
-      SectionCard(
-        key: const ValueKey('tournament-invites'),
-        title: invites.length == 1
-            ? 'Tournament invite'
-            : 'Tournament invites · ${invites.length}',
-        icon: Icons.mark_email_unread_outlined,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (final i in invites)
-              Padding(
-                key: ValueKey('tournament-invite-${i.tournamentId}'),
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      i.name,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: c.ink,
-                      ),
-                    ),
-                    Text(
-                      [
+      if (invites.isNotEmpty)
+        SectionCard(
+          key: const ValueKey('tournament-invites'),
+          title: invites.length == 1
+              ? 'Tournament invite'
+              : 'Tournament invites · ${invites.length}',
+          icon: Icons.mark_email_unread_outlined,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final i in invites)
+                Padding(
+                  key: ValueKey('tournament-invite-${i.tournamentId}'),
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      title(i.name),
+                      meta([
                         day.format(i.startsOn.toLocal()),
                         if (i.hostName.isNotEmpty) 'from ${i.hostName}',
-                        if (i.divisionLabel.isNotEmpty) i.divisionLabel,
-                      ].join(' · '),
-                      style: TextStyle(fontSize: 12.5, color: c.muted),
-                    ),
-                    if (i.expired)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          'Expired. ${TournamentEntry.expiredMessage}',
-                          style: TextStyle(fontSize: 12.5, color: c.ink2),
-                        ),
-                      )
-                    else ...[
-                      if (i.replyBy case final by?)
+                        i.divisionLabel,
+                      ]),
+                      if (i.expired)
                         Padding(
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
-                            'Reply by ${day.format(by.toLocal())}',
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                              color: c.highlightInk,
+                            'Expired. ${TournamentEntry.expiredMessage}',
+                            style: TextStyle(fontSize: 12.5, color: c.ink2),
+                          ),
+                        )
+                      else ...[
+                        if (i.replyBy case final by?)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              'Reply by ${day.format(by.toLocal())}',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                                color: c.highlightInk,
+                              ),
                             ),
                           ),
+                        const SizedBox(height: 8),
+                        FilledButton(
+                          key: ValueKey('respond-invite-${i.tournamentId}'),
+                          onPressed: () => open(
+                            Routes.tournamentRespond(
+                              i.tournamentId,
+                              teamId: vm.teamId,
+                            ),
+                          ),
+                          child: const Text('Respond'),
                         ),
+                      ],
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      if (toFinish.isNotEmpty)
+        SectionCard(
+          key: const ValueKey('entries-to-finish'),
+          title: toFinish.length == 1
+              ? 'Entry to finish'
+              : 'Entries to finish · ${toFinish.length}',
+          icon: Icons.checklist,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final e in toFinish)
+                Padding(
+                  key: ValueKey('entry-to-finish-${e.tournamentId}'),
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      title(e.name),
+                      meta([
+                        day.format(e.startsOn.toLocal()),
+                        if (e.hostName.isNotEmpty) 'from ${e.hostName}',
+                        e.divisionLabel,
+                      ]),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          [
+                            e.stillToDo,
+                            if (e.deadline case final d?)
+                              '${e.overdue ? 'was due' : 'due'} '
+                                  '${day.format(d.toLocal())}',
+                          ].join(' '),
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: e.overdue ? c.highlightInk : c.ink2,
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        children: [
-                          FilledButton(
-                            key: ValueKey('accept-invite-${i.tournamentId}'),
-                            onPressed: () async {
-                              await context.push(
-                                Routes.tournament(i.tournamentId),
-                              );
-                              vm.refreshInvites();
-                            },
-                            child: const Text('Accept'),
+                      FilledButton(
+                        key: ValueKey('finish-entry-${e.tournamentId}'),
+                        onPressed: () => open(
+                          Routes.tournamentRespond(
+                            e.tournamentId,
+                            teamId: vm.teamId,
+                            step: e.rosterSet ? 'pay' : 'roster',
                           ),
-                          OutlinedButton(
-                            key: ValueKey('decline-invite-${i.tournamentId}'),
-                            onPressed: vm.declineInvite.running
-                                ? null
-                                : () async {
-                                    if (await confirmDialog(
-                                      context,
-                                      title: 'Decline the invite?',
-                                      message:
-                                          "Your team won't play in ${i.name}. "
-                                          'The organizers can invite you '
-                                          'again.',
-                                      confirmLabel: 'Decline',
-                                      destructive: true,
-                                    )) {
-                                      vm.declineInvite.execute(i.tournamentId);
-                                    }
-                                  },
-                            child: const Text('Decline'),
-                          ),
-                        ],
+                        ),
+                        child: const Text('Finish entry'),
                       ),
                     ],
-                  ],
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
-      ),
     ];
   }
 

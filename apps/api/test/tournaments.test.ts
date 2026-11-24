@@ -111,7 +111,7 @@ async function enter(id: string, div: string, teamId: string, captain: string) {
 async function accepted(teams: Array<[string, string]>) {
   const t = await open();
   for (const [teamId, cap] of teams) {
-    expect((await enter(t.id, t.div, teamId, cap)).status).toBe(204);
+    expect((await enter(t.id, t.div, teamId, cap)).status).toBe(200);
     expect((await call("PUT", `/v1/tournaments/${t.id}/entries/${teamId}/status`, { status: "accepted" })).status).toBe(204);
   }
   return t;
@@ -148,7 +148,7 @@ describe("hosting (create: manages, createdBy, createdAt, validHosted, officialH
     expect(Object.keys(t).sort()).toEqual(
       [
         "hostId", "hostName", "hostKind", "hostOfficial", "name", "startsOn", "endsOn", "description", "location", "visibility",
-        "entryType", "status", "bidFee", "teamEntry", "teamFee", "kind", "season", "draftMode", "inviteReplyDays", "divisions", "format", "createdBy", "createdAt",
+        "entryType", "status", "bidFee", "teamEntry", "teamFee", "kind", "season", "draftMode", "inviteReplyDays", "entryDeadline", "director", "divisions", "format", "createdBy", "createdAt",
       ].sort(),
     );
     expect(t).toMatchObject({ createdBy: "mgr", createdAt: new Date(now), hostName: "Host Club", hostKind: "community", hostOfficial: false, status: "draft" });
@@ -280,7 +280,8 @@ describe("editing (update: manages, hostId/createdBy/createdAt kept, validHosted
     const women = list[1].id;
     expect((await call("PATCH", `/v1/tournaments/${t.id}`, details({ divisions: ["mixed"] }))).status).toBe(204);
     expect(store.doc(`tournaments/${t.id}/divisions/${women}`)).toBeUndefined();
-    await call("PUT", `/v1/tournaments/${t.id}/status`, { status: "scheduled" });
+    // Publishing a schedule makes it scheduled (it isn't set by hand).
+    store.put(`tournaments/${t.id}`, { ...store.doc(`tournaments/${t.id}`)!, status: "scheduled" });
     expect((await call("PATCH", `/v1/tournaments/${t.id}`, details({ format: { settings, level: "club", maxTeams: 16, minRoster: null } }))).status).toBe(204);
     expect(store.doc(`tournaments/${t.id}/divisions/${t.div}`)?.maxTeams).toBe(8);
   });
@@ -409,8 +410,8 @@ describe("entries (validEntry, teamApplies, teamEdits, teamWithdraws, manages)",
     expect(code(await enter(t.id, t.div, "red", "cap"))).toBe("not_found");
     await call("PUT", `/v1/tournaments/${t.id}/status`, { status: "registration" });
     expect((await call("PUT", `/v1/tournaments/${t.id}/entries/red`, { divisionId: t.div, captainIds: ["cap"] }, "cap2")).status).toBe(403);
-    expect((await enter(t.id, t.div, "red", "cap")).status).toBe(204);
-    expect(store.doc(`tournaments/${t.id}/entries/red`)).toEqual({ teamName: "Red", divisionId: t.div, status: "applied", captainIds: ["cap"], teamId: "red", replyBy: null, updatedAt: new Date(now) });
+    expect((await enter(t.id, t.div, "red", "cap")).status).toBe(200);
+    expect(store.doc(`tournaments/${t.id}/entries/red`)).toEqual({ teamName: "Red", divisionId: t.div, status: "applied", captainIds: ["cap"], teamId: "red", replyBy: null, roster: [], rosterSetAt: null, reason: null, updatedAt: new Date(now) });
     await call("PUT", `/v1/tournaments/${t.id}/status`, { status: "seeding" });
     expect(code(await enter(t.id, t.div, "blue", "bcap"))).toBe("failed_precondition");
     store.put("teams/group", { ...team("Group", "gl"), kind: "community" });
@@ -423,18 +424,46 @@ describe("entries (validEntry, teamApplies, teamEdits, teamWithdraws, manages)",
     expect(code(await enter(t.id, t.div, "red", "cap"))).toBe("failed_precondition");
     const m = await open({ entryType: "players", teamEntry: true });
     store.put("teams/new", team("New", "nc"));
-    expect((await enter(m.id, m.div, "new", "nc")).status).toBe(204);
+    expect((await enter(m.id, m.div, "new", "nc")).status).toBe(200);
   });
 
-  it("invite only: a team enters by accepting the host's invite", async () => {
+  it("invite only: a team enters by accepting the host's invite, straight in (seeded, its captains reporting)", async () => {
     const t = await open({ visibility: "inviteOnly" });
     expect(code(await enter(t.id, t.div, "red", "cap"))).toBe("permission_denied");
     expect((await call("POST", `/v1/tournaments/${t.id}/entries/red/invite`, { divisionId: t.div }, "cap")).status).toBe(403);
     expect((await call("POST", `/v1/tournaments/${t.id}/entries/red/invite`, { divisionId: t.div })).status).toBe(204);
     expect(store.doc(`tournaments/${t.id}/entries/red`)).toMatchObject({ status: "invited", captainIds: [] });
     expect(code(await call("POST", `/v1/tournaments/${t.id}/entries/red/invite`, { divisionId: t.div }))).toBe("already_exists");
-    expect((await enter(t.id, t.div, "red", "cap")).status).toBe(204);
-    expect(store.doc(`tournaments/${t.id}/entries/red`)?.status).toBe("applied");
+    const res = await enter(t.id, t.div, "red", "cap");
+    expect(res.status).toBe(200);
+    expect(res.json()).toEqual({ status: "accepted" });
+    expect(store.doc(`tournaments/${t.id}/entries/red`)?.status).toBe("accepted");
+    expect(store.doc(`tournaments/${t.id}/divisions/${t.div}`)).toMatchObject({ seeds: ["red"], captains: { red: ["cap"] } });
+  });
+
+  it("an invite taken up when the division is full goes on the waitlist", async () => {
+    const t = await open({ visibility: "inviteOnly", format: { settings, level: "club", maxTeams: 2, minRoster: null } });
+    for (const team of ["red", "blue", "green"]) await call("POST", `/v1/tournaments/${t.id}/entries/${team}/invite`, { divisionId: t.div });
+    expect((await enter(t.id, t.div, "red", "cap")).json()).toEqual({ status: "accepted" });
+    expect((await enter(t.id, t.div, "blue", "bcap")).json()).toEqual({ status: "accepted" });
+    expect((await enter(t.id, t.div, "green", "gcap")).json()).toEqual({ status: "waitlisted" });
+    expect(store.doc(`tournaments/${t.id}/divisions/${t.div}`)?.seeds).toEqual(["red", "blue"]);
+  });
+
+  it("an application still waits for the host", async () => {
+    const t = await open();
+    expect((await enter(t.id, t.div, "red", "cap")).json()).toEqual({ status: "applied" });
+    expect(store.doc(`tournaments/${t.id}/divisions/${t.div}`)?.seeds).toEqual([]);
+  });
+
+  it("declining an invite: the team withdraws saying why; the reason goes if it enters again", async () => {
+    const t = await open({ visibility: "inviteOnly" });
+    await call("POST", `/v1/tournaments/${t.id}/entries/red/invite`, { divisionId: t.div });
+    expect((await call("PUT", `/v1/tournaments/${t.id}/entries/red/status`, { status: "withdrawn", reason: "declined" }, "cap")).status).toBe(204);
+    expect(store.doc(`tournaments/${t.id}/entries/red`)).toMatchObject({ status: "withdrawn", reason: "declined" });
+    expect((await call("PUT", `/v1/tournaments/${t.id}/entries/red/status`, { status: "withdrawn", reason: "bored" }, "cap")).status).toBe(400);
+    await call("POST", `/v1/tournaments/${t.id}/entries/red/invite`, { divisionId: t.div });
+    expect(store.doc(`tournaments/${t.id}/entries/red`)).toMatchObject({ status: "invited", reason: null });
   });
 
   it("validEntry(): 1-4 captains, every one on the team; a real division", async () => {
@@ -443,15 +472,41 @@ describe("entries (validEntry, teamApplies, teamEdits, teamWithdraws, manages)",
     expect((await call("PUT", `/v1/tournaments/${t.id}/entries/red`, { divisionId: t.div, captainIds: ["a", "b", "c", "d", "e"] }, "cap")).status).toBe(400);
     expect((await call("PUT", `/v1/tournaments/${t.id}/entries/red`, { divisionId: t.div, captainIds: ["bcap"] }, "cap")).status).toBe(400);
     expect((await call("PUT", `/v1/tournaments/${t.id}/entries/red`, { divisionId: "nope", captainIds: ["cap"] }, "cap")).status).toBe(404);
-    expect((await call("PUT", `/v1/tournaments/${t.id}/entries/red`, { divisionId: t.div, captainIds: ["cap", "cap2"] }, "cap")).status).toBe(204);
+    expect((await call("PUT", `/v1/tournaments/${t.id}/entries/red`, { divisionId: t.div, captainIds: ["cap", "cap2"] }, "cap")).status).toBe(200);
   });
 
-  it("the roster minimum, except where teams reserve spots", async () => {
+  it("entering doesn't need the roster yet: it's named for the event later", async () => {
     const t = await open({ format: { settings, level: "club", maxTeams: 8, minRoster: 10 } });
-    expect(code(await enter(t.id, t.div, "red", "cap"))).toBe("failed_precondition");
-    store.put("teams/small", team("Small", "sc"));
+    expect((await enter(t.id, t.div, "red", "cap")).status).toBe(200);
+  });
+
+  it("the event roster: the team's admins or captains, players from its roster, at least the minimum (any where teams reserve spots), until play starts", async () => {
+    const t = await open({ format: { settings, level: "club", maxTeams: 8, minRoster: 3 } });
+    const url = `/v1/tournaments/${t.id}/entries/red/roster`;
+    expect((await call("PUT", url, { playerIds: ["p0", "p1", "p2"] }, "cap"))).toMatchObject({ status: 404 });
+    await enter(t.id, t.div, "red", "cap");
+    // Not a stranger, another team's captain or a player.
+    expect((await call("PUT", url, { playerIds: ["p0", "p1", "p2"] }, "bcap")).status).toBe(403);
+    expect((await call("PUT", url, { playerIds: ["p0", "p1", "p2"] }, "fan")).status).toBe(403);
+    // Too few, someone not on the roster, twice the same.
+    expect(code(await call("PUT", url, { playerIds: ["p0", "p1"] }, "cap"))).toBe("invalid_argument");
+    expect(code(await call("PUT", url, { playerIds: ["p0", "p1", "ghost"] }, "cap"))).toBe("invalid_argument");
+    expect((await call("PUT", url, { playerIds: ["p0", "p0", "p1"] }, "cap")).status).toBe(400);
+    expect((await call("PUT", url, { playerIds: ["p0", "p1", "p2"] }, "cap")).status).toBe(204);
+    expect(store.doc(`tournaments/${t.id}/entries/red`)).toMatchObject({ roster: ["p0", "p1", "p2"], rosterSetAt: new Date(now) });
+    // A captain named for the event (not an admin of the team) can change it too.
+    await call("PUT", `/v1/tournaments/${t.id}/entries/red`, { divisionId: t.div, captainIds: ["cap2"] }, "cap");
+    expect((await call("PUT", url, { playerIds: ["p3", "p4", "p5"] }, "cap2")).status).toBe(204);
+    // The roster stays through the host's decision.
+    await call("PUT", `/v1/tournaments/${t.id}/entries/red/status`, { status: "accepted" });
+    expect(store.doc(`tournaments/${t.id}/entries/red`)).toMatchObject({ status: "accepted", roster: ["p3", "p4", "p5"] });
+    // Locked once play starts.
+    store.put(`tournaments/${t.id}`, { ...store.doc(`tournaments/${t.id}`)!, status: "live" });
+    expect(code(await call("PUT", url, { playerIds: ["p0", "p1", "p2"] }, "cap"))).toBe("failed_precondition");
+    // Teams reserving spots fill theirs as they go.
     const m = await open({ entryType: "players", teamEntry: true });
-    expect((await enter(m.id, m.div, "small", "sc")).status).toBe(204);
+    await enter(m.id, m.div, "blue", "bcap");
+    expect((await call("PUT", `/v1/tournaments/${m.id}/entries/blue/roster`, { playerIds: ["p0"] }, "bcap")).status).toBe(204);
   });
 
   it("a league division takes teams of its division and level", async () => {
@@ -459,12 +514,12 @@ describe("entries (validEntry, teamApplies, teamEdits, teamWithdraws, manages)",
     const t = await open({ kind: "league", season, format: { settings, level: "college", maxTeams: 8, minRoster: null } });
     expect(code(await enter(t.id, t.div, "red", "cap"))).toBe("failed_precondition");
     store.put("teams/red", { ...store.doc("teams/red"), level: "college" });
-    expect((await enter(t.id, t.div, "red", "cap"))?.status).toBe(204);
+    expect((await enter(t.id, t.div, "red", "cap"))?.status).toBe(200);
   });
 
   it("teamEdits(): captains change, status and division stay", async () => {
     const t = await accepted([["red", "cap"]]);
-    expect((await call("PUT", `/v1/tournaments/${t.id}/entries/red`, { divisionId: t.div, captainIds: ["cap2"] }, "cap")).status).toBe(204);
+    expect((await call("PUT", `/v1/tournaments/${t.id}/entries/red`, { divisionId: t.div, captainIds: ["cap2"] }, "cap")).status).toBe(200);
     expect(store.doc(`tournaments/${t.id}/entries/red`)).toMatchObject({ status: "accepted", captainIds: ["cap2"] });
     expect(code(await call("PUT", `/v1/tournaments/${t.id}/entries/red`, { divisionId: "other", captainIds: ["cap"] }, "cap"))).toBe("not_found");
   });
@@ -483,7 +538,7 @@ describe("entries (validEntry, teamApplies, teamEdits, teamWithdraws, manages)",
     expect((await call("PUT", `/v1/tournaments/${t.id}/entries/red/status`, { status: "withdrawn" }, "cap2")).status).toBe(403);
     expect((await call("PUT", `/v1/tournaments/${t.id}/entries/red/status`, { status: "withdrawn" }, "cap")).status).toBe(204);
     expect(store.doc(`tournaments/${t.id}/entries/red`)).toMatchObject({ status: "withdrawn", captainIds: ["cap"], teamName: "Red" });
-    expect((await enter(t.id, t.div, "red", "cap")).status).toBe(204);
+    expect((await enter(t.id, t.div, "red", "cap")).status).toBe(200);
   });
 
   it("the host accepts (seeded last, captains report), unless the division is full; anything else unseeds", async () => {
@@ -537,8 +592,8 @@ describe("invites: reply-by time, expiry, the team's list and declining", () => 
     expect(code(late)).toBe("failed_precondition");
     expect(late.json().error.message).toMatch(/expired/);
     expect((await call("POST", `/v1/tournaments/${t.id}/entries/red/invite`, { divisionId: t.div })).status).toBe(204);
-    expect((await enter(t.id, t.div, "red", "cap")).status).toBe(204);
-    expect(store.doc(`tournaments/${t.id}/entries/red`)).toMatchObject({ status: "applied", replyBy: null });
+    expect((await enter(t.id, t.div, "red", "cap")).status).toBe(200);
+    expect(store.doc(`tournaments/${t.id}/entries/red`)).toMatchObject({ status: "accepted", replyBy: null });
   });
 
   it("a late invite still gets two days to answer", async () => {
@@ -796,7 +851,8 @@ describe("the host's view keeps things in step (reconcile)", () => {
     expect((await call("POST", url)).json().changed).toEqual([]);
     await call("POST", `/v1/tournaments/${t.id}/divisions/${t.div}/games/g001/report`, { scoreA: 15, scoreB: 9 }, "cap");
     await call("POST", `/v1/tournaments/${t.id}/divisions/${t.div}/games/g001/confirm`, { scoreA: 15, scoreB: 9 }, "bcap");
-    expect((await call("POST", url)).json().changed).toEqual(["live", "placements", "finished"]);
+    // Done by the server with the confirmed final: nothing left for the host's look.
+    expect((await call("POST", url)).json().changed).toEqual([]);
     expect(store.doc(`tournaments/${t.id}/divisions/${t.div}`)?.placements).toEqual(["red", "blue"]);
     expect(store.doc(`tournaments/${t.id}`)?.status).toBe("finished");
   });
@@ -839,9 +895,145 @@ describe("the host's view keeps things in step (reconcile)", () => {
   it("drops withdrawn teams from unpublished seeds and copies captains from entries", async () => {
     const t = await accepted([["red", "cap"], ["blue", "bcap"]]);
     await call("PUT", `/v1/tournaments/${t.id}/entries/red/status`, { status: "withdrawn" }, "cap");
-    await call("PUT", `/v1/tournaments/${t.id}/entries/blue`, { divisionId: t.div, captainIds: ["bcap2"] }, "bcap");
+    // The app changing captains straight in Firestore (through the API the division follows at once).
+    store.put(`tournaments/${t.id}/entries/blue`, { ...store.doc(`tournaments/${t.id}/entries/blue`)!, captainIds: ["bcap2"] });
     const res = await call("POST", `/v1/tournaments/${t.id}/divisions/${t.div}/reconcile`);
     expect(res.json().changed).toEqual(["withdrawn", "captains"]);
     expect(store.doc(`tournaments/${t.id}/divisions/${t.div}`)).toMatchObject({ seeds: ["blue"], captains: { blue: ["bcap2"] } });
+  });
+});
+
+describe("the organizer's run sheet: status moves, confirmed seeds, publishing every division", () => {
+  it("status moves one step at a time by hand; scheduled only by publishing", async () => {
+    const t = await host();
+    const set = (status: string) => call("PUT", `/v1/tournaments/${t.id}/status`, { status });
+    expect(code(await set("seeding"))).toBe("failed_precondition");
+    expect((await set("registration")).status).toBe(204);
+    expect((await set("seeding")).status).toBe(204);
+    expect((await set("registration")).status).toBe(204);
+    expect(code(await set("scheduled"))).toBe("failed_precondition");
+    expect(code(await set("finished"))).toBe("failed_precondition");
+    expect((await set("draft")).status).toBe(204);
+  });
+
+  it("confirming seeds stamps them; a change unconfirms them, and so does a newly accepted team", async () => {
+    const t = await accepted([["red", "cap"], ["blue", "bcap"]]);
+    const url = `/v1/tournaments/${t.id}/divisions/${t.div}/seeds`;
+    const division = () => store.doc(`tournaments/${t.id}/divisions/${t.div}`)!;
+    expect((await call("PUT", url, { seeds: ["blue", "red"], confirm: true })).status).toBe(204);
+    expect(division()).toMatchObject({ seeds: ["blue", "red"], seedsConfirmedAt: new Date(now) });
+    // Saving the same order keeps the confirmation; a new order drops it.
+    expect((await call("PUT", url, { seeds: ["blue", "red"] })).status).toBe(204);
+    expect(division().seedsConfirmedAt).toEqual(new Date(now));
+    expect((await call("PUT", url, { seeds: ["red", "blue"] })).status).toBe(204);
+    expect(division().seedsConfirmedAt).toBeNull();
+    await call("PUT", url, { seeds: ["red", "blue"], confirm: true });
+    await enter(t.id, t.div, "green", "gcap");
+    await call("PUT", `/v1/tournaments/${t.id}/entries/green/status`, { status: "accepted" });
+    expect(division()).toMatchObject({ seeds: ["red", "blue", "green"], seedsConfirmedAt: null });
+  });
+
+  it("one team isn't enough to confirm", async () => {
+    const t = await accepted([["red", "cap"]]);
+    expect(code(await call("PUT", `/v1/tournaments/${t.id}/divisions/${t.div}/seeds`, { seeds: ["red"], confirm: true }))).toBe("failed_precondition");
+  });
+
+  it("publishes every division at once, only with confirmed seeds, checking them all before writing any", async () => {
+    const t = await accepted([["red", "cap"], ["blue", "bcap"]]);
+    const url = `/v1/tournaments/${t.id}/schedule`;
+    const body = (games = plan(["red", "blue"])) => ({ divisions: [{ divisionId: t.div, games }] });
+    expect(code(await call("PUT", url, body()))).toBe("failed_precondition");
+    await call("PUT", `/v1/tournaments/${t.id}/divisions/${t.div}/seeds`, { seeds: ["red", "blue"], confirm: true });
+    expect((await call("PUT", url, body(), "cap")).status).toBe(403);
+    expect(code(await call("PUT", url, body(plan(["red", "green"]))))).toBe("invalid_argument");
+    expect(Object.keys(Object.fromEntries(store.docs)).some((k) => k.includes("/games/"))).toBe(false);
+    expect(code(await call("PUT", url, { divisions: [{ divisionId: t.div, games: plan(["red", "blue"]) }, { divisionId: t.div, games: plan(["red", "blue"]) }] }))).toBe("invalid_argument");
+    expect((await call("PUT", url, body())).status).toBe(204);
+    expect(store.doc(`tournaments/${t.id}`)?.status).toBe("scheduled");
+    expect([...store.docs.keys()].filter((k) => k.startsWith(`tournaments/${t.id}/divisions/${t.div}/games/`))).toHaveLength(1);
+  });
+});
+
+describe("deleting a tournament deletes its chats", () => {
+  it("the conversations behind its chats go, with their messages; other conversations stay", async () => {
+    const t = await accepted([["red", "cap"]]);
+    store.put(`tournaments/${t.id}/chats/captains`, { conversationId: "g-cap1", kind: "captains" });
+    store.put(`tournaments/${t.id}/chats/team_red`, { conversationId: "g-red1", kind: "team", teamId: "red" });
+    store.put("conversations/g-cap1", { kind: "tournament", tournamentId: t.id, participants: ["mgr", "cap"] });
+    store.put("conversations/g-cap1/messages/m1", { text: "hi" });
+    store.put("conversations/g-red1", { kind: "tournament", tournamentId: t.id, participants: ["mgr", "cap"] });
+    store.put("conversations/g-red1/typing/cap", { at: new Date(now) });
+    // A pointer at someone else's conversation doesn't delete it.
+    store.put(`tournaments/${t.id}/chats/team_blue`, { conversationId: "g-other", kind: "team", teamId: "blue" });
+    store.put("conversations/g-other", { kind: "group", participants: ["x"] });
+    expect((await call("DELETE", `/v1/tournaments/${t.id}`, undefined, "cap")).status).toBe(403);
+    expect(store.doc("conversations/g-cap1")).toBeDefined();
+    expect((await call("DELETE", `/v1/tournaments/${t.id}`)).status).toBe(204);
+    // The chat pointers stay for the tournamentDeleted function (it also deletes attachments).
+    for (const gone of ["conversations/g-cap1", "conversations/g-cap1/messages/m1", "conversations/g-red1", "conversations/g-red1/typing/cap", `tournaments/${t.id}`]) {
+      expect(store.doc(gone)).toBeUndefined();
+    }
+    expect(store.doc("conversations/g-other")).toBeDefined();
+  });
+});
+
+describe("the tournament director and the entry deadline", () => {
+  it("a director by name with optional contact details, or a member by uid", async () => {
+    const director = { uid: null, name: "Dana Director", email: "dana@example.com", phone: "+1 (555) 010-0000" };
+    const { id } = await host({ director });
+    expect(store.doc(`tournaments/${id}`)?.director).toEqual(director);
+    expect(code(await call("POST", "/v1/tournaments", hosting({ director: { name: "" } })))).toBe("invalid_argument");
+    expect(code(await call("POST", "/v1/tournaments", hosting({ director: { name: "D", email: "nope" } })))).toBe("invalid_argument");
+    expect(code(await call("POST", "/v1/tournaments", hosting({ director: { name: "D", phone: "call me" } })))).toBe("invalid_argument");
+    expect(code(await call("POST", "/v1/tournaments", hosting({ director: { uid: "ghost", name: "Ghost" } })))).toBe("invalid_argument");
+    store.put("users/dana", { name: "Dana" });
+    expect((await call("POST", "/v1/tournaments", hosting({ director: { uid: "dana", name: "Dana" } }))).status).toBe(201);
+  });
+
+  it("the deadline is before the start, and the fees are due then", async () => {
+    const fee = { amountCents: 25000, currency: "USD", instructions: "", dueAt: null, payerCoversFees: false };
+    const deadline = iso(2026, 11, 1);
+    const { id } = await host({ bidFee: fee, entryDeadline: deadline });
+    const t = store.doc(`tournaments/${id}`)!;
+    expect((t.entryDeadline as Date).toISOString()).toBe(deadline);
+    expect(((t.bidFee as { dueAt: Date }).dueAt).toISOString()).toBe(deadline);
+    expect(code(await call("POST", "/v1/tournaments", hosting({ entryDeadline: iso(2026, 11, 6) })))).toBe("invalid_argument");
+  });
+});
+
+describe("finishing without the host on the page", () => {
+  it("the last confirmed final records places and makes the event final; an earlier one only makes it live", async () => {
+    const t = await accepted([["red", "cap"], ["blue", "bcap"], ["green", "gcap"]]);
+    await call("PUT", `/v1/tournaments/${t.id}/divisions/${t.div}/schedule`, { games: plan(["red", "blue", "green"]) });
+    const games = [...store.docs.keys()].filter((k) => k.startsWith(`tournaments/${t.id}/divisions/${t.div}/games/`)).sort();
+    const play = async (path: string, i: number) => {
+      const g = store.doc(path)!;
+      const gameId = path.split("/").pop();
+      const captain = (team: unknown) => ({ red: "cap", blue: "bcap", green: "gcap" })[String(team)]!;
+      const score = { scoreA: 15, scoreB: 10 - i };
+      await call("POST", `/v1/tournaments/${t.id}/divisions/${t.div}/games/${gameId}/report`, score, captain(g.teamA));
+      expect((await call("POST", `/v1/tournaments/${t.id}/divisions/${t.div}/games/${gameId}/confirm`, score, captain(g.teamB))).status).toBe(204);
+    };
+    await play(games[0], 0);
+    expect(store.doc(`tournaments/${t.id}`)?.status).toBe("live");
+    expect(store.doc(`tournaments/${t.id}/divisions/${t.div}`)?.placements).toEqual([]);
+    for (const [i, g] of games.slice(1).entries()) await play(g, i + 1);
+    expect(store.doc(`tournaments/${t.id}/divisions/${t.div}`)?.placements).toHaveLength(3);
+    expect(store.doc(`tournaments/${t.id}`)?.status).toBe("finished");
+  });
+});
+
+describe("the team page's Finish entry (toFinish)", () => {
+  it("lists entries missing a roster or fee before the event, for the team's admins; complete ones drop off", async () => {
+    const fee = { amountCents: 25000, currency: "USD", instructions: "", dueAt: null, payerCoversFees: false };
+    const t = await open({ bidFee: fee, format: { settings, level: "club", maxTeams: 8, minRoster: 3 } });
+    await enter(t.id, t.div, "red", "cap");
+    store.put(`teams/red/tournamentEntries/${t.id}`, { name: "Spring Fling", status: "applied" });
+    const list = async () => (await call("GET", "/v1/teams/red/tournament-invites", undefined, "cap")).json().toFinish;
+    expect(await list()).toEqual([expect.objectContaining({ tournamentId: t.id, status: "applied", rosterSet: false, paid: false, overdue: false })]);
+    await call("PUT", `/v1/tournaments/${t.id}/entries/red/roster`, { playerIds: ["p0", "p1", "p2"] }, "cap");
+    expect(await list()).toEqual([expect.objectContaining({ rosterSet: true, paid: false })]);
+    store.put(`tournaments/${t.id}/payments/red`, { paid: true });
+    expect(await list()).toEqual([]);
   });
 });

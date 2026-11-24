@@ -184,6 +184,27 @@ and events; everything else in the hub is for members. A private group
 - Not yet: team dues (a dues amount a team sets; today only a paid
   checkbox), refunding from inside Stall 10, memberships, tax.
 
+**Entering an event (2026-11-23, api 0.46.0, web 0.58.0, app 0.0.50):**
+- An invited team **Responds**: Accept (straight in, or the waitlist when
+  the division is full) or Decline (the organizers see it). Then it names
+  its roster and pays, now or later, by the event's **entry deadline**
+  (`entryDeadline`; else the fee's due date; else the day before it
+  starts). Applying to a public event is the same flow; the organizer
+  still accepts it.
+- Past the deadline nothing is withdrawn: the team is flagged to the
+  organizers (**Roster missing**, **Unpaid**) and reminded (3 days before
+  and when it passes, `entryDeadlineReminders`).
+- Organizers confirm each division's seeds, then publish every schedule
+  at once; the event becomes scheduled and teams are notified.
+- A **tournament director** is a contact (a member, or a name with email
+  and phone), not an organizer.
+- Stall 10 staff host any event as the official Stall 10 organization
+  (`set-staff.mjs --host`), shown **Stall 10 verified**; its fees go to
+  that organization's Stripe account.
+- Deleting an event deletes its chats with the organizers.
+- Not yet: refunding automatically when an organizer declines a team
+  that paid (§9), and a server-side list of allowed status changes.
+
 ## 8. Build order
 
 1. **Navigation and the hub:** the five tabs on the app and the website,
@@ -1364,6 +1385,41 @@ Out of scope: payments, meeting recording, USA Ultimate data.
     page without a publishable key. Tests: API `payments.test.ts`
     ("the app's payment sheet", "Checkout in the website's page"), app
     `payments_test.dart` ("payment sheet").
+77. Responding to a tournament a step at a time (2026-11-23): one
+    **Respond** for an invite (Accept or Decline first; accepting puts
+    the team straight in, or on the waitlist when full), then the roster
+    (or **Set later**), the fee (or **Pay later**), then **Request
+    confirmed!** (**Request sent!** when applying) with what's left; the
+    team page's **Entries to finish** with **Finish entry**; a paid hat
+    signup's Payment then **You're signed up!**: [x] app
+    (`/tournaments/:id/respond`, `RespondScreen`); [x] website
+    (`/tournaments/:id/respond` and `/enter`, `EnterTeam`). One rule:
+    shared `entryChecklist` / `effectiveDeadline`, app `EntryChecklist`
+    / `HostedTournament.effectiveDeadline`. Tests: shared
+    `entry_checklist_fixtures.test.ts`, app
+    `entry_checklist_fixtures_test.dart`, `respond_test.dart`,
+    `team_home_test.dart`, `player_entry_test.dart`, API
+    `tournaments.test.ts` (respond, roster, toFinish), rules.
+78. Running an event (2026-11-23): one entry deadline for rosters and
+    fees in the form's **Fees & deadline**; **Roster missing** and
+    **Unpaid** flags; **Confirm seeds** per division (a change needs a new
+    confirm) and **Publish** every schedule at once (`PUT /schedule`):
+    [x] app (the guide's host steps, Teams tab); [x] website (**Run your
+    event**, Teams tab). Tests: app `run_event_test.dart`,
+    `event_guide_test.dart`; API `tournaments.test.ts`; rules.
+79. Tournament director (2026-11-23): the form's **Director** step (a
+    member, or anyone by name, email and phone) and the event page's
+    director (Message for a member; email and phone for signed-in
+    members only, the name for visitors): [x] app (`DirectorSection`,
+    director card); [x] website (`DirectorStep`, `DirectorCard`). Tests:
+    app `tournament_extras_test.dart`; API `public_tournaments.test.ts`;
+    rules.
+80. Payments set up without leaving (2026-11-23): **Payments: On /
+    Finish setup / Not set up** on the payouts card and in team settings
+    for anyone who manages events (only the owner sets up); Stripe's
+    embedded onboarding in the page, and in the app a WebView of the
+    website's `/embed/payouts`: [x] app; [x] website. Tests: API
+    `payments.test.ts`, app `payments_test.dart`.
 
 Libraries the website may add (none today): a small data cache for API
 reads and mutations, the Firestore web SDK for listeners, and LiveKit's

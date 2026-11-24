@@ -1,6 +1,6 @@
 // Hosted tournaments and leagues over HTTP (TournamentService), as the
 // signed-in caller, under the hub's write limit.
-import { liveLimits } from "@stall10/shared";
+import { liveLimits, type TeamTournamentInvitesResult } from "@stall10/shared";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { type Caller, requireCaller } from "../auth.js";
 import { hubLimits } from "../hub/routes.js";
@@ -57,6 +57,11 @@ export function tournamentRoutes(app: FastifyInstance, svc: TournamentService, l
     await svc.publish(caller(req), req.params.id, req.params.divisionId, req.body);
     return reply.code(204).send();
   });
+  // Every division at once, for seeds the host confirmed.
+  app.put<T>(`${base}/schedule`, { bodyLimit: scheduleBodyLimit * 2 }, async (req, reply) => {
+    await svc.publishAll(caller(req), req.params.id, req.body);
+    return reply.code(204).send();
+  });
   app.post<D>(`${div}/seed-bracket`, async (req, reply) => {
     await svc.seedBracket(caller(req), req.params.id, req.params.divisionId);
     return reply.code(204).send();
@@ -91,17 +96,22 @@ export function tournamentRoutes(app: FastifyInstance, svc: TournamentService, l
     return reply.code(204).send();
   });
 
-  app.put<E>(`${base}/entries/:teamId`, async (req, reply) => {
-    await svc.putEntry(caller(req), req.params.id, req.params.teamId, req.body);
+  // Answers the entry's status: an invite taken up is accepted (or waitlisted when full).
+  app.put<E>(`${base}/entries/:teamId`, async (req) => svc.putEntry(caller(req), req.params.id, req.params.teamId, req.body));
+  app.put<E>(`${base}/entries/:teamId/roster`, async (req, reply) => {
+    await svc.putRoster(caller(req), req.params.id, req.params.teamId, req.body);
     return reply.code(204).send();
   });
   app.post<E>(`${base}/entries/:teamId/invite`, async (req, reply) => {
     await svc.invite(caller(req), req.params.id, req.params.teamId, req.body);
     return reply.code(204).send();
   });
-  app.get<{ Params: { teamId: string } }>("/v1/teams/:teamId/tournament-invites", async (req) => ({
-    invites: await svc.teamInvites(caller(req), req.params.teamId),
-  }));
+  // Its open invites, and its entries still missing a roster or fee.
+  app.get<{ Params: { teamId: string } }>("/v1/teams/:teamId/tournament-invites", async (req): Promise<TeamTournamentInvitesResult> => {
+    const c = caller(req);
+    const [invites, toFinish] = await Promise.all([svc.teamInvites(c, req.params.teamId), svc.teamEntriesToFinish(c, req.params.teamId)]);
+    return { invites, toFinish };
+  });
   app.put<E>(`${base}/entries/:teamId/status`, async (req, reply) => {
     await svc.setEntryStatus(caller(req), req.params.id, req.params.teamId, req.body);
     return reply.code(204).send();

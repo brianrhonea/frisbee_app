@@ -5,6 +5,7 @@
 import {
   type CreateTeamResponse,
   divisionLabel,
+  effectiveDeadline,
   effectiveMinRoster,
   entryStatusLabels,
   feeLabel,
@@ -28,10 +29,12 @@ import { ShareButton, tournamentUrl } from "@/components/ShareButton";
 import { usePayments } from "@/components/drafts/data";
 import { HostPaymentControls, PayOnline, PayoutsCard } from "@/components/payments/Payments";
 import { inChats, OrganizerChats, TeamChatButton } from "./TournamentChats";
+import { limit } from "firebase/firestore";
 import { callApi } from "@/lib/client";
+import { useLiveQuery } from "@/lib/live";
 import { dayKey, useRenderZone } from "@/lib/renderZone";
 import { SignupsSlot } from "./SignupsSlot";
-import { DivisionPicker, NoDivisions, ResultsTab, ScheduleTab, TeamMark } from "./TournamentGames";
+import { DivisionPicker, NoDivisions, planFor, ResultsTab, ScheduleTab, TeamMark } from "./TournamentGames";
 import { TournamentNews } from "./TournamentNews";
 import { JoinToTakePart, PublicNews } from "./VisitorParts";
 import { datesLabel, StatusBadge } from "./TournamentLists";
@@ -140,7 +143,7 @@ export function TournamentView({ s, open }: { s: TournamentState; open?: { tab?:
           </button>
         ))}
       </nav>
-      {current === "overview" && <Overview s={s} />}
+      {current === "overview" && <Overview s={s} onTab={setTab} />}
       {current === "players" && (
         <SignupsSlot tournamentId={tournamentId} tournament={t} divisions={s.divisions} divisionId={s.divisionId} manager={s.manager} />
       )}
@@ -222,7 +225,7 @@ function ManagerMenu({ s }: { s: TournamentState }) {
   const router = useRouter();
   const { busy, error, run } = useAction();
   async function remove() {
-    if (!window.confirm(`Delete ${s.t?.name}? Its divisions, entries, schedule and scores are deleted too. This can't be undone.`)) return;
+    if (!window.confirm(`Delete ${s.t?.name}? Its divisions, entries, schedule, scores and captains' chats are deleted too. This can't be undone.`)) return;
     const r = await run(tournamentPath(s.id), "DELETE");
     if (r.ok) router.push(`/teams/${encodeURIComponent(s.t?.hostId ?? "")}`);
   }
@@ -239,79 +242,271 @@ function ManagerMenu({ s }: { s: TournamentState }) {
   );
 }
 
-const nextSteps: Partial<Record<HostedStatus, Array<{ to: HostedStatus; label: string; hint: string; quiet?: boolean }>>> = {
-  draft: [{ to: "registration", label: "Publish and open registration", hint: "Only your managers can see it until you publish." }],
-  registration: [{ to: "seeding", label: "Close registration", hint: "Registration is open. Close it when you're ready to seed and schedule." }],
-  seeding: [{ to: "registration", label: "Reopen registration", hint: "Registration is closed. Seed the teams, then publish the schedule.", quiet: true }],
+const statusActions: Partial<Record<HostedStatus, Array<{ to: HostedStatus; label: string; quiet?: boolean }>>> = {
+  draft: [{ to: "registration", label: "Publish and open registration" }],
+  registration: [{ to: "seeding", label: "Close registration" }],
+  seeding: [{ to: "registration", label: "Reopen registration", quiet: true }],
 };
 
+type RunStep = { title: string; done: boolean; detail: React.ReactNode; action?: React.ReactNode };
+
+/** A division's schedule as the API takes it (PUT /schedule). */
+function gamesBody(plan: NonNullable<ReturnType<typeof planFor>["plan"]>) {
+  return plan.games.map((g) => ({
+    id: g.id,
+    order: g.order,
+    stage: g.stage,
+    round: g.round,
+    label: g.label,
+    pool: g.pool,
+    field: g.field,
+    startsAt: g.startsAt?.toISOString() ?? null,
+    teamA: g.teamA,
+    teamB: g.teamB,
+    sourceA: g.sourceA,
+    sourceB: g.sourceB,
+    ifNeeded: g.ifNeeded,
+    ...(g.place != null && { place: g.place }),
+  }));
+}
+
 /**
- * The host's checklist (HostChecklist in the app): "Next steps", how many
- * are done, then each step ticked when done and the first one left in
- * amber (the host's to do), then the status button for where it's at.
+ * "Run your event" (RunSheet in the app): the host's steps in order, each
+ * with what to do there: open registration, accept teams (with how many
+ * are missing a roster or fee), confirm each division's seeds, publish
+ * every division's schedule at once (PUT /schedule), then play (the
+ * server finishes the event once every place is set).
  */
-function HostChecklist({ s }: { s: TournamentState }) {
-  const { busy, error, run } = useAction();
+/** A division of a scheduled event that has no games yet, with Publish (else nothing). */
+function UnpublishedDivision({ tournamentId, divisionId, label, onOpen }: { tournamentId: string; divisionId: string; label: string; onOpen: () => void }) {
+  const games = useLiveQuery(`tournaments/${tournamentId}/divisions/${divisionId}/games`, [limit(1)], `published-${divisionId}`).data;
+  if (games === undefined || games.length > 0) return null;
+  return (
+    <li>
+      <span>{label} · no schedule yet</span>
+      <button type="button" className="btn btn-small btn-primary" onClick={onOpen}>
+        Publish
+      </button>
+    </li>
+  );
+}
+
+function RunEvent({ s, onTab }: { s: TournamentState; onTab: (tab: Tab) => void }) {
+  const { busy, error, setError, run } = useAction();
+  const payments = usePayments(s.id, s.manager).data ?? [];
   const t = s.t;
   if (!t) return null;
-  const steps = nextSteps[t.status] ?? [];
-  const accepted = s.entriesWith("accepted").length;
+  const teams = takesTeams(t);
+  const fee = spotFee(t);
+  const deadline = effectiveDeadline(t);
+  const accepted = s.entriesWith("accepted");
   const waiting = s.entriesWith("applied").length;
-  const items: Array<{ done: boolean; label: string }> = [
-    { done: s.divisions.length > 0, label: s.divisions.length ? `${s.divisions.length} ${s.divisions.length === 1 ? "division" : "divisions"} open` : "Open a division under Edit details" },
-    { done: t.status !== "draft", label: t.status === "draft" ? "Publish it so teams can find it" : "Published" },
-    ...(takesTeams(t) ? [{ done: accepted >= 2, label: `${accepted} ${accepted === 1 ? "team" : "teams"} accepted${waiting ? `, ${waiting} waiting on you` : ""}` }] : []),
-    { done: s.published, label: s.published ? "Schedule published" : "Publish the schedule (Schedule tab)" },
+  const paid = new Set(payments.filter((x) => x.paid === true).map((x) => x.id));
+  const mixed = mixedEntry(t);
+  const minOf = (div: string) => effectiveMinRoster(s.divisions.find((d) => d.id === div) ?? { minRoster: null });
+  const noRoster = mixed || t.status === "live" || t.status === "finished" ? 0 : accepted.filter((e) => (e.roster?.length ?? 0) < minOf(e.divisionId)).length;
+  const unpaid = fee && fee.amountCents > 0 ? accepted.filter((e) => !paid.has(e.id)).length : 0;
+  const before = ["draft", "registration", "seeding"].includes(t.status);
+  const confirmed = s.divisions.filter((d) => d.seedsConfirmedAt && d.seeds.length >= 2);
+  const allConfirmed = s.divisions.length > 0 && confirmed.length === s.divisions.length;
+
+  async function publishAll() {
+    const divisions = [];
+    for (const d of s.divisions) {
+      const { plan, problem } = planFor(t, d);
+      if (!plan) {
+        setError(`${divisionLabel(d)}: ${problem}`);
+        return;
+      }
+      divisions.push({ divisionId: d.id, games: gamesBody(plan) });
+    }
+    const what = s.divisions.length === 1 ? "the schedule" : `the schedule for all ${s.divisions.length} divisions`;
+    if (!window.confirm(`Publish ${what}? Teams are notified, and seeds lock.`)) return;
+    await run(`${tournamentPath(s.id)}/schedule`, "PUT", { divisions });
+  }
+
+  const statusButtons = (statusActions[t.status] ?? []).map((x) => (
+    <button
+      key={x.to}
+      type="button"
+      className={`btn btn-small ${x.quiet ? "" : "btn-primary"}`}
+      disabled={busy || (x.to === "registration" && t.status === "draft" && !s.divisions.length)}
+      onClick={() => void run(`${tournamentPath(s.id)}/status`, "PUT", { status: x.to })}
+    >
+      {x.label}
+    </button>
+  ));
+  const steps: RunStep[] = [
+    {
+      title: "Set up",
+      done: s.divisions.length > 0,
+      detail: s.divisions.length ? (
+        <>
+          {s.divisions.length} {s.divisions.length === 1 ? "division" : "divisions"}
+          {deadline && (
+            <>
+              {" "}
+              · roster and fees due <LocalTime iso={deadline.toISOString()} />
+            </>
+          )}
+        </>
+      ) : (
+        "Open a division under Edit details."
+      ),
+    },
+    {
+      title: "Registration",
+      done: !["draft", "registration"].includes(t.status),
+      detail:
+        t.status === "draft"
+          ? "Only your managers can see it until you publish."
+          : teams
+            ? `${accepted.length} ${accepted.length === 1 ? "team" : "teams"} in${waiting ? `, ${waiting} waiting on you` : ""}${noRoster ? ` · ${noRoster} missing a roster` : ""}${unpaid ? ` · ${unpaid} unpaid` : ""}`
+            : t.status === "registration"
+              ? "Registration is open."
+              : "Registration is closed.",
+      action: (
+        <>
+          {statusButtons}
+          {teams && (waiting > 0 || noRoster > 0 || unpaid > 0) && (
+            <button type="button" className="btn btn-small" onClick={() => onTab("teams")}>
+              See teams
+            </button>
+          )}
+        </>
+      ),
+    },
+    {
+      title: "Seeds",
+      done: !before || allConfirmed,
+      detail: before ? `${confirmed.length} of ${s.divisions.length} ${s.divisions.length === 1 ? "division" : "divisions"} confirmed` : "Locked with the schedule.",
+      action: before && t.status !== "draft" && (
+        <ul className="run-divisions">
+          {s.divisions.map((d) => (
+            <li key={d.id}>
+              <span>
+                {divisionLabel(d)} · {d.seeds.length} {d.seeds.length === 1 ? "team" : "teams"}
+              </span>
+              {d.seedsConfirmedAt ? (
+                <span className="pill pill-soft">✓ Confirmed</span>
+              ) : (
+                <span className="home-actions">
+                  {teams && (
+                    <button
+                      type="button"
+                      className="text-btn"
+                      onClick={() => {
+                        s.selectDivision(d.id);
+                        onTab("teams");
+                      }}
+                    >
+                      Change order
+                    </button>
+                  )}
+                  <button type="button" className="btn btn-small btn-primary" disabled={busy || d.seeds.length < 2} onClick={() => void run(`${divisionPath(s.id, d.id)}/seeds`, "PUT", { seeds: d.seeds, confirm: true })}>
+                    Confirm seeds
+                  </button>
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      ),
+    },
+    {
+      title: "Schedule",
+      done: !before,
+      detail: !before ? "Published. Teams were notified." : allConfirmed ? "Every division is confirmed: publish when you're ready." : "Confirm every division's seeds first.",
+      action: before ? (
+        <>
+          <button type="button" className="btn btn-small btn-primary" disabled={busy || !allConfirmed} onClick={() => void publishAll()}>
+            Publish schedule
+          </button>
+          <button type="button" className="btn btn-small" onClick={() => onTab("schedule")}>
+            Preview
+          </button>
+        </>
+      ) : (
+        // Already scheduled: a division still without games (published one
+        // at a time from the Schedule tab) is published on its own; the
+        // app's guide does the same.
+        t.status !== "finished" && (
+          <ul className="run-divisions">
+            {s.divisions.map((d) => (
+              <UnpublishedDivision
+                key={d.id}
+                tournamentId={s.id}
+                divisionId={d.id}
+                label={divisionLabel(d)}
+                onOpen={() => {
+                  s.selectDivision(d.id);
+                  onTab("schedule");
+                }}
+              />
+            ))}
+          </ul>
+        )
+      ),
+    },
+    {
+      title: "Play",
+      done: t.status === "finished",
+      detail:
+        t.status === "finished"
+          ? "Finished. Results are final."
+          : t.status === "live"
+            ? "Live. Captains keep scores; it finishes once every place is set."
+            : "Captains keep live scores and report finals. It finishes by itself once every place is set.",
+      action: !before && t.status !== "finished" && (
+        <button type="button" className="btn btn-small" onClick={() => onTab("schedule")}>
+          Schedule
+        </button>
+      ),
+    },
   ];
-  const done = items.filter((x) => x.done).length;
-  const current = items.findIndex((x) => !x.done);
+  const done = steps.filter((x) => x.done).length;
+  const current = steps.findIndex((x) => !x.done);
+  // Registration stays open (and its buttons showing) while seeds are confirmed.
+  const showAction = (x: RunStep, i: number) => i === current || (x.title === "Registration" && t.status === "registration" && current > i) || (x.title === "Registration" && t.status === "seeding");
   return (
     <section className="card hosted-steps">
       <div className="card-head">
-        <h2 className="card-title">Next steps</h2>
+        <h2 className="card-title">Run your event</h2>
         <small className="muted">
-          {done} of {items.length} done
+          {done} of {steps.length} done
         </small>
       </div>
       <div className="hosted-steps-bar" aria-hidden>
-        <i style={{ width: `${(done / items.length) * 100}%` }} />
+        <i style={{ width: `${(done / steps.length) * 100}%` }} />
       </div>
-      <ol className="hosted-checklist">
-        {items.map((x, i) => (
-          <li key={i} className={x.done ? "done" : i === current ? "current" : ""}>
+      <ol className="hosted-checklist run-steps">
+        {steps.map((x, i) => (
+          <li key={x.title} className={x.done ? "done" : i === current ? "current" : ""}>
             <span className="hosted-step-mark" aria-hidden>
               {x.done ? "✓" : i + 1}
             </span>
-            <span>
-              {x.label}
+            <span className="run-step-body">
+              <b>{x.title}</b>
               {x.done && <span className="sr-only"> (done)</span>}
+              <small className="muted">{x.detail}</small>
+              {showAction(x, i) && x.action && <span className="home-actions">{x.action}</span>}
             </span>
           </li>
         ))}
       </ol>
-      {steps.map((x) => (
-        <div key={x.to} className="stack hosted-step-action">
-          <small className="muted">{x.hint}</small>
-          <div className="home-actions">
-            <button type="button" className={`btn btn-small ${x.quiet ? "" : "btn-primary"}`} disabled={busy || (x.to === "registration" && t.status === "draft" && !s.divisions.length)} onClick={() => void run(`${tournamentPath(s.id)}/status`, "PUT", { status: x.to })}>
-              {x.label}
-            </button>
-          </div>
-        </div>
-      ))}
       {error && <p className="form-error">{error}</p>}
     </section>
   );
 }
 
-function Overview({ s }: { s: TournamentState }) {
+function Overview({ s, onTab }: { s: TournamentState; onTab: (tab: Tab) => void }) {
   const t = s.t!;
   const fee = spotFee(t);
   const zone = useRenderZone();
   const { busy, error, run } = useAction();
   return (
     <div className="stack">
-      {s.manager && <HostChecklist s={s} />}
+      {s.manager && <RunEvent s={s} onTab={onTab} />}
       {/* The host's owner connects Stripe here (hidden for others). */}
       {s.manager && s.user && (fee || (t.entryType === "players" && t.bidFee)) && <PayoutsCard user={s.user} teamId={t.hostId} amountCents={(fee ?? t.bidFee)?.amountCents} />}
       {/* An organizer who also runs a team sees its entry and fee too. */}
@@ -342,6 +537,14 @@ function Overview({ s }: { s: TournamentState }) {
               </dd>
             </>
           )}
+          {effectiveDeadline(t) && takesTeams(t) && (
+            <>
+              <dt>Rosters and fees due</dt>
+              <dd>
+                <LocalTime iso={effectiveDeadline(t)!.toISOString()} />
+              </dd>
+            </>
+          )}
           <dt>Who can play</dt>
           <dd>{mixedEntry(t) ? "Players sign up, and teams can reserve a spot" : takesPlayers(t) ? "Players sign up and are drafted onto teams" : t.visibility === "inviteOnly" ? "Teams the host invites" : "Teams apply; the host accepts them"}</dd>
           {t.bidFee && (
@@ -358,6 +561,7 @@ function Overview({ s }: { s: TournamentState }) {
           )}
         </dl>
       </section>
+      {t.director?.name && <DirectorCard s={s} />}
       <section className="card">
         <h2 className="card-title">Divisions</h2>
         {s.divisions.length === 0 && <NoDivisions s={s} />}
@@ -400,10 +604,11 @@ const enterHref = (tournamentId: string, teamId?: string) =>
   `/tournaments/${encodeURIComponent(tournamentId)}/enter${teamId ? `?team=${encodeURIComponent(teamId)}` : ""}`;
 
 /**
- * An invite's answer: its reply-by time and Accept (the enter page, to
- * pick captains) / Decline, or Expired once that time has passed.
+ * An invite's answer: its reply-by time and Respond (the respond flow:
+ * accept or decline, then roster and payment), or Expired once that time
+ * has passed.
  */
-export function InviteAnswer({ entry, href, busy, onDecline }: { entry: { status: string; replyBy?: string | null }; href: string; busy: boolean; onDecline: () => void }) {
+export function InviteAnswer({ entry, href }: { entry: { status: string; replyBy?: string | null }; href: string }) {
   if (inviteExpired(entry, new Date())) {
     return (
       <div className="stack">
@@ -421,11 +626,8 @@ export function InviteAnswer({ entry, href, busy, onDecline }: { entry: { status
       )}
       <div className="home-actions">
         <Link className="btn btn-primary btn-small" href={href}>
-          Accept
+          Respond
         </Link>
-        <button type="button" className="btn btn-small" disabled={busy} onClick={onDecline}>
-          Decline
-        </button>
       </div>
     </div>
   );
@@ -461,18 +663,14 @@ function YourTeams({ s }: { s: TournamentState }) {
                   )}
                 </div>
                 {e.status === "invited" ? (
-                  <InviteAnswer
-                    entry={e}
-                    href={enterHref(s.id, e.id)}
-                    busy={busy}
-                    onDecline={() => {
-                      if (window.confirm(`Decline the invite for ${e.teamName}?`)) void run(`${tournamentPath(s.id)}/entries/${encodeURIComponent(e.id)}/status`, "PUT", { status: "withdrawn" });
-                    }}
-                  />
+                  <InviteAnswer entry={e} href={enterHref(s.id, e.id)} />
                 ) : (
                   e.status !== "declined" && (
                     <div className="home-actions">
                       <Link className="text-btn" href={enterHref(s.id, e.id)}>
+                        Roster &amp; fee
+                      </Link>
+                      <Link className="text-btn" href={`${enterHref(s.id, e.id)}&step=captains`}>
                         Captains
                       </Link>
                       <button
@@ -560,18 +758,34 @@ function TeamsTab({ s }: { s: TournamentState }) {
   const { busy, error, run } = useAction();
   // The host marks each team's bid or spot fee here, as in the app.
   const payments = usePayments(s.id, s.manager).data ?? [];
+  const [order, setOrder] = useState<string[] | null>(null);
   if (!d || !s.t) return <NoDivisions s={s} />;
   const fee = spotFee(s.t);
   const paymentById = new Map(payments.map((x) => [x.id, x]));
   // Drafted teams' players pay one by one, not as a team.
   const owes = (id: string) => !!fee && fee.amountCents > 0 && !(d.teams ?? []).some((x) => x.id === id);
-  const overdue = (id: string) => !!fee?.dueAt && Date.now() > Date.parse(fee.dueAt) && paymentById.get(id)?.paid !== true;
+  const deadline = effectiveDeadline(s.t);
+  const overdue = (id: string) => !!deadline && Date.now() > deadline.getTime() && paymentById.get(id)?.paid !== true;
+  const mixed = mixedEntry(s.t);
+  const rosterMissing = (id: string) => {
+    const e = s.entryOf(id);
+    // Rosters lock once play starts: nothing left to flag.
+    const playing = s.t?.status === "live" || s.t?.status === "finished";
+    return !!e && !mixed && !playing && (e.roster?.length ?? 0) < effectiveMinRoster(d);
+  };
   const seedable = s.manager && !s.published;
+  // Reordered here, then saved once (Save order / Confirm seeds).
+  const seeds = order && order.length === d.seeds.length && order.every((x) => d.seeds.includes(x)) ? order : d.seeds;
+  const changed = seeds.join() !== d.seeds.join();
   const move = (i: number, by: number) => {
-    const seeds = [...d.seeds];
-    const [x] = seeds.splice(i, 1);
-    seeds.splice(i + by, 0, x);
-    void run(`${divisionPath(s.id, d.id)}/seeds`, "PUT", { seeds });
+    const next = [...seeds];
+    const [x] = next.splice(i, 1);
+    next.splice(i + by, 0, x);
+    setOrder(next);
+  };
+  const saveSeeds = async (confirm: boolean) => {
+    const r = await run(`${divisionPath(s.id, d.id)}/seeds`, "PUT", { seeds, ...(confirm && { confirm: true }) });
+    if (r.ok) setOrder(null);
   };
   const decide = (teamId: string, status: string) => void run(`${tournamentPath(s.id)}/entries/${encodeURIComponent(teamId)}/status`, "PUT", { status });
   const waiting = s.entriesIn(d.id).filter((e) => e.status === "applied" || e.status === "waitlisted");
@@ -640,12 +854,20 @@ function TeamsTab({ s }: { s: TournamentState }) {
         </h2>
         {d.seeds.length === 0 && <p className="muted">{s.manager ? "No teams yet. Accept applications above or invite teams." : "No teams accepted yet."}</p>}
         <ol className="hosted-seeds">
-          {d.seeds.map((id, i) => (
+          {seeds.map((id, i) => (
             <li key={id} className="row-card">
               <span className="hosted-seed">
                 <b className="hosted-seed-n">{i + 1}</b>
                 <TeamMark name={s.teamName(id)} />
-                <span>{s.teamName(id)}</span>
+                <span>
+                  {s.teamName(id)}
+                  {s.manager && (rosterMissing(id) || (owes(id) && paymentById.get(id)?.paid !== true)) && (
+                    <span className="entry-flags">
+                      {rosterMissing(id) && <span className={`pill ${deadline && Date.now() > deadline.getTime() ? "hosted-pill-due" : "pill-soft"}`}>Roster missing</span>}
+                      {owes(id) && paymentById.get(id)?.paid !== true && <span className={`pill ${overdue(id) ? "hosted-pill-due" : "pill-soft"}`}>Unpaid</span>}
+                    </span>
+                  )}
+                </span>
               </span>
               {s.manager && s.user && owes(id) && <HostPaymentControls user={s.user} tournamentId={s.id} payerId={id} payment={paymentById.get(id)} overdue={overdue(id)} />}
               {s.manager && s.user && s.t?.status !== "draft" && inChats(s.entries.find((e) => e.id === id)) && <TeamChatButton user={s.user} tournamentId={s.id} teamId={id} teamName={s.teamName(id)} />}
@@ -654,7 +876,7 @@ function TeamsTab({ s }: { s: TournamentState }) {
                   <button type="button" className="text-btn" aria-label="Move up" disabled={busy || i === 0} onClick={() => move(i, -1)}>
                     ↑
                   </button>
-                  <button type="button" className="text-btn" aria-label="Move down" disabled={busy || i === d.seeds.length - 1} onClick={() => move(i, 1)}>
+                  <button type="button" className="text-btn" aria-label="Move down" disabled={busy || i === seeds.length - 1} onClick={() => move(i, 1)}>
                     ↓
                   </button>
                   {s.entryOf(id) && (
@@ -667,6 +889,26 @@ function TeamsTab({ s }: { s: TournamentState }) {
             </li>
           ))}
         </ol>
+        {seedable && seeds.length >= 2 && (
+          <div className="stack hosted-seed-confirm">
+            <small className="muted">
+              {d.seedsConfirmedAt && !changed ? "Seeds confirmed. Publish the schedule when every division is confirmed." : "Put the teams in seed order, then confirm. Changing the order later needs a new confirm."}
+            </small>
+            <div className="home-actions">
+              {changed && (
+                <button type="button" className="btn btn-small" disabled={busy} onClick={() => void saveSeeds(false)}>
+                  Save order
+                </button>
+              )}
+              {(changed || !d.seedsConfirmedAt) && (
+                <button type="button" className="btn btn-primary btn-small" disabled={busy} onClick={() => void saveSeeds(true)}>
+                  Confirm seeds
+                </button>
+              )}
+              {d.seedsConfirmedAt && !changed && <span className="pill pill-soft">✓ Seeds confirmed</span>}
+            </div>
+          </div>
+        )}
         {s.manager && s.published && <small className="muted">Seeds are locked once the schedule is published.</small>}
       </section>
       {s.manager && others.length > 0 && (
@@ -755,6 +997,43 @@ function InviteTeams({ s, divisionId }: { s: TournamentState; divisionId: string
         })}
       </div>
       {error && <p className="form-error">{error}</p>}
+    </section>
+  );
+}
+
+/**
+ * The tournament director, the event's main contact (TournamentDirectorCard
+ * in the app): a member links to their profile and can be messaged;
+ * anyone else shows the email and phone the host gave. Visitors see the
+ * name only.
+ */
+function DirectorCard({ s }: { s: TournamentState }) {
+  const d = s.t?.director;
+  if (!d?.name) return null;
+  return (
+    <section className="card">
+      <h2 className="card-title">Tournament director</h2>
+      <p className="muted small">Questions about the event or logistics? Ask them.</p>
+      <div className="row-card">
+        <span>
+          {d.uid && !s.visitor ? <Link href={`/players/${encodeURIComponent(d.uid)}`}>{d.name}</Link> : <b>{d.name}</b>}
+          {!s.visitor && (d.email || d.phone) && (
+            <>
+              <br />
+              <small className="muted">
+                {d.email && <a href={`mailto:${d.email}`}>{d.email}</a>}
+                {d.email && d.phone && " · "}
+                {d.phone && <a href={`tel:${d.phone.replace(/[^+\d]/g, "")}`}>{d.phone}</a>}
+              </small>
+            </>
+          )}
+        </span>
+        {d.uid && !s.visitor && d.uid !== s.uid && (
+          <Link className="btn btn-small" href={`/messages?to=${encodeURIComponent(d.uid)}`}>
+            Message
+          </Link>
+        )}
+      </div>
     </section>
   );
 }

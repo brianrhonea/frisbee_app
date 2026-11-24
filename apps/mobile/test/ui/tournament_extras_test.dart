@@ -1,6 +1,6 @@
 // Tournament extras (F30): the bracket on its own page, the score form's
 // −/+ steppers, a league's schedule a week at a time, entering a team on a
-// full screen, the event form as steps with Save draft / Publish, and
+// full screen (now the respond flow, respond_test), the event form as steps with Save draft / Publish, and
 // Share on the event page.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -17,7 +17,6 @@ import 'package:frisbee_app/ui/tournaments/widgets/hosted_bracket_screen.dart';
 import 'package:frisbee_app/ui/tournaments/widgets/hosted_tournament_form_screen.dart';
 import 'package:frisbee_app/ui/tournaments/widgets/hosted_tournament_screen.dart';
 import 'package:frisbee_app/ui/tournaments/widgets/share_tournament.dart';
-import 'package:frisbee_app/ui/tournaments/widgets/tournament_dialogs.dart';
 import 'package:frisbee_app/utils/result.dart';
 import 'package:go_router/go_router.dart';
 
@@ -360,64 +359,6 @@ void main() {
     });
   });
 
-  group('Enter a team', () {
-    testWidgets('opens full screen and returns the application', (
-      tester,
-    ) async {
-      bigView(tester);
-      EntryApplication? result;
-      final divisions = [
-        TournamentDivision(
-          id: 'd1',
-          division: Division.mixed,
-          level: CompetitionLevel.club,
-          settings: TournamentSettings(startsAt: now),
-        ),
-      ];
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: AppTheme.light,
-          home: Builder(
-            builder: (context) => TextButton(
-              onPressed: () async => result = await showApplyDialog(
-                context,
-                teams: [teams.teams['t1']!],
-                divisions: divisions,
-                uid: 'cap',
-              ),
-              child: const Text('open'),
-            ),
-          ),
-        ),
-      );
-      await tester.tap(find.text('open'));
-      await tester.pumpAndSettle();
-      expect(find.byType(EnterTeamScreen), findsOneWidget);
-      expect(find.byType(AlertDialog), findsNothing);
-      expect(find.text('Apply to play'), findsOneWidget);
-      // Every part is still there: team, division and captains.
-      expect(find.text('Northside Flyers'), findsOneWidget);
-      expect(find.text('Club Mixed'), findsOneWidget);
-      expect(find.text('Name cap (you)'), findsOneWidget);
-      await tester.tap(find.text('Name pat'));
-      await tester.pump();
-      await tester.tap(find.widgetWithText(FilledButton, 'Apply'));
-      await tester.pumpAndSettle();
-      expect(result?.teamId, 't1');
-      expect(result?.divisionId, 'd1');
-      expect(result?.captainIds, unorderedEquals(['cap', 'pat']));
-
-      // Closing it enters nothing.
-      result = null;
-      await tester.tap(find.text('open'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Cancel'));
-      await tester.pumpAndSettle();
-      expect(result, isNull);
-      expect(find.byType(EnterTeamScreen), findsNothing);
-    });
-  });
-
   group('Event form steps', () {
     HostedTournamentFormViewModel form({String? id}) {
       final f = HostedTournamentFormViewModel(
@@ -516,7 +457,7 @@ void main() {
         MaterialApp.router(theme: AppTheme.light, routerConfig: router),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Step 1 of 6 · Details'), findsOneWidget);
+      expect(find.text('Step 1 of 7 · Details'), findsOneWidget);
       expect(find.text('Save draft'), findsOneWidget);
       await tester.enterText(
         find.widgetWithText(TextField, 'Name'),
@@ -526,15 +467,20 @@ void main() {
         await tester.tap(find.byKey(const Key('form-next')));
         await tester.pumpAndSettle();
       }
-      expect(find.text('Step 6 of 6 · Review'), findsOneWidget);
+      // The Director step: optional, a member or anyone by name.
+      expect(find.text('Step 6 of 7 · Director'), findsOneWidget);
+      expect(find.byKey(const Key('director-me')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('form-next')));
+      await tester.pumpAndSettle();
+      expect(find.text('Step 7 of 7 · Review'), findsOneWidget);
       expect(find.textContaining('Turkey Bowl · Tournament'), findsOneWidget);
       expect(find.byKey(const Key('form-problem')), findsNothing);
       // The name typed on step 1 is kept; Edit goes back to it.
       await tester.tap(find.bySemanticsLabel('Edit Details'));
       await tester.pumpAndSettle();
-      expect(find.text('Step 1 of 6 · Details'), findsOneWidget);
+      expect(find.text('Step 1 of 7 · Details'), findsOneWidget);
       expect(find.text('Turkey Bowl'), findsOneWidget);
-      f.goTo(5);
+      f.goTo(HostedTournamentFormViewModel.steps.length - 1);
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('form-publish')));
       await tester.pumpAndSettle();
@@ -557,7 +503,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      f.goTo(5);
+      f.goTo(HostedTournamentFormViewModel.steps.length - 1);
       await tester.pumpAndSettle();
       expect(find.text('Give it a name.'), findsOneWidget);
       expect(

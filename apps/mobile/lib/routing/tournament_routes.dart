@@ -11,6 +11,7 @@ import '../ui/tournaments/view_models/hosted_tournaments_viewmodel.dart';
 import '../ui/tournaments/view_models/player_signups_viewmodel.dart';
 import '../ui/tournaments/view_models/host_event_viewmodel.dart';
 import '../ui/tournaments/view_models/live_draft_viewmodel.dart';
+import '../ui/tournaments/view_models/respond_viewmodel.dart';
 import '../ui/tournaments/view_models/team_draft_viewmodel.dart';
 import '../ui/tournaments/widgets/hosted_bracket_screen.dart';
 import '../ui/tournaments/widgets/hosted_tournament_form_screen.dart';
@@ -18,6 +19,7 @@ import '../ui/tournaments/widgets/hosted_tournament_screen.dart';
 import '../ui/tournaments/widgets/hosted_tournaments_list.dart';
 import '../ui/tournaments/widgets/host_event_screen.dart';
 import '../ui/tournaments/widgets/live_draft_screen.dart';
+import '../ui/tournaments/widgets/respond_screen.dart';
 import '../ui/tournaments/widgets/team_draft_screen.dart';
 import 'routes.dart';
 
@@ -61,6 +63,7 @@ List<GoRoute> hostedTournamentRoutes() => [
               tournamentRepository: c.read(),
               teamRepository: c.read(),
               authRepository: c.read(),
+              profileRepository: c.read(),
             ),
             builder: (_, vm) => HostedTournamentFormScreen(viewModel: vm),
           );
@@ -103,6 +106,28 @@ List<GoRoute> hostedTournamentRoutes() => [
           );
         },
         routes: [
+          // The respond flow (invite notifications link here, as on the
+          // website): Respond, Roster, Payment, then Request confirmed!
+          GoRoute(
+            path: 'respond',
+            builder: (_, state) {
+              final id = state.pathParameters['tournamentId']!;
+              final team = state.uri.queryParameters['team'];
+              final step = state.uri.queryParameters['step'];
+              return ViewModelHost(
+                key: ValueKey('respond-$id-$team-$step'),
+                create: (c) => RespondViewModel(
+                  tournamentId: id,
+                  teamId: team,
+                  step: step,
+                  tournamentRepository: c.read(),
+                  teamRepository: c.read(),
+                  authRepository: c.read(),
+                ),
+                builder: (_, vm) => RespondScreen(viewModel: vm),
+              );
+            },
+          ),
           GoRoute(
             path: 'draft/:divisionId',
             builder: (_, state) {
@@ -169,6 +194,7 @@ List<GoRoute> hostedTournamentRoutes() => [
                   tournamentRepository: c.read(),
                   teamRepository: c.read(),
                   authRepository: c.read(),
+                  profileRepository: c.read(),
                 ),
                 builder: (_, vm) => HostedTournamentFormScreen(viewModel: vm),
               );

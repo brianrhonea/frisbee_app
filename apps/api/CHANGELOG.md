@@ -7,6 +7,46 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.46.0 — 2026-11-23
+
+Tournament flow: respond, roster, deadline, seeds and publishing, director.
+
+- `PUT /v1/tournaments/:id/entries/:teamId` answers `{ status }`. An
+  invited team that accepts is in straight away (`accepted`, added to the
+  division's seeds and captains), or `waitlisted` when the division is
+  full; the organizer no longer accepts it a second time. The roster
+  minimum is no longer checked here: it moved to the roster.
+- `PUT /v1/tournaments/:id/entries/:teamId/roster` (team admins and
+  captains): the players the team brings (from its roster, at least the
+  division's minimum, up to 60), stored as `roster` and `rosterSetAt`;
+  locked once the event is live.
+- Declining an invite withdraws the entry with `reason: "declined"`;
+  the reason is cleared if the team comes back.
+- `GET /v1/teams/:teamId/tournament-invites` answers
+  `{ invites, toFinish }`: `toFinish` lists the team's entries still
+  missing a roster or fee before the event (`entryChecklist`).
+- Tournaments store `entryDeadline` (rosters and fees due; must be by
+  the start) and `director` (`{ uid?, name, email?, phone? }`; a member
+  must be a real account). The fee's `dueAt` follows the deadline.
+  Shared helpers: `effectiveDeadline`, `entryDeadlineProblem`,
+  `entryChecklist`, `directorSchema` (fixtures/entry_checklist).
+- `PUT .../divisions/:d/seeds` takes `confirm` and sets
+  `seedsConfirmedAt`; changing the order (or a team joining or leaving
+  the seeds) clears it.
+- `PUT /v1/tournaments/:id/schedule`: publishes every division at once
+  (each division's seeds must be confirmed) and makes the event
+  `scheduled`.
+- Deleting a tournament deletes its chats with the organizers first (the
+  Captains' channel and team threads: their conversations and messages,
+  so they leave everyone's inbox); the `tournamentDeleted` function then
+  removes the chat pointers and attachments.
+- Payments: `GET /v1/teams/:id/payouts` is readable by anyone who
+  manages events (`canSetUp`, `ownerName`; only the owner sets it up).
+  `POST /v1/teams/:id/payouts/session` (owner) answers an AccountSession
+  client secret for Stripe's embedded onboarding.
+- Visitors' tournament pages add `directorName` and `entryDeadline`
+  (never the director's email or phone).
+
 ## 0.45.0 — 2026-11-22
 
 - Tournaments store `inviteReplyDays` (null or 3/7/14/21/30). An invite's

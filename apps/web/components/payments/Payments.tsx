@@ -16,6 +16,8 @@ import {
   type PayOptions,
   type PayoutAccountView,
   type PayoutLinkResult,
+  type PayoutSessionResult,
+  payoutStatusLabels,
   paymentNoteMax,
   paymentPaths,
   platformFeeLabel,
@@ -104,10 +106,63 @@ function EmbeddedPay({ clientSecret, account, onClose }: { clientSecret: string;
   );
 }
 
-/** The host owner's "Take payments online" card; [amountCents] is the event's fee, for the "payers pay…" line ($100 without one). */
+/**
+ * Stripe's own setup form inside this page (Connect embedded onboarding),
+ * on a session from POST /v1/teams/:teamId/payouts/session, or from
+ * [clientSecret] when the app's WebView hands one over (/embed/payouts).
+ * [onExit] runs when the person finishes or closes it.
+ */
+export function EmbeddedOnboarding({ user, teamId, clientSecret, onExit }: { user?: User; teamId?: string; clientSecret?: string; onExit: () => void }) {
+  const box = useRef<HTMLDivElement>(null);
+  const exit = useRef(onExit);
+  exit.current = onExit;
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let live = true;
+    let element: HTMLElement | null = null;
+    (async () => {
+      try {
+        if (!publishableKey) throw new Error("no key");
+        const { loadConnectAndInitialize } = await import("@stripe/connect-js");
+        const fetchClientSecret = async () => {
+          if (clientSecret) return clientSecret;
+          if (!user || !teamId) throw new Error("no session");
+          const r = await callApi<PayoutSessionResult>(user, paymentPaths.payoutSession(encodeURIComponent(teamId)), { method: "POST", body: {} });
+          return r.clientSecret;
+        };
+        const connect = loadConnectAndInitialize({
+          publishableKey,
+          fetchClientSecret,
+          appearance: { variables: { colorPrimary: "#12805C", fontFamily: "inherit", borderRadius: "10px" } },
+        });
+        const onboarding = connect.create("account-onboarding");
+        onboarding.setOnExit(() => exit.current());
+        if (!live) return;
+        element = onboarding;
+        box.current?.appendChild(onboarding);
+      } catch {
+        if (live) setError("Couldn't open Stripe's setup here. Check your connection and try again.");
+      }
+    })();
+    return () => {
+      live = false;
+      element?.remove();
+    };
+  }, [user, teamId, clientSecret]);
+  return error ? <p className="form-error">{error}</p> : <div ref={box} className="embedded-onboarding" aria-busy="true" />;
+}
+
+/**
+ * "Payments: On / Finish setup / Not set up" for a host, with setup right
+ * here (Stripe's form in the page; Stripe's own page only without a
+ * publishable key). The host's owner sets it up; other managers see the
+ * status and who to ask. [amountCents] is the event's fee, for the
+ * "payers pay…" line ($100 without one).
+ */
 export function PayoutsCard({ user, teamId, amountCents }: { user: User; teamId: string; amountCents?: number }) {
   const [account, setAccount] = useState<PayoutAccountView | null>(null);
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   const load = useCallback(() => {
     callApi<PayoutAccountView>(user, paymentPaths.payouts(encodeURIComponent(teamId))).then(setAccount, () => setAccount(null));
@@ -116,6 +171,10 @@ export function PayoutsCard({ user, teamId, amountCents }: { user: User; teamId:
   useOnVisible(load);
   if (!account?.available) return null;
   const connect = async () => {
+    if (publishableKey) {
+      setOpen(true);
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -129,9 +188,9 @@ export function PayoutsCard({ user, teamId, amountCents }: { user: User; teamId:
     none: {
       title: "Take payments online",
       body: `Let teams and players pay their fees in Stall 10 instead of collecting them yourself. Payments go to your own Stripe account, and you get the whole fee: payers also pay Stall 10's ${account.feeLabel} and Stripe's card fee.`,
-      action: "Set up with Stripe",
+      action: "Set up payments",
     },
-    pending: { title: "Finish setting up payments", body: "Stripe still needs a few details before you can take payments.", action: "Continue with Stripe" },
+    pending: { title: "Finish setting up payments", body: "Stripe still needs a few details before you can take payments.", action: "Finish setup" },
     ready: {
       title: "Online payments are on",
       body: `Teams and players can pay their fees in Stall 10. Refunds and payouts are in your Stripe Dashboard. You get the whole fee: payers also pay Stall 10's ${account.feeLabel} and Stripe's card fee.`,
@@ -140,16 +199,52 @@ export function PayoutsCard({ user, teamId, amountCents }: { user: User; teamId:
   }[account.status];
   return (
     <section className="card payouts-card">
-      <h2 className="card-title">{copy.title}</h2>
+      <div className="card-head">
+        <h2 className="card-title">{copy.title}</h2>
+        <span className={`pill payouts-status payouts-${account.status}`}>Payments: {payoutStatusLabels[account.status].label}</span>
+      </div>
       <p>{copy.body}</p>
       <FeeBreakdownNote user={user} amountCents={amountCents ?? 10_000} currency="USD" compact />
       {error && <p className="form-error">{error}</p>}
-      {copy.action && (
+      {copy.action && !account.canSetUp && <p className="muted small">Only {account.ownerName} can set up payments. Ask them to open this page.</p>}
+      {copy.action && account.canSetUp && !open && (
         <button type="button" className="btn btn-primary btn-small" disabled={busy} onClick={connect}>
           {busy ? "Opening Stripe…" : copy.action}
         </button>
       )}
+      {open && (
+        <div className="embedded-pay">
+          <div className="embedded-pay-head">
+            <strong>Set up payments with Stripe</strong>
+            <button type="button" className="text-btn" onClick={() => setOpen(false)}>
+              Close
+            </button>
+          </div>
+          <EmbeddedOnboarding
+            user={user}
+            teamId={teamId}
+            onExit={() => {
+              setOpen(false);
+              load();
+            }}
+          />
+        </div>
+      )}
     </section>
+  );
+}
+
+/** "Payments: On" for a team page or settings, for its managers; nothing when online payments are off. */
+export function PayoutsStatus({ user, teamId, href }: { user: User; teamId: string; href: string }) {
+  const [account, setAccount] = useState<PayoutAccountView | null>(null);
+  useEffect(() => {
+    callApi<PayoutAccountView>(user, paymentPaths.payouts(encodeURIComponent(teamId))).then(setAccount, () => setAccount(null));
+  }, [user, teamId]);
+  if (!account?.available) return null;
+  return (
+    <a className={`pill payouts-status payouts-${account.status}`} href={href}>
+      Payments: {payoutStatusLabels[account.status].label}
+    </a>
   );
 }
 

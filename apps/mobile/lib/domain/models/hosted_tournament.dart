@@ -339,6 +339,8 @@ class HostedTournament {
     this.inviteReplyDays,
     this.divisions = const [],
     this.format,
+    this.entryDeadline,
+    this.director,
     this.createdBy,
     this.createdAt,
   });
@@ -433,10 +435,36 @@ class HostedTournament {
   /// null for no deadline.
   final int? inviteReplyDays;
   final List<DivisionSummary> divisions;
+
+  /// When rosters and fees are due (the fee's due date follows it); null
+  /// for [effectiveDeadline]'s fallbacks.
+  final DateTime? entryDeadline;
+
+  /// The main contact for questions and logistics; not an organizer.
+  final TournamentDirector? director;
   final String? createdBy;
   final DateTime? createdAt;
 
   bool get isNew => id.isEmpty;
+
+  /// When rosters and fees are due: [entryDeadline], else the fee's due
+  /// date, else the day before it starts (effectiveDeadline in
+  /// packages/shared).
+  DateTime get effectiveDeadline {
+    if (entryDeadline != null) return entryDeadline!;
+    final fee = takesPlayers ? ((teamEntry ? teamFee : null) ?? bidFee) : bidFee;
+    return fee?.dueAt ?? startsOn.subtract(const Duration(days: 1));
+  }
+
+  /// Why [deadline] can't be the entry deadline, or null
+  /// (entryDeadlineProblem in packages/shared).
+  static String? deadlineProblem(DateTime? deadline, DateTime startsOn) {
+    if (deadline == null) return null;
+    if (deadline.isAfter(startsOn)) {
+      return 'The entry deadline has to be before the event starts.';
+    }
+    return null;
+  }
   bool get isLeague => kind == HostedKind.league;
 
   /// Individuals sign up and teams are generated (a hat tournament, or a
@@ -491,6 +519,8 @@ class HostedTournament {
     int? Function()? inviteReplyDays,
     List<DivisionSummary>? divisions,
     EventFormat? format,
+    DateTime? Function()? entryDeadline,
+    TournamentDirector? Function()? director,
   }) => HostedTournament(
     id: id ?? this.id,
     hostId: hostId,
@@ -516,6 +546,8 @@ class HostedTournament {
         : this.inviteReplyDays,
     divisions: divisions ?? this.divisions,
     format: format ?? this.format,
+    entryDeadline: entryDeadline != null ? entryDeadline() : this.entryDeadline,
+    director: director != null ? director() : this.director,
     createdBy: createdBy,
     createdAt: createdAt,
   );
@@ -564,6 +596,8 @@ class HostedTournament {
         if (d is Map) DivisionSummary.fromMap(Map<String, dynamic>.from(d)),
     ],
     format: EventFormat.fromMap(map['format']),
+    entryDeadline: parseDate(map['entryDeadline']),
+    director: TournamentDirector.fromMap(map['director']),
     createdBy: map['createdBy'] as String?,
     createdAt: parseDate(map['createdAt']),
   );
@@ -591,6 +625,145 @@ class HostedTournament {
     'inviteReplyDays': takesTeams ? inviteReplyDays : null,
     'divisions': [for (final d in divisions) d.toMap()],
     'format': format?.toMap(),
+    'entryDeadline': entryDeadline,
+    'director': director?.toMap(),
+  };
+}
+
+/// The tournament director (directorSchema in packages/shared): a Stall 10
+/// member ([uid], with their name copied for display) or anyone by name,
+/// with an optional email and phone. Members see the email and phone;
+/// visitors to the website see the name only.
+class TournamentDirector {
+  const TournamentDirector({
+    required this.name,
+    this.uid,
+    this.email = '',
+    this.phone = '',
+  });
+
+  static const maxName = 100;
+  static const maxEmail = 200;
+  static const maxPhone = 40;
+
+  final String? uid;
+  final String name;
+  final String email;
+  final String phone;
+
+  bool get isMember => uid != null && uid!.isNotEmpty;
+
+  static final _email = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+  static final _phone = RegExp(r'^[+()\-.\s\d]*$');
+
+  /// Why it can't be saved, or null.
+  String? get problem {
+    if (name.trim().isEmpty) return "Give the director's name.";
+    if (name.trim().length > maxName) return 'Use a shorter name.';
+    final e = email.trim();
+    if (e.isNotEmpty && (e.length > maxEmail || !_email.hasMatch(e))) {
+      return 'Enter a valid email.';
+    }
+    final ph = phone.trim();
+    if (ph.length > maxPhone || !_phone.hasMatch(ph)) {
+      return 'Enter a valid phone number.';
+    }
+    return null;
+  }
+
+  static TournamentDirector? fromMap(Object? raw) {
+    if (raw is! Map) return null;
+    final name = raw['name'];
+    if (name is! String || name.isEmpty) return null;
+    final uid = raw['uid'];
+    return TournamentDirector(
+      uid: uid is String && uid.isNotEmpty ? uid : null,
+      name: name,
+      email: raw['email'] as String? ?? '',
+      phone: raw['phone'] as String? ?? '',
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+    'uid': uid,
+    'name': name.trim(),
+    'email': email.trim(),
+    'phone': phone.trim(),
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      other is TournamentDirector &&
+      other.uid == uid &&
+      other.name == name &&
+      other.email == email &&
+      other.phone == phone;
+
+  @override
+  int get hashCode => Object.hash(uid, name, email, phone);
+}
+
+/// A team's (or player's) progress through entering, before the deadline
+/// (entryChecklist in packages/shared; shared fixtures keep them in step).
+class EntryChecklist {
+  const EntryChecklist({
+    required this.accepted,
+    required this.rosterSet,
+    required this.paid,
+    required this.owes,
+    required this.deadline,
+    required this.overdue,
+    required this.complete,
+  });
+
+  /// [rosterSize] is how many players the team named (null for a player
+  /// signup), [minRoster] how many the division needs, [paid] whether
+  /// `payments/{payer}.paid`, [owes] whether there's a fee at all.
+  factory EntryChecklist.of({
+    required String status,
+    required int? rosterSize,
+    required int minRoster,
+    required bool paid,
+    required bool owes,
+    required DateTime? deadline,
+    required DateTime now,
+  }) {
+    final rosterSet = rosterSize == null || rosterSize >= minRoster;
+    final isPaid = !owes || paid;
+    final complete = rosterSet && isPaid;
+    return EntryChecklist(
+      accepted: status == 'accepted',
+      rosterSet: rosterSet,
+      paid: isPaid,
+      owes: owes,
+      deadline: deadline,
+      overdue: !complete && deadline != null && now.isAfter(deadline),
+      complete: complete,
+    );
+  }
+
+  /// In the event, not still waiting on the organizer.
+  final bool accepted;
+
+  /// The team named enough players (always true for a player signup).
+  final bool rosterSet;
+
+  /// Paid, or nothing to pay.
+  final bool paid;
+  final bool owes;
+  final DateTime? deadline;
+
+  /// Past the deadline with something left to do.
+  final bool overdue;
+  final bool complete;
+
+  Map<String, dynamic> toJson() => {
+    'accepted': accepted,
+    'rosterSet': rosterSet,
+    'paid': paid,
+    'owes': owes,
+    'overdue': overdue,
+    'complete': complete,
   };
 }
 
@@ -782,6 +955,7 @@ class TournamentDivision {
     this.placements = const [],
     this.minRoster,
     this.teams = const [],
+    this.seedsConfirmedAt,
   });
 
   /// Whole numbers only; the engine handles up to [TournamentSettings.maxTeams].
@@ -829,6 +1003,12 @@ class TournamentDivision {
 
   /// Team ids by final place (1st first), once games are done.
   final List<String> placements;
+
+  /// When the host confirmed [seeds]; any change to them clears it. Every
+  /// division needs it before the schedule is published (PUT /schedule).
+  final DateTime? seedsConfirmedAt;
+
+  bool get seedsConfirmed => seedsConfirmedAt != null && seeds.length >= 2;
 
   bool get isNew => id.isEmpty;
   bool get isFull => seeds.length >= maxTeams;
@@ -900,6 +1080,7 @@ class TournamentDivision {
     List<String>? placements,
     int? Function()? minRoster,
     List<TournamentTeam>? teams,
+    DateTime? Function()? seedsConfirmedAt,
   }) => TournamentDivision(
     id: id ?? this.id,
     division: division ?? this.division,
@@ -911,7 +1092,21 @@ class TournamentDivision {
     placements: placements ?? this.placements,
     minRoster: minRoster != null ? minRoster() : this.minRoster,
     teams: teams ?? this.teams,
+    // A change of seeds unconfirms them, as the API does.
+    seedsConfirmedAt: seedsConfirmedAt != null
+        ? seedsConfirmedAt()
+        : (seeds != null && !_same(seeds, this.seeds)
+              ? null
+              : this.seedsConfirmedAt),
   );
+
+  static bool _same(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
 
   /// Moves the team at seed index [from] to [to] (0-based, as
   /// ReorderableListView reports them after adjusting for the removal).
@@ -948,6 +1143,7 @@ class TournamentDivision {
           for (final t in (map['teams'] as List?) ?? const [])
             if (t is Map) TournamentTeam.fromMap(Map<String, dynamic>.from(t)),
         ],
+        seedsConfirmedAt: parseDate(map['seedsConfirmedAt']),
       );
 
   Map<String, dynamic> toMap() => {
@@ -960,6 +1156,7 @@ class TournamentDivision {
     'placements': placements,
     'minRoster': minRoster,
     'teams': [for (final t in teams) t.toMap()],
+    'seedsConfirmedAt': seedsConfirmedAt,
   };
 }
 
@@ -994,9 +1191,15 @@ class TournamentEntry {
     this.captainIds = const [],
     this.replyBy,
     this.updatedAt,
+    this.roster = const [],
+    this.rosterSetAt,
+    this.reason,
   });
 
   static const maxCaptains = 4;
+
+  /// Most players a team brings to one event (tournamentLimits.maxEventRoster).
+  static const maxRoster = 60;
 
   /// Shown when an invite's reply-by time has passed (inviteExpiredMessage).
   static const expiredMessage =
@@ -1015,6 +1218,17 @@ class TournamentEntry {
   final DateTime? replyBy;
   final DateTime? updatedAt;
 
+  /// The team's players for this event (roster ids), set in the respond
+  /// flow or later, by the deadline.
+  final List<String> roster;
+  final DateTime? rosterSetAt;
+
+  /// Why it's withdrawn: 'declined' when the team turned down an invite.
+  final String? reason;
+
+  bool get declinedInvite =>
+      status == EntryStatus.withdrawn && reason == 'declined';
+
   /// An invite nobody answered by its reply-by time (inviteExpired in
   /// packages/shared): it can't be accepted; the host can invite again.
   bool isExpired(DateTime now) =>
@@ -1026,6 +1240,9 @@ class TournamentEntry {
     String? divisionId,
     EntryStatus? status,
     List<String>? captainIds,
+    List<String>? roster,
+    DateTime? rosterSetAt,
+    String? reason,
   }) => TournamentEntry(
     teamId: teamId,
     teamName: teamName,
@@ -1034,6 +1251,9 @@ class TournamentEntry {
     captainIds: captainIds ?? this.captainIds,
     replyBy: replyBy,
     updatedAt: updatedAt,
+    roster: roster ?? this.roster,
+    rosterSetAt: rosterSetAt ?? this.rosterSetAt,
+    reason: reason ?? this.reason,
   );
 
   factory TournamentEntry.fromMap(String teamId, Map<String, dynamic> map) =>
@@ -1051,6 +1271,9 @@ class TournamentEntry {
         ],
         replyBy: parseDate(map['replyBy']),
         updatedAt: parseDate(map['updatedAt']),
+        roster: [for (final u in (map['roster'] as List?) ?? const []) '$u'],
+        rosterSetAt: parseDate(map['rosterSetAt']),
+        reason: map['reason'] as String?,
       );
 
   /// Everything but `updatedAt`, which the repository stamps. The reply-by
@@ -1063,6 +1286,9 @@ class TournamentEntry {
     'captainIds': captainIds,
     'teamId': teamId,
     'replyBy': replyBy,
+    'roster': roster,
+    'rosterSetAt': rosterSetAt,
+    'reason': status == EntryStatus.withdrawn ? reason : null,
   };
 }
 
@@ -1309,6 +1535,72 @@ class TeamTournamentInvite {
         replyBy: parseDate(map['replyBy']),
         expired: map['expired'] == true,
       );
+}
+
+/// One of a team's entries still missing its roster or fee before the
+/// event (`toFinish` from `GET /v1/teams/:id/tournament-invites`;
+/// TeamEntryToFinish in packages/shared): the team page's Finish entry.
+class TeamEntryToFinish {
+  const TeamEntryToFinish({
+    required this.tournamentId,
+    required this.name,
+    required this.startsOn,
+    required this.status,
+    this.hostName = '',
+    this.divisionLabel = '',
+    this.rosterSet = false,
+    this.paid = false,
+    this.deadline,
+    this.overdue = false,
+  });
+
+  final String tournamentId;
+  final String name;
+  final String hostName;
+  final DateTime startsOn;
+  final String divisionLabel;
+  final EntryStatus status;
+  final bool rosterSet;
+
+  /// Paid, or nothing to pay.
+  final bool paid;
+  final DateTime? deadline;
+  final bool overdue;
+
+  /// "Roster and fee", "Roster" or "Fee".
+  String get stillToDo => !rosterSet && !paid
+      ? 'Roster and fee'
+      : rosterSet
+      ? 'Fee'
+      : 'Roster';
+
+  factory TeamEntryToFinish.fromMap(Map<String, dynamic> map) =>
+      TeamEntryToFinish(
+        tournamentId: map['tournamentId'] as String? ?? '',
+        name: map['name'] as String? ?? 'Tournament',
+        hostName: map['hostName'] as String? ?? '',
+        startsOn: parseDate(map['startsOn']) ?? DateTime(2000),
+        divisionLabel: map['divisionLabel'] as String? ?? '',
+        status: enumByName(EntryStatus.values, map['status'], EntryStatus.applied),
+        rosterSet: map['rosterSet'] == true,
+        paid: map['paid'] == true,
+        deadline: parseDate(map['deadline']),
+        overdue: map['overdue'] == true,
+      );
+}
+
+/// A team's tournament business for its admins: invites to answer and
+/// entries to finish.
+class TeamTournamentBusiness {
+  const TeamTournamentBusiness({
+    this.invites = const [],
+    this.toFinish = const [],
+  });
+
+  final List<TeamTournamentInvite> invites;
+  final List<TeamEntryToFinish> toFinish;
+
+  bool get isEmpty => invites.isEmpty && toFinish.isEmpty;
 }
 
 /// Soonest first; undated ones last.

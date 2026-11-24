@@ -197,15 +197,33 @@ void main() {
       );
       g = await guideFor('director');
       expect(g.title, 'Publish the schedule');
-      expect(g.button?.action, GuideAction.publishSchedule);
+      // The seeds are confirmed first, then every schedule goes out at once.
+      expect(g.button?.action, GuideAction.confirmSeeds);
       expect(g.button?.divisionId, div);
+      expect(g.secondary?.action, GuideAction.publishSchedule);
+      repo.divisions[id]![div] = repo.divisions[id]![div]!.copyWith(
+        seedsConfirmedAt: () => DateTime(2026, 11, 20),
+      );
+      g = await guideFor('director');
+      expect(g.button?.action, GuideAction.publishAll);
     });
 
-    test('teams that applied are seeded', () async {
+    test('teams that applied are seeded, then the seeds confirmed', () async {
       event(status: HostedStatus.seeding, entry: TournamentEntryType.teams);
-      final g = await guideFor('director');
-      expect(g.title, 'Seed the teams');
-      expect(g.button?.action, GuideAction.reviewTeams);
+      var g = await guideFor('director');
+      expect(g.title, 'Confirm the seeds');
+      // Fewer than two teams: nothing to confirm yet, only the order.
+      expect(g.button, isNull);
+      expect(g.secondary?.action, GuideAction.reviewTeams);
+
+      event(
+        status: HostedStatus.seeding,
+        entry: TournamentEntryType.teams,
+        seeds: ['a', 'b'],
+      );
+      g = await guideFor('director');
+      expect(g.button?.action, GuideAction.confirmSeeds);
+      expect(g.button?.divisionId, div);
     });
 
     test('opens the schedule while games are on', () async {

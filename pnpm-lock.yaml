@@ -53,6 +53,9 @@ importers:
       '@stall10/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@stripe/connect-js':
+        specifier: 3.5.0
+        version: 3.5.0
       '@stripe/stripe-js':
         specifier: 10.2.1
         version: 10.2.1
@@ -1121,6 +1124,9 @@ packages:
 
   '@rolldown/pluginutils@1.1.0':
     resolution: {integrity: sha512-K+NU2HDCEem4sClgHH4ZZXwdJeNFkJo+hRk479DIwdIviAPN2hFJH1KHHwg8CxHQXvi0M5XY4deTXINfIiSG6w==}
+
+  '@stripe/connect-js@3.5.0':
+    resolution: {integrity: sha512-r0x134GLNJaQa0xY2bVEWZ/57D2QU78bigs+F/I3GJx4UBNwkmq4WeZKkYla9vHPZZ00454lDKpz0KJwnXzE5g==}
 
   '@stripe/stripe-js@10.2.1':
     resolution: {integrity: sha512-diHeR1/FeWZZzuFXEvkjRMzydgKEpxUTrKEUxSV8NcpeZY3Kl8C4Gerw/JSMK+3oXsBRJtgkG7ckviQJ651moA==}
@@ -3246,6 +3252,8 @@ snapshots:
     optional: true
 
   '@rolldown/pluginutils@1.1.0': {}
+
+  '@stripe/connect-js@3.5.0': {}
 
   '@stripe/stripe-js@10.2.1': {}
 

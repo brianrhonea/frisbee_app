@@ -87,6 +87,8 @@ export interface PaymentGateway {
   createAccount(input: { email?: string; name: string; idempotencyKey: string }): Promise<string>;
   /** A single-use onboarding link for [account]. */
   onboardingLink(account: string, refreshUrl: string, returnUrl: string): Promise<string>;
+  /** An AccountSession's client secret for the embedded onboarding and account management of [account]. */
+  accountSession(account: string): Promise<string>;
   account(account: string): Promise<GatewayAccount>;
   /** A Checkout session: [url] for a hosted one, [clientSecret] for an embedded one. */
   createCheckout(input: CheckoutInput): Promise<{ id: string; url: string | null; clientSecret: string | null }>;

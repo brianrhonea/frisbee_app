@@ -14,6 +14,15 @@ import 'package:frisbee_app/utils/result.dart';
 import 'package:provider/provider.dart';
 
 class _FakePayments implements PaymentRepository {
+  /// Teams asked for an embedded onboarding session.
+  final sessions = <String>[];
+
+  @override
+  Future<Result<String>> payoutSession(String teamId) async {
+    sessions.add(teamId);
+    return const Result.ok('acct_session_secret');
+  }
+
   PayoutAccount account = const PayoutAccount(
     available: true,
     status: PayoutStatus.none,
@@ -252,7 +261,8 @@ void main() {
         find.textContaining("payers also pay Stall 10's 3% and Stripe's card fee"),
         findsOneWidget,
       );
-      await tester.tap(find.text('Set up with Stripe'));
+      await tester.tap(find.text('Set up payments'));
+      expect(find.text('Payments: Not set up'), findsOneWidget);
       await tester.pumpAndSettle();
       expect(opened, [Uri.parse('https://connect.test/host')]);
     });
@@ -264,7 +274,7 @@ void main() {
         feeLabel: r'1% + $1',
       );
       await pump(tester, PayoutsCard(teamId: 'host', open: open));
-      expect(find.text('Continue with Stripe'), findsOneWidget);
+      expect(find.text('Finish setup'), findsOneWidget);
       payments.account = const PayoutAccount(
         available: true,
         status: PayoutStatus.ready,
@@ -273,6 +283,21 @@ void main() {
       await pump(tester, PayoutsCard(key: UniqueKey(), teamId: 'host'));
       expect(find.text('Online payments are on'), findsOneWidget);
       expect(find.byType(FilledButton), findsNothing);
+    });
+
+    testWidgets("organizers who aren't the owner are told who sets it up", (
+      tester,
+    ) async {
+      payments.account = const PayoutAccount(
+        available: true,
+        status: PayoutStatus.none,
+        feeLabel: '3%',
+        canSetUp: false,
+        ownerName: 'Dana',
+      );
+      await pump(tester, PayoutsCard(teamId: 'host', open: open));
+      expect(find.textContaining('Only Dana can set up payments'), findsOneWidget);
+      expect(find.byKey(const Key('set-up-payments')), findsNothing);
     });
 
     testWidgets('hides while payments are off, or without a repository', (

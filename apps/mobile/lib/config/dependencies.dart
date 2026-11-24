@@ -243,6 +243,7 @@ List<SingleChildWidget> get firebaseProviders => [
     create: (context) => HostedTournamentRepositoryFirebase(
       functions: context.read<CallableClient>(),
       api: context.read<ApiClient?>(),
+      flags: context.read<FeatureFlags>(),
     ),
   ),
   Provider<RankingRepository>(create: (_) => RankingRepositoryFirebase()),

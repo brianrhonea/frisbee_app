@@ -51,6 +51,19 @@ import {
   bracketSeeds,
   type TournamentFormat,
   type TeamTournamentInvite,
+  canMoveStatus,
+  effectiveMinRoster,
+  type EntryAnswer,
+  entryDeadlineProblem,
+  entryRosterRequestSchema,
+  hostedStatusLabels,
+  publishAllRequestSchema,
+  effectiveDeadline,
+  entryChecklist,
+  spotFee,
+  type TeamEntryToFinish,
+
+  type PublishGameInput,
 } from "@stall10/shared";
 import type { Caller } from "../auth.js";
 import { ApiError, parseBody } from "../errors.js";
@@ -89,9 +102,20 @@ const statusOf = (t: Data): HostedStatus =>
   (hostedStatuses as readonly string[]).includes(t.status as string) ? (t.status as HostedStatus) : "draft";
 const entryStatusOf = (e: Data | null): EntryStatus | null => (e ? ((e.status as EntryStatus) ?? "applied") : null);
 
-/** The fee as stored (BidFee.toMap). */
-const feeDoc = (f: { amountCents: number; currency: string; instructions: string; dueAt: Date | null; payerCoversFees: boolean } | null) =>
-  f ? { amountCents: f.amountCents, currency: f.currency, instructions: f.instructions, dueAt: f.dueAt, payerCoversFees: f.payerCoversFees } : null;
+/**
+ * The fee as stored (BidFee.toMap). With an entry deadline set, the fee is
+ * due then (rosters and fees share one deadline).
+ */
+const feeDoc = (
+  f: { amountCents: number; currency: string; instructions: string; dueAt: Date | null; payerCoversFees: boolean } | null,
+  deadline: Date | null = null,
+) =>
+  f
+    ? { amountCents: f.amountCents, currency: f.currency, instructions: f.instructions, dueAt: deadline ?? f.dueAt, payerCoversFees: f.payerCoversFees }
+    : null;
+
+/** The director as stored, or null. */
+const directorDoc = (d: SaveTournamentInput["director"]) => (d ? { uid: d.uid, name: d.name, email: d.email, phone: d.phone } : null);
 
 type FormatInput = SaveTournamentInput["format"];
 
@@ -139,6 +163,7 @@ function divisionDoc(d: Data, change: Data = {}): Data {
     placements: strings(d.placements),
     minRoster: d.minRoster ?? null,
     teams: Array.isArray(d.teams) ? d.teams : [],
+    seedsConfirmedAt: d.seedsConfirmedAt ?? null,
     ...change,
   };
 }
@@ -247,6 +272,15 @@ export class TournamentService {
     }
     if (r.endsOn && r.endsOn.getTime() < r.startsOn.getTime()) throw new ApiError("invalid_argument", "It can't end before it starts.");
     if (r.bidFee && r.teamEntry && !r.teamFee) throw new ApiError("invalid_argument", "Enter the team spot fee, e.g. 300.");
+    const late = entryDeadlineProblem(r.entryDeadline, r.startsOn);
+    if (late) throw new ApiError("invalid_argument", late);
+  }
+
+  /** A director who's a member must be a real account; their name is theirs. */
+  private async checkDirector(tx: Pick<Tx, "get">, r: SaveTournamentInput) {
+    const uid = r.director?.uid;
+    if (!uid) return;
+    if (!(await tx.get(`users/${docIdParam(uid)}`))) throw new ApiError("invalid_argument", "That director isn't on Stall 10. Enter their name and contact details instead.");
   }
 
   /** The tournament's fields (HostedTournament.toMap), its host's details from the host team. */
@@ -265,13 +299,15 @@ export class TournamentService {
       visibility: r.visibility,
       entryType,
       status,
-      bidFee: feeDoc(r.bidFee),
+      bidFee: feeDoc(r.bidFee, r.entryDeadline),
       teamEntry,
-      teamFee: teamEntry && r.bidFee ? feeDoc(r.teamFee) : null,
+      teamFee: teamEntry && r.bidFee ? feeDoc(r.teamFee, r.entryDeadline) : null,
       kind,
       season: kind === "league" && r.season ? { ...r.season } : null,
       draftMode: r.draftMode,
       inviteReplyDays: r.inviteReplyDays,
+      entryDeadline: r.entryDeadline,
+      director: directorDoc(r.director),
       divisions,
       format: formatDoc(r.format),
     };
@@ -288,6 +324,7 @@ export class TournamentService {
       const host = await tx.get(p.team(hostId));
       if (!host) throw new ApiError("not_found", "That team doesn't exist.");
       if (!can(host, caller.uid, "manageEvents")) throw hostOnly("Only members who manage events can host tournaments.");
+      await this.checkDirector(tx, r);
       const summaries = opened.map((d, i) => ({ id: ids[i], division: d, level: r.format.level }));
       tx.create(p.tournament(id), {
         ...this.hostedFields(host, hostId, r.kind, r.entryType, "draft", r, summaries),
@@ -351,6 +388,7 @@ export class TournamentService {
       const kind = t.kind === "league" ? "league" : "tournament";
       const entryType = t.entryType === "players" ? "players" : "teams";
       this.checkHosted(kind, entryType, r);
+      await this.checkDirector(tx, r);
       const stored = new Map<string, Data>();
       for (const row of divRows) {
         const d = await tx.get(p.division(id, row.id));
@@ -416,14 +454,23 @@ export class TournamentService {
     const id = docIdParam(rawId);
     const { status } = parseBody(tournamentStatusRequestSchema, body);
     await this.store.transact(async (tx) => {
-      await this.managed(tx, id, caller.uid);
+      const t = await this.managed(tx, id, caller.uid);
+      const from = statusOf(t);
+      if (!canMoveStatus(from, status)) {
+        throw new ApiError(
+          "failed_precondition",
+          status === "scheduled"
+            ? "Publish the schedule to make it scheduled."
+            : `It can't go from ${hostedStatusLabels[from]} to ${hostedStatusLabels[status]}.`,
+        );
+      }
       tx.update(p.tournament(id), { status });
     });
   }
 
   /**
-   * Deletes it with its divisions, games, entries, signups, drafts and
-   * payments: each subcollection a page at a time until it's empty, every
+   * Deletes it with its chats (and their conversations), divisions, games,
+   * entries, signups, drafts and payments: each subcollection a page at a time until it's empty, every
    * page re-checked, and the tournament last, so a failure part way can be
    * tried again.
    */
@@ -431,6 +478,23 @@ export class TournamentService {
     const id = docIdParam(rawId);
     const check = (tx: Tx) => this.managed(tx, id, caller.uid);
     await this.store.transact(async (tx) => void (await check(tx)));
+    // Its chats with the organizers first (the Captains' channel and each
+    // team's thread), so they leave everyone's inbox and nothing that
+    // follows (the entries going) updates them. The pointers stay for the
+    // tournamentDeleted function, which deletes them with the chats'
+    // attachments once the tournament is gone.
+    for (const chat of await this.queries.ids(`tournaments/${id}/chats`, 1000)) {
+      const pointer = await this.store.get(`tournaments/${id}/chats/${chat}`);
+      const conv = typeof pointer?.conversationId === "string" && /^g-[A-Za-z0-9]+$/.test(pointer.conversationId) ? pointer.conversationId : null;
+      if (!conv) continue;
+      const c = await this.store.get(`conversations/${conv}`);
+      if (!c || c.kind !== "tournament" || c.tournamentId !== id) continue;
+      for (const sub of ["messages", "typing"]) await this.drain(`conversations/${conv}/${sub}`, check);
+      await this.store.transact(async (tx) => {
+        await check(tx);
+        if (await tx.get(`conversations/${conv}`)) tx.delete(`conversations/${conv}`);
+      });
+    }
     await this.drain(p.divisions(id), check, (d) => this.drain(p.games(id, d), check));
     for (const sub of ["entries", "payments", "signups"]) await this.drain(`tournaments/${id}/${sub}`, check);
     await this.drain(`tournaments/${id}/drafts`, check, (d) => this.drain(`tournaments/${id}/drafts/${d}/details`, check));
@@ -472,7 +536,9 @@ export class TournamentService {
   async saveSeeds(caller: Caller, rawId: unknown, rawDiv: unknown, body: unknown): Promise<void> {
     const id = docIdParam(rawId);
     const divId = docIdParam(rawDiv);
-    const { seeds } = parseBody(seedsRequestSchema, body);
+    const { seeds, confirm } = parseBody(seedsRequestSchema, body);
+    // Only managers get as far as the games (checked again below).
+    await this.managed(this.store, id, caller.uid);
     if ((await this.queries.ids(p.games(id, divId), 1)).length > 0) {
       throw new ApiError("failed_precondition", "Seeds are set: the schedule is published.");
     }
@@ -484,8 +550,13 @@ export class TournamentService {
       if (seeds.length !== current.length || new Set(seeds).size !== seeds.length || !seeds.every((s) => current.includes(s))) {
         throw new ApiError("failed_precondition", "The teams changed. Try again.");
       }
-      checkDivision(divisionDoc(d, { seeds }));
-      tx.update(p.division(id, divId), { seeds });
+      if (confirm && seeds.length < 2) throw new ApiError("failed_precondition", "Accept at least two teams first.");
+      const same = seeds.every((s, i) => current[i] === s);
+      // Confirming sets the time; a change without it unconfirms them.
+      const confirmedAt = confirm ? serverTime : same ? (d.seedsConfirmedAt ?? null) : null;
+      const change = { seeds, seedsConfirmedAt: confirmedAt };
+      checkDivision(divisionDoc(d, change));
+      tx.update(p.division(id, divId), change);
     });
   }
 
@@ -494,7 +565,17 @@ export class TournamentService {
   /** validEntry(e): shape, and captains from the team's members. */
   private entryDoc(
     team: Data,
-    e: { teamId: string; teamName: string; divisionId: string; status: EntryStatus; captainIds: string[]; replyBy?: Date | null },
+    e: {
+      teamId: string;
+      teamName: string;
+      divisionId: string;
+      status: EntryStatus;
+      captainIds: string[];
+      replyBy?: Date | null;
+      /** The entry as it was: its roster stays; its reason only while still withdrawn. */
+      was?: Data | null;
+      reason?: string | null;
+    },
   ): Data {
     if (e.teamName.length < 1 || e.teamName.length > tournamentLimits.teamName) throw new ApiError("invalid_argument", "The team needs a name.");
     if (e.divisionId.length > tournamentLimits.divisionId) throw new ApiError("invalid_argument", "Invalid division.");
@@ -511,27 +592,46 @@ export class TournamentService {
       teamId: e.teamId,
       // An invite's answer-by time; gone once it's answered.
       replyBy: e.status === "invited" ? (e.replyBy ?? null) : null,
+      // The players named for this event stay through status changes.
+      roster: strings(e.was?.roster),
+      rosterSetAt: e.was?.rosterSetAt ?? null,
+      reason: e.status === "withdrawn" ? (e.reason ?? null) : null,
       updatedAt: serverTime,
     };
   }
 
   /**
-   * A team's admins apply, accept an invite, or change their captains
-   * (teamApplies, teamEdits), with the app's checks: a team (not a group),
-   * fit for a league's division, and the roster minimum.
+   * Puts an entry in its division (the host accepting, or a team taking up
+   * an invite): seeded last, its captains the ones who report scores, and
+   * the seeds no longer confirmed. False when the division is full.
    */
-  async putEntry(caller: Caller, rawId: unknown, rawTeam: unknown, body: unknown): Promise<void> {
+  private seedIn(tx: Tx, id: string, divId: string, division: Data, teamId: string, captainIds: string[]): boolean {
+    const seeds = strings(division.seeds);
+    if (seeds.length >= Number(division.maxTeams) && !seeds.includes(teamId)) return false;
+    const change = {
+      seeds: seeds.includes(teamId) ? seeds : [...seeds, teamId],
+      captains: { ...mapOf(division.captains), [teamId]: captainIds },
+      ...(!seeds.includes(teamId) && { seedsConfirmedAt: null }),
+    };
+    checkDivision(divisionDoc(division, change));
+    tx.update(p.division(id, divId), change);
+    return true;
+  }
+
+  /**
+   * A team's admins apply, take up an invite, or change their captains
+   * (teamApplies, teamEdits), with the app's checks: a team (not a group)
+   * and fit for a league's division. Taking up an invite puts the team in
+   * straight away (accepted, or waitlisted when the division is full); an
+   * application waits for the host. The roster is named separately
+   * (putRoster), by the entry deadline.
+   */
+  async putEntry(caller: Caller, rawId: unknown, rawTeam: unknown, body: unknown): Promise<EntryAnswer> {
     const id = docIdParam(rawId);
     const teamId = docIdParam(rawTeam);
     const r = parseBody(entryRequestSchema, body);
     const divId = docIdParam(r.divisionId);
-    // The team's admins only get as far as counting its roster (checked again below).
-    await this.visible(this.store, id, caller.uid);
-    const admin = await this.store.get(p.team(teamId));
-    if (!admin) throw new ApiError("not_found", "That team doesn't exist.");
-    if (!can(admin, caller.uid, "manageTeam")) throw new ApiError("permission_denied", "Only the team's admins can enter it.");
-    const roster = (await this.queries.ids(`teams/${teamId}/roster`, 500)).length;
-    await this.store.transact(async (tx) => {
+    return this.store.transact(async (tx): Promise<EntryAnswer> => {
       const { t } = await this.visible(tx, id, caller.uid);
       const team = await tx.get(p.team(teamId));
       if (!team) throw new ApiError("not_found", "That team doesn't exist.");
@@ -545,8 +645,15 @@ export class TournamentService {
         if (existing?.divisionId !== divId) {
           throw new ApiError("failed_precondition", "To change division, withdraw and apply again.");
         }
-        tx.set(p.entry(id, teamId), this.entryDoc(team, { teamId, teamName: String(existing.teamName ?? ""), divisionId: divId, status: was, captainIds: r.captainIds }));
-        return;
+        tx.set(
+          p.entry(id, teamId),
+          this.entryDoc(team, { teamId, teamName: String(existing.teamName ?? ""), divisionId: divId, status: was, captainIds: r.captainIds, was: existing }),
+        );
+        // An accepted team's captains are the ones who report its scores.
+        if (was === "accepted" && strings(division.seeds).includes(teamId)) {
+          tx.update(p.division(id, divId), { captains: { ...mapOf(division.captains), [teamId]: r.captainIds } });
+        }
+        return { status: was };
       }
       if (was === "declined") throw new ApiError("failed_precondition", "The host declined this team. They can invite it again.");
       // Past its reply-by time (inviteReplyDays) an invite can't be taken up.
@@ -567,19 +674,56 @@ export class TournamentService {
         );
         if (problem) throw new ApiError("failed_precondition", problem);
       }
-      const minimum = typeof division.minRoster === "number" ? division.minRoster : tournamentLimits.defaultMinRoster;
-      // Where teams reserve spots, they fill their roster afterwards.
-      const mixed = t.entryType === "players" && t.teamEntry === true;
-      if (roster < minimum && !mixed) {
-        throw new ApiError(
-          "failed_precondition",
-          `${String(team.name ?? "The team")} needs at least ${minimum} players on its roster to register (it has ${roster}). Add players on the team's Roster tab, then try again.`,
-        );
+      const fields = { teamId, teamName: String(team.name ?? "").slice(0, tournamentLimits.teamName), divisionId: divId, captainIds: r.captainIds, was: existing };
+      if (was === "invited") {
+        // Invited: in straight away, or on the waitlist when it's full.
+        const status: EntryStatus = this.seedIn(tx, id, divId, division, teamId, r.captainIds) ? "accepted" : "waitlisted";
+        tx.set(p.entry(id, teamId), this.entryDoc(team, { ...fields, status }));
+        return { status };
       }
-      tx.set(
-        p.entry(id, teamId),
-        this.entryDoc(team, { teamId, teamName: String(team.name ?? "").slice(0, tournamentLimits.teamName), divisionId: divId, status: "applied", captainIds: r.captainIds }),
-      );
+      tx.set(p.entry(id, teamId), this.entryDoc(team, { ...fields, status: "applied" }));
+      return { status: "applied" };
+    });
+  }
+
+  /**
+   * A team's admins or its captains for this event name the players it
+   * brings (ids from teams/{id}/roster): at least the division's roster
+   * minimum (effectiveMinRoster; any number where teams reserve spots),
+   * while the entry is in or waiting, until play starts.
+   */
+  async putRoster(caller: Caller, rawId: unknown, rawTeam: unknown, body: unknown): Promise<void> {
+    const id = docIdParam(rawId);
+    const teamId = docIdParam(rawTeam);
+    const { playerIds } = parseBody(entryRosterRequestSchema, body);
+    const allowed = (team: Data | null, entry: Data | null) =>
+      !!team && !!entry && (can(team, caller.uid, "manageTeam") || strings(entry.captainIds).includes(caller.uid));
+    // Only the team's admins and captains get as far as listing its roster (checked again below).
+    await this.visible(this.store, id, caller.uid);
+    const [team0, entry0] = await Promise.all([this.store.get(p.team(teamId)), this.store.get(p.entry(id, teamId))]);
+    if (!entry0) throw new ApiError("not_found", "That team hasn't entered.");
+    if (!allowed(team0, entry0)) throw new ApiError("permission_denied", "Only the team's admins and captains set its roster.");
+    const onTeam = new Set(await this.queries.ids(`teams/${teamId}/roster`, 500));
+    await this.store.transact(async (tx) => {
+      const { t } = await this.visible(tx, id, caller.uid);
+      const team = await tx.get(p.team(teamId));
+      const entry = await tx.get(p.entry(id, teamId));
+      if (!entry) throw new ApiError("not_found", "That team hasn't entered.");
+      if (!allowed(team, entry)) throw new ApiError("permission_denied", "Only the team's admins and captains set its roster.");
+      const status = entryStatusOf(entry);
+      if (status !== "applied" && status !== "accepted" && status !== "waitlisted") {
+        throw new ApiError("failed_precondition", "Only a team that's entered sets a roster.");
+      }
+      if (statusIndex(statusOf(t)) >= statusIndex("live")) throw new ApiError("failed_precondition", "Rosters are locked once play starts.");
+      if (!playerIds.every((x) => onTeam.has(x))) throw new ApiError("invalid_argument", "Pick players from the team's roster.");
+      const divId = storedId(entry.divisionId);
+      const division = divId ? await tx.get(p.division(id, divId)) : null;
+      const mixed = t.entryType === "players" && t.teamEntry === true;
+      const minimum = division ? effectiveMinRoster({ minRoster: division.minRoster as number | null }) : tournamentLimits.defaultMinRoster;
+      if (!mixed && playerIds.length < minimum) {
+        throw new ApiError("invalid_argument", `Pick at least ${minimum} players (you picked ${playerIds.length}).`);
+      }
+      tx.update(p.entry(id, teamId), { roster: playerIds, rosterSetAt: serverTime, updatedAt: serverTime });
     });
   }
 
@@ -657,6 +801,65 @@ export class TournamentService {
   }
 
   /**
+   * A team's entries still missing their roster or fee, for its admins
+   * (manageTeam): the team page's "Finish entry". Events that have started
+   * aren't listed; neither are complete entries.
+   */
+  async teamEntriesToFinish(caller: Caller, rawTeam: unknown): Promise<TeamEntryToFinish[]> {
+    const teamId = docIdParam(rawTeam);
+    const team = await this.store.get(p.team(teamId));
+    if (!team) throw new ApiError("not_found", "That team doesn't exist.");
+    if (!can(team, caller.uid, "manageTeam")) throw new ApiError("permission_denied", "Only the team's admins see its entries.");
+    const ids = (
+      await Promise.all((["applied", "accepted", "waitlisted"] as const).map((status) => this.queries.ids(`teams/${teamId}/tournamentEntries`, 50, { status })))
+    ).flat();
+    const [events, entries, payments] = await Promise.all([
+      this.store.getAll(ids.map((t) => p.tournament(t))),
+      this.store.getAll(ids.map((t) => p.entry(t, teamId))),
+      this.store.getAll(ids.map((t) => `tournaments/${t}/payments/${teamId}`)),
+    ]);
+    const now = this.now();
+    const out: TeamEntryToFinish[] = [];
+    for (const [i, tid] of ids.entries()) {
+      const t = events[i];
+      const entry = entries[i];
+      const status = entryStatusOf(entry);
+      if (!t || !entry || !status || !["applied", "accepted", "waitlisted"].includes(status) || statusOf(t) === "draft") continue;
+      const startsOn = dateOf(t.startsOn);
+      if (!startsOn || startsOn.getTime() < now || statusIndex(statusOf(t)) >= statusIndex("live")) continue;
+      const divisionId = String(entry.divisionId ?? "");
+      const division = await this.store.get(p.division(tid, divisionId));
+      const mixed = t.entryType === "players" && t.teamEntry === true;
+      const fee = spotFee(t as never);
+      const deadline = effectiveDeadline(t as never);
+      const list = entryChecklist({
+        status,
+        rosterSize: mixed ? null : strings(entry.roster).length,
+        minRoster: effectiveMinRoster({ minRoster: (division?.minRoster as number | null) ?? null }),
+        paid: payments[i]?.paid === true,
+        owes: !!fee && fee.amountCents > 0,
+        deadline,
+        now,
+      });
+      if (list.complete) continue;
+      const summary = (Array.isArray(t.divisions) ? t.divisions : []).find((d) => mapOf(d).id === divisionId);
+      out.push({
+        tournamentId: tid,
+        name: String(t.name ?? "Tournament"),
+        hostName: String(t.hostName ?? ""),
+        startsOn: startsOn.toISOString(),
+        divisionLabel: summary ? divisionLabel(mapOf(summary) as { division: Division; level: "club" }) : "",
+        status,
+        rosterSet: list.rosterSet,
+        paid: list.paid,
+        deadline: deadline?.toISOString() ?? null,
+        overdue: list.overdue,
+      });
+    }
+    return out.sort((a, b) => a.startsOn.localeCompare(b.startsOn));
+  }
+
+  /**
    * The host accepts, waitlists, declines or removes an entry; a team's
    * admins withdraw it (teamWithdraws). Accepting seeds it last in its
    * division and makes its captains the ones who report scores; anything
@@ -665,7 +868,7 @@ export class TournamentService {
   async setEntryStatus(caller: Caller, rawId: unknown, rawTeam: unknown, body: unknown): Promise<void> {
     const id = docIdParam(rawId);
     const teamId = docIdParam(rawTeam);
-    const { status } = parseBody(entryStatusRequestSchema, body);
+    const { status, reason } = parseBody(entryStatusRequestSchema, body);
     await this.store.transact(async (tx) => {
       const { manager } = await this.visible(tx, id, caller.uid);
       const entry = await tx.get(p.entry(id, teamId));
@@ -674,37 +877,39 @@ export class TournamentService {
       if (!team) throw new ApiError("not_found", "That team doesn't exist.");
       const divId = storedId(entry.divisionId);
       const division = divId ? await tx.get(p.division(id, divId)) : null;
-      const fields = { teamId, teamName: String(entry.teamName ?? ""), divisionId: String(entry.divisionId ?? ""), captainIds: strings(entry.captainIds) };
-      if (!manager) {
-        if (status !== "withdrawn" || !can(team, caller.uid, "manageTeam")) throw hostOnly("Only the host decides on entries.");
-        tx.set(p.entry(id, teamId), this.entryDoc(team, { ...fields, status }));
+      const fields = { teamId, teamName: String(entry.teamName ?? ""), divisionId: String(entry.divisionId ?? ""), captainIds: strings(entry.captainIds), was: entry };
+      const teamAdmin = can(team, caller.uid, "manageTeam");
+      // A team's admins withdraw (saying why, when they turn an invite
+      // down). Its seed goes when the host next looks (reconcile), unless
+      // the schedule is out.
+      if (status === "withdrawn" && teamAdmin && !manager) {
+        tx.set(p.entry(id, teamId), this.entryDoc(team, { ...fields, status, reason: reason ?? null }));
         return;
       }
+      if (!manager) throw hostOnly("Only the host decides on entries.");
       if (status === "accepted") {
         if (!division || !divId) throw new ApiError("not_found", "That division no longer exists.");
-        const seeds = strings(division.seeds);
-        if (seeds.length >= Number(division.maxTeams) && !seeds.includes(teamId)) {
+        if (!this.seedIn(tx, id, divId, division, teamId, fields.captainIds)) {
           throw new ApiError(
             "failed_precondition",
             `${divisionLabel(division as { division: Division; level: "club" })} is full (${String(division.maxTeams)} teams). Waitlist the team or raise the cap.`,
           );
         }
-        const change = {
-          seeds: seeds.includes(teamId) ? seeds : [...seeds, teamId],
-          captains: { ...mapOf(division.captains), [teamId]: fields.captainIds },
-        };
         tx.set(p.entry(id, teamId), this.entryDoc(team, { ...fields, status }));
-        checkDivision(divisionDoc(division, change));
-        tx.update(p.division(id, divId), change);
         return;
       }
-      tx.set(p.entry(id, teamId), this.entryDoc(team, { ...fields, status }));
-      if (division && divId && strings(division.seeds).includes(teamId)) {
-        tx.update(p.division(id, divId), {
-          seeds: strings(division.seeds).filter((s) => s !== teamId),
-          captains: Object.fromEntries(Object.entries(mapOf(division.captains)).filter(([k]) => k !== teamId)),
-        });
-      }
+      tx.set(p.entry(id, teamId), this.entryDoc(team, { ...fields, status, reason: reason ?? null }));
+      this.unseed(tx, id, divId, division, teamId);
+    });
+  }
+
+  /** Takes a team out of its division's seeds and captains (and unconfirms the seeds). */
+  private unseed(tx: Tx, id: string, divId: string | null, division: Data | null, teamId: string) {
+    if (!division || !divId || !strings(division.seeds).includes(teamId)) return;
+    tx.update(p.division(id, divId), {
+      seeds: strings(division.seeds).filter((s) => s !== teamId),
+      captains: Object.fromEntries(Object.entries(mapOf(division.captains)).filter(([k]) => k !== teamId)),
+      seedsConfirmedAt: null,
     });
   }
 
@@ -719,32 +924,77 @@ export class TournamentService {
     const id = docIdParam(rawId);
     const divId = docIdParam(rawDiv);
     const { games } = parseBody(publishScheduleRequestSchema, body);
-    const check = (tx: Tx) => this.managed(tx, id, caller.uid);
-    let format: TournamentFormat = "roundRobin";
-    await this.store.transact(async (tx) => {
+    const format = await this.store.transact(async (tx) => {
       const t = await this.managed(tx, id, caller.uid);
       const d = await tx.get(p.division(id, divId));
       if (!d) throw noDivision();
-      const seeds = strings(d.seeds);
-      const drafted = Array.isArray(d.teams) ? d.teams.map((x) => String(mapOf(x).id ?? "")) : [];
-      // needsTeamsCreated: a league that takes players makes its real teams first.
-      const teamsCreated = drafted.length > 0 && drafted.every((x) => x.startsWith(leagueTeamPrefix));
-      const mixed = t.entryType === "players" && t.teamEntry === true;
-      if (t.kind === "league" && t.entryType === "players" && !teamsCreated && (drafted.length > 0 || !mixed)) {
-        throw new ApiError("failed_precondition", "Create the league's teams first: draft teams, then Create teams.");
-      }
-      if (seeds.length < 2) throw new ApiError("failed_precondition", "Accept at least two teams first.");
-      const ids = new Set(games.map((g) => g.id));
-      if (ids.size !== games.length) throw new ApiError("invalid_argument", "Each game once.");
-      games.forEach((g, i) => {
-        const teamOk = (x: string | null) => x == null || seeds.includes(x);
-        const sourceOk = (s: (typeof g)["sourceA"]) => s == null || s.type === "pool" || (ids.has(s.game) && s.game !== g.id);
-        if (g.order !== i || !teamOk(g.teamA) || !teamOk(g.teamB) || !sourceOk(g.sourceA) || !sourceOk(g.sourceB)) {
-          throw new ApiError("invalid_argument", "That schedule doesn't match the division's teams. Refresh and try again.");
-        }
-      });
-      format = formatOf({ kind: t.kind as "league", season: (t.season as never) ?? null }, { settings: { format: mapOf(d.settings).format as TournamentFormat } });
+      return this.checkGames(t, d, games);
     });
+    await this.writeGames(caller, id, divId, games, format);
+  }
+
+  /**
+   * Publishes every listed division's games in one go (the run sheet's
+   * "Publish schedule"): each division's seeds must be confirmed, and every
+   * division's games are checked before any is written.
+   */
+  async publishAll(caller: Caller, rawId: unknown, body: unknown): Promise<void> {
+    const id = docIdParam(rawId);
+    const { divisions } = parseBody(publishAllRequestSchema, body);
+    const divIds = divisions.map((d) => docIdParam(d.divisionId));
+    if (new Set(divIds).size !== divIds.length) throw new ApiError("invalid_argument", "Each division once.");
+    const formats = await this.store.transact(async (tx) => {
+      const t = await this.managed(tx, id, caller.uid);
+      const out: TournamentFormat[] = [];
+      for (const [i, divId] of divIds.entries()) {
+        const d = await tx.get(p.division(id, divId));
+        if (!d) throw noDivision();
+        if (!d.seedsConfirmedAt) {
+          throw new ApiError("failed_precondition", `Confirm the seeds for ${divisionLabel(d as { division: Division; level: "club" })} first.`);
+        }
+        out.push(this.checkGames(t, d, divisions[i].games));
+      }
+      return out;
+    });
+    for (const [i, divId] of divIds.entries()) await this.writeGames(caller, id, divId, divisions[i].games, formats[i]);
+  }
+
+  /** A schedule's games checked against the division (validGame); answers the format it plays. */
+  private checkGames(t: Data, d: Data, games: Array<{ id: string; order: number; teamA: string | null; teamB: string | null; sourceA: unknown; sourceB: unknown }>): TournamentFormat {
+    const seeds = strings(d.seeds);
+    const drafted = Array.isArray(d.teams) ? d.teams.map((x) => String(mapOf(x).id ?? "")) : [];
+    // needsTeamsCreated: a league that takes players makes its real teams first.
+    const teamsCreated = drafted.length > 0 && drafted.every((x) => x.startsWith(leagueTeamPrefix));
+    const mixed = t.entryType === "players" && t.teamEntry === true;
+    if (t.kind === "league" && t.entryType === "players" && !teamsCreated && (drafted.length > 0 || !mixed)) {
+      throw new ApiError("failed_precondition", "Create the league's teams first: draft teams, then Create teams.");
+    }
+    if (seeds.length < 2) throw new ApiError("failed_precondition", "Accept at least two teams first.");
+    const ids = new Set(games.map((g) => g.id));
+    if (ids.size !== games.length) throw new ApiError("invalid_argument", "Each game once.");
+    type Source = { type: string; game?: string } | null;
+    games.forEach((g, i) => {
+      const teamOk = (x: string | null) => x == null || seeds.includes(x);
+      const sourceOk = (raw: unknown) => {
+        const s = raw as Source;
+        return s == null || s.type === "pool" || (!!s.game && ids.has(s.game) && s.game !== g.id);
+      };
+      if (g.order !== i || !teamOk(g.teamA) || !teamOk(g.teamB) || !sourceOk(g.sourceA) || !sourceOk(g.sourceB)) {
+        throw new ApiError("invalid_argument", "That schedule doesn't match the division's teams. Refresh and try again.");
+      }
+    });
+    return formatOf({ kind: t.kind as "league", season: (t.season as never) ?? null }, { settings: { format: mapOf(d.settings).format as TournamentFormat } });
+  }
+
+  /** Replaces a division's games with [games] (checked already), resets its results and schedules the event. */
+  private async writeGames(
+    caller: Caller,
+    id: string,
+    divId: string,
+    games: PublishGameInput[],
+    format: TournamentFormat,
+  ): Promise<void> {
+    const check = (tx: Tx) => this.managed(tx, id, caller.uid);
     const old = await this.queries.ids(p.games(id, divId), listMax);
     const fresh = new Set(games.map((g) => g.id));
     const writes: Array<(tx: Tx) => void> = [
@@ -869,6 +1119,7 @@ export class TournamentService {
       tx.update(p.game(id, divId, gameId), { status: "done", scoreA: r.scoreA, scoreB: r.scoreB, report: null });
       for (const f of fillsAfter(done, games)) tx.update(p.game(id, divId, f.gameId), fillUpdate(f));
     });
+    await this.settle(id, divId);
   }
 
   /** A host manager sets (or corrects) a final score, unless later games already depend on it. */
@@ -890,6 +1141,7 @@ export class TournamentService {
       tx.update(p.game(id, divId, gameId), { status: "done", scoreA: s.scoreA, scoreB: s.scoreB, report: null });
       for (const f of fillsAfter(done, games, true)) tx.update(p.game(id, divId, f.gameId), fillUpdate(f));
     });
+    await this.settle(id, divId);
   }
 
   /**
@@ -917,7 +1169,7 @@ export class TournamentService {
 
   /**
    * setLive(): the running score while the game is played ([body]
-   * {scoreA, scoreB}, 0–0 to start it). Not the final: the game stays
+   * {scoreA, scoreB}, 0-0 to start it). Not the final: the game stays
    * scheduled and the final is still reported and confirmed. Only from
    * liveLimits.earlyMs before the game's start to liveLimits.lateMs after.
    * The first live game makes a scheduled event live.
@@ -984,8 +1236,31 @@ export class TournamentService {
   async reconcile(caller: Caller, rawId: unknown, rawDiv: unknown): Promise<{ changed: string[] }> {
     const id = docIdParam(rawId);
     const divId = docIdParam(rawDiv);
-    // Managers only get as far as the lists (checked again below).
-    const tour = await this.managed(this.store, id, caller.uid);
+    return this.keepInStep(id, divId, (tx) => this.managed(tx, id, caller.uid));
+  }
+
+  /**
+   * After a final score (confirm, setScore): the same keeping in step as a
+   * host looking (reconcile), done by the server, so a finished division
+   * records its places and the event goes final without anyone on the page.
+   * Never fails the score that was just saved.
+   */
+  private async settle(id: string, divId: string): Promise<void> {
+    try {
+      await this.keepInStep(id, divId, async (tx) => {
+        const t = await tx.get(p.tournament(id));
+        if (!t) throw notFound();
+        return t;
+      });
+    } catch {
+      // A host looking (reconcile) catches up anything missed.
+    }
+  }
+
+  /** reconcile's work, each read of the tournament through [check] (who may do it). */
+  private async keepInStep(id: string, divId: string, check: (tx: Pick<Tx, "get">) => Promise<Data>): Promise<{ changed: string[] }> {
+    // Only those [check] lets through get as far as the lists (checked again below).
+    const tour = await check(this.store);
     const division = await this.store.get(p.division(id, divId));
     if (!division) throw noDivision();
     // A first look from small queries: the division's own entries and the
@@ -1031,7 +1306,7 @@ export class TournamentService {
         ].filter((x): x is string => !!x);
     const divIds = placing ? await this.queries.ids(p.divisions(id), 100) : [];
     return this.store.transact(async (tx) => {
-      const t = await this.managed(tx, id, caller.uid);
+      const t = await check(tx);
       const d = await tx.get(p.division(id, divId));
       if (!d) throw noDivision();
       let others: Data[] | null = null;

@@ -4,6 +4,35 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.58.0 — 2026-11-23
+
+With app 0.0.50 and API 0.46.0.
+
+- **Respond** to a tournament invite a step at a time
+  (`/tournaments/:id/respond`, also `/enter`): Accept or Decline first,
+  then the roster (or **Set later**), then the fee (or **Pay later**),
+  then **Request confirmed!** with what's left. Applying to a public
+  event is the same flow and ends with **Request sent!**.
+- The team page's invites have one **Respond** button, and **Entries to
+  finish** lists entries still missing a roster or fee with **Finish
+  entry**.
+- Organizers: the event page's **Run your event** card (registration,
+  confirm seeds, publish every schedule at once, play). The Teams tab
+  saves the seed order once (**Save order** / **Confirm seeds**) and
+  flags **Roster missing** and **Unpaid** teams.
+- Event form: **Fees & deadline** (one entry deadline for rosters and
+  fees) and a **Director** step (a Stall 10 member, or anyone by name,
+  email and phone). The event page shows the director with **Message**,
+  or their email and phone; visitors see the name only.
+- Payments: Stripe setup happens on the page (embedded onboarding) with
+  a **Payments: On / Finish setup / Not set up** status; organizers who
+  aren't the owner are told who sets it up. Team settings show it to
+  anyone who manages events. `/embed/payouts` hosts the same form for
+  the app.
+- A paid hat signup goes on to **Payment** (pay now or later), then
+  **You're signed up!**.
+- Deleting an event says its captains' chats go too.
+
 ## 0.57.0 — 2026-11-22
 
 - Tournament invites have a reply-by time: the host form's **Invited

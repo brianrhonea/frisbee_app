@@ -82,6 +82,16 @@ class PaymentRepositoryApi implements PaymentRepository {
   }
 
   @override
+  Future<Result<String>> payoutSession(String teamId) => guard(() async {
+    final json = await _client.post('/v1/teams/${_id(teamId)}/payouts/session', {});
+    final secret = json['clientSecret'];
+    if (secret is! String || secret.isEmpty) {
+      throw const ApiException('unavailable', "Stripe's setup didn't open. Try again.");
+    }
+    return secret;
+  });
+
+  @override
   Future<Result<Uri>> payoutLink(String teamId) => guard(
     () async =>
         _url(await _client.post('/v1/teams/${_id(teamId)}/payouts/link', {})),

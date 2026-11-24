@@ -527,5 +527,6 @@
 .tournament-invite-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
 .tournament-invite { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: start; }
 .tournament-invite-main { display: grid; gap: 4px; justify-items: start; min-width: 0; }
+.entry-overdue { color: var(--disc-ink); font-weight: 700; }
 .tournament-invite-main .home-actions { margin-top: 4px; }
 .tournament-invites { border-left: 3px solid var(--accent); }

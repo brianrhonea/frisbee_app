@@ -48,8 +48,11 @@ const timeLabel = (d: Date, zone?: string) => d.toLocaleTimeString("en-US", { ho
 
 /** The schedule a division would get now, or why it can't have one (preview). */
 export function previewPlan(s: TournamentState): { plan: SchedulePlan | null; problem: string | null } {
-  const t = s.t;
-  const d = s.division;
+  return planFor(s.t, s.division);
+}
+
+/** [d]'s schedule as it would be published now (the run sheet plans every division at once). */
+export function planFor(t: TournamentState["t"], d: TournamentState["division"]): { plan: SchedulePlan | null; problem: string | null } {
   if (!t || !d) return { plan: null, problem: "Add a division first." };
   const drafted = d.teams ?? [];
   const created = drafted.length > 0 && drafted.every((x) => x.id.startsWith(leagueTeamPrefix));

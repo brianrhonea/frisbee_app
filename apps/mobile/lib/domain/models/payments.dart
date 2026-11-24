@@ -25,6 +25,8 @@ class PayoutAccount {
     required this.available,
     required this.status,
     required this.feeLabel,
+    this.canSetUp = true,
+    this.ownerName = '',
   });
 
   /// Not available: this server doesn't take payments yet; hide the section.
@@ -40,10 +42,17 @@ class PayoutAccount {
   /// Stall 10's fee, e.g. "1% + $1".
   final String feeLabel;
 
+  /// The caller can start or finish setup (the host's owner); other
+  /// managers see the status and [ownerName] to ask.
+  final bool canSetUp;
+  final String ownerName;
+
   factory PayoutAccount.fromMap(Map<String, Object?> m) => PayoutAccount(
     available: m['available'] == true,
     status: PayoutStatus.parse(m['status']),
     feeLabel: m['feeLabel'] as String? ?? '',
+    canSetUp: m['canSetUp'] != false,
+    ownerName: m['ownerName'] as String? ?? 'the owner',
   );
 }
 

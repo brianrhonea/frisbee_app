@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../domain/models/group_tournament.dart';
 import '../../../domain/models/hosted_tournament.dart';
@@ -28,6 +29,7 @@ import 'event_page_header.dart';
 import 'live_score_sheet.dart';
 import 'player_signups_tab.dart';
 import 'share_tournament.dart';
+import 'signup_next_steps.dart';
 import 'tournament_dialogs.dart';
 import 'tournament_parts.dart';
 
@@ -221,8 +223,8 @@ class _HostedTournamentScreenState extends State<HostedTournamentScreen> {
           context,
           title: 'Delete ${vm.tournament?.name ?? 'tournament'}?',
           message:
-              'Its divisions, teams, bids, schedule and scores are deleted '
-              'for everyone.',
+              "Its divisions, teams, bids, schedule, scores and captains' "
+              'chats are deleted for everyone.',
           confirmLabel: 'Delete',
           destructive: true,
         )) {
@@ -545,29 +547,22 @@ class _OverviewTab extends StatelessWidget {
     }
   }
 
+  /// The respond flow (as on the website): an invite's Accept or
+  /// Decline, applying, or an entered team's roster, fee or ([editing])
+  /// captains, a step at a time on its own screen.
   Future<void> _apply(
     BuildContext context, {
     TournamentEntry? invite,
     TournamentEntry? editing,
+    String? step,
   }) async {
-    final vm = viewModel;
-    final teams = invite != null || editing != null
-        ? [?vm.myTeam((invite ?? editing)!.teamId)]
-        : vm.teamsToEnter;
-    final a = await showApplyDialog(
-      context,
-      teams: teams,
-      divisions: vm.divisions,
-      uid: vm.uid,
-      invite: invite,
-      editing: editing,
+    await context.push(
+      Routes.tournamentRespond(
+        viewModel.tournamentId,
+        teamId: (invite ?? editing)?.teamId,
+        step: step ?? (editing != null ? 'captains' : null),
+      ),
     );
-    if (a == null) return;
-    if (editing != null) {
-      vm.updateCaptains.execute((entry: editing, captainIds: a.captainIds));
-    } else {
-      vm.apply.execute(a);
-    }
   }
 
   /// Does what a guide button says: a dialog, a status change, a tab or
@@ -618,6 +613,22 @@ class _OverviewTab extends StatelessWidget {
       case GuideAction.publishSchedule:
         if (division != null) vm.selectDivision(division);
         go(EventTab.schedule);
+      case GuideAction.confirmSeeds:
+        if (division == null) return;
+        await vm.confirmSeeds.execute(division);
+      case GuideAction.publishAll:
+        if (await confirmDialog(
+          context,
+          title: vm.divisions.length > 1
+              ? 'Publish every schedule?'
+              : 'Publish the schedule?',
+          message:
+              'Teams are notified and the seeds lock. You can still move '
+              'games and fix scores after.',
+          confirmLabel: 'Publish',
+        )) {
+          await vm.publishAll.execute();
+        }
       case GuideAction.schedule:
         go(EventTab.schedule);
       case GuideAction.results:
@@ -639,15 +650,7 @@ class _OverviewTab extends StatelessWidget {
           );
           return;
         }
-        final a = await showPlayerSignupDialog(
-          context,
-          divisions: vm.divisions,
-          initial: sign.mine?.status == SignupStatus.withdrawn
-              ? null
-              : sign.mine,
-          fee: vm.tournament?.entryFee,
-        );
-        if (a != null) await sign.signUp.execute(a);
+        await signUpWithNextSteps(context, event: vm, signups: sign);
       case GuideAction.apply:
         await _apply(context);
       case GuideAction.acceptInvite:
@@ -715,6 +718,10 @@ class _OverviewTab extends StatelessWidget {
                     ),
                   ),
                 ),
+          // The director (a contact) and when rosters and fees are due.
+          if (t.director != null ||
+              (t.takesTeams && t.status.index < HostedStatus.scheduled.index))
+            _DirectorCard(tournament: t),
           // Captains ask the organizers; organizers answer everyone at once.
           if (vm.offersChats) OrganizerChatsCard(viewModel: vm),
           // Their signup, until they're on a team.
@@ -770,6 +777,7 @@ class _OverviewTab extends StatelessWidget {
                   fee: fee,
                   onApply: () => _apply(context, invite: e),
                   onCaptains: () => _apply(context, editing: e),
+                  onFinish: () => _apply(context, editing: e, step: 'next'),
                 ),
               ),
             if (vm.canReserve && vm.myActiveEntry == null) ...[
@@ -916,6 +924,92 @@ class _DivisionRow extends StatelessWidget {
   }
 }
 
+/// The tournament director (a member opens their profile, where Message
+/// is; anyone else by email and phone) and the entry deadline.
+class _DirectorCard extends StatelessWidget {
+  const _DirectorCard({required this.tournament});
+
+  final HostedTournament tournament;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final t = tournament;
+    final d = t.director;
+    return Card(
+      key: const Key('director-card'),
+      margin: const EdgeInsets.only(top: 12),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (d != null) ...[
+              Text(
+                'TOURNAMENT DIRECTOR',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8,
+                  color: c.muted,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      d.name,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: c.ink,
+                      ),
+                    ),
+                  ),
+                  if (d.isMember)
+                    TextButton.icon(
+                      icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                      label: const Text('Message'),
+                      onPressed: () => context.push(Routes.player(d.uid!)),
+                    ),
+                ],
+              ),
+              if (d.email.isNotEmpty)
+                TextButton.icon(
+                  style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                  icon: const Icon(Icons.mail_outline, size: 18),
+                  label: Text(d.email),
+                  onPressed: () =>
+                      launchUrl(Uri(scheme: 'mailto', path: d.email)),
+                ),
+              if (d.phone.isNotEmpty)
+                TextButton.icon(
+                  style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                  icon: const Icon(Icons.phone_outlined, size: 18),
+                  label: Text(d.phone),
+                  onPressed: () => launchUrl(
+                    Uri(scheme: 'tel', path: d.phone.replaceAll(' ', '')),
+                  ),
+                ),
+            ],
+            if (t.takesTeams &&
+                t.status.index < HostedStatus.scheduled.index) ...[
+              if (d != null) const SizedBox(height: 8),
+              Text(
+                'Rosters${t.spotFee != null ? ' and fees' : ''} due '
+                '${DateFormat('EEE, MMM d').format(t.effectiveDeadline.toLocal())}',
+                key: const Key('entry-deadline-line'),
+                style: TextStyle(fontSize: 13, color: c.ink2),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// One of the user's teams entered here: where its entry stands, its fee,
 /// captains and roster, and what its admins can do.
 class _MyEntryCard extends StatelessWidget {
@@ -925,13 +1019,19 @@ class _MyEntryCard extends StatelessWidget {
     required this.fee,
     required this.onApply,
     required this.onCaptains,
+    required this.onFinish,
   });
 
   final TournamentEntry entry;
   final HostedTournamentViewModel viewModel;
   final BidFee? fee;
+
+  /// Respond to the invite (the respond flow).
   final VoidCallback onApply;
   final VoidCallback onCaptains;
+
+  /// The roster and fee steps, from where the entry is.
+  final VoidCallback onFinish;
 
   @override
   Widget build(BuildContext context) {
@@ -1046,7 +1146,13 @@ class _MyEntryCard extends StatelessWidget {
                       foregroundColor: c.onHighlight,
                     ),
                     onPressed: onApply,
-                    child: const Text('Accept invite'),
+                    child: const Text('Respond'),
+                  ),
+                if (e.status != EntryStatus.invited && active)
+                  TextButton(
+                    style: TextButton.styleFrom(foregroundColor: c.accent),
+                    onPressed: onFinish,
+                    child: const Text('Roster & fee'),
                   ),
                 if (e.status != EntryStatus.invited && active)
                   TextButton(
@@ -1061,7 +1167,7 @@ class _MyEntryCard extends StatelessWidget {
                         pushTeamRoute(context, Routes.teamMembers(e.teamId)),
                     child: const Text('Invite players'),
                   ),
-                if (active)
+                if (active && e.status != EntryStatus.invited)
                   TextButton(
                     style: TextButton.styleFrom(foregroundColor: c.muted),
                     onPressed: () async {
@@ -1262,6 +1368,9 @@ class _TeamsTabState extends State<_TeamsTab> {
       final overdue = fee != null && vm.isOverdue(id);
       final mine = vm.myEntries.any((e) => e.teamId == id);
       final showFee = fee != null && (vm.isManager || mine);
+      // The organizer's flag: the team hasn't named enough players yet.
+      final noRoster =
+          vm.isManager && vm.teamsMissingRoster.any((e) => e.teamId == id);
       return Material(
         key: ValueKey(id),
         color: Colors.transparent,
@@ -1298,6 +1407,16 @@ class _TeamsTabState extends State<_TeamsTab> {
                         color: c.ink,
                       ),
                     ),
+                    if (noRoster) ...[
+                      const SizedBox(height: 4),
+                      Pill(
+                        'Roster missing',
+                        key: ValueKey('roster-missing-$id'),
+                        tone: vm.pastDeadline
+                            ? PillTone.needsYou
+                            : PillTone.neutral,
+                      ),
+                    ],
                     if (showFee) ...[
                       const SizedBox(height: 4),
                       Pill(
@@ -1522,6 +1641,37 @@ class _TeamsTabState extends State<_TeamsTab> {
                   children: divided([
                     for (final (i, id) in shown.indexed) seedTile(id, i),
                   ]),
+                ),
+              ),
+            // Confirm the order (every division's is needed to publish).
+            if (vm.isManager && !locked && seeds.length >= 2)
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        d.seedsConfirmed
+                            ? 'Seeds confirmed. Changing the order needs a '
+                                  'new confirm.'
+                            : 'Drag the teams into seed order, then confirm.',
+                        style: TextStyle(fontSize: 12.5, color: c.muted),
+                      ),
+                    ),
+                    if (d.seedsConfirmed)
+                      const Pill('Seeds confirmed', tone: PillTone.turf)
+                    else
+                      ListenableBuilder(
+                        listenable: vm.confirmSeeds,
+                        builder: (context, _) => FilledButton(
+                          key: const Key('confirm-seeds'),
+                          onPressed: vm.confirmSeeds.running
+                              ? null
+                              : () => vm.confirmSeeds.execute(d.id),
+                          child: const Text('Confirm seeds'),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             if (vm.isManager) ...[

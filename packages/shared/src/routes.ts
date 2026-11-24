@@ -63,6 +63,8 @@ const rules: Rule[] = [
   // ?host= opens that group's tournament when no hosted one has the id.
   [new RegExp(`^/tournaments/${id}$`), (m, q) => `/tournaments/${m[1]}${query(q, "host")}`],
   [new RegExp(`^/tournaments/${id}/(edit|signups)$`), (m) => `/tournaments/${m[1]}/${m[2]}`],
+  // The respond flow (an invite's Accept or Decline, roster, fee).
+  [new RegExp(`^/tournaments/${id}/respond$`), (m, q) => `/tournaments/${m[1]}/respond${query(q, "team", "step")}`],
   // The host's balanced draft, and the captains' live draft.
   [new RegExp(`^/tournaments/${id}/(draft|live-draft)/${id}$`), (m) => `/tournaments/${m[1]}/${m[2]}/${m[3]}`],
   // A division's bracket on its own page.

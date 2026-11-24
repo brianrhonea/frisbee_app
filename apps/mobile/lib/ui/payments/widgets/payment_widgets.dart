@@ -6,9 +6,11 @@ import '../../../data/repositories/payment/payment_repository.dart';
 import '../../../data/services/payment_sheet_service.dart';
 import '../../../domain/models/hosted_tournament.dart';
 import '../../../domain/models/payments.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/view_model_host.dart';
 import '../view_models/payments_viewmodels.dart';
+import 'payouts_setup_screen.dart';
 
 /// Stripe's pages open in the browser: entry fees are for real-world
 /// events, which Apple and Google let apps take payment for outside
@@ -122,8 +124,10 @@ Widget _offline(BuildContext context, PayOnlineViewModel vm) {
   );
 }
 
-/// The host owner's "Get paid online" card. Shows nothing until the server
-/// says online payments are available (and the user is the owner).
+/// A host's "Payments: On / Finish setup / Not set up" card, with setup
+/// inside the app (Stripe's form in [PayoutsSetupScreen]). The host's
+/// owner sets it up; other managers see the status and who to ask. Shows
+/// nothing until the server says online payments are available.
 class PayoutsCard extends StatelessWidget {
   const PayoutsCard({
     super.key,
@@ -171,12 +175,12 @@ class PayoutsCard extends StatelessWidget {
             'collecting them yourself. Payments go to your own Stripe '
             'account, and you get the whole fee: payers also pay Stall '
             "10's ${a.feeLabel} and Stripe's card fee.",
-        'Set up with Stripe',
+        'Set up payments',
       ),
       PayoutStatus.pending => (
         'Finish setting up payments',
         'Stripe still needs a few details before you can take payments.',
-        'Continue with Stripe',
+        'Finish setup',
       ),
       PayoutStatus.ready => (
         'Online payments are on',
@@ -205,6 +209,7 @@ class PayoutsCard extends StatelessWidget {
                 Expanded(
                   child: Text(title, style: theme.textTheme.titleMedium),
                 ),
+                PayoutsStatusChip(status: a.status),
               ],
             ),
             const SizedBox(height: 8),
@@ -214,12 +219,34 @@ class PayoutsCard extends StatelessWidget {
               currency: 'USD',
               compact: true,
             ),
-            if (action != null) ...[
+            if (action != null && !a.canSetUp) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Only ${a.ownerName} can set up payments. Ask them to open '
+                "the team's settings.",
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
+            if (action != null && a.canSetUp) ...[
               const SizedBox(height: 12),
               FilledButton(
+                key: const Key('set-up-payments'),
                 onPressed: vm.connect.running
                     ? null
                     : () async {
+                        // Stripe's form in the app; its own page in the
+                        // browser only for tests' fake [open].
+                        if (open == null) {
+                          final payments = _payments(context);
+                          if (payments == null) return;
+                          await PayoutsSetupScreen.open(
+                            context,
+                            payments: payments,
+                            teamId: teamId,
+                          );
+                          await vm.load.execute();
+                          return;
+                        }
                         await vm.connect.execute();
                         if (context.mounted && vm.connect.error) {
                           _showError(context, vm.connect.result);
@@ -488,6 +515,40 @@ class PaymentsOnBuilder extends StatelessWidget {
       builder: (context, vm) => ListenableBuilder(
         listenable: vm,
         builder: (context, _) => builder(context, vm.fees.available),
+      ),
+    );
+  }
+}
+
+/// "Payments: On" (green), "Payments: Finish setup" or "Payments: Not set
+/// up" (amber: yours to do), for team pages, settings and the event form.
+class PayoutsStatusChip extends StatelessWidget {
+  const PayoutsStatusChip({super.key, required this.status});
+
+  final PayoutStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final on = status == PayoutStatus.ready;
+    final label = switch (status) {
+      PayoutStatus.ready => 'On',
+      PayoutStatus.pending => 'Finish setup',
+      PayoutStatus.none => 'Not set up',
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: on ? c.accentSoft : c.highlightSoft,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        'Payments: $label',
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: on ? c.accentInk : c.highlightInk,
+        ),
       ),
     );
   }

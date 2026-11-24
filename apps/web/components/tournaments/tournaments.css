@@ -286,3 +286,38 @@ dialog.dialog:has(.live-dialog) { width: min(100% - 32px, 480px); }
 .form-review-row dt { font-size: 0.8rem; font-weight: 700; color: var(--muted); }
 .form-review-row dd { margin: 0; overflow-wrap: anywhere; }
 .form-review-row .text-btn { color: var(--accent); font-weight: 600; flex: none; }
+
+/* Entering a team a step at a time (EnterTeam): the step bar is the event
+   form's, read-only here; then the "Request confirmed!" card with what's left. */
+.form-steps-bar span {
+  flex: 1; height: 4px; margin: 6px 0; border-radius: 999px; background-color: var(--line);
+}
+.form-steps-bar span.on { background-color: var(--accent); }
+.respond-done { display: grid; gap: 12px; justify-items: start; }
+.respond-done h2 { margin: 0; }
+.respond-done p { margin: 0; }
+.respond-done-mark {
+  display: grid; place-items: center; width: 48px; height: 48px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent-ink); font-size: 1.5rem; font-weight: 800;
+}
+.respond-checklist { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; width: 100%; }
+.respond-checklist li {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line);
+  border-radius: var(--radius-control); font-weight: 600;
+}
+.respond-checklist li::before {
+  content: ""; flex: none; width: 18px; height: 18px; border-radius: 999px; border: 2px solid var(--line);
+}
+.respond-checklist li.done::before { border-color: var(--accent); background: var(--accent); box-shadow: inset 0 0 0 3px var(--card); }
+.respond-checklist li .text-btn { margin-left: auto; color: var(--accent); font-weight: 700; }
+.roster-pick { max-height: 420px; overflow: auto; }
+/* Something still to do (amber: yours to do). */
+.respond-checklist li:not(.done) { border-color: var(--disc); background: var(--disc-soft); color: var(--disc-ink); }
+/* The host's "Run your event" card: each step's title, what's there, and its buttons. */
+.run-step-body { display: grid; gap: 4px; min-width: 0; }
+.run-step-body .home-actions { margin-top: 4px; }
+.run-divisions { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 6px; width: 100%; }
+.run-divisions li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+/* A team's entry still missing its roster or fee, on the host's Teams tab. */
+.entry-flags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.hosted-seed-confirm { margin-top: 12px; }
