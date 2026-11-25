@@ -7,15 +7,15 @@ import '../../core/themes/theme.dart';
 import '../../core/ui/brand.dart';
 
 /// The "Turf & Disc" palette: a scoreboard-navy night sky over a turf
-/// field, and a disc-amber disc.
+/// field, and a red disc (the logo's).
 abstract final class _Palette {
   static const skyTop = Color(0xFF0B121D);
   static const field = Color(0xFF12805C);
   static const fieldDeep = Color(0xFF0B5E43);
   static const chalk = Color(0xFFF5F6F1);
-  static const disc = Color(0xFFFFB627);
-  static const discRim = Color(0xFFB97C00);
-  static const discLine = Color(0xFFD99A10);
+  static const disc = Color(0xFFE5484D);
+  static const discRim = Color(0xFF8F1D23);
+  static const discLine = Color(0xFFC0333A);
 }
 
 /// The background colour at the bottom of the hero, for whatever sits
@@ -438,7 +438,7 @@ class DiscThrowPainter extends CustomPainter {
             const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFFFFE3A3), _Palette.disc, Color(0xFFE09A12)],
+              colors: [Color(0xFFFFB3B5), _Palette.disc, Color(0xFFB3262D)],
               stops: [0, 0.35, 1],
             ).createShader(
               Rect.fromCenter(

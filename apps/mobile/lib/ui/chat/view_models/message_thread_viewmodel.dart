@@ -386,6 +386,10 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
   /// are on screen; null for none.
   String? get noticeKey => null;
 
+  /// Other notices this thread covers while it's on screen (an @mention
+  /// in an open room).
+  List<String> get otherNoticeKeys => const [];
+
   /// Clears this thread's notification once its newest message from
   /// someone else has been on screen with the app in the foreground.
   void _markSeen() {

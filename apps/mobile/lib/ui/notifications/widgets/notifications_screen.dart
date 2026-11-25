@@ -14,6 +14,29 @@ import '../../core/ui/status_views.dart';
 import '../view_models/notifications_viewmodel.dart';
 import '../../../routing/open_link.dart';
 
+/// The icon for what happened: a like, a repost, a message, … falling
+/// back to the category's.
+IconData noticeIcon(AppNotification n) => switch (n.kind) {
+  'likes' || 'commentLikes' => Icons.favorite,
+  'repost' => Icons.repeat,
+  'comments' || 'replies' || 'videoComments' => Icons.mode_comment_outlined,
+  'follower' || 'followRequests' => Icons.person_add_alt_1_outlined,
+  'mention' => Icons.alternate_email,
+  'chat' => Icons.forum_outlined,
+  'dm' || 'dmRequests' => Icons.chat_bubble_outline,
+  'meeting' || 'meetingStarted' => Icons.videocam_outlined,
+  'event' || 'schedule' => Icons.event_outlined,
+  'deadline' => Icons.alarm,
+  'invite' ||
+  'teamInvite' ||
+  'joinRequest' ||
+  'joinApproved' => Icons.group_add_outlined,
+  'calendarInvite' => Icons.calendar_month_outlined,
+  'play' => Icons.sports_outlined,
+  'posts' => Icons.dynamic_feed_outlined,
+  _ => categoryIcon(n.category),
+};
+
 IconData categoryIcon(NotificationCategory c) => switch (c) {
   NotificationCategory.chat => Icons.forum_outlined,
   NotificationCategory.directMessages => Icons.chat_bubble_outline,

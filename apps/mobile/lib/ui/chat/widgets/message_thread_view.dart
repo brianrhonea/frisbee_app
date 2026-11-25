@@ -134,7 +134,15 @@ class _MessageThreadViewState extends State<MessageThreadView>
     _lastText = _text.text;
     _text.addListener(_onText);
     if (vm.noticeKey case final key?) {
-      _unregister = OnScreen.register(key, () => mounted && _visible);
+      final offs = [
+        for (final k in [key, ...vm.otherNoticeKeys])
+          OnScreen.register(k, () => mounted && _visible),
+      ];
+      _unregister = () {
+        for (final off in offs) {
+          off();
+        }
+      };
     }
   }
 

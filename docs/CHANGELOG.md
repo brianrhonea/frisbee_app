@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.55  | 2026-11-24 | `feature/platform-payments`             |                     |
 | 0.0.54  | 2026-11-24 | `feature/platform-payments`             |                     |
 | 0.0.53  | 2026-11-24 | `development`                           |                     |
 | 0.0.52  | 2026-11-24 | `development`                           |                     |
@@ -67,6 +68,19 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.55 — Notification bubble, red logo
+
+- In-app bubble: the icon follows what happened (`noticeIcon`: like,
+  repost, comment, follower, mention, message, meeting, event, …, from
+  the entry's `itemKind` or collapse id), else the category's.
+- Tapping it opens like tapping a push (`openFromOutside`: over its
+  parent page, Back works).
+- No bubble for the chat on screen: the current location is the top
+  page's own (`currentLocationOf`; pushed pages included), and a room
+  also covers its @mention notices (`otherNoticeKeys`).
+- Logo and app icons: a red disc with a turf-green trail
+  (`tool/brand/stall10_logo.py`); the sign-in hero's disc is red.
 
 ## 0.0.54 — Fixes from payment testing
 

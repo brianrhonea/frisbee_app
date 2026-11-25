@@ -4,6 +4,11 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.59.4 — 2026-11-24
+
+- New logo colours: a red disc with a turf-green trail (logo and favicon,
+  from the app's `tool/brand/stall10_logo.py`).
+
 ## 0.59.3 — 2026-11-24
 
 - Hosting from a team: the form starts with the team's division and

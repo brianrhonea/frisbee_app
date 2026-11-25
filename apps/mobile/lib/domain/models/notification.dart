@@ -136,7 +136,20 @@ class AppNotification {
     this.read = false,
     this.count = 1,
     this.followBack,
+    this.itemKind,
   });
+
+  /// What a folded entry counts (`likes`, `comments`, `repost`, …), when
+  /// it folds by item (ItemKind in functions' model.ts).
+  final String? itemKind;
+
+  /// What happened, for its icon: the item kind, else the kind of entry
+  /// its id (the collapse id, e.g. `dm_…`, `likes_…`) starts with.
+  String get kind {
+    if (itemKind case final k? when k.isNotEmpty) return k;
+    final i = id.indexOf('_');
+    return i > 0 ? id.substring(0, i) : id;
+  }
 
   /// For a new follower: who, so they can be followed back from the feed.
   final ({String uid, String name, String? photoUrl})? followBack;
@@ -168,6 +181,7 @@ class AppNotification {
         createdAt: parseDate(map['createdAt']),
         read: map['read'] as bool? ?? false,
         count: (map['count'] as num?)?.toInt() ?? 1,
+        itemKind: map['itemKind'] as String?,
         followBack: switch (map['followBack']) {
           {'uid': final String uid} && final Map<dynamic, dynamic> f
               when uid.isNotEmpty =>

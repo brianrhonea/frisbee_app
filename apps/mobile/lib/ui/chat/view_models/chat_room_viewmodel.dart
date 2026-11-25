@@ -234,6 +234,9 @@ class ChatRoomViewModel extends MessageThreadViewModel {
   String get noticeKey => 'chat_${teamId}_$roomId';
 
   @override
+  List<String> get otherNoticeKeys => ['mention_${teamId}_$roomId'];
+
+  @override
   Stream<List<ChatMessage>> watchMessages(int limit) =>
       _chats.watchMessages(teamId, roomId, limit: limit);
 

@@ -1,8 +1,8 @@
 """Draws the Stall 10 logo -- a bold "1" beside a flying disc that forms the
 "0", with a motion trail -- and writes every app icon from it.
 
-The logo is an indigo disc and an ink "1" on white: the website's palette,
-so the icon matches what users see in the app and on the site.
+The logo is a red disc with a turf-green trail and an ink "1" on white
+(Turf & Disc: the app's green accent, a red disc).
 
 Run from apps/mobile (needs Pillow: `pip install pillow`):
 
@@ -18,14 +18,15 @@ import os
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
-# White with an indigo disc: the website's accent (#5348B2 family), so the
-# icon promises the colours users find inside.
+# White with a red disc and a turf-green trail (the app's accent #12805C).
 BG_TOP = (255, 255, 255)       # background, top
 BG_BOTTOM = (242, 243, 247)    # background, bottom (and the disc's hole)
-DISC = (99, 86, 204)           # disc top surface, trail
-DISC_SHADE = (84, 73, 173)     # disc shading, outer trails
-DISC_EDGE = (54, 47, 112)      # disc rim underside and flight ring
-DISC_RIM = (193, 188, 235)     # rim highlight
+DISC = (214, 64, 69)           # disc top surface
+DISC_SHADE = (184, 50, 56)     # disc shading
+DISC_EDGE = (112, 28, 34)      # disc rim underside and flight ring
+DISC_RIM = (246, 190, 192)     # rim highlight
+TRAIL = (24, 150, 104)         # trail, middle swoosh
+TRAIL_SHADE = (18, 128, 92)    # trail, outer swooshes (#12805C)
 WHITE = (23, 26, 46)           # the "1" (site ink #171A2E)
 
 S = 4  # supersampling
@@ -83,9 +84,9 @@ def draw(font_path, size=1024):
     # Motion trail: three tapered swooshes arcing in under the "1".
     trail = Image.new('RGBA', (W, W), (0, 0, 0, 0))
     td = ImageDraw.Draw(trail)
-    for off, width, color in [(-0.075, 0.034, DISC_SHADE),
-                              (0.0, 0.050, DISC),
-                              (0.075, 0.034, DISC_SHADE)]:
+    for off, width, color in [(-0.075, 0.034, TRAIL_SHADE),
+                              (0.0, 0.050, TRAIL),
+                              (0.075, 0.034, TRAIL_SHADE)]:
         top, bot = [], []
         steps = 80
         for k in range(steps + 1):

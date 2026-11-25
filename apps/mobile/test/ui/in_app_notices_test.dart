@@ -5,6 +5,8 @@ import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/notifications/view_models/in_app_notices_viewmodel.dart';
 import 'package:frisbee_app/ui/notifications/widgets/in_app_notice_bubble.dart';
 
+import 'package:frisbee_app/utils/on_screen.dart';
+
 import '../testing/fakes.dart';
 
 AppNotification _dm({int count = 1, bool read = false, String id = 'c1'}) =>
@@ -146,5 +148,51 @@ void main() {
     await tester.pump();
     expect(vm.current, isNull);
     await tester.pump(vm.showFor);
+  });
+
+  testWidgets('the icon matches what happened', (tester) async {
+    await pump(tester);
+    arrive(
+      const AppNotification(
+        id: 'likes_p1',
+        category: NotificationCategory.social,
+        title: 'Sam liked your post',
+        itemKind: 'likes',
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(find.byIcon(Icons.favorite), findsOne);
+    vm.dismiss();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    arrive(
+      const AppNotification(
+        id: 'repost_p1',
+        category: NotificationCategory.social,
+        title: 'Sam reposted your post',
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(find.byIcon(Icons.repeat), findsOne);
+    await tester.pump(vm.showFor);
+    await tester.pump(const Duration(milliseconds: 300));
+  });
+
+  testWidgets('an @mention in the room on screen stays quiet', (tester) async {
+    final off = OnScreen.register('mention_t1_r1', () => true);
+    addTearDown(off);
+    await pump(tester);
+    arrive(
+      const AppNotification(
+        id: 'mention_t1_r1',
+        category: NotificationCategory.chat,
+        title: 'Sam mentioned you',
+        route: '/teams/t1/chats/r1',
+      ),
+    );
+    await tester.pump();
+    expect(vm.current, isNull);
   });
 }

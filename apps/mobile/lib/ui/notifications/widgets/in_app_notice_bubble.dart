@@ -113,7 +113,7 @@ class _Bubble extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        categoryIcon(notice.category),
+                        noticeIcon(notice),
                         size: 20,
                         color: scheme.onInverseSurface,
                       ),

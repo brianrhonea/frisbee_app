@@ -116,8 +116,7 @@ class _FrisbeeAppState extends State<FrisbeeApp> {
   late final InAppNoticesViewModel _notices = InAppNoticesViewModel(
     authRepository: _auth,
     notificationRepository: _notifications,
-    currentLocation: () =>
-        _router.routerDelegate.currentConfiguration.uri.toString(),
+    currentLocation: () => currentLocationOf(_router),
   );
   final _messengerKey = GlobalKey<ScaffoldMessengerState>();
   StreamSubscription<String>? _opened;
@@ -189,7 +188,7 @@ class _FrisbeeAppState extends State<FrisbeeApp> {
         messengerKey: _messengerKey,
         child: InAppNoticeBubble(
           viewModel: _notices,
-          onOpen: _router.openLink,
+          onOpen: _router.openFromOutside,
           child: OfflineBanner(
             viewModel: _outbox,
             messengerKey: _messengerKey,

@@ -10,6 +10,17 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.55
+
+- **Notification bubbles show what happened:** a heart for a like,
+  arrows for a repost, a speech bubble for a message, and so on.
+- **Tapping a bubble opens it the same way as a phone notification,**
+  with Back to where you were.
+- **No bubble for the chat you're reading.** Messages and @mentions in
+  the chat on screen just appear there.
+- **New colours:** a red disc with a green trail on the app icon, and a
+  red disc on the sign-in screen.
+
 ## 0.0.54
 
 - **"Go to the event" no longer strands you.** After responding or

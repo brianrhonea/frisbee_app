@@ -142,6 +142,16 @@ String _personOver(String location) => switch (_player.firstMatch(location)) {
 /// place. With nothing beneath (opened from a notification), it opens over
 /// the page it belongs under ([GoRouter.openFromOutside]). Never `go`,
 /// which would drop the pages and the tabs below and leave no way back.
+/// Where the user is: the top page's location, a pushed page's own (the
+/// configuration's uri is the page under pushed ones).
+String currentLocationOf(GoRouter router) {
+  final config = router.routerDelegate.currentConfiguration;
+  if (config.matches.isEmpty) return config.uri.toString();
+  final last = config.matches.last;
+  if (last is ImperativeRouteMatch) return last.matches.uri.toString();
+  return config.uri.toString();
+}
+
 void leaveFor(BuildContext context, String location) {
   final router = GoRouter.of(context);
   final matches = router.routerDelegate.currentConfiguration.matches;
