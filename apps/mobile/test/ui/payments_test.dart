@@ -418,7 +418,7 @@ void main() {
       expect(payments.calls.last, 'checkout hat me');
     });
 
-    testWidgets("shows nothing when the host doesn't take payments", (
+    testWidgets("says why it can't be paid online, with no pay button", (
       tester,
     ) async {
       payments.options = const PayOptions(
@@ -431,6 +431,27 @@ void main() {
       );
       await pump(tester, const PayOnlineButton(tournamentId: 't1'));
       expect(find.byType(FilledButton), findsNothing);
+      expect(find.text('The host collects fees themselves.'), findsOneWidget);
+    });
+
+    testWidgets('an organizer paying their own event is told why', (
+      tester,
+    ) async {
+      payments.options = const PayOptions(
+        online: false,
+        amountCents: 40000,
+        feeCents: 500,
+        feeLabel: r'1% + $1',
+        paid: false,
+        reason: _selfPay,
+      );
+      await pump(
+        tester,
+        const PayOnlineButton(tournamentId: 't1', teamId: 'haze'),
+      );
+      expect(find.byType(FilledButton), findsNothing);
+      expect(find.text(_selfPay), findsOneWidget);
+      expect(find.text("We'll pay another way"), findsOneWidget);
     });
   });
 
@@ -737,3 +758,9 @@ void main() {
     expect(refunded, 1);
   });
 }
+
+/// selfPaymentMessage in packages/shared: the API's reason for an
+/// organizer paying their own event.
+const _selfPay =
+    'You run this event, so mark your own fee paid instead of paying it '
+    'online.';

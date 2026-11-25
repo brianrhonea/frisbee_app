@@ -10,6 +10,12 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.53
+
+- **When a fee can't be paid online, you're told why**, for example the
+  host hasn't set up payouts, or you're an organizer of the event (mark
+  your own fee paid instead).
+
 ## 0.0.52
 
 - **Setting up payments asks you to confirm it's you.** If you signed in

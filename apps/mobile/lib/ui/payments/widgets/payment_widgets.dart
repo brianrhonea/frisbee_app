@@ -464,7 +464,29 @@ class PayOnlineButton extends StatelessWidget {
               );
             }
             final offline = _offline(context, vm);
-            if (o == null || !vm.canPay) return offline;
+            if (o == null) return offline;
+            if (!vm.canPay) {
+              // Why it can't be paid online here (the host isn't set up,
+              // it's your own event, ...), so the other ways make sense.
+              final why = !o.online && !o.paid && o.amountCents > 0
+                  ? o.reason
+                  : null;
+              if (why == null) return offline;
+              return Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      why,
+                      key: const Key('pay-online-reason'),
+                      style: small,
+                    ),
+                    offline,
+                  ],
+                ),
+              );
+            }
             return Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Column(

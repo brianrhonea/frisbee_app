@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.53  | 2026-11-24 | `development`                           |                     |
 | 0.0.52  | 2026-11-24 | `development`                           |                     |
 | 0.0.51  | 2026-11-23 | `feature/platform-payments`             |                     |
 | 0.0.50  | 2026-11-23 | `feature/tournament-flow`               |                     |
@@ -65,6 +66,13 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.53 — Say why a fee can't be paid online
+
+- PayOnlineButton: with no online payment, the API's reason
+  (`PayOptions.reason`: the host isn't set up, you run the event, …)
+  shows above "We'll pay another way". Tests: the reason and the
+  self-payment case.
 
 ## 0.0.52 — Confirm it's you before setting up payouts
 

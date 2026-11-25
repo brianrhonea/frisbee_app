@@ -495,6 +495,10 @@ export function PayOnline({ user, tournamentId, teamId, withStatus = false }: { 
         </small>
       ) : options.pending === "processing" && !options.paid ? (
         <small className="muted">{options.reason}</small>
+      ) : !options.online ? (
+        // Why it can't be paid online here (the host isn't set up, it's your
+        // own event, …), so the other ways below make sense.
+        !options.paid && options.amountCents > 0 && options.reason && <small className="muted">{options.reason}</small>
       ) : (
         options.online && (
           <>

@@ -4,6 +4,12 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.59.2 — 2026-11-24
+
+- Pay: when a fee can't be paid online, the reason shows (the host isn't
+  set up for online payments, you run the event, …) above "We'll pay
+  another way", instead of no button and no reason.
+
 ## 0.59.1 — 2026-11-24
 
 - Setting up payouts more than 15 minutes after signing in asks you to
