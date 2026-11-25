@@ -37,6 +37,7 @@ import {
   inviteReplyBy,
   isDone,
   laterGamesPlayed,
+  hostDefaults,
   leagueFitProblem,
   leagueTeamPrefix,
   pendingFills,
@@ -62,7 +63,7 @@ import {
   publishAllRequestSchema,
   effectiveDeadline,
   entryChecklist,
-  spotFee,
+  teamFee,
   type TeamEntryToFinish,
 
   type PublishGameInput,
@@ -342,11 +343,38 @@ export class TournamentService {
         createdBy: caller.uid,
         createdAt: serverTime,
       });
+      // The host team in its own event (enterHost): accepted and seeded in
+      // the division matching its own (else the first), the creator its
+      // captain. Teams-entry events only; no fee (teamFee).
+      const own = r.enterHost === true && r.entryType === "teams" && (host.kind ?? "team") === "team"
+          ? hostDefaults({ kind: String(host.kind ?? "team"), division: String(host.division ?? ""), level: String(host.level ?? "") }, r.kind)
+          : null;
+      const hostIn = own ? Math.max(0, opened.indexOf(own.division)) : -1;
+      if (own && r.kind === "league") {
+        const problem = leagueFitProblem(
+          { name: String(host.name ?? "Team"), division: host.division as string, level: host.level as string },
+          { division: opened[hostIn], level: r.format.level as "club" },
+        );
+        if (problem) throw new ApiError("failed_precondition", problem);
+      }
       opened.forEach((d, i) => {
         const doc = newDivisionDoc(r.format, d);
-        checkDivision(doc);
-        tx.create(p.division(id, ids[i]), doc);
+        const withHost = i === hostIn ? { ...doc, seeds: [hostId], captains: { [hostId]: [caller.uid] } } : doc;
+        checkDivision(withHost);
+        tx.create(p.division(id, ids[i]), withHost);
       });
+      if (hostIn >= 0) {
+        tx.set(
+          p.entry(id, hostId),
+          this.entryDoc(host, {
+            teamId: hostId,
+            teamName: String(host.name ?? "").slice(0, tournamentLimits.teamName),
+            divisionId: ids[hostIn],
+            status: "accepted",
+            captainIds: [caller.uid],
+          }),
+        );
+      }
     });
     return { id };
   }
@@ -865,7 +893,7 @@ export class TournamentService {
       const divisionId = String(entry.divisionId ?? "");
       const division = await this.store.get(p.division(tid, divisionId));
       const mixed = t.entryType === "players" && t.teamEntry === true;
-      const fee = spotFee(t as never);
+      const fee = teamFee({ ...(t as never as Parameters<typeof teamFee>[0]), hostId: String(t.hostId ?? "") }, teamId);
       const deadline = effectiveDeadline(t as never);
       const list = entryChecklist({
         status,

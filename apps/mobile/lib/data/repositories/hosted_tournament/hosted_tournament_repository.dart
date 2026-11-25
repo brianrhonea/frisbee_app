@@ -2,6 +2,7 @@ import '../../../domain/models/app_user.dart';
 import '../../../domain/models/group_tournament.dart';
 import '../../../domain/models/hosted_tournament.dart';
 import '../../../domain/models/live_draft.dart';
+import '../../../domain/models/team.dart' show Division;
 import '../../../domain/tournament_engine/progress.dart';
 import '../../../utils/result.dart';
 
@@ -135,6 +136,19 @@ abstract class HostedTournamentRepository {
 
   /// The host invites a team, or a team admin applies.
   Future<Result<void>> saveEntry(String tournamentId, TournamentEntry entry);
+
+  /// A new event's host team enters it (the form's "Enter [team] in this
+  /// event"): accepted and seeded in the division matching [division]
+  /// (else the first), with [captainId] its captain. Its fee is waived
+  /// (HostedTournament.feeFor). Written with the host's own rights, so it
+  /// works while the event is still a draft.
+  Future<Result<void>> enterHostTeam(
+    String tournamentId, {
+    required String teamId,
+    required String teamName,
+    required Division division,
+    required String captainId,
+  });
 
   /// The host accepts an entry: it gets a seed (last) in its division and
   /// its captains report scores.

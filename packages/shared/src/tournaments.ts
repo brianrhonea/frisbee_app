@@ -328,6 +328,8 @@ export const createTournamentRequestSchema = z.strictObject({
   hostId: z.string().min(1).max(128),
   kind: z.enum(hostedKinds),
   entryType: z.enum(entryTypes),
+  /** Enter the host team in its own event (accepted, in the division matching its own; no fee). Teams-entry events only. */
+  enterHost: z.boolean().optional(),
   ...detailsShape,
 });
 export type CreateTournamentInput = z.output<typeof createTournamentRequestSchema>;
@@ -774,6 +776,35 @@ export const entryFields = (c: EntryChoice): { entryType: TournamentEntryType; t
 /** What a team pays to enter (bid fee or spot fee), if anything. */
 export function spotFee(t: Pick<TournamentDoc, "entryType" | "teamEntry" | "bidFee" | "teamFee">): FeeDoc | null {
   return t.entryType === "players" ? (t.teamEntry ? (t.teamFee ?? null) : null) : t.bidFee;
+}
+
+/**
+ * The fee [teamId] pays to enter: the spot fee, except for the host's own
+ * team, which plays its own event for free (HostedTournament.feeFor in
+ * the app).
+ */
+export function teamFee(
+  t: Pick<TournamentDoc, "entryType" | "teamEntry" | "bidFee" | "teamFee"> & { hostId?: string | null },
+  teamId: string,
+): FeeDoc | null {
+  return t.hostId && teamId === t.hostId ? null : spotFee(t);
+}
+
+/**
+ * A new event's starting divisions and level from the team hosting it:
+ * its own division, and its level (club, college, youth) unless the event
+ * is a league, which keeps "league". Null for groups and organizations,
+ * which have no division.
+ */
+export function hostDefaults(
+  host: { kind?: string | null; division?: string | null; level?: string | null },
+  kind: HostedKind,
+): { division: Division; level: CompetitionLevel } | null {
+  if ((host.kind ?? "team") !== "team") return null;
+  const division = divisions.find((d) => d === host.division);
+  const level = competitionLevels.find((l) => l === host.level);
+  if (!division || !level) return null;
+  return { division, level: kind === "league" ? "league" : level };
 }
 
 const dayMs = 24 * 60 * 60 * 1000;

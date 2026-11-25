@@ -4,6 +4,19 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.59.3 — 2026-11-24
+
+- Hosting from a team: the form starts with the team's division and
+  level ticked, and "Enter <team> in this event" (on by default) puts
+  the team in its own event, with no fee.
+- The host's team shows "Host · no fee"; it isn't asked to pay.
+- Tournament cards show spots left per division ("Mixed: 3 left").
+- The Captains' channel button shows only to organizers and the captains
+  picked with a roster; other team admins message the organizers about
+  their team.
+- Paying needs the roster's minimum first, and confirms the team's spot
+  (the reason shows on the Pay button until then).
+
 ## 0.59.2 — 2026-11-24
 
 - Pay: when a fee can't be paid online, the reason shows (the host isn't

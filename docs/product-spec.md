@@ -1471,6 +1471,26 @@ Out of scope: payments, meeting recording, USA Ultimate data.
     on the website's `/staff` only (staff tools). Tests: shared
     `registration_window.test.ts`, API `tournaments.test.ts`,
     `payments.test.ts`; app `hosted_tournaments_test.dart`.
+83. The host team in its own event (2026-11-24): the form starts with
+    the host team's division and level (`hostDefaults`), and "Enter
+    <team> in this event" (on by default) enters it, accepted, with no
+    fee (`teamFee`, "Host · no fee"): [x] app (`enterHostTeam`); [x]
+    website (`enterHost` on create). Tests: API `tournaments.test.ts`,
+    `payments.test.ts`; functions `tournament.test.ts`.
+84. Spots left per division on tournament cards (`spotsLines`): [x] app
+    (`TournamentSpots.lines`); [x] website (`SpotsLeft`). Fixtures
+    `discover/spots.json`.
+85. Paying confirms a spot (2026-11-24): Pay waits for the roster's
+    minimum and a spot (`teamPayProblem`, shown as the Pay button's
+    reason), and a paid team is accepted: [x] app; [x] website (both
+    show the API's reason). Done screen's Pay opens payment directly on
+    both. Tests: API `payments.test.ts`.
+86. Captains' channel for roster captains only (2026-11-24): [x] app
+    (`inCaptainsChannel`); [x] website (`inCaptainsChannel`). A team's
+    own thread keeps its admins. Tests: API `tournament_chats.test.ts`,
+    functions `chat_members.test.ts`.
+87. Your own waiting team on the Teams tab: [x] app (`_myEntryTile`);
+    [x] website (Your teams card, already).
 
 Libraries the website may add (none today): a small data cache for API
 reads and mutations, the Firestore web SDK for listeners, and LiveKit's

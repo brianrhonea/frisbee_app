@@ -224,6 +224,17 @@ class HostedTournamentViewModel extends ChangeNotifier {
   /// Whether an entry's captains can message the organizers about it.
   static bool inChats(TournamentEntry e) => _chatStatuses.contains(e.status);
 
+  /// Whether the user is in the Captains' channel: an organizer, or one of
+  /// the captains picked with an entered team's roster (team admins who
+  /// aren't captains only have their team's own thread).
+  bool get inCaptainsChannel =>
+      isManager ||
+      myChatEntries.any(
+        (e) =>
+            e.captainIds.contains(_uid) &&
+            _myTeams.any((t) => t.id == e.teamId),
+      );
+
   /// Whether to show the chats with the organizers: the API is there, the
   /// tournament is out, and the user organizes it or captains a team in it.
   bool get offersChats =>
@@ -640,7 +651,7 @@ class HostedTournamentViewModel extends ChangeNotifier {
   /// Unpaid past the entry deadline (effectiveDeadline, as the website).
   bool isOverdue(String teamId) {
     final t = _tournament;
-    if (t?.spotFee == null) return false;
+    if (t?.feeFor(teamId) == null) return false;
     return !isPaid(teamId) && _now().isAfter(t!.effectiveDeadline);
   }
 
@@ -653,7 +664,7 @@ class HostedTournamentViewModel extends ChangeNotifier {
   /// Whether [teamId] pays to enter as a team: not a league team drafted
   /// from players who signed up (they each pay their own entry fee).
   bool owesSpotFee(String teamId) =>
-      _tournament?.spotFee != null &&
+      _tournament?.feeFor(teamId) != null &&
       !(_tournament!.takesPlayers &&
           teamId.startsWith(TournamentDivision.leagueTeamPrefix));
 

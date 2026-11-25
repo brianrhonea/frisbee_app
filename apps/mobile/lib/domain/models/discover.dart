@@ -3,16 +3,34 @@
 // reading progress (F9). Mirrors packages/shared/src/discover.ts, checked
 // by test/shared_fixtures/discover_fixtures_test.dart.
 
+import 'team.dart' show Division;
 import 'team_event.dart';
 
 /// Team spots in an event open for registration: [left] of [cap] across
 /// its divisions (each division's cap less its accepted teams). The API
 /// works it out for `GET /v1/public/tournaments` (tournamentSpots).
 class TournamentSpots {
-  const TournamentSpots({required this.left, required this.cap});
+  const TournamentSpots({
+    required this.left,
+    required this.cap,
+    this.divisions = const [],
+  });
 
   final int left;
   final int cap;
+
+  /// Each open division's own spots (DivisionSpots in packages/shared).
+  final List<DivisionSpots> divisions;
+
+  /// What a card shows: one line per division when there are two or more
+  /// ("Mixed: 3 left", "Open: full · waitlist"), else [label] (spotsLines).
+  List<String> get lines => divisions.length < 2
+      ? [label]
+      : [
+          for (final d in divisions)
+            '${d.division.label}: '
+                '${d.left <= 0 ? 'full · waitlist' : '${d.left} left'}',
+        ];
 
   /// No spots left: teams can still apply to the waitlist.
   bool get isFull => left <= 0;
@@ -29,15 +47,52 @@ class TournamentSpots {
     final left = json['left'];
     final cap = json['cap'];
     if (left is! num || cap is! num) return null;
-    return TournamentSpots(left: left.toInt(), cap: cap.toInt());
+    final each = json['divisions'];
+    return TournamentSpots(
+      left: left.toInt(),
+      cap: cap.toInt(),
+      divisions: [
+        if (each is List)
+          for (final d in each) ?DivisionSpots.fromJson(d),
+      ],
+    );
   }
 
   @override
   bool operator ==(Object other) =>
-      other is TournamentSpots && other.left == left && other.cap == cap;
+      other is TournamentSpots &&
+      other.left == left &&
+      other.cap == cap &&
+      other.lines.join('|') == lines.join('|');
 
   @override
-  int get hashCode => Object.hash(left, cap);
+  int get hashCode => Object.hash(left, cap, lines.join('|'));
+}
+
+/// One division's spots: its cap less its accepted teams.
+class DivisionSpots {
+  const DivisionSpots({
+    required this.division,
+    required this.left,
+    required this.cap,
+  });
+
+  final Division division;
+  final int left;
+  final int cap;
+
+  static DivisionSpots? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final division = Division.values.asNameMap()[json['division']];
+    final left = json['left'];
+    final cap = json['cap'];
+    if (division == null || left is! num || cap is! num) return null;
+    return DivisionSpots(
+      division: division,
+      left: left.toInt(),
+      cap: cap.toInt(),
+    );
+  }
 }
 
 /// A public team event (a pickup game, a practice open to all) from

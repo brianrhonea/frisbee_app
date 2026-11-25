@@ -62,11 +62,15 @@ export function missingFor(a: {
   payment: Data | undefined;
   /** A player's signup rather than a team's entry. */
   player: boolean;
+  /** The entry's team (its doc id): the host's own team has no fee. */
+  teamId?: string;
 }): Array<"roster" | "payment"> {
   const out: Array<"roster" | "payment"> = [];
   const mixed = a.t.entryType === "players" && a.t.teamEntry === true;
   if (!a.player && !mixed && strings(a.entry?.roster).length < a.minRoster) out.push("roster");
-  if (owes(a.player ? playerFeeOf(a.t) : teamFeeOf(a.t)) && a.payment?.paid !== true) out.push("payment");
+  // The host's own team has no fee (teamFee in packages/shared).
+  const hostTeam = !a.player && !!a.teamId && a.teamId === a.t.hostId;
+  if (!hostTeam && owes(a.player ? playerFeeOf(a.t) : teamFeeOf(a.t)) && a.payment?.paid !== true) out.push("payment");
   return out;
 }
 

@@ -51,8 +51,9 @@ describe("the Captains' channel", () => {
     expect(conv).toMatchObject({ kind: "tournament", tournamentId: "t1", tournamentChat: "captains", name: "Spring Fling · Captains", createdBy: "" });
     // Organizers first, then captains in entry order.
     expect(conv.participants.slice(0, 2)).toEqual(["dir", "vol"]);
-    expect([...conv.participants].sort()).toEqual(["adm2", "cap1", "dir", "vol"]);
-    expect(conv.names).toEqual({ dir: "Dana", vol: "Vic", cap1: "Cam", adm2: "Ada" });
+    // Only the captains picked with the roster: Bolt's admin, who isn't one, isn't in.
+    expect([...conv.participants].sort()).toEqual(["cap1", "dir", "vol"]);
+    expect(conv.names).toEqual({ dir: "Dana", vol: "Vic", cap1: "Cam" });
     expect(docOf("tournaments/t1/chats/captains")).toMatchObject({ conversationId: res.json().id, kind: "captains" });
   });
 
@@ -60,8 +61,14 @@ describe("the Captains' channel", () => {
     const id = (await captains("dir")).json().id;
     store.put("tournaments/t1/entries/haze", { teamName: "Haze", status: "withdrawn", captainIds: ["cap1"] });
     store.put("tournaments/t1/entries/gone", { teamName: "Gone", status: "waitlisted", captainIds: ["cap3"] });
-    expect((await captains("adm2")).json().id).toBe(id);
-    expect([...docOf(`conversations/${id}`).participants].sort()).toEqual(["adm2", "cap3", "dir", "vol"]);
+    expect((await captains("cap3")).json().id).toBe(id);
+    expect([...docOf(`conversations/${id}`).participants].sort()).toEqual(["cap3", "dir", "vol"]);
+  });
+
+  it("refuses a team's admin who isn't one of its roster's captains", async () => {
+    expect((await captains("adm2")).status).toBe(403);
+    // They still have their team's own thread with the organizers.
+    expect((await team("adm2", "bolt")).status).toBe(200);
   });
 
   it("refuses players who aren't captains, withdrawn captains and outsiders", async () => {
@@ -78,7 +85,7 @@ describe("the Captains' channel", () => {
   });
 
   it("two first opens at once share one conversation", async () => {
-    const [a, b] = await Promise.all([captains("cap1"), captains("adm2")]);
+    const [a, b] = await Promise.all([captains("cap1"), captains("dir")]);
     expect(a.json().id).toBe(b.json().id);
     expect(docOf("tournaments/t1/chats/captains").conversationId).toBe(a.json().id);
   });

@@ -864,7 +864,7 @@ async function remindEntries(tournamentId: string, t: Data, now: number) {
   const entries = await db.collection(`tournaments/${tournamentId}/entries`).where("status", "in", active).get();
   for (const e of entries.docs) {
     const entry = e.data();
-    const missing = missingFor({ t, entry, minRoster: minRoster.get(String(entry.divisionId ?? "")) ?? 7, payment: payments.get(e.id), player: false });
+    const missing = missingFor({ t, entry, minRoster: minRoster.get(String(entry.divisionId ?? "")) ?? 7, payment: payments.get(e.id), player: false, teamId: e.id });
     if (missing.length === 0) continue;
     missingTeams++;
     if (!(await firstTime(`entry_${tournamentId}_${e.id}_${kind}_${deadline}`))) continue;

@@ -244,6 +244,7 @@ dialog.dialog:has(.live-dialog) { width: min(100% - 32px, 480px); }
 /* Spots left on a tournament card (F10): turf while there is room, neutral when full; never amber. */
 .row-card small.spots-left { color: var(--accent-ink); font-weight: 700; }
 .row-card small.spots-left.spots-full { color: var(--muted); font-weight: 500; }
+.row-card .spots-lines { display: grid; gap: 1px; }
 
 /* A league's schedule a week at a time: ‹ Week 3 › (turf arrows). */
 .league-week-nav { display: flex; align-items: center; gap: 8px; }

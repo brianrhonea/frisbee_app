@@ -1261,7 +1261,10 @@ class _TeamsTabState extends State<_TeamsTab> {
                       paymentStatusLabel(
                         vm.paymentOf(e.teamId),
                         overdue: vm.isOverdue(e.teamId),
-                      ),
+                      )
+                    else if (e.teamId == vm.tournament?.hostId &&
+                        (vm.tournament?.spotFee?.amountCents ?? 0) > 0)
+                      'Host · no fee',
                   ].join(' · '),
                   style: TextStyle(fontSize: 12.5, color: c.muted),
                 ),
@@ -1315,6 +1318,50 @@ class _TeamsTabState extends State<_TeamsTab> {
     );
   }
 
+  /// The viewer's own team waiting on the host: its name and where it
+  /// stands ("Applied · waiting on the host", roster and fee).
+  Widget _myEntryTile(TournamentEntry e) {
+    final c = AppColors.of(context);
+    final d = vm.division;
+    final min = (vm.tournament?.mixedEntry ?? false)
+        ? 0
+        : (d?.effectiveMinRoster ?? 0);
+    final fee = vm.owesSpotFee(e.teamId) ? vm.tournament?.spotFee : null;
+    return Padding(
+      key: ValueKey('my-entry-${e.teamId}'),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            e.teamName,
+            style: TextStyle(
+              fontSize: 14.5,
+              fontWeight: FontWeight.w700,
+              color: c.ink,
+            ),
+          ),
+          Text(
+            [
+              switch (e.status) {
+                EntryStatus.applied => 'Applied · waiting on the host',
+                EntryStatus.invited => 'Invited · waiting on you',
+                _ => e.status.label,
+              },
+              if (min > 0) '${e.roster.length} of $min players',
+              if (fee != null)
+                paymentStatusLabel(
+                  vm.paymentOf(e.teamId),
+                  overdue: vm.isOverdue(e.teamId),
+                ),
+            ].join(' · '),
+            style: TextStyle(fontSize: 12.5, color: c.muted),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// The host's note on a team's payment ("Check #1042").
   Widget _noteButton(BuildContext context, String teamId) {
     final note = vm.paymentOf(teamId)?.note ?? '';
@@ -1360,6 +1407,8 @@ class _TeamsTabState extends State<_TeamsTab> {
     // Teams that withdrew (or were removed) are out: the host doesn't
     // decide on them again. They can apply again, or be invited.
     final out = vm.entriesIn(d.id, status: EntryStatus.declined);
+    bool mineIn(TournamentEntry e) =>
+        vm.myEntries.any((m) => m.teamId == e.teamId);
     Widget seedTile(String id, int index) {
       // Drafted teams' players pay one by one, not as a team.
       final fee = d.draftedIds.contains(id) || !vm.owesSpotFee(id)
@@ -1690,16 +1739,24 @@ class _TeamsTabState extends State<_TeamsTab> {
                 const _Section('Declined'),
                 RowsCard(children: [for (final e in out) _entryTile(e)]),
               ],
-            ] else if (pending.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 16),
-                child: Text(
-                  '${pending.length} more '
-                  '${pending.length == 1 ? 'team is' : 'teams are'} '
-                  'waiting on the host.',
-                  style: TextStyle(fontSize: 12.5, color: c.muted),
+            ] else ...[
+              // The viewer's own teams waiting here: their card and status.
+              if (pending.where(mineIn).toList() case final mine
+                  when mine.isNotEmpty) ...[
+                const _Section('Your team'),
+                RowsCard(children: [for (final e in mine) _myEntryTile(e)]),
+              ],
+              if (pending.where((e) => !mineIn(e)).length case final n
+                  when n > 0)
+                Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: Text(
+                    '$n more ${n == 1 ? 'team is' : 'teams are'} '
+                    'waiting on the host.',
+                    style: TextStyle(fontSize: 12.5, color: c.muted),
+                  ),
                 ),
-              ),
+            ],
           ],
         ),
       ),
@@ -2904,9 +2961,13 @@ class OrganizerChatsCard extends StatelessWidget {
                   vm.isManager
                       ? 'Answer everyone in the Captains\' channel, or '
                             'message a team from its row on the Teams tab.'
-                      : 'Ask the organizers in the Captains\' channel, '
+                      : vm.inCaptainsChannel
+                      ? 'Ask the organizers in the Captains\' channel, '
                             'where every team sees the answer, or message '
-                            'them privately about your team.',
+                            'them privately about your team.'
+                      : 'Message the organizers privately about your team. '
+                            'The Captains\' channel is for the captains '
+                            'picked with each roster.',
                   style: theme.textTheme.bodySmall,
                 ),
                 const SizedBox(height: 8),
@@ -2914,14 +2975,15 @@ class OrganizerChatsCard extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    FilledButton.tonalIcon(
-                      key: const Key('captains-channel'),
-                      onPressed: busy
-                          ? null
-                          : () => openTournamentChat(context, vm, null),
-                      icon: const Icon(Icons.forum_outlined),
-                      label: const Text("Captains' channel"),
-                    ),
+                    if (vm.inCaptainsChannel)
+                      FilledButton.tonalIcon(
+                        key: const Key('captains-channel'),
+                        onPressed: busy
+                            ? null
+                            : () => openTournamentChat(context, vm, null),
+                        icon: const Icon(Icons.forum_outlined),
+                        label: const Text("Captains' channel"),
+                      ),
                     if (!vm.isManager)
                       for (final e in mine)
                         OutlinedButton.icon(

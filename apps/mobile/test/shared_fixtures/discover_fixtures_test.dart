@@ -5,6 +5,7 @@
 // fixture_file.dart.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/domain/models/discover.dart';
+import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/ui/learn/learn_content.dart';
 
 import 'fixture_file.dart';
@@ -30,6 +31,42 @@ void main() {
               'cap': cap,
               'label': s.label,
               'full': s.isFull,
+              'lines': s.lines,
+            };
+          }(),
+        for (final (name, each) in [
+          ('one division', [(Division.mixed, 3, 8)]),
+          ('two divisions', [(Division.mixed, 7, 8), (Division.open, 0, 8)]),
+          (
+            'three divisions',
+            [
+              (Division.open, 1, 4),
+              (Division.women, 4, 4),
+              (Division.masters, 2, 6),
+            ],
+          ),
+        ])
+          () {
+            final divisions = [
+              for (final (d, left, cap) in each)
+                DivisionSpots(division: d, left: left, cap: cap),
+            ];
+            final s = TournamentSpots(
+              left: divisions.fold(0, (n, d) => n + d.left),
+              cap: divisions.fold(0, (n, d) => n + d.cap),
+              divisions: divisions,
+            );
+            return {
+              'name': name,
+              'left': s.left,
+              'cap': s.cap,
+              'divisions': [
+                for (final d in divisions)
+                  {'division': d.division.name, 'left': d.left, 'cap': d.cap},
+              ],
+              'label': s.label,
+              'full': s.isFull,
+              'lines': s.lines,
             };
           }(),
       ],

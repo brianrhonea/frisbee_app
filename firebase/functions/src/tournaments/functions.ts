@@ -219,7 +219,7 @@ export const chatMembers = onDocumentWritten("tournaments/{tournamentId}/entries
   const organizers = organizersOf(host);
   if (teamPtr.exists) {
     const team = (await db.doc(`teams/${teamId}`).get()).data();
-    await setMembers(String(teamPtr.data()?.conversationId ?? ""), capMembers([...organizers, ...captainsOf(after, team)]));
+    await setMembers(String(teamPtr.data()?.conversationId ?? ""), capMembers([...organizers, ...captainsOf(after, team, true)]));
   }
   if (captainsPtr.exists) {
     const entries = (await db.collection(`tournaments/${tournamentId}/entries`).limit(500).get()).docs.filter((d) =>

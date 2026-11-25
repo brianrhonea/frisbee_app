@@ -6,28 +6,109 @@
       "left": 5,
       "cap": 16,
       "label": "5 spots left",
-      "full": false
+      "full": false,
+      "lines": [
+        "5 spots left"
+      ]
     },
     {
       "name": "one left",
       "left": 1,
       "cap": 8,
       "label": "1 spot left",
-      "full": false
+      "full": false,
+      "lines": [
+        "1 spot left"
+      ]
     },
     {
       "name": "full",
       "left": 0,
       "cap": 8,
       "label": "Full · waitlist",
-      "full": true
+      "full": true,
+      "lines": [
+        "Full · waitlist"
+      ]
     },
     {
       "name": "over full",
       "left": -1,
       "cap": 4,
       "label": "Full · waitlist",
-      "full": true
+      "full": true,
+      "lines": [
+        "Full · waitlist"
+      ]
+    },
+    {
+      "name": "one division",
+      "left": 3,
+      "cap": 8,
+      "divisions": [
+        {
+          "division": "mixed",
+          "left": 3,
+          "cap": 8
+        }
+      ],
+      "label": "3 spots left",
+      "full": false,
+      "lines": [
+        "3 spots left"
+      ]
+    },
+    {
+      "name": "two divisions",
+      "left": 7,
+      "cap": 16,
+      "divisions": [
+        {
+          "division": "mixed",
+          "left": 7,
+          "cap": 8
+        },
+        {
+          "division": "open",
+          "left": 0,
+          "cap": 8
+        }
+      ],
+      "label": "7 spots left",
+      "full": false,
+      "lines": [
+        "Mixed: 7 left",
+        "Open: full · waitlist"
+      ]
+    },
+    {
+      "name": "three divisions",
+      "left": 7,
+      "cap": 14,
+      "divisions": [
+        {
+          "division": "open",
+          "left": 1,
+          "cap": 4
+        },
+        {
+          "division": "women",
+          "left": 4,
+          "cap": 4
+        },
+        {
+          "division": "masters",
+          "left": 2,
+          "cap": 6
+        }
+      ],
+      "label": "7 spots left",
+      "full": false,
+      "lines": [
+        "Open: 1 left",
+        "Women: 4 left",
+        "Masters: 2 left"
+      ]
     }
   ]
 }

@@ -518,6 +518,11 @@ class HostedTournament {
   /// What a team pays to enter (its bid fee or spot fee), if anything.
   BidFee? get spotFee => takesPlayers ? (teamEntry ? teamFee : null) : bidFee;
 
+  /// What [teamId] pays to enter: [spotFee], except for the host's own
+  /// team, which plays its event for free (teamFee in packages/shared).
+  BidFee? feeFor(String? teamId) =>
+      teamId != null && teamId == hostId ? null : spotFee;
+
   /// What kind of event it is, for lists.
   HostedType get type => isLeague
       ? HostedType.league

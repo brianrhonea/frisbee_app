@@ -43,11 +43,15 @@ const active = (entry: Data | null | undefined) =>
 export const organizersOf = (host: Data | null): string[] =>
   host ? strings(host.memberIds).filter((u) => can(host, u, "manageEvents")) : [];
 
-/** An entry's captains: its captainIds and the team's admins (teamAdmin()), all still on the team. */
-export function captainsOf(entry: Data | null | undefined, team: Data | null): string[] {
+/**
+ * An entry's captains, still on the team: its captainIds (picked with the
+ * roster). The Captains' channel has only those; a team's own thread with
+ * the organizers also has the team's admins (teamAdmin()) ([withAdmins]).
+ */
+export function captainsOf(entry: Data | null | undefined, team: Data | null, withAdmins = false): string[] {
   if (!entry || !active(entry) || !team) return [];
   const members = strings(team.memberIds);
-  const admins = members.filter((u) => can(team, u, "manageTeam"));
+  const admins = withAdmins ? members.filter((u) => can(team, u, "manageTeam")) : [];
   return [...new Set([...strings(entry.captainIds).filter((u) => members.includes(u)), ...admins])];
 }
 
@@ -98,7 +102,7 @@ export class TournamentChatService {
       const [entry, team] = await this.store.getAll([p.entry(tournamentId, teamId!), p.team(teamId!)]);
       const teamName = String(entry?.teamName ?? team?.name ?? "");
       return {
-        participants: cap([...organizers, ...captainsOf(entry, team)]),
+        participants: cap([...organizers, ...captainsOf(entry, team, true)]),
         name: teamChatName(teamName, name),
         hasEntry: active(entry),
       };

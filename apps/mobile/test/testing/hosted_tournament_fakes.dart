@@ -421,6 +421,18 @@ class FakeHostedTournamentRepository implements HostedTournamentRepository {
   }
 
   @override
+  Future<Result<void>> enterHostTeam(
+    String tournamentId, {
+    required String teamId,
+    required String teamName,
+    required Division division,
+    required String captainId,
+  }) async {
+    log.add('enter host $teamId ${division.name} $captainId');
+    return const Result.ok(null);
+  }
+
+  @override
   Future<Result<void>> acceptEntry(
     String tournamentId,
     TournamentDivision division,

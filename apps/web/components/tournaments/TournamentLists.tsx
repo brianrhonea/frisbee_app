@@ -15,6 +15,7 @@ import {
   hostedTypeLabels,
   publishedStatuses,
   spotsLabel,
+  spotsLines,
   type TournamentDoc,
   type TournamentSpots,
   divisionLabel,
@@ -60,6 +61,19 @@ export type CardTournament = Pick<
  * the viewer's own to-dos).
  */
 export function SpotsLeft({ spots }: { spots: TournamentSpots }) {
+  // A line per division when there are two or more ("Mixed: 3 left").
+  if (spots.divisions && spots.divisions.length > 1) {
+    const lines = spotsLines(spots);
+    return (
+      <span className="spots-lines">
+        {spots.divisions.map((d, i) => (
+          <small key={d.division} className={`spots-left${d.left <= 0 ? " spots-full" : ""}`}>
+            {lines[i]}
+          </small>
+        ))}
+      </span>
+    );
+  }
   return <small className={`spots-left${spots.left <= 0 ? " spots-full" : ""}`}>{spotsLabel(spots)}</small>;
 }
 

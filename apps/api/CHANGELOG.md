@@ -7,6 +7,25 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.48.0 — 2026-11-24
+
+- Hosting: `POST /v1/tournaments` takes `enterHost`. A team hosting an
+  event that teams enter goes in, accepted and seeded, in the opened
+  division matching its own (else the first), with the caller as captain.
+  Groups and players' events ignore it; leagues check the team's fit.
+- The host's own team has no fee (`teamFee` in shared): pay options say
+  so, the Finish entry list and the payment reminder skip it.
+- Paying confirms a spot: a team waiting on the host can pay once its
+  roster reaches the division's minimum and its division has room
+  (`teamPayProblem`; the pay options' reason says which), and a paid
+  applied or waitlisted team is accepted and seeded while registration
+  is open.
+- `GET /v1/public/tournaments`: `spots` also has `divisions`, each open
+  division's own spots left.
+- Tournament chats: the Captains' channel holds only the captains picked
+  with each team's roster (`captainIds`), not every team admin; a team's
+  own thread with the organizers still has its admins.
+
 ## 0.47.1 — 2026-11-24
 
 - Setting up payouts checks the recent sign-in before anything else, so a

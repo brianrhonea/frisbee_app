@@ -33,6 +33,11 @@ describe("what's missing", () => {
     expect(missingFor({ t, entry: { roster: ["a", "b"] }, minRoster: 7, payment: undefined, player: false })).toEqual(["roster", "payment"]);
     expect(missingFor({ t, entry: { roster: Array.from({ length: 7 }, (_, i) => `p${i}`) }, minRoster: 7, payment: { paid: true }, player: false })).toEqual([]);
   });
+  it("the host's own team has no fee", () => {
+    const hosted = { ...t, hostId: "host" };
+    expect(missingFor({ t: hosted, entry: { roster: [] }, minRoster: 2, payment: undefined, player: false, teamId: "host" })).toEqual(["roster"]);
+    expect(missingFor({ t: hosted, entry: { roster: [] }, minRoster: 2, payment: undefined, player: false, teamId: "other" })).toEqual(["roster", "payment"]);
+  });
   it("teams reserving spots fill their roster later; free events owe nothing", () => {
     const mixed = { entryType: "players", teamEntry: true, bidFee: fee(), teamFee: fee() };
     expect(missingFor({ t: mixed, entry: {}, minRoster: 7, payment: undefined, player: false })).toEqual(["payment"]);

@@ -34,6 +34,7 @@ import {
   tournamentFormats,
   tournamentLimits,
   usualFormat,
+  hostDefaults,
   visibilityLabels,
   type CompetitionLevel,
   type EngineSeason,
@@ -105,6 +106,10 @@ interface FormState {
   teamFeeAmount: string;
   format: FormFormat;
   wanted: Division[];
+  /** "Enter <team> in this event": the host team joins its own event (accepted, no fee). New events only. */
+  enterHost: boolean;
+  /** The host's defaults were applied, or the divisions changed by hand: they aren't applied again. */
+  touched?: boolean;
   /** When rosters and fees are due (entryDeadline); the fee's due date follows it. */
   entryDeadline: Date | null;
   director: DirectorForm | null;
@@ -144,6 +149,7 @@ function blank(type: HostedType | null): FormState {
     teamFeeAmount: "",
     format: usualFormat({ kind, startsOn: start, endsOn }),
     wanted: ["mixed"],
+    enterHost: true,
     entryDeadline: null,
     director: null,
   };
@@ -181,6 +187,7 @@ function filled(t: TournamentDoc, divisions: Array<Doc<DivisionDoc>>): FormState
     teamFeeAmount: t.teamFee ? amountOf(t.teamFee.amountCents) : "",
     format,
     wanted: divisions.map((d) => d.division),
+    enterHost: false,
     entryDeadline: t.entryDeadline ? new Date(t.entryDeadline) : t.bidFee?.dueAt ? new Date(t.bidFee.dueAt) : null,
     director: t.director ? { uid: t.director.uid ?? null, name: t.director.name, email: t.director.email ?? "", phone: t.director.phone ?? "" } : null,
   };
@@ -248,7 +255,7 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
   const isNew = !tournamentId;
   const existing = useLiveDoc<TournamentDoc>(user && tournamentId ? `tournaments/${tournamentId}` : null);
   const hostKey = hostId ?? existing.data?.hostId ?? null;
-  const host = useLiveDoc<TeamDoc & { official?: boolean }>(user && hostKey ? `teams/${hostKey}` : null);
+  const host = useLiveDoc<TeamDoc & { official?: boolean; division?: string; level?: string }>(user && hostKey ? `teams/${hostKey}` : null);
   const divRows = useLiveQuery<DivisionDoc>(user && tournamentId ? `tournaments/${tournamentId}/divisions` : null, [], tournamentId ?? "");
   const entryRows = useLiveQuery<EntryDoc>(user && tournamentId ? `tournaments/${tournamentId}/entries` : null, [], tournamentId ?? "");
   // Only managers read signups; a division someone has signed up for stays open.
@@ -263,6 +270,16 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
   const { busy, error, run } = useAction();
   // A new event created as a draft whose Publish then failed: further saves update it (the app's createdDraftId).
   const [createdId, setCreatedId] = useState<string | null>(null);
+
+  // A team hosting a new event likely hosts for its own division and level
+  // (hostDefaults, as the app): ticked until the user changes them.
+  const hostData = host.data;
+  useEffect(() => {
+    if (!isNew || !hostData) return;
+    const own = hostDefaults({ kind: hostData.kind ?? "team", division: hostData.division, level: hostData.level }, form?.kind ?? "tournament");
+    if (!own) return;
+    setForm((f) => (f && !f.touched ? { ...f, touched: true, wanted: [own.division], format: { ...f.format, level: own.level } } : f));
+  }, [isNew, hostData, form?.kind]);
 
   useEffect(() => {
     if (form || !existing.data || !divRows.data) return;
@@ -289,6 +306,11 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
   const set = (patch: Partial<FormState>) => setForm({ ...f, ...patch });
   const league = f.kind === "league";
   const players = f.entryType === "players";
+  // The host team in its own event: a new event, hosted by a team, that teams enter.
+  const hostTeam = host.data && (host.data.kind ?? "team") === "team" ? host.data : null;
+  const canEnterHost = isNew && !createdId && !!hostTeam && !players;
+  const hostDivision: Division | null =
+    !hostTeam || f.wanted.length === 0 ? null : f.wanted.includes(hostTeam.division as Division) ? (hostTeam.division as Division) : (allDivisions.find((d) => f.wanted.includes(d)) ?? null);
   const choice = entryChoiceOf(f);
   const s = f.format.settings;
   const editable = statusIndex(existing.data?.status ?? "draft") < statusIndex("scheduled");
@@ -319,7 +341,13 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
     if (problem) return;
     let id = tournamentId ?? createdId;
     if (isNew && !createdId) {
-      const res = await run<{ id: string }>("/v1/tournaments", "POST", { hostId, kind: f.kind, entryType: f.entryType, ...requestOf(f) });
+      const res = await run<{ id: string }>("/v1/tournaments", "POST", {
+        hostId,
+        kind: f.kind,
+        entryType: f.entryType,
+        ...(canEnterHost && f.enterHost && { enterHost: true }),
+        ...requestOf(f),
+      });
       if (!res.ok) return;
       id = res.value.id;
     } else if (id) {
@@ -686,7 +714,7 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
                     type="checkbox"
                     checked={on}
                     disabled={!!reason}
-                    onChange={(e) => set({ wanted: e.target.checked ? [...f.wanted, d] : f.wanted.filter((x) => x !== d) })}
+                    onChange={(e) => set({ touched: true, wanted: e.target.checked ? [...f.wanted, d] : f.wanted.filter((x) => x !== d) })}
                   />
                   <span>
                     {levelLabels[f.format.level]} {divisionLabels[d]}
@@ -695,6 +723,18 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
                 </label>
               );
             })}
+            {canEnterHost && (
+              <label className="switch-row">
+                <input type="checkbox" checked={f.enterHost} onChange={(e) => set({ enterHost: e.target.checked })} />
+                <span>
+                  Enter {host.data?.name ?? "your team"} in this event
+                  <small className="muted">
+                    {" "}
+                    {hostDivision ? `Your team goes into ${levelLabels[f.format.level]} ${divisionLabels[hostDivision]}. No fee for the host.` : "Open a division first."}
+                  </small>
+                </span>
+              </label>
+            )}
           </fieldset>
         </section>
       )}

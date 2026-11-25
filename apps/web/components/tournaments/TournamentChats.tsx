@@ -25,6 +25,12 @@ export function myChatEntries(s: TournamentState): Entry[] {
   );
 }
 
+/** In the Captains' channel: an organizer, or a captain picked with an entered team's roster (inCaptainsChannel in the app). */
+export function inCaptainsChannel(s: TournamentState): boolean {
+  const uid = s.user?.uid ?? "";
+  return s.manager || myChatEntries(s).some((e) => e.captainIds.includes(uid) && s.myTeams.some((m) => m.id === e.id));
+}
+
 function useOpenChat(user: User | null) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -48,6 +54,7 @@ function useOpenChat(user: User | null) {
 export function OrganizerChats({ s }: { s: TournamentState }) {
   const { busy, error, open } = useOpenChat(s.user ?? null);
   const mine = myChatEntries(s);
+  const captain = inCaptainsChannel(s);
   if (!s.user || !s.t || s.t.status === "draft" || (!s.manager && mine.length === 0)) return null;
   const id = encodeURIComponent(s.id);
   return (
@@ -56,12 +63,16 @@ export function OrganizerChats({ s }: { s: TournamentState }) {
       <p className="muted small">
         {s.manager
           ? "Answer everyone in the Captains' channel, or message a team from its row on the Teams tab."
-          : "Ask the organizers in the Captains' channel, where every team sees the answer, or message them privately about your team."}
+          : captain
+            ? "Ask the organizers in the Captains' channel, where every team sees the answer, or message them privately about your team."
+            : "Message the organizers privately about your team. The Captains' channel is for the captains picked with each roster."}
       </p>
       <div className="home-actions">
-        <button type="button" className="btn btn-small" disabled={busy} onClick={() => void open(tournamentChatPaths.captains(id))}>
-          Captains&apos; channel
-        </button>
+        {captain && (
+          <button type="button" className="btn btn-small" disabled={busy} onClick={() => void open(tournamentChatPaths.captains(id))}>
+            Captains&apos; channel
+          </button>
+        )}
         {!s.manager &&
           mine.map((e) => (
             <button key={e.id} type="button" className="btn btn-small" disabled={busy} onClick={() => void open(tournamentChatPaths.team(id, encodeURIComponent(e.id)))}>

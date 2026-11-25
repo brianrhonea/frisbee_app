@@ -13,9 +13,11 @@ describe("tournament chat members", () => {
     expect(organizersOf(undefined)).toEqual([]);
   });
 
-  it("captains are the entry's captainIds on the team and its admins, while it's in", () => {
+  it("captains are the entry's captainIds on the team (with its admins for the team's own thread), while it's in", () => {
     expect(captainsOf({ status: "applied", captainIds: ["cap1", "left"] }, haze)).toEqual(["cap1"]);
-    expect(captainsOf({ status: "accepted", captainIds: [] }, bolt)).toEqual(["adm2"]);
+    // The Captains' channel: only the roster's captains, not the team's admins.
+    expect(captainsOf({ status: "accepted", captainIds: [] }, bolt)).toEqual([]);
+    expect(captainsOf({ status: "accepted", captainIds: [] }, bolt, true)).toEqual(["adm2"]);
     expect(captainsOf({ status: "withdrawn", captainIds: ["cap1"] }, haze)).toEqual([]);
     expect(captainsOf({ status: "declined", captainIds: [] }, bolt)).toEqual([]);
     // Invited teams join once they apply.

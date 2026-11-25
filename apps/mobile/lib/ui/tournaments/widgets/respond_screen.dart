@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../domain/models/hosted_tournament.dart';
+import '../../../routing/open_link.dart';
 import '../../../routing/routes.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
@@ -61,7 +62,7 @@ class RespondScreen extends StatelessWidget {
     if (context.canPop()) {
       context.pop();
     } else {
-      context.go(Routes.tournament(viewModel.tournamentId));
+      leaveFor(context, Routes.tournament(viewModel.tournamentId));
     }
   }
 
@@ -566,12 +567,17 @@ class RespondScreen extends StatelessWidget {
                 : list.paid
                 ? 'Paid'
                 : 'Fee to pay',
-            !vm.paymentKnown || list.paid
-                ? null
-                : TextButton(
-                    onPressed: () => vm.goTo(RespondStep.pay),
-                    child: const Text('Pay now'),
-                  ),
+          ),
+        // Pay right here: the payment sheet opens straight away (or it
+        // says why it can't, with other ways to pay).
+        if (vm.owes && vm.paymentKnown && !list.paid)
+          Padding(
+            key: const Key('done-pay'),
+            padding: const EdgeInsets.only(bottom: 8),
+            child: PayOnlineButton(
+              tournamentId: vm.tournamentId,
+              teamId: vm.teamId,
+            ),
           ),
         if (!list.complete && vm.deadline != null)
           Padding(
@@ -583,7 +589,9 @@ class RespondScreen extends StatelessWidget {
           ),
         const SizedBox(height: 20),
         FilledButton(
-          onPressed: () => context.go(Routes.tournament(vm.tournamentId)),
+          key: const Key('respond-go-to-event'),
+          onPressed: () =>
+              leaveFor(context, Routes.tournament(vm.tournamentId)),
           child: const Text('Go to the event'),
         ),
         const SizedBox(height: 8),

@@ -29,11 +29,15 @@ export const activeEntry = (e: Data | undefined | null): boolean => !!e && chatS
 export const organizersOf = (host: Data | undefined | null): string[] =>
   host ? strings(host.memberIds).filter((u) => can(host, u, "manageEvents")) : [];
 
-/** An active entry's captains: its captainIds still on the team, and the team's admins. */
-export function captainsOf(entry: Data | undefined | null, team: Data | undefined | null): string[] {
+/**
+ * An active entry's captains, still on the team: its captainIds (picked
+ * with the roster). The Captains' channel has only those; a team's own
+ * thread also has the team's admins ([withAdmins]), as the API.
+ */
+export function captainsOf(entry: Data | undefined | null, team: Data | undefined | null, withAdmins = false): string[] {
   if (!activeEntry(entry) || !team) return [];
   const members = strings(team.memberIds);
-  const admins = members.filter((u) => can(team, u, "manageTeam"));
+  const admins = withAdmins ? members.filter((u) => can(team, u, "manageTeam")) : [];
   return [...new Set([...strings(entry!.captainIds).filter((u) => members.includes(u)), ...admins])];
 }
 

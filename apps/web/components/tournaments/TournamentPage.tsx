@@ -658,7 +658,7 @@ function YourTeams({ s }: { s: TournamentState }) {
                   <small className="muted">
                     {d ? divisionLabel(d) : ""} · captains: {e.captainIds.map((c) => team?.memberNames?.[c] ?? "a member").join(", ")}
                   </small>
-                  {fee && s.user && ["applied", "accepted", "waitlisted"].includes(e.status) && (
+                  {fee && e.id !== t.hostId && s.user && ["applied", "accepted", "waitlisted"].includes(e.status) && (
                     <PayOnline user={s.user} tournamentId={s.id} teamId={e.id} withStatus />
                   )}
                 </div>
@@ -763,7 +763,8 @@ function TeamsTab({ s }: { s: TournamentState }) {
   const fee = spotFee(s.t);
   const paymentById = new Map(payments.map((x) => [x.id, x]));
   // Drafted teams' players pay one by one, not as a team.
-  const owes = (id: string) => !!fee && fee.amountCents > 0 && !(d.teams ?? []).some((x) => x.id === id);
+  // The host's own team has no fee (teamFee).
+  const owes = (id: string) => !!fee && fee.amountCents > 0 && id !== s.t?.hostId && !(d.teams ?? []).some((x) => x.id === id);
   const deadline = effectiveDeadline(s.t);
   const overdue = (id: string) => !!deadline && Date.now() > deadline.getTime() && paymentById.get(id)?.paid !== true;
   const mixed = mixedEntry(s.t);
@@ -867,6 +868,7 @@ function TeamsTab({ s }: { s: TournamentState }) {
                       {owes(id) && paymentById.get(id)?.paid !== true && <span className={`pill ${overdue(id) ? "hosted-pill-due" : "pill-soft"}`}>Unpaid</span>}
                     </span>
                   )}
+                  {s.manager && fee && fee.amountCents > 0 && id === s.t?.hostId && <small className="muted"> Host · no fee</small>}
                 </span>
               </span>
               {s.manager && s.user && owes(id) && (

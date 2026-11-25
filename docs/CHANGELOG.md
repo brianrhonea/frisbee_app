@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.54  | 2026-11-24 | `feature/platform-payments`             |                     |
 | 0.0.53  | 2026-11-24 | `development`                           |                     |
 | 0.0.52  | 2026-11-24 | `development`                           |                     |
 | 0.0.51  | 2026-11-23 | `feature/platform-payments`             |                     |
@@ -66,6 +67,25 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.54 — Fixes from payment testing
+
+- Respond: "Go to the event" pops back to the event, or replaces Respond
+  with it (`leaveFor` in `open_link.dart`), instead of `go`, which left
+  the event page with no tabs under it. The Done screen's Pay is
+  `PayOnlineButton` (opens payment straight away).
+- Hosting: the form starts with the host team's division and level
+  (until changed), and "Enter <team> in this event" (`enterHost`, on by
+  default) writes the host team's accepted entry and seed
+  (`enterHostTeam`). The host team has no fee (`feeFor`, "Host · no fee").
+- Spots per division: `TournamentSpots.divisions` and `lines`;
+  `SpotsLeft` draws a line per division. Fixtures `discover/spots.json`.
+- Teams tab: the viewer's own waiting team shows as a card with its
+  status, roster and fee, instead of "1 team waiting on the host".
+- Captains' channel button only for organizers and roster captains
+  (`inCaptainsChannel`).
+- Paying needs the roster minimum and confirms the spot (API 0.48.0;
+  the Pay button shows the reason).
 
 ## 0.0.53 — Say why a fee can't be paid online
 

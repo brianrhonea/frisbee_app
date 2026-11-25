@@ -156,6 +156,29 @@ describe("hosting (create: manages, createdBy, createdAt, validHosted, officialH
     expect(store.doc(`tournaments/${id}/divisions/${div}`)).toMatchObject({ division: "mixed", level: "club", maxTeams: 8, seeds: [], captains: {}, placements: [], teams: [] });
   });
 
+  it("a team hosting can enter itself: accepted and seeded in its own division, the creator its captain", async () => {
+    store.put("teams/red", { ...team("Red", "cap", { division: "open" }), memberPerms: { cap2: ["manageEvents"] } });
+    const res = await call("POST", "/v1/tournaments", hosting({ hostId: "red", enterHost: true, divisions: ["mixed", "open"] }), "cap2");
+    expect(res.status).toBe(201);
+    const id = res.json().id as string;
+    const divs = store.doc(`tournaments/${id}`)?.divisions as Array<{ id: string; division: string }>;
+    const open = divs.find((d) => d.division === "open")!;
+    const mixed = divs.find((d) => d.division === "mixed")!;
+    expect(store.doc(`tournaments/${id}/divisions/${open.id}`)).toMatchObject({ seeds: ["red"], captains: { red: ["cap2"] } });
+    expect(store.doc(`tournaments/${id}/divisions/${mixed.id}`)).toMatchObject({ seeds: [], captains: {} });
+    expect(store.doc(`tournaments/${id}/entries/red`)).toMatchObject({ teamId: "red", teamName: "Red", divisionId: open.id, status: "accepted", captainIds: ["cap2"] });
+  });
+
+  it("without enterHost, for groups, and for player sign-up events, the host isn't entered", async () => {
+    store.put("teams/red", { ...team("Red", "cap"), memberPerms: { cap2: ["manageEvents"] } });
+    const plain = (await call("POST", "/v1/tournaments", hosting({ hostId: "red" }), "cap2")).json().id as string;
+    expect(store.doc(`tournaments/${plain}/entries/red`)).toBeUndefined();
+    const group = (await host({ enterHost: true })).id;
+    expect(store.doc(`tournaments/${group}/entries/host`)).toBeUndefined();
+    const hat = await call("POST", "/v1/tournaments", hosting({ hostId: "red", enterHost: true, entryType: "players" }), "cap2");
+    if (hat.status === 201) expect(store.doc(`tournaments/${hat.json().id}/entries/red`)).toBeUndefined();
+  });
+
   it("extra keys in the body are refused (hasOnly), so createdBy can't be forged", async () => {
     expect((await call("POST", "/v1/tournaments", { ...hosting(), createdBy: "owner" })).status).toBe(400);
     expect((await call("POST", "/v1/tournaments", { ...hosting(), status: "live" })).status).toBe(400);

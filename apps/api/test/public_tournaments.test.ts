@@ -317,7 +317,13 @@ describe("visitors' tournament pages", () => {
       t.repo.divisionDocs.set("hat", [{ id: "open", data: division() }]);
       const cards = (await t.get("/v1/public/tournaments")).json().tournaments;
       const spots = Object.fromEntries(cards.map((c: { id: string; spots?: unknown }) => [c.id, c.spots ?? null]));
-      expect(spots).toEqual({ open: { left: 6, cap: 12 }, full: { left: 0, cap: 2 }, seeding: null, hat: null });
+      // The total, and each division's own (spots per division on the cards).
+      expect(spots).toEqual({
+        open: { left: 6, cap: 12, divisions: [{ division: "open", left: 6, cap: 8 }, { division: "mixed", left: 0, cap: 4 }] },
+        full: { left: 0, cap: 2, divisions: [{ division: "open", left: 0, cap: 2 }] },
+        seeding: null,
+        hat: null,
+      });
       // Never who's in.
       expect(JSON.stringify(cards)).not.toContain("haze");
     });

@@ -328,6 +328,7 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
 
   void setOpen(Division d, bool open) {
     if (!open && lockedReason(d) != null) return;
+    _divisionsTouched = true;
     _wanted = open ? {..._wanted, d} : ({..._wanted}..remove(d));
     notifyListeners();
   }
@@ -383,9 +384,45 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
 
   void _watchHost(String id) {
     _hostSub = _teams.watchTeam(id).listen((t) {
+      final first = _host == null;
       _host = t;
+      if (first && t != null) _hostDefaults(t);
       notifyListeners();
     }, onError: _onError);
+  }
+
+  /// A team hosting a new event likely hosts for its own division and
+  /// level (hostDefaults in packages/shared): they start ticked, until the
+  /// user changes them. Leagues keep their own level.
+  void _hostDefaults(Team t) {
+    if (!isNew || !t.hasDivision || _divisionsTouched) return;
+    _wanted = {t.division};
+    if (!isLeague) _format = _format.copyWith(level: t.level);
+  }
+
+  bool _divisionsTouched = false;
+
+  /// "Enter [the team] in this event": the host team joins its own event,
+  /// accepted in its division, with no fee. On by default.
+  bool enterHost = true;
+
+  /// Whether to offer [enterHost]: a new event, hosted by a team (not a
+  /// group), that teams enter.
+  bool get canEnterHost =>
+      isNew && (_host?.hasDivision ?? false) && !takesPlayers;
+
+  /// The division the host team would go into: its own if open, else the
+  /// first open one.
+  Division? get hostDivision {
+    final h = _host;
+    if (h == null || _wanted.isEmpty) return null;
+    if (_wanted.contains(h.division)) return h.division;
+    return EventFormat.divisionChoices.firstWhere(_wanted.contains);
+  }
+
+  void setEnterHost(bool on) {
+    enterHost = on;
+    notifyListeners();
   }
 
   void _fill(HostedTournament t) {
@@ -642,6 +679,19 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
     if (changes.isNotEmpty) {
       final r = await _repo.saveDivisions(t, changes);
       if (r case Error(:final error)) return Result.error(error);
+    }
+    // The host team in its own event, once, when it's made.
+    if (_existing == null && canEnterHost && enterHost) {
+      if (hostDivision case final d?) {
+        final r = await _repo.enterHostTeam(
+          id,
+          teamId: host.id,
+          teamName: host.name,
+          division: d,
+          captainId: user.uid,
+        );
+        if (r case Error(:final error)) return Result.error(error);
+      }
     }
     return Result.ok(id);
   }

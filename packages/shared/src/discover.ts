@@ -2,6 +2,7 @@
 // lists (F10) and the Learn guide's lessons and reading progress (F9).
 // The app mirrors them (lib/domain/models/discover.dart), checked against
 // fixtures/discover by test/discover_fixtures.test.ts.
+import { type Division, divisions as allDivisions } from "./team.js";
 import type { HostedStatus, TournamentEntryType } from "./tournaments.js";
 
 // ---- Spots left (F10) ------------------------------------------------------
@@ -14,13 +15,25 @@ import type { HostedStatus, TournamentEntryType } from "./tournaments.js";
 export interface TournamentSpots {
   left: number;
   cap: number;
+  /** Each open division's own spots, in the event's order (absent from older APIs). */
+  divisions?: DivisionSpots[];
 }
 
-/** A division as the count reads it: its cap and accepted teams (seeds). */
+/** One division's spots: its cap less its accepted teams. */
+export interface DivisionSpots {
+  division: Division;
+  left: number;
+  cap: number;
+}
+
+/** A division as the count reads it: its gender division, cap and accepted teams (seeds). */
 export interface SpotsDivision {
+  division?: unknown;
   maxTeams?: unknown;
   seeds?: unknown;
 }
+
+const spotsDivisionLabels: Record<Division, string> = { mixed: "Mixed", open: "Open", women: "Women", masters: "Masters" };
 
 /**
  * The spots an event shows, or null when it shows none: only while
@@ -34,13 +47,26 @@ export function tournamentSpots(
   if (t.status !== "registration" || t.entryType !== "teams") return null;
   let cap = 0;
   let left = 0;
+  const each: DivisionSpots[] = [];
   for (const d of divisions) {
     const max = typeof d.maxTeams === "number" && Number.isInteger(d.maxTeams) && d.maxTeams > 0 ? d.maxTeams : 0;
     const taken = Array.isArray(d.seeds) ? d.seeds.length : 0;
     cap += max;
     left += Math.max(0, max - taken);
+    const division = allDivisions.find((g) => g === d.division);
+    if (division && max > 0) each.push({ division, left: Math.max(0, max - taken), cap: max });
   }
-  return cap > 0 ? { left, cap } : null;
+  return cap > 0 ? { left, cap, ...(each.length > 0 && { divisions: each }) } : null;
+}
+
+/**
+ * What a card shows: one line per division when there are two or more
+ * ("Mixed: 3 left", "Open: full · waitlist"), else spotsLabel's one line
+ * (TournamentSpots.lines in the app).
+ */
+export function spotsLines(s: TournamentSpots): string[] {
+  if (!s.divisions || s.divisions.length < 2) return [spotsLabel(s)];
+  return s.divisions.map((d) => `${spotsDivisionLabels[d.division]}: ${d.left <= 0 ? "full · waitlist" : `${d.left} left`}`);
 }
 
 /** What a list card says: "3 spots left", "1 spot left", or "Full · waitlist". */

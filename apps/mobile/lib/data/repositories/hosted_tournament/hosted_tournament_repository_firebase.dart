@@ -7,6 +7,7 @@ import '../../../domain/models/group_tournament.dart';
 import '../../../domain/models/hosted_tournament.dart';
 import '../../../domain/models/live_draft.dart';
 import '../../../domain/models/model_utils.dart';
+import '../../../domain/models/team.dart' show Division;
 import '../../../domain/tournament_engine/progress.dart';
 import '../../../utils/result.dart';
 import '../../services/api_client.dart';
@@ -664,6 +665,39 @@ class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
           'updatedAt': FieldValue.serverTimestamp(),
         });
       });
+
+  @override
+  Future<Result<void>> enterHostTeam(
+    String tournamentId, {
+    required String teamId,
+    required String teamName,
+    required Division division,
+    required String captainId,
+  }) => guard(() async {
+    final divs = (await _divisions(tournamentId).get()).docs;
+    if (divs.isEmpty) return;
+    final match = divs.firstWhere(
+      (d) => d.data()['division'] == division.name,
+      orElse: () => divs.first,
+    );
+    final entry = TournamentEntry(
+      teamId: teamId,
+      teamName: teamName,
+      divisionId: match.id,
+      status: EntryStatus.accepted,
+      captainIds: [captainId],
+    );
+    await (_db.batch()
+          ..set(_entries(tournamentId).doc(teamId), {
+            ...entry.toMap(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          })
+          ..update(match.reference, {
+            'seeds': FieldValue.arrayUnion([teamId]),
+            'captains.$teamId': [captainId],
+          }))
+        .commit();
+  });
 
   @override
   Future<Result<void>> acceptEntry(

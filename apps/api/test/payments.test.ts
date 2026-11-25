@@ -13,6 +13,9 @@ import {
   processingPaymentNote,
   paidOnlineNote,
   payoutsReauthMessage,
+  hostTeamFeeNote,
+  rosterBeforePayMessage,
+  fullBeforePayMessage,
   platformFeeCents,
   platformFeeLabel,
   refundedNote,
@@ -1610,6 +1613,42 @@ describe("security: fraud checks on payouts", () => {
     s.store.put("charges/cs_1", { ...s.store.doc("charges/cs_1"), paidAt: new Date(now - 3 * day) });
     await earnings();
     expect(s.gateway.transfers).toHaveLength(1);
+  });
+
+  it("the host's own team in its event has no fee", async () => {
+    ready();
+    s.store.put("tournaments/t1/entries/host", { teamName: "Host", divisionId: "d1", status: "accepted" });
+    const r = await s.call("GET", "/v1/tournaments/t1/pay?team=host", undefined, "owner");
+    expect(r.status).toBe(200);
+    expect(r.json()).toMatchObject({ online: false, amountCents: 0, reason: hostTeamFeeNote });
+    expect((await s.call("POST", "/v1/tournaments/t1/checkout", { payer: "team", teamId: "host" }, "owner")).status).toBe(412);
+  });
+
+  it("a team waiting on the host pays once its roster is set, and paying confirms its spot", async () => {
+    ready();
+    s.store.put("tournaments/t1/divisions/d1", { division: "open", level: "club", maxTeams: 2, minRoster: 2, seeds: ["bolt"], captains: { bolt: ["b"] } });
+    s.store.put("tournaments/t1/entries/haze", { teamName: "Haze", divisionId: "d1", status: "applied", captainIds: ["captain"], roster: ["p1"] });
+    // Short of the minimum: no paying yet.
+    const short = await s.call("GET", "/v1/tournaments/t1/pay?team=haze", undefined, "captain");
+    expect(short.json()).toMatchObject({ online: false, reason: rosterBeforePayMessage(2) });
+    expect((await s.call("POST", "/v1/tournaments/t1/checkout", team, "captain")).status).toBe(412);
+    // Roster set: paying accepts and seeds it.
+    s.store.put("tournaments/t1/entries/haze", { ...s.store.doc("tournaments/t1/entries/haze"), roster: ["p1", "p2"] });
+    expect((await s.call("GET", "/v1/tournaments/t1/pay?team=haze", undefined, "captain")).json()).toMatchObject({ online: true, reason: null });
+    await paid();
+    expect(s.store.doc("tournaments/t1/entries/haze")).toMatchObject({ status: "accepted" });
+    expect(s.store.doc("tournaments/t1/divisions/d1")).toMatchObject({ seeds: ["bolt", "haze"], captains: { bolt: ["b"], haze: ["captain"] } });
+  });
+
+  it("a team can't pay for a full division until the host gives it a spot", async () => {
+    ready();
+    s.store.put("tournaments/t1/divisions/d1", { division: "open", level: "club", maxTeams: 1, minRoster: 1, seeds: ["bolt"] });
+    s.store.put("tournaments/t1/entries/haze", { teamName: "Haze", divisionId: "d1", status: "waitlisted", roster: ["p1"] });
+    expect((await s.call("GET", "/v1/tournaments/t1/pay?team=haze", undefined, "captain")).json()).toMatchObject({ online: false, reason: fullBeforePayMessage });
+    // Accepted (the host raised the cap): it pays as usual.
+    s.store.put("tournaments/t1/divisions/d1", { division: "open", level: "club", maxTeams: 2, minRoster: 1, seeds: ["bolt", "haze"] });
+    s.store.put("tournaments/t1/entries/haze", { teamName: "Haze", divisionId: "d1", status: "accepted", roster: ["p1"] });
+    expect((await s.call("GET", "/v1/tournaments/t1/pay?team=haze", undefined, "captain")).json()).toMatchObject({ online: true });
   });
 
   it("organizers can't pay online for their own event", async () => {

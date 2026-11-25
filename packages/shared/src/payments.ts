@@ -10,6 +10,7 @@
 // record the host can still set by hand, so instructions-and-mark-paid
 // keeps working beside it.
 import { z } from "zod";
+import { effectiveMinRoster } from "./tournaments.js";
 
 /** Stall 10's cut of each payment: a percentage (basis points) plus a fixed amount. */
 export interface PlatformFee {
@@ -425,6 +426,38 @@ export interface ReconcileResult {
  * sign-in in the last 15 minutes. The app and website then ask the owner
  * to confirm it's them (their password, Google or Apple) and try again.
  */
+/** Why the host's own team has nothing to pay for its event (teamFee in tournaments.ts). */
+export const hostTeamFeeNote = "Your team is hosting this event, so it has no fee.";
+
+/** Why a team can't pay yet: its roster is short of the division's minimum. Paying confirms the spot. */
+export const rosterBeforePayMessage = (min: number) =>
+  `Set your roster first: at least ${min} ${min === 1 ? "player" : "players"}. Then you can pay, which confirms your spot.`;
+
+/** Why a team that isn't in yet can't pay: its division is full. */
+export const fullBeforePayMessage = "This division is full, so your team is on the waitlist. You can pay once the host gives you a spot.";
+
+/**
+ * Whether a team's fee can be paid yet (null when it can): a team that
+ * hasn't been given a spot pays to confirm it, so it needs its roster's
+ * minimum first (not where teams only reserve spots, [mixed]) and a spot
+ * left in its division. The API answers it in the pay options' reason;
+ * paying then accepts the team.
+ */
+export function teamPayProblem(
+  entry: { status: string; rosterCount: number },
+  division: { seeds?: readonly string[] | null; maxTeams?: number | null; minRoster?: number | null } | null,
+  teamId: string,
+  mixed: boolean,
+): string | null {
+  if (!division) return null;
+  const min = effectiveMinRoster(division);
+  if (!mixed && entry.rosterCount < min) return rosterBeforePayMessage(min);
+  const seeds = division.seeds ?? [];
+  const full = typeof division.maxTeams === "number" && seeds.length >= division.maxTeams && !seeds.includes(teamId);
+  if (entry.status !== "accepted" && full) return fullBeforePayMessage;
+  return null;
+}
+
 /** Above Stripe's setup form, so hosts know they aren't opening a Stripe account. */
 export const payoutsSetupNote =
   "Stall 10 pays you through Stripe, our payment processor. They confirm who you are and where to send your money; Stall 10 never sees these details.";

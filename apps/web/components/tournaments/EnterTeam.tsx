@@ -23,7 +23,7 @@ import {
   inviteExpired,
   inviteExpiredMessage,
   type RosterPlayer,
-  spotFee,
+  teamFee,
   type TeamRoster,
 } from "@stall10/shared";
 import Link from "next/link";
@@ -139,7 +139,8 @@ function EntryFlow({
   const [step, setStep] = useState<Step>(() => (mode === "entered" ? firstStep(s, entry, startAt) : "respond"));
   const [teamId, setTeamId] = useState(preselect ?? s.teamsToEnter[0]?.id ?? "");
   const [answer, setAnswer] = useState<EntryStatus | null>(mode === "entered" && entry ? entry.status : null);
-  const fee = spotFee(t);
+  // The host's own team has no fee (teamFee).
+  const fee = teamFee(t, teamId);
   const owes = !!fee && fee.amountCents > 0;
   const deadline = effectiveDeadline(t);
   const steps: Array<Exclude<Step, "done" | "declined">> = owes ? ["respond", "roster", "pay"] : ["respond", "roster"];
@@ -555,14 +556,11 @@ function Done({
         {owes && (
           <li className={list.paid ? "done" : ""}>
             {paid === null ? "Checking payment…" : list.paid ? "Paid" : "Fee to pay"}
-            {paid === false && (
-              <button type="button" className="text-btn" onClick={() => onStep("pay")}>
-                Pay now
-              </button>
-            )}
           </li>
         )}
       </ul>
+      {/* Pay straight away (PayOnlineButton on the app's Done screen); it says why when it can't yet. */}
+      {owes && paid === false && s.user && <PayOnline user={s.user} tournamentId={s.id} teamId={teamId} />}
       {!list.complete && deadline && (
         <p className="muted small">
           Due <LocalTime iso={deadline.toISOString()} />. You can finish from your team&apos;s page.

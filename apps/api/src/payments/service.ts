@@ -69,6 +69,7 @@ import {
   type PayoutReview,
   payoutReviewOverCents,
   payoutsReauthMessage,
+  hostTeamFeeNote,
   selfPaymentMessage,
   type PayerKind,
   type PaymentFees,
@@ -88,7 +89,9 @@ import {
   type PaymentIssueView,
   type ReconcileResult,
   type ReleaseResult,
-  spotFee,
+  teamFee,
+  teamPayProblem,
+  mixedEntry,
   type StaffChargeView,
   type StaffPaymentsView,
   stripeCardFeeEstimate,
@@ -168,6 +171,7 @@ const p = {
   team: (t: string) => `teams/${t}`,
   tournament: (t: string) => `tournaments/${t}`,
   entry: (t: string, team: string) => `tournaments/${t}/entries/${team}`,
+  division: (t: string, d: string) => `tournaments/${t}/divisions/${d}`,
   signup: (t: string, u: string) => `tournaments/${t}/signups/${u}`,
   payment: (t: string, payer: string) => `tournaments/${t}/payments/${payer}`,
   payout: (team: string) => `payoutAccounts/${team}`,
@@ -261,9 +265,13 @@ interface Payer {
   fee: FeeDoc | null;
   /** The line on the receipt. */
   name: string;
+  /** Why a team can't pay yet (teamPayProblem), or null. */
+  blocked?: string | null;
 }
 
 const activeEntries = new Set(["applied", "accepted", "waitlisted"]);
+/** While paying still confirms a team's spot (before the schedule is out). */
+const confirmable = new Set(["registration", "seeding"]);
 const activeSignups = new Set(["applied", "accepted", "waitlisted"]);
 
 export class PaymentService {
@@ -418,7 +426,20 @@ export class PaymentService {
       if (!can(team, caller.uid, "manageTeam")) throw new ApiError("permission_denied", "Only the team's admins can pay its fee.");
       if (!entry || !activeEntries.has(str(entry.status))) throw new ApiError("failed_precondition", "This team hasn't entered.");
       const label = doc.entryType === "players" ? "Team fee" : "Bid fee";
-      return { kind, id: teamId, fee: spotFee(doc), name: `${label}: ${event} (${str(entry.teamName) || str(team.name)})`.slice(0, 200) };
+      // A team not yet in pays to confirm its spot: its roster first, and a spot left (teamPayProblem).
+      const divisionId = storedId(entry.divisionId);
+      const division = divisionId ? await tx.get(p.division(id, divisionId)) : null;
+      const roster = Array.isArray(entry.roster) ? entry.roster.length : 0;
+      const blocked = teamPayProblem(
+        { status: str(entry.status), rosterCount: roster },
+        division
+          ? { seeds: Array.isArray(division.seeds) ? division.seeds.map(String) : [], maxTeams: typeof division.maxTeams === "number" ? division.maxTeams : null, minRoster: typeof division.minRoster === "number" ? division.minRoster : null }
+          : null,
+        teamId,
+        mixedEntry(doc),
+      );
+      // The host's own team plays its event for free (teamFee).
+      return { kind, id: teamId, fee: teamFee({ ...doc, hostId: str(t.hostId) }, teamId), blocked, name: `${label}: ${event} (${str(entry.teamName) || str(team.name)})`.slice(0, 200) };
     }
     if (doc.entryType !== "players") throw new ApiError("failed_precondition", "Teams pay for this event, not players.");
     const signup = await tx.get(p.signup(id, caller.uid));
@@ -447,7 +468,8 @@ export class PaymentService {
     const pending = !paid && latest.state === "processing" ? "processing" : null;
     let reason: string | null = null;
     if (!this.config) reason = "Online payments aren't set up here yet.";
-    else if (!payer.fee || amountCents <= 0) reason = "There's no fee to pay.";
+    else if (!payer.fee || amountCents <= 0) reason = payer.kind === "team" && payer.id === host ? hostTeamFeeNote : "There's no fee to pay.";
+    else if (payer.blocked) reason = payer.blocked;
     else if (!official && payoutOf(payout) !== "ready") reason = "The host doesn't take payments through Stall 10. Follow their instructions.";
     // Paying your own event with a card would be paid straight back to you
     // (the pattern of stolen-card fraud): organizers mark it paid instead.
@@ -933,6 +955,11 @@ export class PaymentService {
       if (status === "paid" || status === "refunded" || status === "disputed") return null;
       if (status === "duplicate") return { refund: true, release: false };
       const [t, payment] = await Promise.all([tx.get(p.tournament(tournamentId)), tx.get(p.payment(tournamentId, payerId))]);
+      // A team that paid to confirm its spot: read its entry and division before writing.
+      const team = str(charge.payerKind) === "team";
+      const entry = team ? await tx.get(p.entry(tournamentId, payerId)) : null;
+      const divisionId = storedId(entry?.divisionId);
+      const division = divisionId ? await tx.get(p.division(tournamentId, divisionId)) : null;
       tx.set(p.intent(pi), { charge: session });
       const base = { paymentIntent: pi, updatedAt: serverTime };
       // Paid already (two tabs, or the host marked it by hand), or the event is gone: give it back.
@@ -944,6 +971,21 @@ export class PaymentService {
       tx.merge(p.charge(session), { ...base, status: "paid", paidAt: serverTime });
       tx.set(p.payment(tournamentId, payerId), { paid: true, paidAt: serverTime, note: paidOnlineNote });
       this.logCharge(tx, session, charge, "paid_online", { paymentIntent: pi });
+      // Paying confirms the spot: an applied or waitlisted team is accepted
+      // and seeded, while registration is open and there's still room.
+      if (entry && division && divisionId && (entry.status === "applied" || entry.status === "waitlisted") && confirmable.has(str(t.status))) {
+        const seeds = Array.isArray(division.seeds) ? division.seeds.map(String) : [];
+        const room = seeds.includes(payerId) || seeds.length < Number(division.maxTeams);
+        if (room) {
+          const captainIds = Array.isArray(entry.captainIds) ? entry.captainIds.map(String) : [];
+          tx.update(p.division(tournamentId, divisionId), {
+            seeds: seeds.includes(payerId) ? seeds : [...seeds, payerId],
+            captains: { ...mapOf(division.captains), [payerId]: captainIds },
+            ...(!seeds.includes(payerId) && { seedsConfirmedAt: null }),
+          });
+          tx.merge(p.entry(tournamentId, payerId), { status: "accepted", updatedAt: serverTime });
+        }
+      }
       return { refund: false, release: isPlatform(charge) };
     });
     if (outcome?.refund) {

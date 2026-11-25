@@ -2,7 +2,7 @@
 // lib/domain/models/discover.dart, on the vectors in fixtures/discover
 // (written by apps/mobile/test/shared_fixtures/discover_fixtures_test.dart).
 import { describe, expect, it } from "vitest";
-import { learnLessons, learnProgressLabel, learnReadIds, spotsLabel, tournamentSpots } from "../src/index.js";
+import { type DivisionSpots, learnLessons, learnProgressLabel, learnReadIds, spotsLabel, spotsLines, tournamentSpots } from "../src/index.js";
 import { fixture } from "./shared_fixtures.js";
 
 interface SpotsCase {
@@ -11,6 +11,8 @@ interface SpotsCase {
   cap: number;
   label: string;
   full: boolean;
+  divisions?: DivisionSpots[];
+  lines: string[];
 }
 
 interface LessonsCase {
@@ -26,7 +28,9 @@ interface ProgressCase {
 
 describe("spots left match the app (fixtures/discover/spots.json)", () => {
   it.each(fixture<SpotsCase>("discover/spots.json").cases)("$name", (c) => {
-    expect(spotsLabel({ left: c.left, cap: c.cap })).toBe(c.label);
+    const s = { left: c.left, cap: c.cap, ...(c.divisions && { divisions: c.divisions }) };
+    expect(spotsLabel(s)).toBe(c.label);
+    expect(spotsLines(s)).toEqual(c.lines);
   });
 });
 
@@ -50,6 +54,14 @@ describe("tournamentSpots", () => {
         { maxTeams: 4, seeds: ["a", "b", "c", "d", "e"] },
       ]),
     ).toEqual({ left: 6, cap: 12 });
+  });
+  it("counts each division on its own, in order", () => {
+    expect(
+      tournamentSpots(open, [
+        { division: "mixed", maxTeams: 8, seeds: ["a"] },
+        { division: "open", maxTeams: 4, seeds: ["a", "b", "c", "d"] },
+      ]),
+    ).toEqual({ left: 7, cap: 12, divisions: [{ division: "mixed", left: 7, cap: 8 }, { division: "open", left: 0, cap: 4 }] });
   });
   it("is null unless registration is open for teams, or with no caps", () => {
     expect(tournamentSpots({ status: "seeding", entryType: "teams" }, [{ maxTeams: 8, seeds: [] }])).toBeNull();

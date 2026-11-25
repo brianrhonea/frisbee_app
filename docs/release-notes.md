@@ -10,6 +10,25 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.54
+
+- **"Go to the event" no longer strands you.** After responding or
+  paying, the event page opens with Back and the tabs still there.
+- **Pay from the Done screen.** Once your team is in, the Pay button
+  opens the payment straight away.
+- **Paying confirms your spot.** Set your roster to the division's
+  minimum, then pay: your team is in. The Pay button says what's
+  missing until then.
+- **Host with your own team.** The form starts with your team's division
+  and level, and "Enter <team> in this event" (on by default) puts your
+  team in, with no fee.
+- **Spots left per division** on tournament cards.
+- **Your team shows on the Teams tab** while it waits on the host, with
+  its status, roster and fee.
+- **The Captains' channel is for captains:** organizers and the captains
+  picked with each roster. Other team admins message the organizers
+  about their team.
+
 ## 0.0.53
 
 - **When a fee can't be paid online, you're told why**, for example the

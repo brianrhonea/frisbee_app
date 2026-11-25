@@ -135,3 +135,23 @@ String _personOver(String location) => switch (_player.firstMatch(location)) {
   final m? => Routes.personOver(m.group(1)!),
   null => location,
 };
+
+/// Leaves this page (one over the tabs, like a tournament's Respond) for
+/// [location], a page that also opens over the tabs, keeping what's
+/// beneath: back to it when it's the page underneath, else in this page's
+/// place. With nothing beneath (opened from a notification), it opens over
+/// the page it belongs under ([GoRouter.openFromOutside]). Never `go`,
+/// which would drop the pages and the tabs below and leave no way back.
+void leaveFor(BuildContext context, String location) {
+  final router = GoRouter.of(context);
+  final matches = router.routerDelegate.currentConfiguration.matches;
+  final target = Uri.parse(location).path;
+  if (matches.length >= 2 &&
+      matches[matches.length - 2].matchedLocation == target) {
+    context.pop();
+  } else if (context.canPop()) {
+    context.pushReplacement(location);
+  } else {
+    router.openFromOutside(location);
+  }
+}

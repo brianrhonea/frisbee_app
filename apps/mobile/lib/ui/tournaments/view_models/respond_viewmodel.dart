@@ -183,7 +183,7 @@ class RespondViewModel extends ChangeNotifier {
       .where((d) => d.id == (entry?.divisionId ?? _divisionId))
       .firstOrNull;
 
-  BidFee? get fee => _tournament?.spotFee;
+  BidFee? get fee => _tournament?.feeFor(_teamId);
   bool get owes => (fee?.amountCents ?? 0) > 0;
   DateTime? get deadline => _tournament?.effectiveDeadline;
 

@@ -281,6 +281,21 @@ class EventFormatSection extends StatelessWidget {
               ? null
               : (v) => vm.setOpen(d, v ?? false),
         ),
+      // The host team in its own event (on by default).
+      if (vm.canEnterHost)
+        SwitchListTile(
+          key: const Key('enter-host'),
+          contentPadding: EdgeInsets.zero,
+          value: vm.enterHost,
+          onChanged: vm.setEnterHost,
+          title: Text('Enter ${vm.host?.name ?? 'your team'} in this event'),
+          subtitle: Text(
+            vm.hostDivision == null
+                ? 'Open a division first.'
+                : 'Your team goes into ${f.level.label} '
+                      '${vm.hostDivision!.label}. No fee for the host.',
+          ),
+        ),
     ];
   }
 }
