@@ -4,6 +4,16 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.59.5 — 2026-11-24
+
+- Notifications: each row has an icon for what happened (like, repost,
+  comment, follower, mention, message, meeting, event, …, as the app's
+  bubble), the count sits beside the title instead of across the card,
+  and Follow requests and its arrow aren't underlined.
+- Styled links (cards, rows, buttons) are no longer underlined anywhere
+  unless their own style says so (`:where(a[class])` in `site.css`);
+  links in text keep theirs.
+
 ## 0.59.4 — 2026-11-24
 
 - New logo colours: a red disc with a turf-green trail (logo and favicon,

@@ -252,6 +252,19 @@
 .notifications .notice .pill { background: var(--field); color: var(--ink-soft); }
 /* Follow requests waiting: the member's to do, in amber. */
 .notifications .notice-requests { margin: 0; }
+/* Rows that are links (Follow requests) and their text: no underlines. */
+.notifications a.notice, .notifications a.notice:hover, .notifications .notice-main, .notifications .notice-main:hover { text-decoration: none; color: inherit; }
+/* The title with its count beside it, not a pill across the card. */
+.notifications .notice-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.notifications .notice-title .pill { margin: 0; flex: none; padding: 1px 8px; font-size: 0.78rem; font-weight: 700; }
+.notifications .notice-chevron { order: 11; color: var(--muted); font-size: 1.3rem; line-height: 1; padding-left: 4px; }
+/* What happened, in a round badge on the left (noticeIcon in the app). */
+.notifications .notice-icon {
+  order: -1; flex: none; width: 38px; height: 38px; border-radius: 999px;
+  display: grid; place-items: center; background: var(--field); color: var(--ink-soft);
+}
+.notifications .notice.unread .notice-icon { background: var(--accent-soft); color: var(--accent-ink); }
+.notifications .notice-icon-heart, .notifications .notice.unread .notice-icon-heart { color: var(--danger); }
 .notice-group.needs .notice-requests { background: var(--disc-soft); }
 .notice-group.needs .notice-requests:hover { background: var(--disc-soft); filter: brightness(0.98); }
 .notice-group.needs .notice-requests .notice-dot { background: var(--disc); }

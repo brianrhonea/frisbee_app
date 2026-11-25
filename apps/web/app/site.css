@@ -157,6 +157,10 @@ body {
 }
 
 a { color: inherit; }
+/* Styled links (cards, rows, buttons) aren't underlined unless their own
+   rule says so; plain links in text keep the browser's underline. Zero
+   specificity, so any class rule wins. */
+:where(a[class]) { text-decoration: none; }
 
 h1, h2, h3 { line-height: 1.1; letter-spacing: -0.03em; margin: 0; }
 
