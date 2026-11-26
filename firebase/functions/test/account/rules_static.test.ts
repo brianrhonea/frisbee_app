@@ -133,6 +133,21 @@ const openFirestore: Record<string, string> = {
   "/profiles/{userId} delete": "removing one's own profile stays open (leaving, account deletion)",
   "/profiles/{userId}/private/{doc} delete": "removing one's own private profile details stays open",
 };
+/**
+ * Write rules that may be gated by `ageOk()` alone (the adult check, not the
+ * email or Terms), each with why (N6). Anything else led by `ageOk()` is a
+ * mistake: it would let an account with a pending email or Terms write.
+ * Key: "<match path> <methods>".
+ */
+const ageOnlyFirestore: Record<string, string> = {
+  "/profiles/{userId} create": "the profile card: an adult may publish it before the email or Terms are done (F1)",
+  "/profiles/{userId} update": "the profile card (F1)",
+  "/profiles/{userId}/private/{doc} create,update": "private profile details (F1)",
+  "/usernames/{name} create": "claiming a username (F1)",
+};
+const ageOnlyStorage: Record<string, string> = {
+  "/users/{userId}/profile/{fileName} create,update": "profile pictures, part of the adult-checked profile (F1)",
+};
 const openStorage: Record<string, string> = {
   "/users/{userId}/profile/{fileName} delete": "removing one's own profile picture stays open",
 };
@@ -152,7 +167,7 @@ describe("the rules parser", () => {
   });
 });
 
-function check(name: string, src: string, open: Record<string, string>) {
+function check(name: string, src: string, open: Record<string, string>, ageOnly: Record<string, string>) {
   describe(`${name}: every write is gated`, () => {
     const writes = writesOf(src);
     it("finds the write rules", () => {
@@ -165,14 +180,25 @@ function check(name: string, src: string, open: Record<string, string>) {
         .filter((k) => !(k in open));
       expect(bad).toEqual([]);
     });
+    it("only the age-only list's rules are gated by ageOk() alone (N6)", () => {
+      const bad = writes
+        .filter((a) => /^ageOk\(\)\s*(&&|$)/.test(a.condition))
+        .map(keyOf)
+        .filter((k) => !(k in ageOnly));
+      expect(bad).toEqual([]);
+    });
+    it("the age-only list has no stale entries", () => {
+      const keys = new Set(writes.filter((a) => /^ageOk\(\)\s*(&&|$)/.test(a.condition)).map(keyOf));
+      expect(Object.keys(ageOnly).filter((k) => !keys.has(k))).toEqual([]);
+    });
     it("the open list has no stale entries", () => {
       const keys = new Set(writes.map(keyOf));
       expect(Object.keys(open).filter((k) => !keys.has(k))).toEqual([]);
     });
   });
 }
-check("firestore.rules", firestoreRules, openFirestore);
-check("storage.rules", storageRules, openStorage);
+check("firestore.rules", firestoreRules, openFirestore, ageOnlyFirestore);
+check("storage.rules", storageRules, openStorage, ageOnlyStorage);
 
 describe("the current Terms version", () => {
   const literal = (src: string) => Number(/token\.get\('terms', 0\) >= (\d+)/.exec(src)?.[1]);
