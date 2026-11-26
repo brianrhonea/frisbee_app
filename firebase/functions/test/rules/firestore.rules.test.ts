@@ -718,6 +718,21 @@ describe("community groups", () => {
     await assertSucceeds(setDoc(ref, listing));
   });
 
+  it("a group's managers can't write its level either (SEC-4)", async () => {
+    await setGroup(false);
+    const group = (uid: string) => doc(db(uid), "teams", GROUP);
+    for (const uid of [OWNER, ORGANIZER]) {
+      await assertFails(updateDoc(group(uid), { level: "club" }));
+      await assertFails(updateDoc(group(uid), { level: "college" }));
+      await assertFails(updateDoc(group(uid), { level: deleteField() }));
+      await assertFails(updateDoc(group(uid), { name: "Renamed", level: "club" }));
+    }
+    await assertFails(updateDoc(group(MEMBER), { level: "club" }));
+    expect((await getDoc(group(MEMBER))).data()?.level).toBe("pickup");
+    // Other details still edit, and repeating the level is harmless.
+    await assertSucceeds(updateDoc(group(ORGANIZER), { name: "Renamed", level: "pickup" }));
+  });
+
   it("a private group's listing leaves out its location", async () => {
     await setGroup(true);
     const listing = {
@@ -1877,6 +1892,27 @@ describe("team directory", () => {
     await assertSucceeds(batch.commit());
   });
 
+  it("a client batch can't change a team's level with its listing (SEC-4)", async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "teamDirectory", TEAM), listing()),
+    );
+    for (const level of ["club", "youth"]) {
+      for (const uid of [OWNER, COACH]) {
+        const fs = db(uid);
+        const batch = writeBatch(fs);
+        batch.update(doc(fs, "teams", TEAM), { level });
+        batch.set(doc(fs, "teamDirectory", TEAM), listing({ level }));
+        await assertFails(batch.commit());
+      }
+    }
+    // The listing alone can't drift from the team's level either.
+    await assertFails(setDoc(ref(OWNER), listing({ level: "club" })));
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      expect((await getDoc(doc(ctx.firestore(), "teams", TEAM))).data()?.level).toBe("college");
+      expect((await getDoc(doc(ctx.firestore(), "teamDirectory", TEAM))).data()?.level).toBe("college");
+    });
+  });
+
   it("the listing no longer carries a USA Ultimate page", async () => {
     await assertFails(
       setDoc(ref(COACH), listing({ usauUrl: "https://play.usaultimate.org/teams/events/Eventteam/?TeamId=1" })),
@@ -2402,6 +2438,22 @@ describe("custom roles", () => {
     // Their roles keep their powers.
     await assertSucceeds(updateDoc(doc(db(COACH), "teams", TEAM), { name: "Renamed" }));
     await assertFails(updateDoc(doc(db(PLAYER), "teams", TEAM), { name: "Nope" }));
+  });
+
+  it("a custom role with manageTeam can edit details but never the level (SEC-4)", async () => {
+    const perms = ["manageTeam"];
+    await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), {
+      roles: { mgr: { name: "Manager", color: 0, position: 0, perms } },
+      memberRoles: { [PLAYER]: ["mgr"] },
+      memberPerms: { [PLAYER]: perms },
+    }));
+    const team = doc(db(PLAYER), "teams", TEAM);
+    await assertSucceeds(updateDoc(team, { name: "By Role" }));
+    await assertFails(updateDoc(team, { level: "club" }));
+    await assertFails(updateDoc(team, { level: "youth" }));
+    await assertFails(updateDoc(team, { level: deleteField() }));
+    await assertFails(updateDoc(team, { name: "By Role 2", level: "club" }));
+    expect((await getDoc(team)).data()?.level).toBe("college");
   });
 
   it("permissions from roles open the matching powers", async () => {
