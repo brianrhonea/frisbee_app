@@ -2,7 +2,7 @@
    on Home and the team page, red dot only while it's live, amber Report
    score for the team's captains. */
 .huddle-side-days { display: grid; gap: 16px; }
-.tournament-day { display: grid; gap: 8px; background: var(--board); color: var(--on-board); border-color: transparent; }
+.tournament-day { display: grid; gap: 8px; background: var(--board); color: var(--on-board); border-color: var(--line); }
 .tournament-day .muted { color: var(--board-muted); }
 .tournament-day-when {
   display: inline-flex; align-items: center; gap: 6px;

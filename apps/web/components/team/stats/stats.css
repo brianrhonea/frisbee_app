@@ -59,7 +59,7 @@
 ul.st-chips.st-plain { display: flex; }
 
 /* The live scoreboard: navy, white Barlow scores. */
-.st-scoreboard { display: grid; gap: 10px; background: var(--board); color: var(--on-board); border-color: transparent; }
+.st-scoreboard { display: grid; gap: 10px; background: var(--board); color: var(--on-board); border-color: var(--line); }
 .st-scoreboard small { color: var(--board-muted); }
 .st-scoreboard .pill { background: var(--board-2); color: var(--on-board); border: 0; font: inherit; font-size: 0.78rem; font-weight: 700; cursor: pointer; }
 .st-scoreboard .text-btn { color: var(--on-board); }

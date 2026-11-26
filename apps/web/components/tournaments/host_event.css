@@ -37,5 +37,5 @@
   flex: none; width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
   font-size: 0.8rem; font-weight: 800; background: var(--team); color: var(--card);
 }
-.host-mark-organization { background: var(--board); color: var(--on-board); }
+.host-mark-organization { background: var(--accent-soft); color: var(--accent-ink); }
 .host-mark-community { background: var(--accent-soft); color: var(--accent-ink); }
