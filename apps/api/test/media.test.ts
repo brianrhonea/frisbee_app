@@ -232,6 +232,8 @@ describe("uploads API", () => {
     });
     store.put("teams/t1/chats/c1", { writeRoles: ["chatter"], writeUsers: [] });
     store.put("conversations/u1_u2", { participants: ["u1", "u2"], status: "accepted" });
+    // Native video upload is open (meta/flags; the flag-off cases set their own).
+    store.put("meta/flags", { videoUploads: true });
   });
 
   async function upload(body: object, data: Buffer | null, uid = "u1") {
@@ -321,6 +323,69 @@ describe("uploads API", () => {
     const big = Buffer.concat([await jpeg(), Buffer.alloc(10 * 1024 * 1024)]);
     const tooBig = await upload({ purpose: "post", itemId: "i1", contentType: "image/jpeg", size: 1000 }, big);
     expect(tooBig.done!.json().error.message).toBe("That file is too big. The most is 10 MB.");
+  });
+
+  describe("video uploads flag (meta/flags.videoUploads)", () => {
+    const videoBodies = [
+      { purpose: "post", itemId: "i1", contentType: "video/mp4", size: 1000 },
+      { purpose: "teamVideo", itemId: "i1", contentType: "video/quicktime", size: 1000, targetId: "t1" },
+      { purpose: "chat", itemId: "i1", contentType: "video/mp4", size: 1000, targetId: "conversations/u1_u2" },
+      // Sent as a file, named like a video.
+      { purpose: "chat", itemId: "i1", contentType: "application/octet-stream", size: 1000, name: "clip.MOV", targetId: "conversations/u1_u2" },
+    ];
+    const off: Array<[string, () => void]> = [
+      ["false", () => store.put("meta/flags", { videoUploads: false })],
+      ["a non-boolean", () => store.put("meta/flags", { videoUploads: "true" })],
+      ["missing", () => store.docs.delete("meta/flags")],
+    ];
+
+    it.each(off)("refuses every kind of video up front when the flag is %s", async (_, set) => {
+      set();
+      for (const body of videoBodies) {
+        const res = await call("/v1/uploads", body, body.targetId === "t1" ? "mgr" : "u1");
+        expect(res.statusCode).toBe(412);
+        expect(res.json().error.message).toBe("Video uploads aren't available right now.");
+      }
+      expect([...store.docs.keys()].filter((k) => k.startsWith("uploads/"))).toEqual([]);
+    });
+
+    it("fails closed when the flag can't be read", async () => {
+      const get = store.get.bind(store);
+      store.get = async (path: string) => {
+        if (path === "meta/flags") throw new Error("unavailable");
+        return get(path);
+      };
+      const res = await call("/v1/uploads", videoBodies[2]);
+      expect(res.statusCode).toBe(412);
+    });
+
+    it("still takes photos and documents", async () => {
+      store.put("meta/flags", { videoUploads: false });
+      expect((await call("/v1/uploads", { purpose: "post", itemId: "i1", contentType: "image/jpeg", size: 1000 })).statusCode).toBe(201);
+      const doc = { purpose: "chat", itemId: "i2", contentType: "application/pdf", size: 1000, name: "plan.pdf", targetId: "conversations/u1_u2" };
+      expect((await call("/v1/uploads", doc)).statusCode).toBe(201);
+    });
+
+    it("refuses on complete a video whose flag was turned off after the URL was signed, and deletes it", async () => {
+      const res = await call("/v1/uploads", videoBodies[2]);
+      expect(res.statusCode).toBe(201);
+      const { id } = res.json();
+      storage.files.set(`uploads/raw/u1/${id}`, { data: samples["video/mp4"] });
+      store.put("meta/flags", { videoUploads: false });
+      const done = await call(`/v1/uploads/${id}/complete`);
+      expect(done.statusCode).toBe(412);
+      expect(storage.files.has(`uploads/raw/u1/${id}`)).toBe(false);
+      expect(store.doc(`uploads/${id}`)).toMatchObject({ status: "failed" });
+    });
+
+    it("refuses a video sent as a document, by its bytes, on complete", async () => {
+      store.put("meta/flags", { videoUploads: true });
+      const res = await call("/v1/uploads", { purpose: "chat", itemId: "i1", contentType: "application/pdf", size: 1000, name: "plan.pdf", targetId: "conversations/u1_u2" });
+      const { id } = res.json();
+      storage.files.set(`uploads/raw/u1/${id}`, { data: samples["video/mp4"] });
+      store.put("meta/flags", { videoUploads: false });
+      expect((await call(`/v1/uploads/${id}/complete`)).statusCode).toBe(412);
+    });
   });
 
   it("queues a video for transcoding", async () => {
@@ -726,9 +791,18 @@ describe("photo checks (SafeSearch)", () => {
     expect([...storage.files.keys()].filter((k) => k.includes(id))).toEqual([]);
   });
 
-  it("lets the photo through when Vision fails", async () => {
+  it("fails closed when Vision fails: nothing saved, 503, the upload stays pending to retry", async () => {
     answer = new Error("Vision 503");
-    expect((await uploadPhoto()).done.statusCode).toBe(200);
+    const { id, done } = await uploadPhoto();
+    expect(done.statusCode).toBe(503);
+    expect(done.json().error.code).toBe("unavailable");
+    expect(store.doc(`uploads/${id}`)).toMatchObject({ status: "pending" });
+    expect([...storage.files.keys()].filter((k) => k.includes(id) && !k.startsWith("uploads/raw/"))).toEqual([]);
+  });
+
+  it("fails closed when Vision gives no answer", async () => {
+    answer = null;
+    expect((await uploadPhoto()).done.statusCode).toBe(503);
   });
 });
 
