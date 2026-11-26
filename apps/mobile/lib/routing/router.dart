@@ -1,3 +1,4 @@
+import '../data/repositories/account_gate/account_gate.dart';
 import '../data/repositories/chat/chat_repository.dart';
 import '../data/services/payment_sheet_service.dart';
 import '../data/repositories/team/team_repository.dart';
@@ -102,19 +103,25 @@ final _rootKey = GlobalKey<NavigatorState>();
 GoRouter router(
   AuthRepository auth,
   PersonalDetailsRepository personal,
-  AgreementRepository agreement,
-) => GoRouter(
+  AgreementRepository agreement, {
+  AccountGate? gate,
+}) => GoRouter(
   navigatorKey: _rootKey,
   initialLocation: Routes.home,
-  refreshListenable: Listenable.merge([auth, personal, agreement]),
+  refreshListenable: Listenable.merge([auth, personal, agreement, ?gate]),
   // Stripe coming back to the payment sheet (a bank or wallet page) is for
   // Stripe, not a page to open.
   onEnter: (_, _, next, _) {
     if (!isStripeReturn(next.uri)) return const Allow();
     return Block.then(() => completeStripeReturn(next.uri));
   },
-  redirect: (context, state) =>
-      authRedirect(auth, state.uri, personal: personal, agreement: agreement),
+  redirect: (context, state) => authRedirect(
+    auth,
+    state.uri,
+    personal: personal,
+    agreement: agreement,
+    gate: gate,
+  ),
   routes: [
     GoRoute(
       path: splashPath,
@@ -127,6 +134,8 @@ GoRouter router(
     ),
     GoRoute(path: Routes.accountCheck, builder: (_, _) => accountCheckPage()),
     GoRoute(path: Routes.agreeTerms, builder: (_, _) => agreeTermsPage()),
+    GoRoute(path: Routes.verifyEmail, builder: (_, _) => verifyEmailPage()),
+    GoRoute(path: Routes.adultsOnly, builder: (_, _) => adultsOnlyPage()),
     GoRoute(
       path: Routes.finishSignUp,
       builder: (_, _) => personalDetailsPage(finishing: true),
@@ -1104,6 +1113,7 @@ String? authRedirect(
   Uri uri, {
   PersonalDetailsRepository? personal,
   AgreementRepository? agreement,
+  AccountGate? gate,
 }) {
   final path = uri.path;
   final from = uri.queryParameters['from'];
@@ -1125,6 +1135,13 @@ String? authRedirect(
           : {'from': target},
     ).toString();
   }
+  // A birth date under 18: launch is adults only. A dead end (sign out or
+  // delete the account), not a form to retry.
+  final adultsOnly = path == Routes.adultsOnly;
+  if (gate?.underAge ?? false) {
+    return adultsOnly ? null : Routes.adultsOnly;
+  }
+  if (adultsOnly) return from ?? Routes.home;
   // The sign-up checks (terms, personal details) errored or came back
   // unreadable: hold the app on "Couldn't check your account" until a retry
   // gets a real answer. (Not having an answer yet doesn't hold anyone.)
@@ -1140,11 +1157,40 @@ String? authRedirect(
     ).toString();
   }
   if (checkingAccount) return from ?? Routes.home;
+  String? hold(String to) {
+    final target = public || path == splashPath ? from : uri.toString();
+    return Uri(
+      path: to,
+      queryParameters: target == null || target == Routes.home
+          ? null
+          : {'from': target},
+    ).toString();
+  }
+
+  // The account gate (docs/specifications/contracts/account-gate.md): a
+  // write was refused for a missing step; go to it, by the first field.
+  // The API client has already retried once, so this isn't a loop.
+  final verifying = path == Routes.verifyEmail;
+  if (gate?.first == AccountGate.emailUnverified) {
+    return verifying ? null : hold(Routes.verifyEmail);
+  }
+  if (verifying) return from ?? Routes.home;
+  // No username, profile or photo is written before the birth date is
+  // saved (the server refuses them until the token has `ageOk`), so a
+  // new account is asked for it first.
+  final finishing = path == Routes.finishSignUp;
+  final needsName = (personal?.status?.required ?? false) && auth.needsName;
+  final birthDateFirst =
+      (auth.needsUsername || needsName) &&
+      !auth.ageOk &&
+      personal?.status != null;
+  if (birthDateFirst || (gate?.has(AccountGate.age) ?? false)) {
+    return finishing ? null : hold(Routes.finishSignUp);
+  }
   // No username yet, or a new account without a name (Google and Apple
   // skip the form that asks them; Apple can hide the name): "Your name and
   // username" first, then carry on.
   final choosing = path == Routes.chooseUsername;
-  final needsName = (personal?.status?.required ?? false) && auth.needsName;
   if (auth.needsUsername || needsName) {
     if (choosing) return null;
     final target = public || path == splashPath ? from : uri.toString();
@@ -1159,7 +1205,8 @@ String? authRedirect(
   // Everyone agrees to the Community Guidelines and Terms (again when they
   // change). Only on a definite "not yet"; while unknown nobody waits.
   final agreeing = path == Routes.agreeTerms;
-  if (agreement?.mustAgree ?? false) {
+  if ((agreement?.mustAgree ?? false) ||
+      (gate?.has(AccountGate.terms) ?? false)) {
     if (agreeing) return null;
     final target = public || path == splashPath ? from : uri.toString();
     return Uri(
@@ -1172,7 +1219,6 @@ String? authRedirect(
   if (agreeing) return from ?? Routes.home;
   // A new account without personal details: those next. Only on a definite
   // "required and missing"; while it's unknown nobody is held up.
-  final finishing = path == Routes.finishSignUp;
   if (personal?.mustComplete ?? false) {
     if (finishing) return null;
     final target = public || path == splashPath ? from : uri.toString();

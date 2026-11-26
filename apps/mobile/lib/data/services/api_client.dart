@@ -5,6 +5,9 @@ import 'package:http/http.dart' as http;
 
 import 'app_check.dart';
 
+const accountIncompleteCode = 'account_incomplete';
+const _statusPath = '/v1/me/personal/status';
+
 /// The API turned a request down; [message] is the API's own, ready to
 /// show. [code] is one of ApiErrorCode in packages/shared/src/api.ts.
 class ApiException implements Exception {
@@ -15,6 +18,11 @@ class ApiException implements Exception {
 
   /// Per-field messages, for `invalid_argument`.
   final Map<String, String> fields;
+
+  /// 403 `account_incomplete`: the account can read but not write yet
+  /// (docs/specifications/contracts/account-gate.md). [fields] names what
+  /// is missing.
+  bool get accountIncomplete => code == accountIncompleteCode;
 
   @override
   String toString() => message;
@@ -38,6 +46,11 @@ class ApiClient {
   /// The client for this build's `API_BASE_URL`, or null without one.
   static ApiClient? fromEnvironment() =>
       _baseUrl.isEmpty ? null : ApiClient(baseUrl: Uri.parse(_baseUrl));
+
+  /// Told when a write is still refused as `account_incomplete` after the
+  /// one retry (the app then routes by the first field). Set by
+  /// dependencies.dart.
+  void Function(Map<String, String> fields)? onAccountIncomplete;
 
   final Uri _base;
   final FirebaseAuth? _auth;
@@ -76,12 +89,49 @@ class ApiClient {
 
   /// Sends [method] to [path], with [body] as JSON when given, and returns
   /// the decoded JSON answer or throws [ApiException].
+  ///
+  /// A 403 `account_incomplete` is handled here, once: ask for the account
+  /// status (which sets any claims it already earns), and when that says to
+  /// refresh the token, do and send the request again. Still refused (or
+  /// nothing to refresh): [onAccountIncomplete] hears which steps are
+  /// missing and the [ApiException] is thrown. No loop: one retry only.
+  /// Any answer with `refreshToken: true` refreshes the ID token.
   Future<Map<String, Object?>> send(
     String method,
     String path, [
     Map<String, Object?>? body,
     Duration timeout = _timeout,
   ]) async {
+    try {
+      return await _sendOnce(method, path, body, timeout);
+    } on ApiException catch (e) {
+      if (!e.accountIncomplete || path == _statusPath) rethrow;
+      var refreshed = false;
+      try {
+        final status = await _sendOnce('GET', _statusPath, null, _timeout);
+        refreshed = status['refreshToken'] == true;
+      } on Exception {
+        // The original refusal stands.
+      }
+      if (!refreshed) {
+        onAccountIncomplete?.call(e.fields);
+        rethrow;
+      }
+      try {
+        return await _sendOnce(method, path, body, timeout);
+      } on ApiException catch (again) {
+        if (again.accountIncomplete) onAccountIncomplete?.call(again.fields);
+        rethrow;
+      }
+    }
+  }
+
+  Future<Map<String, Object?>> _sendOnce(
+    String method,
+    String path,
+    Map<String, Object?>? body,
+    Duration timeout,
+  ) async {
     final user = (_auth ?? FirebaseAuth.instance).currentUser;
     if (user == null) {
       throw const ApiException('unauthenticated', 'Not signed in.');
@@ -112,7 +162,17 @@ class ApiClient {
     } on Exception {
       throw _offline;
     }
-    return _decode(response);
+    final answer = _decode(response);
+    if (answer['refreshToken'] == true) {
+      // The API changed this account's claims; they reach us only in a new
+      // ID token, which the next write needs.
+      try {
+        await user.getIdToken(true);
+      } on Exception {
+        // Offline: a later refusal runs the steps above again.
+      }
+    }
+    return answer;
   }
 
   static Map<String, Object?> _decode(http.Response response) {

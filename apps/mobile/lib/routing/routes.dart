@@ -19,6 +19,12 @@ abstract final class Routes {
 
   /// The last step of signing up: personal details (new accounts).
   static const finishSignUp = '/welcome/details';
+
+  /// The account can't write until its email is verified (account gate).
+  static const verifyEmail = '/welcome/verify-email';
+
+  /// Dead end for a birth date under 18 (launch is adults only).
+  static const adultsOnly = '/welcome/adults-only';
   static const home = '/home';
   static const teams = '/teams';
   static const createTeam = '/teams/new';

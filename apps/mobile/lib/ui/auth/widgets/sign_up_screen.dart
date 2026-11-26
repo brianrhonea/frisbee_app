@@ -154,7 +154,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       child: InputDecorator(
                         decoration: InputDecoration(
                           labelText: 'Date of birth',
-                          helperText: 'Only you will see it.',
+                          helperText: 'Must be 18 or older. Only you see it.',
                           errorText: field.errorText,
                           errorMaxLines: 2,
                           suffixIcon: const Icon(Icons.calendar_today_outlined),

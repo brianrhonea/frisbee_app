@@ -12,6 +12,7 @@ import 'package:logging/logging.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:provider/provider.dart';
 
+import 'data/repositories/account_gate/account_gate.dart';
 import 'config/dependencies.dart';
 import 'data/repositories/auth/auth_repository.dart';
 import 'data/repositories/notification/notification_repository.dart';
@@ -110,7 +111,12 @@ class FrisbeeApp extends StatefulWidget {
 class _FrisbeeAppState extends State<FrisbeeApp> {
   late final AuthRepository _auth = context.read();
   late final NotificationRepository _notifications = context.read();
-  late final GoRouter _router = router(_auth, context.read(), context.read());
+  late final GoRouter _router = router(
+    _auth,
+    context.read(),
+    context.read(),
+    gate: context.read<AccountGate>(),
+  );
   late final MeetingAlertsViewModel _meetingAlerts;
   late final OutboxViewModel _outbox = OutboxViewModel(outbox: context.read());
   late final InAppNoticesViewModel _notices = InAppNoticesViewModel(
