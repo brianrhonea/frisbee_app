@@ -4,6 +4,15 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.59.6 — 2026-11-26
+
+- Text, spacing, corner and motion tokens in `site.css` (K6/K7): `--text-<name>`
+  (`weight size/line`, plus `--text-<name>-size`), `--space-<name>`,
+  `--radius-pill`, `--dur-fast/base/sheet` and `--ease`; durations are 0
+  under `prefers-reduced-motion`. Spacing, font sizes, corner radii and
+  transitions that equalled a token now use it (no layout change; the
+  .15s transitions now run at 120ms). The 26 skipped token-parity checks run.
+
 ## 0.59.5 — 2026-11-24
 
 - Notifications: each row has an icon for what happened (like, repost,
