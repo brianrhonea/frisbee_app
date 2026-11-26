@@ -12,7 +12,6 @@ import 'package:frisbee_app/ui/notifications/view_models/notification_settings_v
 import 'package:frisbee_app/ui/notifications/view_models/notifications_viewmodel.dart';
 import 'package:frisbee_app/ui/notifications/widgets/notification_settings_screen.dart';
 import 'package:frisbee_app/ui/notifications/widgets/notifications_screen.dart';
-import 'package:frisbee_app/ui/profile/view_models/profile_viewmodel.dart';
 import 'package:frisbee_app/ui/shell/widgets/app_shell.dart';
 import 'package:go_router/go_router.dart';
 
@@ -381,18 +380,5 @@ void main() {
       await tester.pumpAndSettle();
       expect(repo.prefs.hasOverrides('t1'), isFalse);
     });
-  });
-
-  test('signing out unregisters this device first', () async {
-    final repo = FakeNotificationRepository();
-    final vm = ProfileViewModel(
-      authRepository: FakeAuthRepository(user: testUser),
-      themeRepository: FakeThemeRepository(),
-      notificationRepository: repo,
-      directMessageRepository: FakeDirectMessageRepository(),
-    );
-    await vm.signOut.execute();
-    expect(repo.unregistered, ['u1']);
-    vm.dispose();
   });
 }

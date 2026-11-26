@@ -10,6 +10,7 @@ import 'package:frisbee_app/data/services/feature_flags.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/invite_code.dart';
 import 'package:frisbee_app/domain/models/team.dart';
+import 'package:frisbee_app/ui/core/ui/error_message.dart';
 import 'package:frisbee_app/utils/result.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -92,6 +93,71 @@ void main() {
           (method: 'DELETE', path: '/v1/c', body: null),
         ].map(_m),
       );
+    });
+  });
+
+  group('updateTeam and the club level', () {
+    const msg =
+        "This team can't switch to the club level: 2 people on it are under "
+        "16 or haven't added a date of birth. Club teams are for players 16 "
+        'and over.';
+
+    test('a 412 from the API reaches the user as the server message', () async {
+      final api = ApiClient(
+        baseUrl: Uri.parse('https://api.test'),
+        auth: MockFirebaseAuth(signedIn: true, mockUser: MockUser(uid: 'u1')),
+        client: MockClient(
+          (_) async => http.Response(
+            jsonEncode({
+              'error': {
+                'code': 'failed_precondition',
+                'message': msg,
+                'fields': {'level': msg},
+              },
+            }),
+            412,
+            headers: {'content-type': 'application/json'},
+          ),
+        ),
+      );
+      final r = await TeamRepositoryFirebase(
+        attachments: AttachmentStorage(),
+        firestore: db,
+        api: api,
+      ).updateTeam(team);
+      expect(r, isA<Error<void>>());
+      expect(errorMessage(r), msg);
+    });
+
+    test('the Firestore fallback never writes level', () async {
+      await db.doc('teams/t1').set({
+        'name': 'The Haze',
+        'division': 'open',
+        'level': 'youth',
+        'city': 'Austin',
+      });
+      final r = await repo(
+        api: false,
+      ).updateTeam(team.copyWith(level: CompetitionLevel.youth, city: 'Waco'));
+      expect(r, isA<Ok<void>>());
+      final doc = (await db.doc('teams/t1').get()).data()!;
+      expect(doc['city'], 'Waco');
+      expect(doc['level'], 'youth');
+    });
+
+    test('the fallback refuses a level change with a clear error', () async {
+      await db.doc('teams/t1').set({
+        'name': 'The Haze',
+        'division': 'open',
+        'level': 'youth',
+        'city': 'Austin',
+      });
+      final r = await repo(
+        flags: FeatureFlags.fixed({'use_api_membership': false}),
+      ).updateTeam(team.copyWith(level: CompetitionLevel.club));
+      expect(r, isA<Error<void>>());
+      expect(errorMessage(r), contains("level can't be changed"));
+      expect((await db.doc('teams/t1').get()).data()!['level'], 'youth');
     });
   });
 

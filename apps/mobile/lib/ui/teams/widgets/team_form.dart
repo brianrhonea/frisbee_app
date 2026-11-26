@@ -47,13 +47,15 @@ class _TeamFormState extends State<TeamForm> {
 
   bool get _isGroup => _kind.isGroupLike;
 
-  /// The club age rule, under Level while club is picked. A team moved to
-  /// club keeps everyone on it; only new players must be 16 or over.
+  /// The club age rule, under Level while club is picked. Moving a team to
+  /// club needs everyone on it to be 16 or over with a birth date (the
+  /// server checks).
   String? get _clubNotice {
     if (_isGroup || _level != CompetitionLevel.club) return null;
     final wasClub = widget.initial?.level == CompetitionLevel.club;
     return _editing && !wasClub
-        ? '$clubTooYoungMessage People already on the team stay on it.'
+        ? '$clubTooYoungMessage Switching an existing team to club needs everyone '
+              'on it to be 16 or over with a date of birth.'
         : clubTooYoungMessage;
   }
 

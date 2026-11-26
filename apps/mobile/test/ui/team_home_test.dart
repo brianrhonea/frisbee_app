@@ -406,12 +406,18 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        expect(find.byKey(const ValueKey('tournament-invites')), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('tournament-invites')),
+          findsOneWidget,
+        );
         expect(find.text('Tournament invites · 2'), findsOneWidget);
         expect(find.text('Spring Fling'), findsOneWidget);
         expect(find.textContaining('Reply by'), findsOneWidget);
         // One button: Accept or Decline come first in the flow.
-        expect(find.byKey(const ValueKey('respond-invite-spring')), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('respond-invite-spring')),
+          findsOneWidget,
+        );
         expect(find.widgetWithText(FilledButton, 'Decline'), findsNothing);
         // An expired one says so, with nothing to press.
         expect(find.textContaining('Expired.'), findsOneWidget);

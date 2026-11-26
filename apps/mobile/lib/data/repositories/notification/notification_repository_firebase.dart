@@ -288,11 +288,19 @@ class NotificationRepositoryFirebase implements NotificationRepository {
     final fid = _fid;
     _fid = null;
     if (fid == null) return;
+    // Both at once: offline, the Firestore delete waits for the server, and
+    // the FCM installation must still be dropped.
+    await Future.wait([
+      _attempt(() => _devices(uid).doc(fid).delete(), 'device doc'),
+      _attempt(_push.unregister, 'installation'),
+    ]);
+  }
+
+  Future<void> _attempt(Future<void> Function() body, String what) async {
     try {
-      await _devices(uid).doc(fid).delete();
-      await _push.unregister();
+      await body();
     } on Exception catch (e) {
-      _log.warning('Device unregister failed', e);
+      _log.warning('Device unregister ($what) failed', e);
     }
   }
 

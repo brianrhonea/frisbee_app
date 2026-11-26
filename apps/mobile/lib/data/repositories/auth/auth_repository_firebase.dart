@@ -26,6 +26,8 @@ class AuthRepositoryFirebase extends AuthRepository {
     FirebaseFirestore? firestore,
     ApiClient? api,
     FeatureFlags? flags,
+    this.beforeSignOut,
+    this.beforeSignOutTimeout = const Duration(seconds: 4),
   }) : _authService = authService,
        _accounts = accountService,
        _api = api,
@@ -42,6 +44,14 @@ class AuthRepositoryFirebase extends AuthRepository {
   /// `use_api_profiles` is on.
   final ApiClient? _api;
   final FeatureFlags? _flags;
+
+  /// Runs with the signed-in uid just before every sign-out, so this
+  /// device stops getting that account's pushes (the next account on the
+  /// phone must not see them). Wired to the notification repository in
+  /// dependencies.dart. Best effort: it gets [beforeSignOutTimeout], and
+  /// sign-out goes ahead if it fails or the device is offline.
+  final Future<void> Function(String uid)? beforeSignOut;
+  final Duration beforeSignOutTimeout;
   final _log = Logger('AuthRepository');
   late final StreamSubscription<User?> _subscription;
 
@@ -353,7 +363,20 @@ class AuthRepositoryFirebase extends AuthRepository {
       guard(() => _authService.updatePhotoUrl(url));
 
   @override
-  Future<Result<void>> signOut() => guard(_authService.signOut);
+  Future<Result<void>> signOut() => guard(() async {
+    // The one place every sign-out goes through (Settings, the sign-up
+    // steps, a failed account delete): the rules stop us once signed out.
+    final uid = _currentUser?.uid ?? _authService.currentUser?.uid;
+    final hook = beforeSignOut;
+    if (uid != null && hook != null) {
+      try {
+        await hook(uid).timeout(beforeSignOutTimeout);
+      } on Object catch (e) {
+        _log.warning('Unregistering the device before sign-out failed', e);
+      }
+    }
+    await _authService.signOut();
+  });
 
   @override
   SignInMethod? get reauthMethod =>
