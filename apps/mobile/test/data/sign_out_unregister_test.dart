@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/data/repositories/auth/auth_repository_firebase.dart';
 import 'package:frisbee_app/data/services/account_service.dart';
 import 'package:frisbee_app/data/services/auth_service.dart';
+import 'package:frisbee_app/ui/auth/view_models/adults_only_viewmodel.dart';
 import 'package:frisbee_app/ui/auth/view_models/agree_terms_viewmodel.dart';
 import 'package:frisbee_app/ui/auth/view_models/choose_username_viewmodel.dart';
 import 'package:frisbee_app/ui/personal/view_models/personal_details_viewmodel.dart';
@@ -102,13 +103,9 @@ void main() {
     vm.dispose();
   });
 
-  test('personal details: a failed delete signs out through it too', () async {
-    final vm = PersonalDetailsViewModel(
-      personalRepository: FakePersonalDetailsRepository(),
-      authRepository: repo,
-      finishing: true,
-    );
-    await vm.refuseUnderAge();
+  test('the adults-only screen sign-out unregisters first', () async {
+    final vm = AdultsOnlyViewModel(authRepository: repo);
+    await vm.signOut.execute();
     expectUnregisteredFirst();
     vm.dispose();
   });

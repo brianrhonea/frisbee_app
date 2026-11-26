@@ -17,8 +17,11 @@ void main() {
       birthDateProblem(DateTime(2027), today),
       'That date is in the future.',
     );
-    expect(birthDateProblem(DateTime(2014), today), tooYoungMessage);
-    expect(birthDateProblem(DateTime(2013, 11, 20), today), isNull);
+    // Launch is adults only: 18 and over, as the API's adultOnlyMessage.
+    expect(birthDateProblem(DateTime(2014), today), adultOnlyMessage);
+    expect(birthDateProblem(DateTime(2008, 11, 21), today), adultOnlyMessage);
+    expect(birthDateProblem(DateTime(2008, 11, 20), today), isNull);
+    expect(adultOnlyMessage, 'You must be 18 or older to use Stall 10.');
     expect(birthDateProblem(DateTime(1890), today), isNotNull);
   });
 

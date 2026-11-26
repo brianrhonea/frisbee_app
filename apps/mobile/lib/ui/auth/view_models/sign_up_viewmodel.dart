@@ -35,7 +35,8 @@ class SignUpViewModel extends ChangeNotifier {
 
   late final Command1<void, SignUpForm> signUp;
 
-  /// Under 13, no account is made (the details step checks again).
+  /// Under 18, no account is made (launch is adults only; the server
+  /// checks again and its own message is shown if it refuses).
   String? birthDateProblemOn(DateTime? birth) {
     final n = DateTime.now();
     return birthDateProblem(birth, DateTime(n.year, n.month, n.day));
@@ -54,19 +55,26 @@ class SignUpViewModel extends ChangeNotifier {
       firstName: f.firstName,
       lastName: f.lastName,
       username: f.username,
+      // The birth date goes first, right after the login exists: the
+      // server refuses the username and the directory profile until it
+      // is saved (the `ageOk` claim).
+      afterCreate: () => _saveBirthDate(f.birthDate),
     );
     if (result case Error(error: UsernameTakenException())) {
       username.markTaken();
     }
-    // Whenever the account was made, even if a later step failed.
-    if (_auth.currentUser != null) {
-      // Kept (encrypted) so "About you" has it after a restart or on
-      // another device. Never holds up sign-up: if it fails (offline, a
-      // build without the API, or under 13 by the server's date), the
-      // in-memory copy still fills the form, whose save checks again.
-      await _personal.saveSignUpBirthDate(f.birthDate);
-    }
     return result;
+  }
+
+  /// Kept (encrypted) so "About you" has it after a restart or on another
+  /// device. Never holds up sign-up when it can't be reached (offline, no
+  /// API): the in-memory copy still fills the form, whose save checks
+  /// again, and the username waits for it. Returns false when the server
+  /// refused the date as under 18: the app then shows the adults-only
+  /// screen, and nothing else is written.
+  Future<bool> _saveBirthDate(DateTime birthDate) async {
+    final saved = await _personal.saveSignUpBirthDate(birthDate);
+    return saved is! Error || saved.error is! TooYoungException;
   }
 
   @override

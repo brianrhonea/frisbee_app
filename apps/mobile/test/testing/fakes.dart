@@ -109,6 +109,7 @@ class FakeAuthRepository extends AuthRepository {
     required String firstName,
     required String lastName,
     required String username,
+    Future<bool> Function()? afterCreate,
   }) async {
     if (takenUsernames.contains(Username.normalize(username))) {
       return Result.error(UsernameTakenException(username));
@@ -119,11 +120,50 @@ class FakeAuthRepository extends AuthRepository {
       ),
     );
     if (result is Error) return result;
+    events.add('account-created');
+    if (!(await afterCreate?.call() ?? true)) return const Result.ok(null);
+    events.add('claim-username');
     return claimUsername(username);
   }
 
   /// Usernames someone else has.
   final takenUsernames = <String>{};
+
+  /// What sign-up did, in order (the account, then the username claim).
+  final events = <String>[];
+
+  /// The account's `ageOk` claim; on by default so most tests go straight
+  /// in.
+  bool ageOkClaim = true;
+
+  @override
+  bool get ageOk => ageOkClaim;
+
+  /// Whether the email is verified, and what the verification calls did.
+  bool verified = true;
+  bool verifiedAfterCheck = true;
+  int verificationsSent = 0;
+  int verifiedChecks = 0;
+
+  @override
+  bool get emailVerified => verified;
+
+  @override
+  Future<Result<void>> sendEmailVerification() =>
+      _run(() => verificationsSent++);
+
+  @override
+  Future<Result<bool>> checkEmailVerified() async {
+    verifiedChecks++;
+    final e = nextError;
+    if (e != null) {
+      nextError = null;
+      return Result.error(e);
+    }
+    verified = verifiedAfterCheck;
+    notifyListeners();
+    return Result.ok(verified);
+  }
 
   /// Whether the signed-in user is still to pick one; off so most tests
   /// go straight in.
@@ -3242,6 +3282,13 @@ class FakePersonalDetailsRepository extends PersonalDetailsRepository {
 
   /// Makes the next save fail as the API does for someone under 13.
   bool refuseTooYoung = false;
+
+  /// Makes the next save fail as the API does for a different birth date
+  /// than the saved one.
+  bool refuseLocked = false;
+
+  /// Makes [saveSignUpBirthDate] fail with this (offline, say).
+  Exception? saveBirthDateError;
   DateTime? _birth;
 
   void setStatus(PersonalDetailsStatus? s) {
@@ -3279,6 +3326,7 @@ class FakePersonalDetailsRepository extends PersonalDetailsRepository {
   @override
   Future<Result<void>> saveSignUpBirthDate(DateTime birthDate) async {
     if (refuseTooYoung) return const Result.error(TooYoungException());
+    if (saveBirthDateError case final e?) return Result.error(e);
     if (details != null) {
       return Result.error(Exception('Your details are already saved.'));
     }
@@ -3289,6 +3337,7 @@ class FakePersonalDetailsRepository extends PersonalDetailsRepository {
   @override
   Future<Result<void>> save(PersonalDetails d) async {
     if (refuseTooYoung) return const Result.error(TooYoungException());
+    if (refuseLocked) return const Result.error(BirthDateLockedException());
     saved.add(d);
     details = d;
     setStatus(

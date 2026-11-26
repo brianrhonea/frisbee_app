@@ -3,6 +3,15 @@ import 'package:flutter/foundation.dart';
 import '../../../domain/models/app_user.dart';
 import '../../../utils/result.dart';
 
+/// Claiming a username (or writing the profile) before the birth date is
+/// saved: the server would refuse, so it isn't tried.
+class AgeNotConfirmedException implements Exception {
+  const AgeNotConfirmedException();
+
+  @override
+  String toString() => 'Add your date of birth first, then pick a username.';
+}
+
 /// Source of truth for the signed-in user.
 ///
 /// Extends [ChangeNotifier] so the router can refresh on auth changes.
@@ -25,6 +34,23 @@ abstract class AuthRepository extends ChangeNotifier {
   /// account for one ("Your name and username").
   bool get needsName;
 
+  /// The signed-in account's ID token has the `ageOk` claim: a saved birth
+  /// date made it 18 or over. Until then nothing writes the directory
+  /// profile, a username or a photo (the server refuses). True by default,
+  /// for repositories with no such claim.
+  bool get ageOk => true;
+
+  /// The signed-in email account has verified its email (Google and Apple
+  /// accounts always have). True by default.
+  bool get emailVerified => true;
+
+  /// Sends Firebase's verification email to the signed-in account.
+  Future<Result<void>> sendEmailVerification() async => const Result.ok(null);
+
+  /// "I've verified": reloads the user, takes a new ID token so the API
+  /// and rules see `email_verified`, and returns whether it is now true.
+  Future<Result<bool>> checkEmailVerified() async => const Result.ok(true);
+
   /// Whether nobody has [username] yet. It's only claimed by
   /// [claimUsername], so it can still be taken in between.
   Future<Result<bool>> isUsernameAvailable(String username);
@@ -43,12 +69,20 @@ abstract class AuthRepository extends ChangeNotifier {
   /// [username] for it. If the username was taken in the meantime, the
   /// account is still made and the app asks for another
   /// ([needsUsername]).
+  ///
+  /// The server refuses the directory profile, a username and a photo until
+  /// the birth date is saved (the `ageOk` claim), so [afterCreate] runs
+  /// right after the login exists and before any of them: it saves the
+  /// birth date and returns whether to go on. When it returns false, or the
+  /// claim still isn't there afterwards, no profile or username is written;
+  /// the app asks for them once the birth date is in ([ageOk]).
   Future<Result<void>> signUpWithEmail({
     required String email,
     required String password,
     required String firstName,
     required String lastName,
     required String username,
+    Future<bool> Function()? afterCreate,
   });
 
   Future<Result<void>> signInWithGoogle();

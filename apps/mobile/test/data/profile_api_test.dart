@@ -44,7 +44,11 @@ void main() {
   setUp(() {
     auth = MockFirebaseAuth(
       signedIn: true,
-      mockUser: MockUser(uid: 'u1', displayName: 'Pat'),
+      mockUser: MockUser(
+        uid: 'u1',
+        displayName: 'Pat',
+        customClaim: {'ageOk': true},
+      ),
     );
     sent = [];
     db = FakeFirebaseFirestore();

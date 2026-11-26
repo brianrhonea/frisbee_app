@@ -3,6 +3,7 @@ import 'package:logging/logging.dart';
 import '../../../domain/models/personal_details.dart';
 import '../../../utils/result.dart';
 import '../../services/api_client.dart';
+import '../account_gate/account_gate.dart';
 import '../auth/auth_repository.dart';
 import 'personal_repository.dart';
 
@@ -14,14 +15,17 @@ class PersonalDetailsRepositoryApi extends PersonalDetailsRepository {
   PersonalDetailsRepositoryApi({
     required ApiClient? api,
     required AuthRepository auth,
+    AccountGate? gate,
   }) : _api = api,
-       _auth = auth {
+       _auth = auth,
+       _gate = gate {
     _auth.addListener(_onAuth);
     _onAuth();
   }
 
   final ApiClient? _api;
   final AuthRepository _auth;
+  final AccountGate? _gate;
   String? _uid;
   PersonalDetailsStatus? _status;
   DateTime? _signUpBirthDate;
@@ -98,13 +102,11 @@ class PersonalDetailsRepositoryApi extends PersonalDetailsRepository {
             'birthDate': isoDate(birthDate),
           });
         } on ApiException catch (e) {
-          if (e.code == 'failed_precondition' &&
-              e.fields.containsKey('birthDate')) {
-            throw const TooYoungException();
-          }
-          rethrow;
+          throw _refusal(e) ?? e;
         }
-        // The status is unchanged: the details aren't complete yet.
+        // The status is unchanged: the details aren't complete yet. The
+        // server set ageOk (the ApiClient refreshed the token).
+        _gate?.clear(AccountGate.age);
       });
 
   @override
@@ -114,18 +116,23 @@ class PersonalDetailsRepositoryApi extends PersonalDetailsRepository {
     try {
       await api.put('/v1/me/personal', details.toMap());
     } on ApiException catch (e) {
-      if (e.code == 'failed_precondition' &&
-          e.fields.containsKey('birthDate')) {
-        throw const TooYoungException();
-      }
-      rethrow;
+      throw _refusal(e) ?? e;
     }
+    _gate?.clear(AccountGate.age);
     _status = PersonalDetailsStatus(
       complete: true,
       required: _status?.required ?? false,
     );
     notifyListeners();
   });
+
+  /// A 412 on the birth date as the exception the screens show; an
+  /// adults-only refusal also sends the app to the dead-end screen.
+  Exception? _refusal(ApiException e) {
+    final x = birthDateRefusal(e.code, e.fields, e.message);
+    if (x is TooYoungException) _gate?.markUnderAge();
+    return x;
+  }
 
   static const _noApi =
       "Personal details can't be saved in this version of the app. Update "

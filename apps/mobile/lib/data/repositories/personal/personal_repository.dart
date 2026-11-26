@@ -41,13 +41,14 @@ abstract class PersonalDetailsRepository extends ChangeNotifier {
   /// before the details are given, the birthday saved at sign-up.
   Future<Result<PersonalDetailsLoad>> load();
 
-  /// Saves [details]; fails with [TooYoungException] under 13.
+  /// Saves [details]; fails with [TooYoungException] under 18 and
+  /// [BirthDateLockedException] for a different date than the saved one.
   Future<Result<void>> save(PersonalDetails details);
 
   /// Saves the email sign-up form's birthday, encrypted like the details
   /// (`PUT /v1/me/personal/birth-date`), so "About you" has it after a
   /// restart or on another device. Doesn't complete the details; refused
-  /// once they're saved. Fails with [TooYoungException] under 13.
+  /// once they're saved. Fails with [TooYoungException] under 18.
   Future<Result<void>> saveSignUpBirthDate(DateTime birthDate);
 
   /// The birthday from the sign-up form, in memory only, so the details

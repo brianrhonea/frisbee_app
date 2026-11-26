@@ -67,7 +67,6 @@ class PersonalDetailsScreen extends StatelessWidget {
       body: ListenableBuilder(
         listenable: Listenable.merge([vm, vm.load]),
         builder: (context, _) {
-          if (vm.tooYoung) return const _TooYoung();
           if (vm.load.running) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -94,22 +93,6 @@ class PersonalDetailsScreen extends StatelessWidget {
       ),
     );
   }
-}
-
-class _TooYoung extends StatelessWidget {
-  const _TooYoung();
-
-  @override
-  Widget build(BuildContext context) => const Center(
-    child: Padding(
-      padding: EdgeInsets.all(32),
-      child: Text(
-        "$tooYoungMessage We didn't keep your details, and you've been "
-        'signed out.',
-        textAlign: TextAlign.center,
-      ),
-    ),
-  );
 }
 
 class _PersonalForm extends StatefulWidget {
@@ -141,12 +124,6 @@ class _PersonalFormState extends State<_PersonalForm> {
   late final _countryCode = TextEditingController(
     text: _countries.containsKey(d?.address.country) ? '' : d?.address.country,
   );
-  late final _gName = TextEditingController(text: d?.guardian?.name);
-  late final _gRelationship = TextEditingController(
-    text: d?.guardian?.relationship,
-  );
-  late final _gEmail = TextEditingController(text: d?.guardian?.email);
-  late final _gPhone = TextEditingController(text: d?.guardian?.phone);
 
   late DateTime? _birth = d?.birthDate ?? vm.prefillBirthDate;
   late Gender? _gender = d?.gender;
@@ -166,10 +143,6 @@ class _PersonalFormState extends State<_PersonalForm> {
     _region,
     _postal,
     _countryCode,
-    _gName,
-    _gRelationship,
-    _gEmail,
-    _gPhone,
   ];
 
   DateTime get _today {
@@ -177,7 +150,6 @@ class _PersonalFormState extends State<_PersonalForm> {
     return DateTime(n.year, n.month, n.day);
   }
 
-  bool get _minor => _birth != null && ageOn(_birth!, _today) < adultAge;
   bool get _us => _country == 'US';
 
   @override
@@ -198,7 +170,7 @@ class _PersonalFormState extends State<_PersonalForm> {
   void _onSaved() {
     final cmd = vm.save;
     if (cmd.running) return;
-    if (cmd.error && !vm.tooYoung) {
+    if (cmd.error) {
       showErrorSnackBar(context, cmd.result);
       cmd.clearResult();
     } else if (cmd.completed) {
@@ -221,7 +193,7 @@ class _PersonalFormState extends State<_PersonalForm> {
   }
 
   void _submit() {
-    if (vm.finishing && birthDateProblem(_birth, _today) == tooYoungMessage) {
+    if (vm.finishing && birthDateProblem(_birth, _today) == adultOnlyMessage) {
       vm.refuseUnderAge();
       return;
     }
@@ -241,14 +213,6 @@ class _PersonalFormState extends State<_PersonalForm> {
           postalCode: _postal.text,
           country: _country == _otherCountry ? _countryCode.text : _country,
         ),
-        guardian: _minor
-            ? Guardian(
-                name: _gName.text,
-                relationship: _gRelationship.text,
-                email: _gEmail.text,
-                phone: _gPhone.text,
-              )
-            : null,
       ),
     );
   }
@@ -389,15 +353,28 @@ class _PersonalFormState extends State<_PersonalForm> {
               builder: (field) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: InkWell(
-                  onTap: () async {
-                    await _pickBirthDate();
-                    field.didChange(_birth);
-                  },
+                  // Saved once, then read-only (the API refuses a change).
+                  onTap: vm.birthDateLocked
+                      ? null
+                      : () async {
+                          await _pickBirthDate();
+                          field.didChange(_birth);
+                        },
                   child: InputDecorator(
                     decoration: InputDecoration(
                       labelText: 'Date of birth',
+                      helperText: vm.birthDateLocked
+                          ? birthDateLockedHint
+                          : 'You must be $adultAge or older.',
+                      helperMaxLines: 3,
+                      enabled: !vm.birthDateLocked,
                       errorText: field.errorText ?? birthProblem,
-                      suffixIcon: const Icon(Icons.calendar_today_outlined),
+                      errorMaxLines: 2,
+                      suffixIcon: Icon(
+                        vm.birthDateLocked
+                            ? Icons.lock_outline
+                            : Icons.calendar_today_outlined,
+                      ),
                     ),
                     child: Text(
                       _birth == null
@@ -515,42 +492,6 @@ class _PersonalFormState extends State<_PersonalForm> {
                 caps: TextCapitalization.characters,
               ),
             ]),
-            if (_minor) ...[
-              _heading('Parent or guardian'),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(
-                  "Players under $adultAge need a parent or guardian's details.",
-                  style: TextStyle(fontSize: 12, color: c.muted),
-                ),
-              ),
-              _text(
-                _gName,
-                'Name',
-                validator: _required("your parent or guardian's name"),
-                maxLength: PersonalLimits.name,
-              ),
-              _text(
-                _gRelationship,
-                'Relationship (optional)',
-                maxLength: PersonalLimits.relationship,
-              ),
-              _text(
-                _gEmail,
-                'Email',
-                validator: (v) => emailProblem(v ?? ''),
-                maxLength: PersonalLimits.email,
-                keyboard: TextInputType.emailAddress,
-                caps: TextCapitalization.none,
-              ),
-              _text(
-                _gPhone,
-                'Phone',
-                validator: (v) => phoneProblem(v ?? ''),
-                maxLength: PersonalLimits.phone,
-                keyboard: TextInputType.phone,
-              ),
-            ],
           ],
         ),
       ),
