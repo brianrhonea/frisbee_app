@@ -299,3 +299,13 @@ Task board: https://claude.ai/artifact/6NYWMKQmuuRJeHrKJSM1yS
 **Approved (owner, 2026-11-25):**
 - Every page and screen design on the UI direction page. The design gate is lifted.
 - UI-Q8: Vitest, Testing Library, Playwright and axe as **dev-only** website dependencies.
+
+**Decided (owner, 2026-11-25), following the recommendations in §8:**
+- **UI-Q3:** extension tokens approved:
+  - input border;
+  - soft pill tints;
+  - team and personal colours.
+  - Unread uses indigo, per §9.
+- **UI-Q4:** body text 16, secondary 14, dense lists 14.
+- **UI-Q7:** mirrored token files (Dart and CSS) plus a parity fixture test for January; a JSON generator after launch.
+- **UI-Q10:** keep Home's three feed tabs (Your teams / Following / Everyone).
