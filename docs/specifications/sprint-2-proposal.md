@@ -79,3 +79,23 @@
   3. the app and website updates;
   4. enforcement on;
   5. rules and the callable fixes last.
+
+## Progress
+
+- **On `feature/jan-4-release`:**
+  - INF-1 (`ce84d11`).
+  - Lane A (`cd015cb`): the `meta/flags` contract (`9695521`); #13 video uploads behind `videoUploads`; #14 photo screening fails closed and DM attachments are checked; API 0.50.0.
+  - Lane C (`8eb2941`): K6/K7 on the website, with the layout pixel-identical before and after (52 of 64 screenshots identical; the rest differ only by loading timing); #7 error pages and the reporter to `POST /v1/client-errors`.
+- **On `hold/3a-account-gate`:** the 3a-C website work (`58c46b6`), and the release branch merged in (`2a8c5a8`). Rules 523, API 1,485, shared 927, web 263.
+- **Running:**
+  - 3a-S, the security fixes plus the report-only switch and the claim backfill;
+  - 3a-C in the app;
+  - #13 on the website.
+- **Next:**
+  - the `POST /v1/client-errors` endpoint (API);
+  - the app's update-required gate (#6), video flag (#13), Crashlytics (#7), K6/K7 and #24.
+
+**Decisions from lane A for the owner:**
+- **D17:** when Vision errors, the API now refuses the photo (503, retry) instead of letting it through. This is in #14's scope as "fails closed". Confirm?
+- **D18:** video playback uses Firebase download tokens that never expire. Moving to short-lived signed playback URLs needs a design (Sprint 3?).
+- **D19:** a photo uploaded straight to Storage is visible for a few seconds until `photoCheck` runs. Closing that window needs a "pending" marker, which is a data-shape change. Do it, or accept the window?
