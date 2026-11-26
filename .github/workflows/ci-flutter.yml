@@ -19,6 +19,9 @@ on:
       - "apps/mobile/**"
       - ".github/workflows/ci-flutter.yml"
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-flutter-${{ github.ref }}
   cancel-in-progress: true
@@ -30,8 +33,10 @@ jobs:
       run:
         working-directory: apps/mobile
     steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           channel: stable
           # Same version as codemagic.yaml and _deploy-backend.yml.

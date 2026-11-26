@@ -1206,6 +1206,59 @@ describe("club teams are for players 16 and over", () => {
       expect(team().level).toBe("youth");
     });
 
+    it("refuses when the team turned youth with an under-16 after the first read (race); level unchanged", async () => {
+      s.store.put(T, seedTeam({ level: "club" })); // not a switch when read
+      await adults();
+      await born("kid", "2012-06-01");
+      const transact = s.store.transact.bind(s.store);
+      let flipped = false;
+      s.store.transact = (async (fn: Parameters<typeof transact>[0]) => {
+        if (!flipped) {
+          flipped = true;
+          const base = seedTeam();
+          s.store.put(T, seedTeam({ level: "youth", members: { ...base.members, kid: "player" }, memberIds: [...base.memberIds, "kid"] }));
+        }
+        return transact(fn);
+      }) as typeof s.store.transact;
+      const res = await patch("club");
+      expect(res.statusCode).toBe(412);
+      expect(err(res).code).toBe("failed_precondition");
+      expect(team().level).toBe("youth");
+      expect(s.store.doc("teamDirectory/t1")).toBeUndefined();
+    });
+
+    it("refuses a roster over the cap rather than checking part of it", async () => {
+      s.store.put(T, seedTeam({ level: "youth" }));
+      await adults();
+      for (let i = 0; i < 501; i++) s.store.put(`teams/t1/roster/r${String(i).padStart(4, "0")}`, { name: `P${i}`, position: "cutter" });
+      s.store.put("teams/t1/roster/r9999", { name: "Last", position: "cutter", userId: "gone" });
+      await born("gone", "2013-01-01");
+      const res = await patch("club");
+      expect(res.statusCode).toBe(412);
+      expect(err(res).message).toMatch(/roster is too large/);
+      expect(team().level).toBe("youth");
+    });
+
+    it("refuses the 4th failed switch on one team in a day (429), without checking ages again", async () => {
+      withKid();
+      await adults();
+      for (let i = 0; i < 3; i++) refused(await patch("club"));
+      expect(s.store.doc("limits/clubswitch-t1")).toBeDefined();
+      // Everyone is now old enough, but the team has used its tries for the day.
+      await born("kid", "1995-01-01");
+      expect((await patch("club")).statusCode).toBe(429);
+      expect(team().level).toBe("youth");
+      // Another team is unaffected by this team's count.
+      s.store.put("teams/t2", seedTeam({ level: "youth" }));
+      expect((await s.call("PATCH", "/v1/teams/t2", "owner", { name: "Other", level: "club", city: "Austin" })).statusCode).toBe(200);
+    });
+
+    it("a 6th team-detail PATCH in a minute is refused (429)", async () => {
+      s.store.put(T, seedTeam({ level: "youth" }));
+      for (let i = 0; i < 5; i++) expect((await patch("youth")).statusCode).toBe(200);
+      expect((await patch("youth")).statusCode).toBe(429);
+    });
+
     it("refuses a level that doesn't exist", async () => {
       s.store.put(T, seedTeam({ level: "youth" }));
       expect((await patch("pro")).statusCode).toBe(400);

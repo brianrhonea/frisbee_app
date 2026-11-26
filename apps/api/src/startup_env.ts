@@ -48,6 +48,13 @@ export function assertStartupEnvironment(env: Env = process.env): string {
   }
   const projectId = explicit || DEV_PROJECT_ID;
 
+  // Without the personal-details key every age check fails closed: the web
+  // sign-up gate would turn every member away. Emulators use a local key.
+  const emulated = Boolean(env.FIRESTORE_EMULATOR_HOST?.trim() || env.FIREBASE_AUTH_EMULATOR_HOST?.trim());
+  if (deployed && !emulated && !env.PERSONAL_DETAILS_KMS_KEY?.trim()) {
+    throw new StartupConfigError("PERSONAL_DETAILS_KMS_KEY must be set when deployed: without it date-of-birth checks fail closed and block every member.");
+  }
+
   const key = env.STRIPE_SECRET_KEY?.trim();
   if (key) {
     const mode = stripeKeyMode(key);

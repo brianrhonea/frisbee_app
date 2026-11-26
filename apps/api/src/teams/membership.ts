@@ -63,10 +63,16 @@ import {
   takesRequests,
   transferOwnership,
 } from "./access.js";
-import { ClubAgeGate } from "./club_age.js";
+import { ClubAgeGate, clubSwitchPrefix } from "./club_age.js";
 import { newTeamDocuments } from "./documents.js";
 import type { TeamRepository } from "./repository.js";
 import { tooFastMessage } from "./service.js";
+import { tooFast } from "../limits/memory.js";
+import { type Counter, count, type Limit } from "../limits/model.js";
+
+/** Failed switches to the club level per team per day; the next one is refused outright. */
+export const failedClubSwitchLimit: Limit = { max: 3, windowMs: 24 * 60 * 60_000 };
+const failedSwitchPath = (teamId: string) => `limits/clubswitch-${teamId}`;
 
 // Where everything lives (docs/ARCHITECTURE.md, firestore.rules).
 const p = {
@@ -454,11 +460,25 @@ export class MembershipService {
     // write). Moving a team to the club level re-checks everyone on it,
     // members and the accounts linked to roster spots, as a join would.
     const toClub = !isGroup(current) && input.level === "club" && !isClubTeam(current);
-    const checked = toClub ? await this.checkClubSwitch(teamId, current) : null;
+    let checked: Set<string> | null = null;
+    if (toClub) {
+      await this.assertSwitchAttemptsLeft(teamId);
+      try {
+        checked = await this.checkClubSwitch(teamId, current);
+      } catch (e) {
+        // Only an age refusal counts (the too-big roster says nothing about ages).
+        if (e instanceof ApiError && e.code === "failed_precondition" && e.message.startsWith(clubSwitchPrefix)) await this.recordFailedSwitch(teamId, caller.uid);
+        throw e;
+      }
+    }
     await this.store.transact(async (tx) => {
       const team = await this.team(tx, teamId);
+      // The team may have changed since the first read (now youth, say):
+      // work out again whether this is a switch to club that the check covered.
+      const switching = !isGroup(team) && input.level === "club" && !isClubTeam(team);
+      if (switching && !checked) throw new ApiError("failed_precondition", "The team changed. Try again.");
       // Someone joined since the check: ask again rather than skip them.
-      if (checked && strings(team.memberIds).some((u) => !checked.has(u))) {
+      if (switching && checked && strings(team.memberIds).some((u) => !checked.has(u))) {
         throw new ApiError("failed_precondition", "The team's members changed. Try again.");
       }
       const update = editDetails(team, caller.uid, input);
@@ -470,10 +490,37 @@ export class MembershipService {
   /** Everyone who'd be on the club team: members, and accounts linked to roster spots. Throws if any is under 16 or has no date of birth. */
   private async checkClubSwitch(teamId: string, team: Data): Promise<Set<string>> {
     const spots = await this.store.list(`teams/${teamId}/roster`, rosterMax + 1);
+    // More spots than a roster can hold: only part of them would be checked.
+    if (spots.length > rosterMax) {
+      throw new ApiError("failed_precondition", "This team's roster is too large to check for the club level. Remove roster spots and try again.");
+    }
     const linked = spots.map((s) => s.data.userId).filter((u): u is string => typeof u === "string" && u !== "");
     const everyone = new Set([...strings(team.memberIds), ...linked]);
     await this.clubAges.checkEveryone([...everyone]);
     return everyone;
+  }
+
+  /**
+   * Failed switches to club are counted per team per day in limits/ (so the
+   * count holds across instances and restarts): the refusal says how many
+   * people fail, so unlimited tries would probe members' ages.
+   */
+  private async assertSwitchAttemptsLeft(teamId: string): Promise<void> {
+    const doc = await this.store.get(failedSwitchPath(teamId));
+    const prev = (doc?.counts as Record<string, unknown> | undefined)?.clubSwitch as Counter | undefined;
+    const fresh = !prev || this.now() - prev.start >= failedClubSwitchLimit.windowMs || this.now() < prev.start;
+    if (!fresh && prev.n >= failedClubSwitchLimit.max) throw tooFast();
+  }
+
+  private async recordFailedSwitch(teamId: string, uid: string): Promise<void> {
+    const path = failedSwitchPath(teamId);
+    await this.store.transact(async (tx) => {
+      const doc = await tx.get(path);
+      const prev = (doc?.counts as Record<string, unknown> | undefined)?.clubSwitch as Counter | undefined;
+      tx.merge(path, { counts: { clubSwitch: count(prev, this.now(), failedClubSwitchLimit).counter } });
+    });
+    // No names or dates of birth: who asked, and for which team.
+    console.warn(JSON.stringify({ severity: "WARNING", message: "Club switch refused", teamId, uid }));
   }
 
   /** setSections(): the owner switches the team's optional sections. */

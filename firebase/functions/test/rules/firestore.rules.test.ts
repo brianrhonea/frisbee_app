@@ -3556,6 +3556,10 @@ describe("user posts", () => {
       updateDoc(doc(db(COACH), "posts", "ev"), { body: "See you there", updatedAt: serverTimestamp() }),
     );
     // (A new id: "ev" now belongs to the coach, so writing it as the player would be an update.)
+    // Overwriting the coach's existing event post is an update by someone else: refused,
+    // even with a valid personal event body.
+    await assertFails(setDoc(ref(PLAYER, "ev"), shared(event({ teamId: null, teamName: null }))));
+    await assertFails(setDoc(ref(PLAYER, "ev"), shared(event())));
     await assertSucceeds(setDoc(ref(PLAYER, "ev-personal"), shared(event({ teamId: null, teamName: null }))));
     // A personal event: no team, no end, no place.
     await assertSucceeds(
