@@ -1,6 +1,7 @@
 // Personal details through the API (packages/shared/src/personal.ts):
-// encrypted at rest, only ever the caller's own, under 13 refused.
-import { tooYoungMessage } from "@stall10/shared";
+// encrypted at rest, only ever the caller's own, under 13 refused, under 18
+// refused (adults-only launch), the birth date locked once saved.
+import { adultOnlyMessage, birthDateLockedMessage, tooYoungMessage } from "@stall10/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
 import { LocalCipher } from "../src/personal/cipher.js";
@@ -79,29 +80,70 @@ describe("PUT /v1/me/personal", () => {
     expect(s.cipher.calls.seal).toBe(0);
   });
 
-  it("counts birthdays in the furthest-ahead time zone (UTC+14)", async () => {
+  it("counts 18th birthdays in the furthest-ahead time zone (UTC+14)", async () => {
     // 20 Nov 12:00 UTC is already 21 Nov in Kiribati.
-    const res = await s.call("PUT", "/v1/me/personal", { ...adult, birthDate: "2013-11-21", guardian });
+    const res = await s.call("PUT", "/v1/me/personal", { ...adult, birthDate: "2008-11-21" });
     expect(res.statusCode).toBe(200);
-    expect((await s.call("PUT", "/v1/me/personal", { ...adult, birthDate: "2013-11-22", guardian })).statusCode).toBe(412);
+    s.store.docs.delete(D);
+    const tooYoungForNow = await s.call("PUT", "/v1/me/personal", { ...adult, birthDate: "2008-11-22" });
+    expect(tooYoungForNow.statusCode).toBe(412);
+    expect(s.store.doc(D)).toBeUndefined();
   });
 
-  it("allows a 13th birthday today", async () => {
-    const res = await s.call("PUT", "/v1/me/personal", { ...adult, birthDate: "2013-11-20", guardian });
+  it("allows an 18th birthday today", async () => {
+    const res = await s.call("PUT", "/v1/me/personal", { ...adult, birthDate: "2008-11-20" });
     expect(res.statusCode).toBe(200);
   });
 
-  it("needs a guardian under 18", async () => {
-    const res = await s.call("PUT", "/v1/me/personal", { ...adult, birthDate: "2010-01-01" });
-    expect(res.statusCode).toBe(400);
-    expect(res.json().error.fields).toHaveProperty("guardian");
+  it.each([
+    ["13", "2013-11-20"],
+    ["16", "2010-01-01"],
+    ["17", "2009-06-01"],
+  ])("refuses a %s-year-old (adults only), with or without a guardian, and saves nothing", async (_, birthDate) => {
+    for (const body of [{ ...adult, birthDate }, { ...adult, birthDate, guardian }]) {
+      const res = await s.call("PUT", "/v1/me/personal", body);
+      expect(res.statusCode).toBe(412);
+      expect(res.json().error).toEqual({
+        code: "failed_precondition",
+        message: adultOnlyMessage,
+        fields: { birthDate: adultOnlyMessage },
+      });
+    }
+    expect(s.store.doc(D)).toBeUndefined();
+    expect(s.cipher.calls.seal).toBe(0);
   });
 
-  it("keeps a minor's guardian, drops an adult's", async () => {
-    await s.call("PUT", "/v1/me/personal", { ...adult, birthDate: "2010-01-01", guardian });
-    expect((await s.call("GET", "/v1/me/personal")).json().details.guardian).toEqual(guardian);
+  it("never keeps a guardian (everyone is an adult)", async () => {
     await s.call("PUT", "/v1/me/personal", { ...adult, guardian });
     expect((await s.call("GET", "/v1/me/personal")).json().details).not.toHaveProperty("guardian");
+  });
+
+  it("locks the birth date once saved: another one is refused and changes nothing", async () => {
+    await s.call("PUT", "/v1/me/personal", adult);
+    const before = s.store.doc(D);
+    const res = await s.call("PUT", "/v1/me/personal", { ...adult, birthDate: "1990-01-01" });
+    expect(res.statusCode).toBe(412);
+    expect(res.json().error).toEqual({
+      code: "failed_precondition",
+      message: birthDateLockedMessage,
+      fields: { birthDate: birthDateLockedMessage },
+    });
+    expect(s.store.doc(D)).toEqual(before);
+    expect((await s.call("GET", "/v1/me/personal")).json().details.birthDate).toBe("1995-04-02");
+  });
+
+  it("still lets the rest of the details change, with the same birth date", async () => {
+    await s.call("PUT", "/v1/me/personal", adult);
+    const res = await s.call("PUT", "/v1/me/personal", { ...adult, phone: "+1 555 010 4444" });
+    expect(res.statusCode).toBe(200);
+    expect((await s.call("GET", "/v1/me/personal")).json().details.phone).toBe("+1 555 010 4444");
+  });
+
+  it("locks a birth date saved at sign-up too, against the full form", async () => {
+    await s.call("PUT", "/v1/me/personal/birth-date", { birthDate: "1996-01-01" });
+    const res = await s.call("PUT", "/v1/me/personal", adult);
+    expect(res.statusCode).toBe(412);
+    expect(res.json().error.fields.birthDate).toBe(birthDateLockedMessage);
   });
 
   it.each([
@@ -194,7 +236,7 @@ describe("PUT /v1/me/personal/birth-date (sign-up)", () => {
   });
 
   it("is replaced whole by the full details, which complete them", async () => {
-    await s.call("PUT", B, { birthDate: "1996-01-01" });
+    await s.call("PUT", B, { birthDate: "1995-04-02" });
     await s.call("PUT", "/v1/me/personal", adult);
     expect(s.store.doc(D)).not.toHaveProperty("birthDateOnly");
     const got = (await s.call("GET", "/v1/me/personal")).json();
@@ -213,13 +255,16 @@ describe("PUT /v1/me/personal/birth-date (sign-up)", () => {
     expect((await s.call("GET", "/v1/me/personal")).json().details.birthDate).toBe("1995-04-02");
   });
 
-  it("can be given again until then", async () => {
+  it("can be given again until then, but only the same date (the birth date is locked once saved)", async () => {
     await s.call("PUT", B, { birthDate: "1995-04-02" });
-    expect((await s.call("PUT", B, { birthDate: "1995-04-03" })).statusCode).toBe(200);
-    expect((await s.call("GET", "/v1/me/personal")).json().signUpBirthDate).toBe("1995-04-03");
+    const changed = await s.call("PUT", B, { birthDate: "1995-04-03" });
+    expect(changed.statusCode).toBe(412);
+    expect(changed.json().error.fields.birthDate).toBe(birthDateLockedMessage);
+    expect((await s.call("GET", "/v1/me/personal")).json().signUpBirthDate).toBe("1995-04-02");
+    expect((await s.call("PUT", B, { birthDate: "1995-04-02" })).statusCode).toBe(200);
   });
 
-  it("refuses under 13 as the full save does, and saves nothing", async () => {
+  it("refuses under 13 with the under-13 message, and saves nothing", async () => {
     const res = await s.call("PUT", B, { birthDate: "2013-11-22" });
     expect(res.statusCode).toBe(412);
     expect(res.json().error).toEqual({
@@ -229,8 +274,22 @@ describe("PUT /v1/me/personal/birth-date (sign-up)", () => {
     });
     expect(s.store.doc(D)).toBeUndefined();
     expect(s.cipher.calls.seal).toBe(0);
-    // A 13th birthday today in UTC+14 is fine.
-    expect((await s.call("PUT", B, { birthDate: "2013-11-21" })).statusCode).toBe(200);
+  });
+
+  it.each(["2008-11-22", "2010-01-01", "2013-11-21"])("refuses %s (under 18, adults only) and saves nothing", async (birthDate) => {
+    const res = await s.call("PUT", B, { birthDate });
+    expect(res.statusCode).toBe(412);
+    expect(res.json().error).toEqual({
+      code: "failed_precondition",
+      message: adultOnlyMessage,
+      fields: { birthDate: adultOnlyMessage },
+    });
+    expect(s.store.doc(D)).toBeUndefined();
+    expect(s.cipher.calls.seal).toBe(0);
+  });
+
+  it("allows an 18th birthday today in UTC+14", async () => {
+    expect((await s.call("PUT", B, { birthDate: "2008-11-21" })).statusCode).toBe(200);
   });
 
   it.each([

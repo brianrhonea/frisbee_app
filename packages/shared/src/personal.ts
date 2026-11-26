@@ -211,6 +211,11 @@ export interface PersonalDetailsStatus {
   complete: boolean;
   /** Their account is new enough that the apps ask before anything else. */
   required: boolean;
+  /**
+   * The API changed this account's claims (account_gate.ts): call
+   * `getIdToken(true)` before the next write.
+   */
+  refreshToken?: true;
 }
 
 /** `GET /v1/me/personal`: their own details, for editing. */

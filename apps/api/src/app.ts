@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
 import { registerWriteLimits } from "./limits/writes.js";
 import { accountRoutes } from "./account/routes.js";
+import { AccountGate } from "./account/gate.js";
 import { AccountService } from "./account/service.js";
 import { TeamDeletion, teamDeletionRoutes } from "./teams/deletion.js";
 import { ChatAdmin, chatAdminRoutes } from "./hub/rooms.js";
@@ -214,10 +215,12 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   if (deps.store) {
     membershipRoutes(app, new MembershipService(deps.store, deps.users, deps.teams, deps.now, undefined, clubAges, deps.queries));
     profileRoutes(app, new ProfileService(deps.store, deps.users), revalidate);
-    accountRoutes(app, new AccountService(deps.store, deps.users, deps.media), revalidate);
+    // Sets the account gate's claims (ageOk, terms) as the records earn them.
+    const gate = new AccountGate(deps.store, deps.users, personal, deps.now);
+    accountRoutes(app, new AccountService(deps.store, deps.users, deps.media), revalidate, gate);
     const queries = deps.queries ?? listDocQueries(deps.store);
     teamDeletionRoutes(app, new TeamDeletion(deps.store, deps.teams, deps.media, queries));
-    if (personal) personalRoutes(app, personal);
+    if (personal) personalRoutes(app, personal, gate);
     if (deps.exports) exportRoutes(app, new ExportService(deps.exports, deps.store, deps.users, personal, deps.now));
     const reads = deps.writeLimits !== false ? writes : undefined;
     rosterRoutes(app, new RosterService(deps.store, deps.browse?.photoBuckets ?? []), reads);

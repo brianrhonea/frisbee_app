@@ -1,6 +1,8 @@
 import {
   adultAge,
+  adultOnlyMessage,
   ageOn,
+  birthDateLockedMessage,
   birthDateProblem,
   type PersonalDetails,
   type PersonalDetailsResponse,
@@ -83,7 +85,7 @@ export class PersonalService {
     return typeof birthDate === "string" ? birthDate : null;
   }
 
-  /** Replaces their details. Under 13 is refused and nothing is saved. */
+  /** Replaces their details. Under 18 is refused and nothing is saved; a saved birth date can't change. */
   async save(caller: Caller, body: unknown): Promise<void> {
     const r = personalDetailsSchema.safeParse(body ?? {});
     if (!r.success) throw fromZod(r.error);
@@ -93,15 +95,36 @@ export class PersonalService {
     if (problem?.message === tooYoungMessage) {
       throw new ApiError("failed_precondition", tooYoungMessage, { birthDate: tooYoungMessage });
     }
+    // Launch is adults only (the account gate): under 18 is refused, nothing
+    // saved, whatever else is wrong (a 17-year-old isn't asked for a guardian).
+    if (problem?.field !== "birthDate" && ageOn(details.birthDate, today) < adultAge) {
+      throw new ApiError("failed_precondition", adultOnlyMessage, { birthDate: adultOnlyMessage });
+    }
     if (problem) throw new ApiError("invalid_argument", problem.message, { [problem.field]: problem.message });
     // Adults' guardians aren't kept.
-    const record: PersonalDetails =
-      ageOn(details.birthDate, today) >= adultAge ? { ...details, guardian: undefined } : details;
+    const record: PersonalDetails = { ...details, guardian: undefined };
     const path = personalPath(caller.uid);
     const sealed = await this.cipher.seal(Buffer.from(JSON.stringify(record), "utf8"), path);
     await this.store.transact(async (tx) => {
+      await this.requireSameBirthDate(await tx.get(path), details.birthDate, path);
       tx.set(path, { ciphertext: sealed.ciphertext, key: sealed.key, format, updatedAt: serverTime });
     });
+  }
+
+  /**
+   * The birth date is locked once saved (pentest P4: it was changeable
+   * 20 times a day, which defeats the club 16+ rule): a save that names a
+   * different one than [existing] holds is refused. Re-saving the same one
+   * is fine. There is no support override here; deleting the account
+   * clears it.
+   */
+  private async requireSameBirthDate(existing: Record<string, unknown> | null, birthDate: string, path: string): Promise<void> {
+    if (!existing) return;
+    const plain = await this.cipher.open({ ciphertext: String(existing.ciphertext), key: String(existing.key) }, path);
+    const saved = (JSON.parse(plain.toString("utf8")) as { birthDate?: unknown }).birthDate;
+    if (typeof saved === "string" && saved !== birthDate) {
+      throw new ApiError("failed_precondition", birthDateLockedMessage, { birthDate: birthDateLockedMessage });
+    }
   }
 
   /**
@@ -121,6 +144,9 @@ export class PersonalService {
       throw new ApiError("failed_precondition", tooYoungMessage, { birthDate: tooYoungMessage });
     }
     if (problem) throw new ApiError("invalid_argument", problem, { birthDate: problem });
+    if (ageOn(birthDate, this.today()) < adultAge) {
+      throw new ApiError("failed_precondition", adultOnlyMessage, { birthDate: adultOnlyMessage });
+    }
     const path = personalPath(caller.uid);
     const sealed = await this.cipher.seal(Buffer.from(JSON.stringify({ birthDate }), "utf8"), path);
     await this.store.transact(async (tx) => {
@@ -128,6 +154,7 @@ export class PersonalService {
       if (doc && !isBirthDateOnly(doc)) {
         throw new ApiError("already_exists", "Your details are already saved. Change them in Settings.");
       }
+      await this.requireSameBirthDate(doc, birthDate, path);
       tx.set(path, { ciphertext: sealed.ciphertext, key: sealed.key, format, [birthDateOnly]: true, updatedAt: serverTime });
     });
   }

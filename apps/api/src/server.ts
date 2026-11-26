@@ -83,7 +83,17 @@ const app = buildApp({
   verifier: {
     async verifyIdToken(token) {
       const t = await auth.verifyIdToken(token);
-      return { uid: t.uid, name: t.name as string | undefined, email: t.email, authTime: t.auth_time, ...(t.staff === true && { staff: true }) };
+      return {
+        uid: t.uid,
+        name: t.name as string | undefined,
+        email: t.email,
+        authTime: t.auth_time,
+        emailVerified: t.email_verified === true,
+        // The account gate's claims: set only by the API (account/gate.ts).
+        ...(t.ageOk === true && { ageOk: true }),
+        ...(typeof t.terms === "number" && { terms: t.terms }),
+        ...(t.staff === true && { staff: true }),
+      };
     },
     async verifyAppCheck(token) {
       await appCheck.verifyToken(token);
@@ -103,6 +113,11 @@ const app = buildApp({
         ...(changes.name !== undefined && { displayName: changes.name }),
         ...(changes.photoUrl !== undefined && { photoURL: changes.photoUrl }),
       });
+    },
+    async setClaims(uid, claims) {
+      // Merged, so other claims (staff) stay.
+      const existing = (await auth.getUser(uid)).customClaims ?? {};
+      await auth.setCustomUserClaims(uid, { ...existing, ...claims });
     },
     async setDisabled(uid, disabled) {
       await auth.updateUser(uid, { disabled });

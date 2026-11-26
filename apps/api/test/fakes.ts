@@ -1,19 +1,35 @@
 import type { PersonalCipher, Sealed } from "../src/personal/cipher.js";
 import { readFile, writeFile } from "node:fs/promises";
-import type { CreateTeamInput, NameListing } from "@stall10/shared";
+import { type CreateTeamInput, type NameListing, termsVersion } from "@stall10/shared";
 import type { Caller, TokenVerifier, UserLookup } from "../src/auth.js";
 import type { MediaStorage } from "../src/media/storage.js";
 import type { Owner } from "../src/teams/documents.js";
 import type { TeamRepository } from "../src/teams/repository.js";
 import { AlreadyExists, type Data, type DocStore, deleteField, serverTime, type Tx } from "../src/store.js";
 
-/** Accepts tokens "token:<uid>[:<name>]" ("staff:<uid>" for staff) and App Check token "good". */
+/**
+ * Accepts tokens "token:<uid>[:<name>]" ("staff:<uid>" for staff) and App Check token "good".
+ * These are complete accounts (the account gate: verified email, ageOk, current terms).
+ * Incomplete ones, for the gate's own tests: "unverified:" (no verified email), "noage:"
+ * (no ageOk claim), "noterms:" (no terms claim), "bare:" (a REST-created account: none of them),
+ * "oldterms:" (agreed an older Terms version).
+ */
 export class FakeVerifier implements TokenVerifier {
   async verifyIdToken(token: string): Promise<Caller> {
     const [kind, uid, name] = token.split(":");
-    if ((kind !== "token" && kind !== "staff" && kind !== "fresh") || !uid) throw new Error("bad token");
+    const known = ["token", "staff", "fresh", "unverified", "noage", "noterms", "bare", "oldterms"];
+    if (!kind || !known.includes(kind) || !uid) throw new Error("bad token");
     // "fresh": signed in just now (auth_time in the future of any test clock).
-    return { uid, name, email: `${uid}@x.test`, ...(kind === "staff" && { staff: true }), ...(kind === "fresh" && { authTime: 9_999_999_999 }) };
+    return {
+      uid,
+      name,
+      email: `${uid}@x.test`,
+      emailVerified: kind !== "unverified" && kind !== "bare",
+      ...(kind !== "noage" && kind !== "bare" && { ageOk: true }),
+      ...(kind !== "noterms" && kind !== "bare" && { terms: kind === "oldterms" ? termsVersion - 1 : termsVersion }),
+      ...(kind === "staff" && { staff: true }),
+      ...(kind === "fresh" && { authTime: 9_999_999_999 }),
+    };
   }
 
   async verifyAppCheck(token: string): Promise<void> {
@@ -33,6 +49,11 @@ export class FakeUsers implements UserLookup {
     if (changes.name !== undefined) r.name = changes.name;
     if (changes.photoUrl !== undefined) r.photoUrl = changes.photoUrl ?? undefined;
     this.records.set(uid, r);
+  }
+  /** Custom claims set through the API's account gate, by uid. */
+  claims = new Map<string, Record<string, unknown>>();
+  async setClaims(uid: string, claims: Record<string, unknown>) {
+    this.claims.set(uid, { ...this.claims.get(uid), ...claims });
   }
   disabled = new Set<string>();
   async setDisabled(uid: string, disabled: boolean) {

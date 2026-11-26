@@ -9,6 +9,12 @@ export const apiErrorCodes = [
   "not_found",
   "already_exists",
   "failed_precondition",
+  /**
+   * The account can read but not write yet: its email isn't verified, no
+   * adult birth date is saved, or the Terms aren't agreed
+   * (account_gate.ts; `fields` names what is missing).
+   */
+  "account_incomplete",
   "resource_exhausted",
   "internal",
   /** A service the API depends on (Discord, say) can't be reached; try again later. */
@@ -23,6 +29,7 @@ export const apiErrorStatus: Record<ApiErrorCode, number> = {
   not_found: 404,
   already_exists: 409,
   failed_precondition: 412,
+  account_incomplete: 403,
   resource_exhausted: 429,
   internal: 500,
   unavailable: 503,
