@@ -13,6 +13,7 @@ import '../../core/ui/error_message.dart';
 import '../../core/ui/view_model_host.dart';
 import '../view_models/payments_viewmodels.dart';
 import 'payouts_setup_screen.dart';
+import '../../core/ui/status_pill.dart';
 
 /// Stripe's pages open in the browser: entry fees are for real-world
 /// events, which Apple and Google let apps take payment for outside
@@ -668,7 +669,8 @@ class PaymentsOnBuilder extends StatelessWidget {
 }
 
 /// "Payments: On" (green), "Payments: Finish setup" or "Payments: Not set
-/// up" (amber: yours to do), for team pages, settings and the event form.
+/// up" (amber: yours to do), for team pages, settings and the event form: a
+/// [StatusPill].
 class PayoutsStatusChip extends StatelessWidget {
   const PayoutsStatusChip({super.key, required this.status});
 
@@ -676,27 +678,15 @@ class PayoutsStatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = AppColors.of(context);
     final on = status == PayoutStatus.ready;
     final label = switch (status) {
       PayoutStatus.ready => 'On',
       PayoutStatus.pending => 'Finish setup',
       PayoutStatus.none => 'Not set up',
     };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm, vertical: 3),
-      decoration: BoxDecoration(
-        color: on ? c.positiveSoft : c.highlightSoft,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        'Payments: $label',
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          color: on ? c.positive : c.highlightInk,
-        ),
-      ),
+    return StatusPill(
+      'Payments: $label',
+      tone: on ? PillTone.success : PillTone.warning,
     );
   }
 }

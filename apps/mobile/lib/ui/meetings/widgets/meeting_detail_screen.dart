@@ -18,6 +18,7 @@ import '../../schedule/widgets/event_detail_screen.dart'
 import '../../schedule/widgets/event_style.dart';
 import '../../schedule/widgets/rsvp_widgets.dart';
 import '../view_models/meeting_detail_viewmodel.dart';
+import '../../core/ui/status_pill.dart';
 
 class MeetingDetailScreen extends StatefulWidget {
   const MeetingDetailScreen({super.key, required this.viewModel});
@@ -279,43 +280,18 @@ class _Header extends StatelessWidget {
   }
 }
 
-/// "Live" or "Ended", for headers and the room.
+/// "Live" or "Ended", for headers and the room: a [StatusPill].
 class MeetingStatusBadge extends StatelessWidget {
   const MeetingStatusBadge({super.key, required this.meeting});
 
   final TeamMeeting meeting;
 
   @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    final live = meeting.isLive;
-    // A live meeting is turf: red is only for live games.
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: live ? c.accentSoft : c.field,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (live)
-            TeamDot(color: c.accent)
-          else
-            Icon(Icons.check, size: 12, color: c.muted),
-          const SizedBox(width: 5),
-          Text(
-            live ? 'Live' : 'Ended',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: live ? c.accentInk : c.ink2,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      // A live meeting is the app's accent: red is only for live games.
+      meeting.isLive
+      ? const StatusPill('Live', tone: PillTone.accent, dot: true)
+      : const StatusPill('Ended', icon: Icons.check);
 }
 
 class _RsvpCard extends StatelessWidget {

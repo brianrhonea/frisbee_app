@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/hosted_tournament.dart';
-import '../../core/themes/theme.dart';
 import '../../core/ui/scoreboard.dart';
 import '../../core/ui/tone.dart';
+import '../../core/ui/status_pill.dart';
 
 /// Each status's dot color (website parity: registration green, live red,
 /// the rest grey). Amber is kept for what's the user's to do, so no status
@@ -28,33 +28,20 @@ extension HostedStatusTone on HostedStatus {
   };
 }
 
-/// A tournament's status as a small pill: red with its dot when live,
-/// turf while registration is open, grey otherwise.
+/// A tournament's status as a [StatusPill]: red with its dot when live,
+/// green while registration is open, grey otherwise.
 class HostedStatusBadge extends StatelessWidget {
   const HostedStatusBadge({super.key, required this.status});
 
   final HostedStatus status;
 
   @override
-  Widget build(BuildContext context) {
-    if (status == HostedStatus.live) return LivePill(label: status.label);
-    final c = AppColors.of(context);
-    final open = status == HostedStatus.registration;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-      decoration: BoxDecoration(
-        color: open ? c.positiveSoft : c.field,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        status.label,
-        maxLines: 1,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          color: open ? c.positive : c.ink2,
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => switch (status) {
+    HostedStatus.live => LivePill(label: status.label),
+    HostedStatus.registration => StatusPill(
+      status.label,
+      tone: PillTone.success,
+    ),
+    _ => StatusPill(status.label),
+  };
 }

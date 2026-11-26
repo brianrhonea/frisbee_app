@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../themes/theme.dart';
 import 'balanced_text.dart';
 import 'scroll_to_top.dart';
+import 'status_pill.dart';
 
 /// The three layouts the app is designed for.
 enum ScreenSize {
@@ -388,7 +389,7 @@ class HighlightButton extends StatelessWidget {
   }
 }
 
-/// A small rounded tag, e.g. "Mixed club" or "PINNED".
+/// A small tag, e.g. "Mixed club" or "PINNED": a [StatusPill].
 class Tag extends StatelessWidget {
   const Tag(this.text, {super.key, this.strong = false, this.success = false});
 
@@ -397,31 +398,16 @@ class Tag extends StatelessWidget {
   /// In the success colours, for a confirmed state such as "You're on it".
   final bool success;
 
-  /// For use on navy: the secondary navy fill with white text.
+  /// A quieter grey fill instead of the accent tint.
   final bool strong;
 
   @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm, vertical: 3),
-      decoration: BoxDecoration(
-        color: strong
-            ? c.featureHighlight
-            : (success ? c.positiveSoft : c.accentSoft),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 10.5,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.2,
-          color: strong ? c.onFeature : (success ? c.positive : c.accentInk),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => StatusPill(
+    text,
+    tone: strong
+        ? PillTone.neutral
+        : (success ? PillTone.success : PillTone.accent),
+  );
 }
 
 /// The mark of an official organizer (Team.official), e.g. Stall 10, and
@@ -654,36 +640,19 @@ class TeamBadge extends StatelessWidget {
   }
 }
 
-/// An unread count in a disc-amber pill, for navigation items and rows.
+/// An unread count in a solid pill, for navigation items and rows: a
+/// [StatusPill.count].
 class CountPill extends StatelessWidget {
   const CountPill(this.count, {super.key, this.dark = false});
 
   final int count;
 
-  /// Navy with white text, e.g. on a selected nav item.
+  /// Neutral (ink) instead of the accent, e.g. on a selected nav item.
   final bool dark;
 
   @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    return Container(
-      constraints: const BoxConstraints(minWidth: 20),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: dark ? c.feature : c.highlight,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(
-        count > 99 ? '99+' : '$count',
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: dark ? c.onFeature : c.onHighlight,
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      StatusPill.count(count, tone: dark ? PillTone.neutral : PillTone.accent);
 }
 
 /// "2 hours ago", "Yesterday", "Mon", or "Oct 3" for [time] relative to

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../themes/theme.dart';
+import 'status_pill.dart';
 
 /// Shared pieces of the "Turf & Disc" design: scores, live marks, team
 /// dots, "needs you" pills and section headers. Colours follow the rules in
@@ -45,69 +46,31 @@ class LiveDot extends StatelessWidget {
   );
 }
 
-/// "Live" in a soft red pill with its dot, for rows and headers on light
-/// surfaces. On navy, use [LiveDot] beside white text instead.
+/// "Live" in a soft red pill with its dot: a [StatusPill].
 class LivePill extends StatelessWidget {
   const LivePill({super.key, this.label = 'Live'});
 
   final String label;
 
   @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    return Container(
-      padding: const EdgeInsets.fromLTRB(8, 3, 10, 3),
-      decoration: BoxDecoration(
-        color: c.liveSoft,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const LiveDot(size: 7),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: c.liveInk,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      StatusPill(label, tone: PillTone.live, dot: true);
 }
 
-/// A "needs you" pill in soft amber, e.g. "Needs RSVP" or "Score due".
+/// A "needs you" pill in soft amber, e.g. "Needs RSVP" or "Score due": a
+/// [StatusPill].
 class NeedsYouPill extends StatelessWidget {
   const NeedsYouPill(this.label, {super.key, this.strong = false});
 
   final String label;
 
-  /// Solid amber, for the single most urgent thing on a screen.
+  /// Solid, for the single most urgent thing on a screen.
   final bool strong;
 
   @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: strong ? c.highlight : c.highlightSoft,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          color: strong ? c.onHighlight : c.highlightInk,
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => strong
+      ? StatusPill(label, tone: PillTone.accent, solid: true)
+      : StatusPill(label, tone: PillTone.warning);
 }
 
 /// A small coloured dot that marks a team event, a personal event, or a
