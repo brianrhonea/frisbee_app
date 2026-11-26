@@ -44,6 +44,7 @@ import { type PickedPerson, PersonPicker } from "./PersonPicker";
 import { ColorPicker } from "./settings/CalendarSettings";
 import { meetingAnswer, needsRsvp, RsvpPill } from "./RsvpPill";
 import "./member.css";
+import { Button } from "./ui/Button";
 
 const dayMs = 86_400_000;
 const canEdit = (c: CalendarInfo | undefined) => c?.role === "owner" || c?.role === "edit";
@@ -406,9 +407,9 @@ export function Schedule() {
             ))}
           </div>
           {!editing && writable.length > 0 && (
-            <button type="button" className="btn btn-primary btn-small" onClick={() => setEditing({})}>
+            <Button variant="primary" size="small" onClick={() => setEditing({})}>
               Add event
-            </button>
+            </Button>
           )}
         </div>
         <div className="segmented schedule-filter" role="tablist" aria-label="Show">

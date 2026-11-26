@@ -223,7 +223,6 @@
   cursor: pointer; text-decoration: underline;
 }
 button.btn { cursor: pointer; }
-button.btn:disabled { opacity: 0.6; cursor: default; }
 
 /* Cards and the profile dashboard (components/ProfileDashboard.tsx) */
 .card {
@@ -626,6 +625,10 @@ dialog.dialog > * { max-height: calc(100vh - 32px); overflow-y: auto; }
 }
 .icon-btn:hover:not(:disabled) { background: var(--field); color: var(--ink); }
 .icon-btn:disabled { opacity: 0.4; cursor: default; }
+.icon-btn:active:not(:disabled) { background: var(--line); color: var(--ink); }
+.icon-btn[aria-busy="true"] { cursor: progress; opacity: 0.6; }
+/* 36 px to look at, 48 px to hit (see .btn in site.css). */
+.icon-btn::after { content: ""; position: absolute; inset: -6px; }
 .icon-wrap { position: relative; display: inline-grid; place-items: center; }
 .count-badge {
   position: absolute; top: -6px; right: -9px; min-width: 18px; height: 18px; padding: 0 5px;
@@ -823,9 +826,9 @@ dialog.dialog > * { max-height: calc(100vh - 32px); overflow-y: auto; }
 .switch-row span { display: grid; gap: 2px; }
 .radio-list { border: 0; padding: 0; margin: 0; min-width: 0; }
 .danger-zone { border-color: var(--line-2); }
-/* Solid ink: destructive confirms (.btn-danger) and other strong neutral actions (.btn-ink). */
-.btn-danger, .btn.btn-ink { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-.btn-danger:hover:not(:disabled), .btn.btn-ink:hover:not(:disabled) { filter: none; opacity: 0.88; }
+/* Solid ink: strong neutral actions (.btn-ink). Destructive confirms (.btn-danger) are the error fill in site.css. */
+.btn.btn-ink { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn.btn-ink:hover:not(:disabled) { filter: none; opacity: 0.88; }
 .switch-row input[type="checkbox"], .data-table input[type="checkbox"] {
   appearance: none; width: 42px; height: 24px; border-radius: var(--radius-pill); background: var(--line); position: relative;
   cursor: pointer; flex: none; transition: background var(--dur-fast) var(--ease); margin: 0;

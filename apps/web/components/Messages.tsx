@@ -25,6 +25,7 @@ import { useTeamChats } from "./useTeamChats";
 import { useMutedRooms } from "./useUnreadChats";
 import { type Conversation, describe, isGroup, type Mine, ms } from "./conversations";
 import "./member.css";
+import { Button } from "./ui/Button";
 
 interface Message {
   authorId?: string;
@@ -167,12 +168,12 @@ export function Messages() {
     <div className="hub-split chat-split messages">
       <nav className="hub-list" aria-label="Conversations">
         <div className="messages-tools">
-          <button type="button" className="btn btn-primary btn-small" onClick={() => setComposing("direct")}>
+          <Button variant="primary" size="small" onClick={() => setComposing("direct")}>
             New message
-          </button>
-          <button type="button" className="btn btn-small" onClick={() => setComposing("group")}>
+          </Button>
+          <Button size="small" onClick={() => setComposing("group")}>
             New group
-          </button>
+          </Button>
         </div>
         <div className="segmented" role="tablist" aria-label="Show">
           {(["inbox", "requests", "archived"] as const).map((v) => (

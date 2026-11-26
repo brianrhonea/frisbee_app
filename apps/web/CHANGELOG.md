@@ -4,6 +4,21 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.59.10 — 2026-11-26
+
+C2: Button and IconButton (Sprint 2).
+
+- New `Button` and `IconButton` (components/ui): primary, secondary, ghost,
+  destructive; small, medium, large; loading keeps focus, shows a spinner,
+  ignores clicks and sets `aria-busy`. `buttonClass()` styles links the same.
+  Parity with the app's AppButton.
+- `.btn*` and `.icon-btn` gain hover, pressed and loading states from tokens
+  (no brightness filters) and a 48 px hit area in every size without moving
+  the layout (an invisible band around the control). `.btn-danger` is now the
+  error fill, like `.btn-destructive`.
+- Messages, Notifications, Schedule, the invite and create/join dialogs use
+  the components; the other buttons get the new states through the classes.
+
 ## 0.59.9 — 2026-11-26
 
 C1: StatusPill (Sprint 2).

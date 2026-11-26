@@ -11,6 +11,7 @@ import { ErrorNote, Loading } from "../StatusViews";
 import { InvitePeople } from "./InvitePeople";
 import { type JoinRequestDoc, JoinRequests } from "./JoinRequests";
 import { useTeamHub } from "./TeamContext";
+import { IconButton } from "../ui/Button";
 
 const site = process.env.NEXT_PUBLIC_SITE_URL || "";
 
@@ -126,9 +127,9 @@ function InviteDialog({ pane, setPane, link, onClose }: { pane: Pane; setPane: (
     <Dialog label={`Invite to ${name}`} onClose={onClose} className="card invite-dialog" dismissOnBackdrop>
       <div className="invite-head">
         <h2 className="card-title">Invite to {name}</h2>
-        <button type="button" className="icon-btn" aria-label="Close" onClick={onClose}>
+        <IconButton label="Close" onClick={onClose}>
           ×
-        </button>
+        </IconButton>
       </div>
       <div className="segmented" role="tablist" aria-label="How to invite">
         {panes.map(([p, label]) => (

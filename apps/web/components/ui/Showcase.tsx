@@ -1,6 +1,7 @@
 "use client";
 import type { CSSProperties } from "react";
 import { NeedsPill, RsvpPill } from "../RsvpPill";
+import { Button, buttonClass, IconButton } from "./Button";
 import { StatusPill } from "./StatusPill";
 
 const row: CSSProperties = { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" };
@@ -34,6 +35,50 @@ export function Showcase() {
           <RsvpPill answer="maybe" />
           <RsvpPill answer="notGoing" />
           <NeedsPill>Needs RSVP</NeedsPill>
+        </div>
+      </section>
+
+      <section className="card" data-showcase="button" aria-labelledby="sc-btn">
+        <h2 id="sc-btn">Button</h2>
+        <div style={row}>
+          <Button variant="primary">Primary</Button>
+          <Button>Secondary</Button>
+          <Button variant="ghost">Ghost</Button>
+          <Button variant="destructive">Destructive</Button>
+        </div>
+        <div style={{ ...row, marginTop: 12 }}>
+          <Button variant="primary" size="small">
+            Small
+          </Button>
+          <Button variant="primary" size="large">
+            Large
+          </Button>
+          <Button variant="primary" disabled>
+            Disabled
+          </Button>
+          <Button variant="primary" loading>
+            Saving
+          </Button>
+          <Button loading>Loading</Button>
+          <Button variant="ghost" disabled>
+            Ghost off
+          </Button>
+          <Button variant="destructive" disabled>
+            Delete off
+          </Button>
+        </div>
+        <div style={{ ...row, marginTop: 12 }}>
+          <IconButton label="Close">×</IconButton>
+          <IconButton label="Next">›</IconButton>
+          <IconButton label="Refresh" disabled>
+            ↻
+          </IconButton>
+          <IconButton label="Saving" loading>
+            ↻
+          </IconButton>
+          <a className={buttonClass({ variant: "primary", size: "small" })} href="#sc-btn">
+            Link as button
+          </a>
         </div>
       </section>
     </div>
