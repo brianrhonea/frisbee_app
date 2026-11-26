@@ -326,6 +326,7 @@ These apply to every session and every agent:
 
 - **Secret files:** never read, edit, parse, copy or list the keys of secret files: `*.local.json` (including `secrets.local.json` and `secrets.prod.local.json`), `.env*`, `*.plist`, `google-services.json` and signing keys. If a change needs one, tell the product owner what to change.
 - **Pushing:** never push or merge to `development` or `main` without asking each time. Codemagic builds are pay-as-you-go.
+- **Release-branch git (owner, 2026-11-26):** local git operations into `feature/jan-4-release` and its lane/fix branches (commit, branch, merge, cherry-pick, rebase, revert, worktree management) need no owner approval; the orchestrator approves them. This does not cover pushing to any remote, opening or merging pull requests, or anything touching `development` or `main`. Those still need the owner each time.
 - **Deploys:** deploy nothing without explicit approval. Cloud Functions deploy only by named group. After an approved change to Firestore or Storage rules, deploy the rules to dev.
 - **Flutter runs and builds:** every `flutter run` and `flutter build` takes `--dart-define-from-file=secrets.local.json`. Pass the flag but never open the file. `flutter test` does not need it.
 - **Architecture:** the Flutter app follows the official Flutter MVVM guide with `provider` + `ChangeNotifier`. No Riverpod, Bloc or other state library.
