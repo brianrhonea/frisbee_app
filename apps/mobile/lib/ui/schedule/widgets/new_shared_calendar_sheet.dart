@@ -55,7 +55,7 @@ class _NewSharedCalendarSheetState extends State<_NewSharedCalendarSheet> {
 
   void _onQuery(String q) {
     _debounce?.cancel();
-    _debounce = Timer(AppMotion.sheet, () async {
+    _debounce = Timer(const Duration(milliseconds: 300), () async {
       final ask = ++_asked;
       final found = await widget.search(q);
       if (!mounted || ask != _asked) return;

@@ -10,7 +10,6 @@ import '../../../utils/command.dart';
 import '../../../utils/invite_links.dart';
 import '../../../utils/result.dart';
 import '../../core/ui/brand.dart';
-import '../../core/themes/theme.dart';
 
 /// Sends a post to people as a direct message: a line about it and its
 /// link, which opens the post in the app. People the user has talked to
@@ -20,7 +19,7 @@ class SendPostViewModel extends ChangeNotifier {
     required this.post,
     required DirectMessageRepository directMessageRepository,
     required AuthRepository authRepository,
-    this.debounce = AppMotion.sheet,
+    this.debounce = const Duration(milliseconds: 300),
   }) : _dms = directMessageRepository,
        _auth = authRepository {
     send = Command1<void, UserProfile>(_send);

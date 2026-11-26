@@ -47,7 +47,7 @@ class _DirectorSectionState extends State<DirectorSection> {
 
   void _search(String q) {
     _debounce?.cancel();
-    _debounce = Timer(AppMotion.sheet, () async {
+    _debounce = Timer(const Duration(milliseconds: 300), () async {
       final hits = await widget.viewModel.searchPeople(q);
       if (mounted && _query.text == q) setState(() => _hits = hits);
     });

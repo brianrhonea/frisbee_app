@@ -64,7 +64,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
 
   void _onChanged(String text) {
     _debounce?.cancel();
-    _debounce = Timer(AppMotion.sheet, () => vm.search.execute(text));
+    _debounce = Timer(const Duration(milliseconds: 300), () => vm.search.execute(text));
   }
 
   @override

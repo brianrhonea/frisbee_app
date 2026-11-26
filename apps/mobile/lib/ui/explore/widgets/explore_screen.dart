@@ -132,7 +132,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     // searches wait for a pause in typing.
     widget.events?.setQuery(_ready(text) ? text.trim() : '');
     _debounce?.cancel();
-    _debounce = Timer(AppMotion.sheet, () => _search(text));
+    _debounce = Timer(const Duration(milliseconds: 300), () => _search(text));
   }
 
   /// Whether the chip picked shows [f]'s results (All shows every kind).
