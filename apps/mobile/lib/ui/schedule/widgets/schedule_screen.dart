@@ -108,6 +108,15 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     }
   }
 
+  /// Below this width "New event" is an icon, to leave the title room.
+  static const _wideHeader = 480.0;
+
+  Future<void> _newEvent() async {
+    final id = await showEventEditor(context, day: vm.selectedDay);
+    // Other calendars aren't live.
+    if (id != null) await vm.refreshCalendars();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -120,9 +129,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             listenable: vm,
             builder: (context, _) => vm.showsToday
                 ? const SizedBox.shrink()
-                : TextButton(
+                : IconButton(
+                    tooltip: 'Today',
+                    constraints: const BoxConstraints.tightFor(
+                      width: 48,
+                      height: 48,
+                    ),
+                    icon: const Icon(Icons.today_outlined),
                     onPressed: vm.goToToday,
-                    child: const Text('Today'),
                   ),
           ),
           // Sharing, new shared calendars and subscription links, one
@@ -138,21 +152,29 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 : const SizedBox.shrink(),
           ),
           // In the header rather than floating, so it never covers events.
+          // Icon-only on phones, so the title keeps its room next to the
+          // avatar and the other actions.
           Padding(
             padding: const EdgeInsets.only(left: AppSpace.xs, right: 12),
-            child: FilledButton.icon(
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(0, 40),
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-              ),
-              onPressed: () async {
-                final id = await showEventEditor(context, day: vm.selectedDay);
-                // Other calendars aren't live.
-                if (id != null) await vm.refreshCalendars();
-              },
-              icon: const Icon(Icons.add, size: 20),
-              label: const Text('New event'),
-            ),
+            child: MediaQuery.sizeOf(context).width < _wideHeader
+                ? IconButton.filled(
+                    tooltip: 'New event',
+                    constraints: const BoxConstraints.tightFor(
+                      width: 48,
+                      height: 48,
+                    ),
+                    onPressed: _newEvent,
+                    icon: const Icon(Icons.add),
+                  )
+                : FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 40),
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                    ),
+                    onPressed: _newEvent,
+                    icon: const Icon(Icons.add, size: 20),
+                    label: const Text('New event'),
+                  ),
           ),
         ],
       ),

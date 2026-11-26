@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.59  | 2026-11-26 | `sprint2/c2-layout-fixes`               |                     |
 | 0.0.58  | 2026-11-26 | `sprint2/3a-callables`                |                     |
 | 0.0.57  | 2026-11-26 | `sprint2/lane-b-app`                    |                     |
 | 0.0.56  | 2026-11-26 | `sprint2/lane-b-app`                    |                     |
@@ -71,6 +72,21 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.59 — Layout fixes after the 48 px buttons (C2)
+
+- Schedule: Today is a 48 px icon button (tooltip "Today"), and "New event"
+  is an icon-only 48 px button (same tooltip) below 480 px wide, so the
+  "Schedule" title is readable at 360 px again.
+- Join-request rows (members) and organization team rows: Decline/Approve/
+  Add use tighter horizontal padding and keep the 48 px height, so names
+  stay on one line.
+- Organization teams: the "You're on it" / "Joining…" pill moved from the
+  trailing slot to under the team's details. Shared `Tag`/`StatusPill`
+  unchanged.
+- Widget tests at 360 px (`test/ui/layout_360_test.dart`); the Today test
+  in `schedule_month_test.dart` finds the button by tooltip.
+- Regenerated the `update_required` goldens (version text).
 
 ## 0.0.58 — Account gate on callables (3a-C)
 

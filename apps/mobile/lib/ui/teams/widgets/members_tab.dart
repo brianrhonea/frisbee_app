@@ -266,6 +266,7 @@ class _JoinRequests extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   TextButton(
+                    style: _compactAction,
                     onPressed: viewModel.declineJoinRequest.running
                         ? null
                         : () => viewModel.declineJoinRequest.execute(r.uid),
@@ -276,6 +277,9 @@ class _JoinRequests extends StatelessWidget {
                     style: FilledButton.styleFrom(
                       backgroundColor: c.highlight,
                       foregroundColor: c.onHighlight,
+                      visualDensity: const VisualDensity(horizontal: -2),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      minimumSize: const Size(0, 48),
                     ),
                     onPressed: viewModel.approveJoinRequest.running
                         ? null
@@ -290,6 +294,14 @@ class _JoinRequests extends StatelessWidget {
     );
   }
 }
+
+/// Tighter horizontal padding for buttons in a list row's trailing slot,
+/// so the name keeps its width. Keeps the 48 px tap height.
+final ButtonStyle _compactAction = TextButton.styleFrom(
+  visualDensity: const VisualDensity(horizontal: -2),
+  padding: const EdgeInsets.symmetric(horizontal: 8),
+  minimumSize: const Size(0, 48),
+);
 
 /// A member's tier, stats access and custom roles.
 class _MemberRoles extends StatelessWidget {

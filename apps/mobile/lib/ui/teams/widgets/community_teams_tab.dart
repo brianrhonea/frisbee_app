@@ -266,14 +266,23 @@ class _TeamTile extends StatelessWidget {
           color: c.ink,
         ),
       ),
-      subtitle: Text(
-        '${team.division.label} · $who',
-        style: TextStyle(fontSize: 12.5, color: c.muted),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${team.division.label} · $who',
+            style: TextStyle(fontSize: 12.5, color: c.muted),
+          ),
+          if (on || joining)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Tag(on ? "You're on it" : 'Joining…', success: on),
+            ),
+        ],
       ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (on || joining) Tag(on ? "You're on it" : 'Joining…', success: on),
           if (onInvite != null || onEditAccess != null)
             PopupMenuButton<String>(
               tooltip: 'Team options',
@@ -361,6 +370,11 @@ class _Requests extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     TextButton(
+                      style: TextButton.styleFrom(
+                        visualDensity: const VisualDensity(horizontal: -2),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: const Size(0, 48),
+                      ),
                       onPressed: () => onDecline(r),
                       child: const Text('Decline'),
                     ),
@@ -368,6 +382,9 @@ class _Requests extends StatelessWidget {
                       style: FilledButton.styleFrom(
                         backgroundColor: c.highlight,
                         foregroundColor: c.onHighlight,
+                        visualDensity: const VisualDensity(horizontal: -2),
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        minimumSize: const Size(0, 48),
                       ),
                       onPressed: () => onAccept(r),
                       child: const Text('Add'),
