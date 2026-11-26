@@ -5,6 +5,12 @@ import { open } from "./helpers";
 // The shared components (Sprint 2 C1-C4) in every state, on the non-production
 // gallery at /dev/ui: accessibility, hit areas, keyboard and 200% text. jsdom
 // has no layout, so sizes are checked here.
+
+// The gallery is a development and test route (a 404 in production builds), so
+// against a deployed site (E2E_BASE_URL) only the source guard below runs.
+test.beforeEach(({}, info) => {
+  test.skip(!!process.env.E2E_BASE_URL && !info.title.startsWith("the gallery is not offered"), "the gallery is not served by production builds");
+});
 for (const theme of ["light", "dark"] as const) {
   test(`gallery has no axe violations (${theme})`, async ({ page }) => {
     await open(page, "/dev/ui", theme);
@@ -109,4 +115,13 @@ test("a loading button is busy and keeps focus", async ({ page }) => {
   await expect(saving).toBeFocused();
   await expect(saving).toHaveAttribute("aria-busy", "true");
   expect(await saving.evaluate((el) => el.hasAttribute("disabled"))).toBe(false);
+});
+
+test("pages that use the new bars do not scroll sideways at phone width", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 700 });
+  for (const path of ["/explore", "/learn", "/sign-in"]) {
+    await open(page, path);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow, path).toBeLessThanOrEqual(0);
+  }
 });

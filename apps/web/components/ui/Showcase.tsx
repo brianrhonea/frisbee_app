@@ -2,7 +2,8 @@
 import { type CSSProperties, useState } from "react";
 import { NeedsPill, RsvpPill } from "../RsvpPill";
 import { Avatar, AvatarStack, TeamLogo } from "./Avatar";
-import { Button, buttonClass, IconButton } from "./Button";
+import { Button, IconButton } from "./Button";
+import { buttonClass } from "./buttonClass";
 import { FilterChips } from "./FilterChips";
 import { SegmentedTabs } from "./SegmentedTabs";
 import { StatusPill } from "./StatusPill";

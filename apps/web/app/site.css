@@ -276,19 +276,20 @@ h1, h2, h3 { line-height: 1.1; letter-spacing: -0.03em; margin: 0; }
 .btn-large { min-height: 52px; padding: 12px 28px; font-size: var(--text-body-size); }
 
 /* The Button component's variants (components/ui/Button.tsx; the app's
-   AppButton). Ghost: text only. Destructive: the error fill. */
+   AppButton). Ghost: text only. Destructive: the error fill (the existing
+   .btn-danger, solid ink, is unchanged: app.css). */
 .btn-ghost { background: transparent; color: var(--accent); border-color: transparent; }
-.btn-destructive, .btn-danger { background: var(--error); color: var(--on-accent); border-color: transparent; }
+.btn-destructive { background: var(--error); color: var(--on-accent); border-color: transparent; }
 
 /* States. Hover and pressed shift the fill with tokens, not filters. */
 .btn-amber:hover:not(:disabled), .btn-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, var(--ink)); }
 .btn-amber:hover:not(:disabled) { background: color-mix(in srgb, var(--disc) 88%, var(--ink)); }
 .btn-ghost:hover:not(:disabled) { background: var(--accent-soft); }
-.btn-destructive:hover:not(:disabled), .btn-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--error) 88%, var(--ink)); opacity: 1; }
+.btn-destructive:hover:not(:disabled) { background: color-mix(in srgb, var(--error) 88%, var(--ink)); }
 .btn:active:not(:disabled):not([aria-disabled="true"]) { transform: scale(0.98); }
 .btn-primary:active:not(:disabled) { background: color-mix(in srgb, var(--accent) 76%, var(--ink)); }
 .btn-ghost:active:not(:disabled) { background: color-mix(in srgb, var(--accent-soft) 80%, var(--accent)); }
-.btn-destructive:active:not(:disabled), .btn-danger:active:not(:disabled) { background: color-mix(in srgb, var(--error) 76%, var(--ink)); }
+.btn-destructive:active:not(:disabled) { background: color-mix(in srgb, var(--error) 76%, var(--ink)); }
 .btn:disabled, .btn[aria-disabled="true"] { opacity: 0.6; cursor: default; }
 /* Loading: the button keeps its size and focus, shows a spinner and ignores clicks. */
 .btn[aria-busy="true"] { cursor: progress; }

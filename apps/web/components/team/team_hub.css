@@ -22,6 +22,7 @@
 .team-hub .team-meta > * + *::before { content: "·"; margin: 0 7px; color: var(--muted); font-weight: 400; }
 .team-hub .team-meta > .pill::before { content: none; }
 .team-hub .team-meta > .pill { margin: 0 0 0 10px; padding: 2px 9px; font-size: 0.74rem; }
+.team-hub .team-meta > .ui-pill { padding: 2px 9px; font-size: 0.74rem; }
 .team-hub .team-meta .member-count { color: var(--muted); font-weight: 500; font-size: inherit; gap: 6px; }
 .team-hub .team-meta .member-count:hover { color: var(--ink); }
 .team-hub .team-meta .avatar-stack .avatar { font-size: 9px !important; }
@@ -264,6 +265,7 @@
 .team-hub .member-rows .member-card b { font-weight: 700; }
 .team-hub .member-rows .member-roles { justify-content: flex-end; align-items: center; gap: 4px; }
 .team-hub .member-rows .member-roles .pill { margin: 0; padding: 2px 9px; font-size: 0.74rem; }
+.team-hub .member-rows .member-roles .ui-pill { margin: 0; padding: 2px 9px; font-size: 0.74rem; }
 @media (max-width: 480px) {
   .team-hub .member-rows .member-card { grid-template-columns: 36px minmax(0, 1fr); }
   .team-hub .member-rows .member-roles { grid-column: 2; justify-content: flex-start; }

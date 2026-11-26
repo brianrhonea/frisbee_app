@@ -4,6 +4,19 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.59.13 — 2026-11-26
+
+Review fixes for C1-C4 (Sprint 2).
+
+- Fixes found in review of C1-C4: migrated pills keep their row layout
+  (`.row-card > .ui-pill`, member roles, team share, team banner and roster
+  sizes); `Button` and `IconButton` are client components and `buttonClass`
+  moved to its own plain module so server components can use it; the existing
+  `.btn-danger` stays solid ink (only the Button's destructive variant is the
+  error fill); the gallery's browser checks are skipped against a deployed
+  site, and a check that Explore, Learn and Sign in do not scroll sideways at
+  320 px was added.
+
 ## 0.59.12 — 2026-11-26
 
 C4: Avatar, TeamLogo, AvatarStack (Sprint 2).
@@ -51,8 +64,9 @@ C2: Button and IconButton (Sprint 2).
   Parity with the app's AppButton.
 - `.btn*` and `.icon-btn` gain hover, pressed and loading states from tokens
   (no brightness filters) and a 48 px hit area in every size without moving
-  the layout (an invisible band around the control). `.btn-danger` is now the
-  error fill, like `.btn-destructive`.
+  the layout (an invisible band around the control). The Button's destructive
+  variant is the error fill; the existing `.btn-danger` (solid ink) is
+  unchanged, pending the owner's choice between them.
 - Messages, Notifications, Schedule, the invite and create/join dialogs use
   the components; the other buttons get the new states through the classes.
 

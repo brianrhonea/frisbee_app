@@ -1,4 +1,6 @@
+"use client";
 import type { ButtonHTMLAttributes, MouseEvent, ReactNode } from "react";
+import { type ButtonSize, type ButtonVariant, buttonClass } from "./buttonClass";
 
 /**
  * The website's Button (the app's AppButton): primary, secondary, ghost and
@@ -9,24 +11,9 @@ import type { ButtonHTMLAttributes, MouseEvent, ReactNode } from "react";
  *
  * Loading keeps the button focusable (so focus is not lost mid-save), shows
  * a spinner and ignores clicks; `aria-busy` tells assistive tech. Use
- * [buttonClass] for a link that should look like a button.
+ * [buttonClass] (buttonClass.ts, usable from server components) for a link
+ * that should look like a button.
  */
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "destructive";
-export type ButtonSize = "small" | "medium" | "large";
-
-const variantClass: Record<ButtonVariant, string> = {
-  primary: " btn-primary",
-  secondary: "",
-  ghost: " btn-ghost",
-  destructive: " btn-destructive",
-};
-const sizeClass: Record<ButtonSize, string> = { small: " btn-small", medium: "", large: " btn-large" };
-
-/** The classes of a button, for `<Link>` and `<a>` that should look like one. */
-export function buttonClass({ variant = "secondary", size = "medium", className }: { variant?: ButtonVariant; size?: ButtonSize; className?: string } = {}) {
-  return `btn${variantClass[variant]}${sizeClass[size]}${className ? ` ${className}` : ""}`;
-}
-
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: ButtonSize;

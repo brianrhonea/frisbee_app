@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { Button, buttonClass, IconButton } from "@/components/ui/Button";
+import { Button, IconButton } from "@/components/ui/Button";
+import { buttonClass } from "@/components/ui/buttonClass";
 
 const root = join(__dirname, "../..");
 const css = readFileSync(join(root, "app/site.css"), "utf8") + readFileSync(join(root, "app/app.css"), "utf8");
@@ -141,6 +142,15 @@ describe("IconButton", () => {
   });
 });
 
+describe("server-safe pieces", () => {
+  it("Button is a client component and buttonClass is not", () => {
+    const button = readFileSync(join(root, "components/ui/Button.tsx"), "utf8");
+    const plain = readFileSync(join(root, "components/ui/buttonClass.ts"), "utf8");
+    expect(button.startsWith('"use client"')).toBe(true);
+    expect(plain.startsWith('"use client"')).toBe(false);
+  });
+});
+
 describe("buttonClass for links", () => {
   it("builds the same classes", () => {
     expect(buttonClass()).toBe("btn");
@@ -156,7 +166,7 @@ describe("button states exist in the stylesheets", () => {
     has(/\.btn:disabled,\s*\.btn\[aria-disabled="true"\]/);
     has(/\.btn\[aria-busy="true"\]::before/);
     has(/\.btn-ghost\s*\{/);
-    has(/\.btn-destructive,\s*\.btn-danger\s*\{[^}]*var\(--error\)/);
+    has(/\.btn-destructive\s*\{[^}]*var\(--error\)/);
     has(/\.btn-large\s*\{[^}]*min-height:\s*52px/);
     has(/\.icon-btn:active:not\(:disabled\)/);
   });
