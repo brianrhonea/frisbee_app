@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../themes/theme.dart';
 import 'app_button.dart';
+import 'avatar.dart';
 import 'balanced_text.dart';
 import 'scroll_to_top.dart';
 import 'status_pill.dart';
@@ -516,17 +517,9 @@ class DateBadge extends StatelessWidget {
 }
 
 /// Initials of [name]: the first letters of its first two words.
-String initialsOf(String name) {
-  final letters = name
-      .split(RegExp(r'\s+'))
-      .where((w) => w.isNotEmpty)
-      .take(2)
-      .map((w) => w[0].toUpperCase())
-      .join();
-  return letters.isEmpty ? '?' : letters;
-}
+String initialsOf(String name) => initialsOfName(name);
 
-/// A person's photo, or their initials in a circle.
+/// A person's photo, or their initials in a circle: an [Avatar].
 class PersonAvatar extends StatelessWidget {
   const PersonAvatar({
     super.key,
@@ -540,30 +533,13 @@ class PersonAvatar extends StatelessWidget {
   final double radius;
 
   @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    final photo = photoUrl;
-    final hasPhoto = photo != null && photo.isNotEmpty;
-    return CircleAvatar(
-      radius: radius,
-      backgroundColor: c.accentSoft,
-      foregroundColor: c.ink,
-      backgroundImage: hasPhoto ? NetworkImage(photo) : null,
-      child: hasPhoto
-          ? null
-          : Text(
-              initialsOf(name),
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: radius * 0.72,
-              ),
-            ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      Avatar(name: name, imageUrl: photoUrl, size: radius * 2);
 }
 
-/// A team's mark: a rounded dark green square with a mountain-like crest
-/// (or a people icon for community groups).
+/// A team's mark: its initials in the condensed face (a rounded square for a
+/// team, a circle for a community), or a crest icon (or a people icon for
+/// community groups) without a [name]: a [TeamLogo].
 class TeamBadge extends StatelessWidget {
   const TeamBadge({
     super.key,
@@ -575,54 +551,16 @@ class TeamBadge extends StatelessWidget {
   final double size;
   final bool community;
 
-  /// When given, the team's initials in the condensed face instead of an
-  /// icon: a team-blue rounded square for a team, a turf circle for a
-  /// community.
+  /// When given, the team's initials instead of an icon.
   final String? name;
 
   @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    final initials = name;
-    if (initials != null) {
-      return Container(
-        width: size,
-        height: size,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: community ? c.accent : c.badge,
-          borderRadius: BorderRadius.circular(
-            community ? size / 2 : size * 0.27,
-          ),
-        ),
-        child: Text(
-          initialsOf(initials),
-          maxLines: 1,
-          softWrap: false,
-          style: TextStyle(
-            fontFamily: scoreFont,
-            fontWeight: FontWeight.w800,
-            fontSize: size * 0.45,
-            height: 1,
-            color: community ? c.onAccent : Colors.white,
-          ),
-        ),
-      );
-    }
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: c.accentSoft,
-        borderRadius: BorderRadius.circular(size * 0.28),
-      ),
-      child: Icon(
-        community ? Icons.diversity_3_outlined : Icons.landscape_outlined,
-        size: size * 0.56,
-        color: c.accentInk,
-      ),
-    );
-  }
+  Widget build(BuildContext context) => TeamLogo(
+    name: name,
+    size: size,
+    kind: community ? TeamLogoKind.community : TeamLogoKind.team,
+    decorative: true,
+  );
 }
 
 /// An unread count in a solid pill, for navigation items and rows: a
