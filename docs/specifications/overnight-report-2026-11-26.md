@@ -255,3 +255,4 @@ The owner approved the defaults for D1–D13.
 4. Phone check: sign out of account A while offline, sign in as B, message A, and confirm B's phone gets nothing.
 
 **2026-11-26:** the owner approved step 1, and `deviceOwnership-fidOwner` was deployed to dev from `35e9a94`: v2, a Firestore write trigger, us-central1, Node 22. Steps 2–4 are not done.
+**2026-11-26:** the owner approved step 2. The backfill ran on dev: the dry run found 2 devices, 2 FIDs and 0 stale copies. `--apply` wrote 2 mappings and deleted 0 device docs. A second dry run afterwards found nothing stale. Steps 3–4 (`notifications` deploy and the phone test) are not done.
