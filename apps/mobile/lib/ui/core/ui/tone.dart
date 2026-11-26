@@ -11,18 +11,23 @@ import 'status_pill.dart';
 /// live, green only for success (open, done), amber only for what needs the
 /// user. There are no other hues, so a new tag cannot pick one by accident.
 enum Tone {
-  grey(Color(0xFF6B7280), Color(0xFFB0B7C3)),
-  amber(Color(0xFFB7791F), Color(0xFFF2C46B)),
-  red(Color(0xFFD03A2F), Color(0xFFF58A80)),
-  // The success colours (AppColors.positive): green means done, open or OK.
-  green(Color(0xFF166534), Color(0xFF86EFAC));
+  grey,
+  amber,
+  red,
+  // Green means done, open or OK.
+  green;
 
-  const Tone(this._light, this._dark);
-  final Color _light;
-  final Color _dark;
-
-  Color of(BuildContext context) =>
-      Theme.of(context).brightness == Brightness.dark ? _dark : _light;
+  /// The tone's colour: a semantic [AppColors] token, so each theme picks its
+  /// own shade (muted, highlightInk, live, positive).
+  Color of(BuildContext context) {
+    final c = AppColors.of(context);
+    return switch (this) {
+      Tone.grey => c.muted,
+      Tone.amber => c.highlightInk,
+      Tone.red => c.live,
+      Tone.green => c.positive,
+    };
+  }
 
   /// The tone as text on its own tint ([tint] is the tint's opacity, 18%
   /// for a selected chip): the tone itself, moved toward black in the light

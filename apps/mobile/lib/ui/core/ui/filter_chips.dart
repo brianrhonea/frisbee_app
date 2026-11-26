@@ -44,6 +44,7 @@ class AppFilterChips<T> extends StatelessWidget {
             padding: const EdgeInsetsDirectional.only(end: AppSpace.sm),
             child: AppFilterChip(
               label: o.count == null ? o.label : '${o.label} ${o.count}',
+              semanticsLabel: o.count == null ? null : '${o.label}, ${o.count}',
               leading: o.leading,
               selected: o.value == selected,
               onSelected: () => onSelected(o.value),
@@ -62,9 +63,13 @@ class AppFilterChip extends StatelessWidget {
     required this.selected,
     required this.onSelected,
     this.leading,
+    this.semanticsLabel,
   });
 
   final String label;
+
+  /// Read by screen readers instead of [label], e.g. "All, 12".
+  final String? semanticsLabel;
   final bool selected;
 
   /// Null shows the chip disabled.
@@ -72,12 +77,25 @@ class AppFilterChip extends StatelessWidget {
   final Widget? leading;
 
   @override
-  Widget build(BuildContext context) => ChoiceChip(
-    // The selected chip gets a check as well as the fill.
-    showCheckmark: true,
-    avatar: leading,
-    label: Text(label),
-    selected: selected,
-    onSelected: onSelected == null ? null : (_) => onSelected!(),
-  );
+  Widget build(BuildContext context) {
+    final chip = ChoiceChip(
+      // The selected chip gets a check as well as the fill; the check
+      // replaces the dot so the two never overlap.
+      showCheckmark: true,
+      avatar: selected ? null : leading,
+      label: Text(label),
+      selected: selected,
+      onSelected: onSelected == null ? null : (_) => onSelected!(),
+    );
+    if (semanticsLabel == null) return chip;
+    return Semantics(
+      label: semanticsLabel,
+      excludeSemantics: true,
+      button: true,
+      selected: selected,
+      enabled: onSelected != null,
+      onTap: onSelected,
+      child: chip,
+    );
+  }
 }

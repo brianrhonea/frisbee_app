@@ -57,14 +57,15 @@ class LivePill extends StatelessWidget {
       StatusPill(label, tone: PillTone.live, dot: true);
 }
 
-/// A "needs you" pill in soft amber, e.g. "Needs RSVP" or "Score due": a
+/// A "needs you" pill, soft amber (solid indigo when [strong]), e.g. "Needs RSVP" or "Score due": a
 /// [StatusPill].
 class NeedsYouPill extends StatelessWidget {
   const NeedsYouPill(this.label, {super.key, this.strong = false});
 
   final String label;
 
-  /// Solid, for the single most urgent thing on a screen.
+  /// Solid indigo (token decision 1: the old solid amber became indigo), for
+  /// the single most urgent thing on a screen.
   final bool strong;
 
   @override

@@ -124,7 +124,8 @@ class AppButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     final style = AppButtonStyles.of(c, variant, size);
-    final tap = loading ? null : onPressed;
+    // Loading keeps the enabled look (a no-op tap), not the disabled one.
+    final tap = loading ? () {} : onPressed;
     final iconSize = size == AppButtonSize.large ? 20.0 : 18.0;
     final text = Text(label, textAlign: TextAlign.center);
     Widget content = icon == null
