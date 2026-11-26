@@ -2,7 +2,7 @@
 
 **Status:** draft for the owner. Nothing here has been run. Every step is an owner-run deploy or script, per CLAUDE.md §16.
 
-**Code:** `feature/jan-4-release` at `b471e30` or later. That means API 0.52.1, web 0.61.0 and app 0.0.58, with `ACCOUNT_GATE_MODE: "report"` in `apps/api/deploy/service.yaml`.
+**Code:** `feature/jan-4-release` at `b471e30` or later. That means API 0.52.2, web 0.61.0 and app 0.0.58, with `ACCOUNT_GATE_MODE: "report"` in `apps/api/deploy/service.yaml`.
 
 **Dev project:** `frisbee-app-brianrhonea-dev`.
 
@@ -16,16 +16,16 @@ The order is the one the owner chose on 2026-11-26: API report-only, then backfi
 
    The new rules re-validate the whole doc when the notify toggle changes, so a legacy URL there would make that update fail. QA found no current app or web write that breaks.
 2. **Check dev `profiles`** for `photoUrl` or `headerUrl` values that fail the new strict pattern. A Storage URL with `/o/<name>?alt=media&token=…` passes. Two effects:
-   - From step 1, API 0.52.1 drops a non-conforming profile photo from new posts, comments, follows, follow requests, block cards and meeting tokens. Those players appear without a picture until they upload a new one.
+   - From step 1, API 0.52.2 drops a non-conforming profile photo from new posts, comments, follows, follow requests, block cards and meeting tokens. Those players appear without a picture until they upload a new one.
    - From step 5, their direct profile writes are also refused.
 3. **Confirm the `ageRefusals/{uid}` collection** (owner decision, see the completion report).
 
 ## 1. API in report-only on dev
 
-- Build and replace the API from this branch. Use your usual Cloud Build plus `gcloud run services replace` procedure (`apps/api/DEPLOY.md`). `service.yaml` already sets `ACCOUNT_GATE_MODE: "report"`. Since 0.52.1, a deployed API refuses to start without that value.
+- Build and replace the API from this branch. Use your usual Cloud Build plus `gcloud run services replace` procedure (`apps/api/DEPLOY.md`). `service.yaml` already sets `ACCOUNT_GATE_MODE: "report"`. Since 0.52.2, a deployed API refuses to start without that value.
 - Deploy the `account` function group at the same time. From now on the API writes `ageRefusals`, and `deleteAccount` must clear it:
   `firebase deploy --only functions:account --project frisbee-app-brianrhonea-dev`
-- Check that `/health` reports 0.52.1.
+- Check that `/health` reports 0.52.2.
 
 ## 2. Claim backfill on dev
 
