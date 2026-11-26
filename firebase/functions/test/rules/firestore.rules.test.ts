@@ -39,7 +39,10 @@ const STATS = "stats";
 const PLAYER = "player";
 const OUTSIDER = "outsider";
 
-const db = (uid: string) => env.authenticatedContext(uid).firestore();
+// A complete account (the account gate: verified email, ageOk, terms): the API sets the
+// claims; account_gate.rules.test.ts covers the incomplete ones.
+const COMPLETE = { email_verified: true, ageOk: true, terms: 1 };
+const db = (uid: string) => env.authenticatedContext(uid, COMPLETE).firestore();
 
 // An inviteCodes doc as the app mints it (InviteCode in
 // lib/domain/models/invite_code.dart): a 6-character code that works for

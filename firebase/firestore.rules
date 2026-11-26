@@ -7,6 +7,26 @@ service cloud.firestore {
 
     function signedIn() { return request.auth != null; }
     function uid() { return request.auth.uid; }
+    // A complete account (apps/api/src/account/gate.ts, docs/specifications/
+    // contracts/account-gate.md): verified email, an adult (the API sets the
+    // `ageOk` claim only from a saved birth date of 18 or over) and the
+    // Terms agreed (the `terms` claim, the version agreed). Every create,
+    // update and delete that is user activity needs it; reads don't, and
+    // neither do the paths a new account uses to finish onboarding: its own
+    // users doc, profile (and username claim), devices, notification
+    // settings and read markers. The API enforces the same gate on its writes.
+    function accountOk() {
+      return signedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.token.get('ageOk', false) == true
+        && request.auth.token.get('terms', 0) is number
+        && request.auth.token.get('terms', 0) >= 1;
+    }
+    // For a rule that covers reads and deletes together: reads need only a
+    // signed-in user.
+    function readOrAccountOk() {
+      return request.method in ['get', 'list'] ? signedIn() : accountOk();
+    }
     // A list query asking for at most [n] documents (security review S4):
     // anyone signed in may search the directories, posts and comments, but
     // not download them whole in one go. Every app and website query on
@@ -372,8 +392,8 @@ service cloud.firestore {
             && (!('series' in d) || validSeries(d.series));
         }
 
-        allow read, delete: if signedIn() && uid() == userId;
-        allow create, update: if signedIn() && uid() == userId && validMine();
+        allow read, delete: if readOrAccountOk() && uid() == userId;
+        allow create, update: if accountOk() && uid() == userId && validMine();
       }
 
       // Invitations to someone's calendar (CalendarService in the API,
@@ -405,9 +425,9 @@ service cloud.firestore {
           return can(team(), 'manageMembers') || communityInvites();
         }
 
-        allow read, delete: if signedIn()
+        allow read, delete: if readOrAccountOk()
           && (uid() == userId || canInvite());
-        allow create, update: if signedIn()
+        allow create, update: if accountOk()
           && canInvite()
           && !(userId in team().memberIds)
           && request.resource.data.keys().hasOnly([
@@ -479,11 +499,11 @@ service cloud.firestore {
 
         allow read: if signedIn() && uid() == userId;
         // The follower unfollows, or the person followed removes them.
-        allow delete: if signedIn()
+        allow delete: if accountOk()
           && (uid() == userId || key == 'user_' + uid());
         // Following a private profile needs its owner's OK: the owner
         // writes the follow in the same batch that removes the request.
-        allow create: if signedIn() && notMuted() && validFollow()
+        allow create: if accountOk() && notMuted() && validFollow()
           && request.resource.data.createdAt == request.time
           && ((uid() == userId
                && request.resource.data.get('approved', false) == false
@@ -496,7 +516,7 @@ service cloud.firestore {
                   && request.resource.data.get('approved', false) == true
                   && exists(followRequestPath(uid(), userId))
                   && !existsAfter(followRequestPath(uid(), userId))));
-        allow update: if signedIn() && uid() == userId
+        allow update: if accountOk() && uid() == userId
           && changed().hasOnly(['notify', 'name', 'photoUrl'])
           && validFollow();
       }
@@ -525,7 +545,7 @@ service cloud.firestore {
       // Creator becomes sole owner. Invite codes are minted later, and
       // only for as long as an admin shows or shares one (inviteCodes).
       // Club teams are started through the API (isClubTeam).
-      allow create: if signedIn() && notMuted() && !serverOnlyId()
+      allow create: if accountOk() && notMuted() && !serverOnlyId()
         && !isClubTeam(request.resource.data)
         && request.resource.data.keys().hasOnly([
              'name', 'division', 'level', 'city', 'ownerId', 'members',
@@ -542,7 +562,7 @@ service cloud.firestore {
 
       // A community group: same owner checks, plus its group fields, and
       // no invite code since anyone can find and join it.
-      allow create: if signedIn() && notMuted() && !serverOnlyId()
+      allow create: if accountOk() && notMuted() && !serverOnlyId()
         && request.resource.data.keys().hasOnly([
              'name', 'division', 'level', 'city', 'ownerId', 'members',
              'memberIds', 'memberNames', 'createdAt', 'kind', 'description',
@@ -554,7 +574,7 @@ service cloud.firestore {
         && request.resource.data.memberIds == [uid()]
         && request.resource.data.memberNames.keys().hasOnly([uid()]);
 
-      allow update: if signedIn() && (
+      allow update: if accountOk() && (
         editDetails() || dropLegacyCode() || changeRole() ||
         setStatKeepers() || transferOwnership() || removeMember() || join() ||
         joinOpenGroup() || approveRequest() || acceptInvite() || markDeleting() ||
@@ -617,7 +637,7 @@ service cloud.firestore {
 
       // Only once the owner is the last one on it (see soleOwner), and not
       // while it plays in a league: its games and standings refer to it.
-      allow delete: if signedIn() && resource.data.ownerId == uid()
+      allow delete: if accountOk() && resource.data.ownerId == uid()
         && soleOwner() && !inActiveLeague();
 
       // A team a league made (createLeagueTeams) carries its league's id.
@@ -868,7 +888,7 @@ service cloud.firestore {
       // Where older teams kept their permanent invite code. Codes now
       // rotate (inviteCodes); the owner clears the old one with the team.
       match /private/{docId} {
-        allow delete: if signedIn() && isOwner(get(teamPath(teamId)).data);
+        allow delete: if accountOk() && isOwner(get(teamPath(teamId)).data);
       }
 
       // Join proofs: each user writes only their own. The owner can list
@@ -876,10 +896,10 @@ service cloud.firestore {
       match /joins/{userId} {
         allow read: if signedIn()
           && (uid() == userId || isOwner(get(teamPath(teamId)).data));
-        allow create, update: if signedIn() && uid() == userId
+        allow create, update: if accountOk() && uid() == userId
           && request.resource.data.keys().hasOnly(['code'])
           && validString(request.resource.data.code, 32);
-        allow delete: if signedIn() && isOwner(get(teamPath(teamId)).data);
+        allow delete: if accountOk() && isOwner(get(teamPath(teamId)).data);
       }
 
       // Requests to join a group that requires approval. Each user writes
@@ -893,14 +913,14 @@ service cloud.firestore {
         function team() { return get(teamPath(teamId)).data; }
 
         allow read: if signedIn() && (uid() == userId || can(team(), 'manageMembers'));
-        allow create: if signedIn() && notMuted() && uid() == userId
+        allow create: if accountOk() && notMuted() && uid() == userId
           && isGroup(team())
           && team().requiresApproval
           && !isMember(team())
           && request.resource.data.keys().hasOnly(['name', 'createdAt'])
           && validString(request.resource.data.name, 80)
           && request.resource.data.createdAt == request.time;
-        allow delete: if signedIn() && (uid() == userId || can(team(), 'manageMembers'));
+        allow delete: if accountOk() && (uid() == userId || can(team(), 'manageMembers'));
       }
 
       // Teams asking to join this school or club community, keyed by team
@@ -911,9 +931,9 @@ service cloud.firestore {
         function org() { return get(teamPath(teamId)).data; }
         function asker() { return get(teamPath(reqTeamId)).data; }
 
-        allow read, delete: if signedIn()
+        allow read, delete: if readOrAccountOk()
           && (can(org(), 'manageTeam') || can(asker(), 'manageTeam'));
-        allow create: if signedIn()
+        allow create: if accountOk()
           && isOrg(org())
           && can(getAfter(teamPath(reqTeamId)).data, 'manageTeam')
           && getAfter(teamPath(reqTeamId)).data.get('orgId', null) == teamId
@@ -953,8 +973,8 @@ service cloud.firestore {
         }
 
         allow read: if signedIn() && isMember(get(teamPath(teamId)).data);
-        allow delete: if signedIn() && can(get(teamPath(teamId)).data, 'manageTeam');
-        allow create, update: if signedIn()
+        allow delete: if accountOk() && can(get(teamPath(teamId)).data, 'manageTeam');
+        allow create, update: if accountOk()
           && can(get(teamPath(teamId)).data, 'manageTeam')
           && validLink(get(teamPath(teamId)).data)
           && request.resource.data.keys().hasOnly(['name', 'number', 'position', 'userId', 'line'])
@@ -964,7 +984,7 @@ service cloud.firestore {
           && request.resource.data.name.size() <= 80
           && (request.resource.data.number == null || request.resource.data.number is int)
           && request.resource.data.position in ['handler', 'cutter', 'hybrid'];
-        allow update: if signedIn()
+        allow update: if accountOk()
           && isMember(get(teamPath(teamId)).data)
           && changed().hasOnly(['userId'])
           && ((linkedTo(resource.data) == null
@@ -976,8 +996,8 @@ service cloud.firestore {
       // Per-player paid mark, keyed like roster.
       // Owners, coaches and captains only; players can't read it.
       match /rosterStatus/{playerId} {
-        allow read, delete: if signedIn() && can(get(teamPath(teamId)).data, 'manageTeam');
-        allow create, update: if signedIn()
+        allow read, delete: if readOrAccountOk() && can(get(teamPath(teamId)).data, 'manageTeam');
+        allow create, update: if accountOk()
           && can(get(teamPath(teamId)).data, 'manageTeam')
           && request.resource.data.keys().hasOnly(['paid'])
           && request.resource.data.get('paid', false) is bool;
@@ -985,8 +1005,8 @@ service cloud.firestore {
 
       match /plays/{playId} {
         allow read: if signedIn() && isMember(get(teamPath(teamId)).data);
-        allow delete: if signedIn() && can(get(teamPath(teamId)).data, 'manageTeam');
-        allow create, update: if signedIn()
+        allow delete: if accountOk() && can(get(teamPath(teamId)).data, 'manageTeam');
+        allow create, update: if accountOk()
           && can(get(teamPath(teamId)).data, 'manageTeam')
           && request.resource.data.keys().hasOnly([
                'name', 'category', 'notes', 'elements', 'arrows', 'steps',
@@ -1073,8 +1093,8 @@ service cloud.firestore {
         }
 
         allow read: if signedIn() && isMember(team()) && sees(resource.data);
-        allow delete: if signedIn() && can(team(), 'manageEvents');
-        allow create: if signedIn()
+        allow delete: if accountOk() && can(team(), 'manageEvents');
+        allow create: if accountOk()
           && can(team(), 'manageEvents')
           && request.resource.data.keys().hasOnly([
                'title', 'type', 'startsAt', 'endsAt', 'location', 'notes',
@@ -1087,7 +1107,7 @@ service cloud.firestore {
           && request.resource.data.reactions == {}
           && request.resource.data.votes == {}
           && validEvent(request.resource.data);
-        allow update: if signedIn() && (respond() || editDetails());
+        allow update: if accountOk() && (respond() || editDetails());
       }
 
       // The hosted tournaments the team has entered, and its entry's
@@ -1096,7 +1116,7 @@ service cloud.firestore {
       // with the team.
       match /tournamentEntries/{tournamentId} {
         allow read: if signedIn() && isMember(get(teamPath(teamId)).data);
-        allow delete: if signedIn() && can(get(teamPath(teamId)).data, 'manageTeam');
+        allow delete: if accountOk() && can(get(teamPath(teamId)).data, 'manageTeam');
       }
 
       // Copies of events marked public, for the team's public home page:
@@ -1104,8 +1124,8 @@ service cloud.firestore {
       // Editors write them alongside the event.
       match /publicEvents/{eventId} {
         allow read: if signedIn() && showsPublic(get(teamPath(teamId)).data);
-        allow delete: if signedIn() && can(get(teamPath(teamId)).data, 'manageEvents');
-        allow create, update: if signedIn()
+        allow delete: if accountOk() && can(get(teamPath(teamId)).data, 'manageEvents');
+        allow create, update: if accountOk()
           && can(get(teamPath(teamId)).data, 'manageEvents')
           && request.resource.data.keys().hasOnly([
                'title', 'type', 'startsAt', 'endsAt', 'location', 'notes',
@@ -1193,7 +1213,7 @@ service cloud.firestore {
         }
 
         allow read: if signedIn() && isMember(team()) && invited(resource.data);
-        allow create: if signedIn()
+        allow create: if accountOk()
           && can(team(), 'manageEvents')
           && request.resource.data.keys().hasOnly([
                'title', 'startsAt', 'endsAt', 'notes', 'inviteRoles',
@@ -1203,9 +1223,9 @@ service cloud.firestore {
           && request.resource.data.rsvps == {}
           && request.resource.data.createdBy == uid()
           && validMeeting(request.resource.data);
-        allow update: if signedIn() && isMember(team())
+        allow update: if accountOk() && isMember(team())
           && (respond() || editDetails() || start() || end());
-        allow delete: if signedIn() && can(team(), 'manageEvents');
+        allow delete: if accountOk() && can(team(), 'manageEvents');
 
         // Asking to join a meeting that needs approval, keyed by uid.
         // Invitees ask (or ask again) for themselves; admins let them in
@@ -1214,7 +1234,7 @@ service cloud.firestore {
           function meeting() { return get(meetingPath()).data; }
 
           allow read: if signedIn() && (uid() == userId || can(team(), 'manageEvents'));
-          allow create, update: if signedIn() && uid() == userId
+          allow create, update: if accountOk() && uid() == userId
             && isMember(team())
             && invited(meeting())
             && meeting().requireApproval == true
@@ -1223,13 +1243,13 @@ service cloud.firestore {
             && request.resource.data.status == 'pending'
             && validString(request.resource.data.name, 80)
             && request.resource.data.requestedAt == request.time;
-          allow update: if signedIn() && can(team(), 'manageEvents')
+          allow update: if accountOk() && can(team(), 'manageEvents')
             && request.resource.data.diff(resource.data).affectedKeys()
                  .hasOnly(['status', 'decidedBy', 'decidedAt'])
             && request.resource.data.status in ['admitted', 'denied']
             && request.resource.data.decidedBy == uid()
             && request.resource.data.decidedAt == request.time;
-          allow delete: if signedIn() && (uid() == userId || can(team(), 'manageEvents'));
+          allow delete: if accountOk() && (uid() == userId || can(team(), 'manageEvents'));
         }
 
         // Watch together (MeetingPlayback in
@@ -1254,11 +1274,11 @@ service cloud.firestore {
           }
 
           allow read: if signedIn() && isMember(team()) && inCall(meeting());
-          allow create, update: if signedIn() && docId == 'current'
+          allow create, update: if accountOk() && docId == 'current'
             && can(team(), 'manageEvents')
             && meeting().status == 'live'
             && validPlayback(request.resource.data);
-          allow delete: if signedIn() && can(team(), 'manageEvents');
+          allow delete: if accountOk() && can(team(), 'manageEvents');
         }
 
         // The chat inside the call: text only, for people in the call.
@@ -1268,7 +1288,7 @@ service cloud.firestore {
           function meeting() { return get(meetingPath()).data; }
 
           allow read: if signedIn() && isMember(team()) && inCall(meeting());
-          allow create: if signedIn() && notMuted() && isMember(team())
+          allow create: if accountOk() && notMuted() && isMember(team())
             && meeting().status == 'live'
             && inCall(meeting())
             && request.resource.data.keys().hasOnly([
@@ -1279,7 +1299,7 @@ service cloud.firestore {
             && request.resource.data.text.size() > 0
             && request.resource.data.text.size() <= 4000
             && request.resource.data.createdAt == request.time;
-          allow delete: if signedIn()
+          allow delete: if accountOk()
             && (resource.data.authorId == uid() || can(team(), 'manageEvents'));
         }
       }
@@ -1322,8 +1342,8 @@ service cloud.firestore {
         allow read: if signedIn()
           && (isMember(team())
               || (resource.data.public == true && showsPublic(team())));
-        allow delete: if signedIn() && can(team(), 'manageTeam');
-        allow create: if signedIn()
+        allow delete: if accountOk() && can(team(), 'manageTeam');
+        allow create: if accountOk()
           && can(team(), 'manageTeam')
           && request.resource.data.keys().hasOnly([
                'title', 'body', 'location', 'links', 'images', 'public',
@@ -1333,7 +1353,7 @@ service cloud.firestore {
           && validString(request.resource.data.authorName, 80)
           && request.resource.data.createdAt == request.time
           && validPost(request.resource.data);
-        allow update: if signedIn() && can(team(), 'manageTeam')
+        allow update: if accountOk() && can(team(), 'manageTeam')
           && changed().hasOnly([
                'title', 'body', 'location', 'links', 'images', 'public',
                'tournamentKey', 'updatedAt'])
@@ -1383,8 +1403,8 @@ service cloud.firestore {
         }
 
         allow read: if signedIn() && isMember(team());
-        allow delete: if signedIn() && can(team(), 'manageTeam');
-        allow create: if signedIn()
+        allow delete: if accountOk() && can(team(), 'manageTeam');
+        allow create: if accountOk()
           && can(team(), 'manageTeam')
           && request.resource.data.keys().hasOnly([
                'youtubeId', 'file', 'folderId', 'title', 'description',
@@ -1394,7 +1414,7 @@ service cloud.firestore {
           && request.resource.data.createdAt == request.time
           && request.resource.data.updatedAt == request.time
           && validVideo(request.resource.data);
-        allow update: if signedIn() && can(team(), 'manageTeam')
+        allow update: if accountOk() && can(team(), 'manageTeam')
           && changed().hasOnly([
                'youtubeId', 'folderId', 'title', 'description', 'updatedAt'])
           && request.resource.data.updatedAt == request.time
@@ -1408,7 +1428,7 @@ service cloud.firestore {
         // too: it's in neither key list above.
         match /comments/{commentId} {
           allow read: if signedIn() && isMember(team());
-          allow delete: if signedIn() && can(team(), 'manageTeam');
+          allow delete: if accountOk() && can(team(), 'manageTeam');
         }
       }
 
@@ -1424,12 +1444,12 @@ service cloud.firestore {
         }
 
         allow read: if signedIn() && isMember(team());
-        allow delete: if signedIn() && can(team(), 'manageTeam');
-        allow create: if signedIn() && can(team(), 'manageTeam')
+        allow delete: if accountOk() && can(team(), 'manageTeam');
+        allow create: if accountOk() && can(team(), 'manageTeam')
           && request.resource.data.keys().hasOnly(['name', 'createdAt'])
           && request.resource.data.createdAt == request.time
           && validFolder(request.resource.data);
-        allow update: if signedIn() && can(team(), 'manageTeam')
+        allow update: if accountOk() && can(team(), 'manageTeam')
           && changed().hasOnly(['name'])
           && validFolder(request.resource.data);
       }
@@ -1463,14 +1483,14 @@ service cloud.firestore {
 
         allow read: if signedIn()
           && (can(team(), 'manageEvents') || uid() in resource.data.participantIds);
-        allow create: if signedIn() && isGroup(team()) && can(team(), 'manageEvents')
+        allow create: if accountOk() && isGroup(team()) && can(team(), 'manageEvents')
           && request.resource.data.createdBy == uid()
           && request.resource.data.createdAt == request.time
           && validTournament(request.resource.data);
-        allow update: if signedIn() && isGroup(team()) && can(team(), 'manageEvents')
+        allow update: if accountOk() && isGroup(team()) && can(team(), 'manageEvents')
           && !('createdBy' in changed()) && !('createdAt' in changed())
           && validTournament(request.resource.data);
-        allow delete: if signedIn() && can(team(), 'manageEvents');
+        allow delete: if accountOk() && can(team(), 'manageEvents');
 
         // Games (GroupGame). Organizers write anything. A team's captain
         // reports a score, the other captain confirms it (or reports their
@@ -1564,8 +1584,8 @@ service cloud.firestore {
 
           allow read: if signedIn()
             && (can(team(), 'manageEvents') || uid() in tournament().participantIds);
-          allow create, delete: if signedIn() && can(team(), 'manageEvents');
-          allow update: if signedIn() && (
+          allow create, delete: if accountOk() && can(team(), 'manageEvents');
+          allow update: if accountOk() && (
             (can(team(), 'manageEvents') && validGame(request.resource.data))
             || report() || confirm() || advance()
           );
@@ -1607,7 +1627,7 @@ service cloud.firestore {
         allow read: if signedIn() && isMember(team())
           && (can(team(), 'manageChats') || canReadRoom(team(), resource.data));
         // getAfter: General is created in the same batch as its team.
-        allow create: if signedIn()
+        allow create: if accountOk()
           && can(getAfter(teamPath(teamId)).data, 'manageChats')
           && request.resource.data.keys().hasOnly([
                'name', 'kind', 'readRoles', 'writeRoles', 'readUsers',
@@ -1615,7 +1635,7 @@ service cloud.firestore {
           && validRoom(request.resource.data)
           && request.resource.data.createdBy == uid()
           && request.resource.data.createdAt == request.time;
-        allow update: if signedIn() && can(team(), 'manageChats')
+        allow update: if accountOk() && can(team(), 'manageChats')
           && changed().hasOnly([
                'name', 'readRoles', 'writeRoles', 'readUsers', 'writeUsers',
                'folderId', 'position'])
@@ -1624,11 +1644,11 @@ service cloud.firestore {
         // sends it (in the same batch), for unread dots in the inbox. Only
         // a time, never the text: chat managers read rooms' docs even when
         // they can't read the messages.
-        allow update: if signedIn() && notMuted() && isMember(team())
+        allow update: if accountOk() && notMuted() && isMember(team())
           && canWriteRoom(team(), resource.data)
           && changed().hasOnly(['lastAt'])
           && request.resource.data.lastAt == request.time;
-        allow delete: if signedIn() && can(team(), 'manageChats')
+        allow delete: if accountOk() && can(team(), 'manageChats')
           && canReadRoom(team(), resource.data);
 
         match /messages/{messageId} {
@@ -1638,7 +1658,7 @@ service cloud.firestore {
 
           allow read: if signedIn() && isMember(team())
             && canReadRoom(team(), room());
-          allow create: if signedIn() && notMuted() && isMember(team())
+          allow create: if accountOk() && notMuted() && isMember(team())
             && canWriteRoom(team(), room())
             && request.resource.data.keys().hasOnly([
                  'authorId', 'authorName', 'text', 'attachments', 'createdAt',
@@ -1653,13 +1673,13 @@ service cloud.firestore {
                 || request.resource.data.attachments.size() > 0)
             && request.resource.data.createdAt == request.time;
           // Anyone who can read the room reacts.
-          allow update: if signedIn() && isMember(team())
+          allow update: if accountOk() && isMember(team())
             && canReadRoom(team(), room())
             && reactsOnlyAsMe();
           // Authors delete their own; the owner and moderators who can
           // read the room moderate, and chat managers clear a room they
           // delete.
-          allow delete: if signedIn()
+          allow delete: if accountOk()
             && (resource.data.authorId == uid()
                 || isOwner(team())
                 || ((can(team(), 'moderate') || can(team(), 'manageChats'))
@@ -1683,7 +1703,7 @@ service cloud.firestore {
         allow read: if signedIn() && isMember(team());
         // getAfter: new teams get a Voice Channels folder in the batch
         // that creates them.
-        allow create: if signedIn()
+        allow create: if accountOk()
           && can(getAfter(teamPath(teamId)).data, 'manageChats')
           && request.resource.data.keys().hasOnly([
                'name', 'position', 'readRoles', 'writeRoles', 'readUsers',
@@ -1691,12 +1711,12 @@ service cloud.firestore {
           && validFolder(request.resource.data)
           && request.resource.data.createdBy == uid()
           && request.resource.data.createdAt == request.time;
-        allow update: if signedIn() && can(team(), 'manageChats')
+        allow update: if accountOk() && can(team(), 'manageChats')
           && changed().hasOnly([
                'name', 'position', 'readRoles', 'writeRoles', 'readUsers',
                'writeUsers'])
           && validFolder(request.resource.data);
-        allow delete: if signedIn() && can(team(), 'manageChats');
+        allow delete: if accountOk() && can(team(), 'manageChats');
       }
 
       // Stats: owners, coaches, captains and players with stats access
@@ -1710,8 +1730,8 @@ service cloud.firestore {
         function team() { return get(teamPath(teamId)).data; }
 
         allow read: if signedIn() && isMember(team());
-        allow delete: if signedIn() && canKeepStats(team());
-        allow create, update: if signedIn()
+        allow delete: if accountOk() && canKeepStats(team());
+        allow create, update: if accountOk()
           && canKeepStats(team())
           && request.resource.data.keys().hasOnly([
                'name', 'startDate', 'location', 'eventId', 'roster', 'lines',
@@ -1732,8 +1752,8 @@ service cloud.firestore {
         function team() { return get(teamPath(teamId)).data; }
 
         allow read: if signedIn() && isMember(team());
-        allow delete: if signedIn() && canKeepStats(team());
-        allow create, update: if signedIn()
+        allow delete: if accountOk() && canKeepStats(team());
+        allow create, update: if accountOk()
           && canKeepStats(team())
           && request.resource.data.keys().hasOnly([
                'opponent', 'date', 'gameTo', 'tournamentId', 'eventId',
@@ -1883,7 +1903,7 @@ service cloud.firestore {
           && t.startsOn <= request.time + duration.value(60, 'd');
       }
       allow read: if signedIn() && visible(resource.data);
-      allow create: if signedIn()
+      allow create: if accountOk()
         && (request.resource.data.get('status', 'draft') == 'draft'
             || inWindow(request.resource.data))
         && manages(request.resource.data)
@@ -1894,7 +1914,7 @@ service cloud.firestore {
         && officialHost(request.resource.data);
       // finishedAt is the server's (it starts the payout hold for fees
       // paid online).
-      allow update: if signedIn()
+      allow update: if accountOk()
         && manages(resource.data)
         && request.resource.data.hostId == resource.data.hostId
         && !('createdBy' in changed()) && !('createdAt' in changed())
@@ -1911,7 +1931,7 @@ service cloud.firestore {
         && officialHost(request.resource.data);
       // Only a draft is deleted here; any other event is deleted through
       // the API, which refuses while it holds fees paid online.
-      allow delete: if signedIn() && manages(resource.data)
+      allow delete: if accountOk() && manages(resource.data)
         && resource.data.get('status', 'draft') == 'draft';
 
       // Divisions: format, seeds and which uids report each team's scores.
@@ -1938,9 +1958,9 @@ service cloud.firestore {
         }
 
         allow read: if signedIn() && visible(current());
-        allow create, update: if signedIn() && manages(current())
+        allow create, update: if accountOk() && manages(current())
           && validDivision(request.resource.data);
-        allow delete: if signedIn() && manages(current());
+        allow delete: if accountOk() && manages(current());
 
         // Games (GroupGame), like group tournament games: managers write
         // anything; a team's captain reports, the other confirms; a
@@ -2039,11 +2059,11 @@ service cloud.firestore {
           }
 
           allow read: if signedIn() && visible(current());
-          allow create: if signedIn() && manages(current())
+          allow create: if accountOk() && manages(current())
             && validGame(request.resource.data)
             && !('live' in request.resource.data);
-          allow delete: if signedIn() && manages(current());
-          allow update: if signedIn() && (
+          allow delete: if accountOk() && manages(current());
+          allow update: if accountOk() && (
             (manages(current()) && validGame(request.resource.data)
               && liveKept())
             || report() || confirm() || advance()
@@ -2110,12 +2130,12 @@ service cloud.firestore {
         }
 
         allow read: if signedIn() && visible(current());
-        allow create: if signedIn() && validEntry(request.resource.data)
+        allow create: if accountOk() && validEntry(request.resource.data)
           && (manages(current()) || teamApplies(current()));
-        allow update: if signedIn() && validEntry(request.resource.data)
+        allow update: if accountOk() && validEntry(request.resource.data)
           && (manages(current()) || teamApplies(current())
               || teamEdits() || teamWithdraws());
-        allow delete: if signedIn() && manages(current());
+        allow delete: if accountOk() && manages(current());
       }
 
       // A player's signup for a player-entry tournament or league, keyed by
@@ -2169,11 +2189,11 @@ service cloud.firestore {
         }
 
         allow read: if signedIn() && (uid() == userId || manages(current()));
-        allow create: if signedIn() && validSignup(request.resource.data)
+        allow create: if accountOk() && validSignup(request.resource.data)
           && playerSignsUp();
-        allow update: if signedIn() && validSignup(request.resource.data)
+        allow update: if accountOk() && validSignup(request.resource.data)
           && (playerEdits() || playerWithdraws() || hostDecides());
-        allow delete: if signedIn() && manages(current());
+        allow delete: if accountOk() && manages(current());
       }
 
       // The live captains' draft for a division. Only the server writes it
@@ -2187,7 +2207,7 @@ service cloud.firestore {
                   && get(/databases/$(database)/documents/tournaments/$(tournamentId)/signups/$(uid())).data.divisionId == divisionId));
         allow create, update: if false;
         // So deleting the tournament can clear it.
-        allow delete: if signedIn() && manages(current());
+        allow delete: if accountOk() && manages(current());
 
         // Everyone's skill and gender: only the host and this draft's
         // captains, who need them to pick.
@@ -2197,7 +2217,7 @@ service cloud.firestore {
                 || uid() in get(/databases/$(database)/documents/tournaments/$(tournamentId)/drafts/$(divisionId)).data.captainIds);
           allow create, update: if false;
           // So deleting the division or tournament can clear it.
-          allow delete: if signedIn() && manages(current());
+          allow delete: if accountOk() && manages(current());
         }
       }
 
@@ -2207,7 +2227,7 @@ service cloud.firestore {
       match /payments/{teamId} {
         allow read: if signedIn()
           && (uid() == teamId || manages(current()) || teamAdmin(teamId));
-        allow create, update: if signedIn() && manages(current())
+        allow create, update: if accountOk() && manages(current())
           && request.resource.data.keys().hasOnly(['paid', 'paidAt', 'note',
                                                    'offlineAt'])
           && request.resource.data.paid is bool
@@ -2223,7 +2243,7 @@ service cloud.firestore {
           // only the API says a fee was paid online.
           && request.resource.data.note != 'Paid online through Stall 10'
           && !paidOnline();
-        allow delete: if signedIn() && manages(current()) && !paidOnline();
+        allow delete: if accountOk() && manages(current()) && !paidOnline();
         function paidOnline() {
           return resource != null && resource.data.get('paid', false) == true
             && resource.data.get('note', '') == 'Paid online through Stall 10';
@@ -2261,12 +2281,12 @@ service cloud.firestore {
       allow get: if signedIn();
       // The app's team-name check reads up to 200 listings at once.
       allow list: if signedIn() && capped(200);
-      allow create, update: if signedIn()
+      allow create, update: if accountOk()
         && can(getAfter(teamPath(teamId)).data, 'manageTeam')
         && validListing(request.resource.data, getAfter(teamPath(teamId)).data);
       // The owner deletes it with the team; a listing left without a team
       // is anyone's to clear.
-      allow delete: if signedIn()
+      allow delete: if accountOk()
         && (!exists(teamPath(teamId)) || isOwner(get(teamPath(teamId)).data));
     }
 
@@ -2292,7 +2312,7 @@ service cloud.firestore {
       }
 
       allow read: if signedIn();
-      allow create, update: if signedIn()
+      allow create, update: if accountOk()
         && organizes(request.resource.data.groupId)
         && validTournamentListing(request.resource.data)
         && (resource == null
@@ -2301,7 +2321,7 @@ service cloud.firestore {
                    == request.resource.data.tournamentId));
       // Organizers delete it with the tournament; one left behind by a
       // deleted group is anyone's to clear.
-      allow delete: if signedIn()
+      allow delete: if accountOk()
         && (!exists(teamPath(resource.data.groupId))
             || organizes(resource.data.groupId));
     }
@@ -2505,8 +2525,8 @@ service cloud.firestore {
       // `private == false`; a private author's posts one author at a time,
       // by the author or an accepted follower. At most 50 a page (S4).
       allow list: if signedIn() && capped(50) && canListPost(resource.data);
-      allow delete: if signedIn() && resource.data.authorId == uid();
-      allow create: if signedIn() && notMuted()
+      allow delete: if accountOk() && resource.data.authorId == uid();
+      allow create: if accountOk() && notMuted()
         && request.resource.data.keys().hasOnly([
              'kind', 'body', 'links', 'images', 'workout', 'event',
              'repostOf', 'tournamentKey', 'tournamentName', 'authorId',
@@ -2525,7 +2545,7 @@ service cloud.firestore {
             ? validRepost(request.resource.data)
             : sharesOwnTeamEvent(request.resource.data));
       // The author edits their post.
-      allow update: if signedIn() && resource.data.authorId == uid()
+      allow update: if accountOk() && resource.data.authorId == uid()
         && changed().hasOnly([
              'kind', 'body', 'links', 'images', 'workout', 'event',
              'repostOf', 'tournamentKey', 'tournamentName', 'updatedAt'])
@@ -2538,7 +2558,7 @@ service cloud.firestore {
                 && sharesOwnTeamEvent(request.resource.data)));
       // Anyone likes it or reposts it (reposts of reposts go to the
       // original, so a repost's own repostedBy never changes).
-      allow update: if signedIn()
+      allow update: if accountOk()
         && canSeePost(resource.data)
         && !blockedWith(resource.data.authorId)
         && changed().hasOnly(['likedBy', 'repostedBy'])
@@ -2577,7 +2597,7 @@ service cloud.firestore {
         // Seen, and written, by whoever may see the post.
         allow get: if signedIn() && canSeePost(post());
         allow list: if signedIn() && canSeePost(post()) && capped(100);
-        allow create: if signedIn() && notMuted() && canSeePost(post())
+        allow create: if accountOk() && notMuted() && canSeePost(post())
           && !blockedWith(post().authorId)
           && request.resource.data.keys().hasOnly([
                'body', 'authorId', 'authorName', 'authorPhotoUrl',
@@ -2593,16 +2613,16 @@ service cloud.firestore {
           && post().get('repostOf', null) == null
           && validReply(request.resource.data);
         // Its author rewrites it.
-        allow update: if signedIn() && resource.data.authorId == uid()
+        allow update: if accountOk() && resource.data.authorId == uid()
           && changed().hasOnly(['body', 'editedAt'])
           && validString(request.resource.data.body, 1000)
           && request.resource.data.body.size() > 0
           && request.resource.data.editedAt == request.time;
         // Anyone likes it or takes their like back.
-        allow update: if signedIn() && canSeePost(post())
+        allow update: if accountOk() && canSeePost(post())
           && changed().hasOnly(['likedBy'])
           && onlySelfToggled('likedBy');
-        allow delete: if signedIn()
+        allow delete: if accountOk()
           && (resource.data.authorId == uid() || post().authorId == uid());
       }
     }
@@ -2744,9 +2764,9 @@ service cloud.firestore {
       // lib/domain/models/follow.dart). The owner accepts (see the follows
       // rule) or declines by deleting it; the asker can take it back.
       match /followRequests/{requesterId} {
-        allow read, delete: if signedIn()
+        allow read, delete: if readOrAccountOk()
           && (uid() == userId || uid() == requesterId);
-        allow create: if signedIn()
+        allow create: if accountOk()
           && uid() == requesterId && requesterId != userId
           && isPrivateProfile(userId)
           && !blockedWith(userId)
@@ -2917,7 +2937,7 @@ service cloud.firestore {
 
       allow get: if signedIn() && inConversation();
       allow list: if signedIn() && uid() in resource.data.participants;
-      allow create: if signedIn() && !isGroup() && inConversation()
+      allow create: if accountOk() && !isGroup() && inConversation()
         && request.resource.data.keys().hasOnly([
              'participants', 'names', 'lastMessage', 'lastMessageAt',
              'lastSenderId', 'readAt', 'createdAt', 'status', 'requestedOf'])
@@ -2942,7 +2962,7 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time
         && allowedStart(request.resource.data);
       // A group starts with just its creator.
-      allow create: if signedIn() && isGroup()
+      allow create: if accountOk() && isGroup()
         && request.resource.data.keys().hasOnly([
              'kind', 'name', 'createdBy', 'participants', 'names',
              'lastMessage', 'lastMessageAt', 'lastSenderId', 'readAt',
@@ -2961,7 +2981,7 @@ service cloud.firestore {
       // Posting updates the preview; opening marks it read; whoever a
       // request waits on accepts or declines it. While it waits on them
       // they neither post nor send a read receipt.
-      allow update: if signedIn() && inConversation() && (
+      allow update: if accountOk() && inConversation() && (
         (changed().hasOnly(['lastMessage', 'lastMessageAt', 'lastSenderId', 'readAt', 'names'])
           && !awaitingMe()
           && request.resource.data.lastSenderId == uid()
@@ -2984,7 +3004,7 @@ service cloud.firestore {
 
       match /messages/{messageId} {
         allow read: if signedIn() && inConversation();
-        allow create: if signedIn() && notMuted() && inConversation()
+        allow create: if accountOk() && notMuted() && inConversation()
           && exists(convPath())
           && (isGroup() || !blockedWith(otherPerson()))
           // Not by whoever a request waits on, until they accept it.
@@ -3003,20 +3023,20 @@ service cloud.firestore {
               || request.resource.data.attachments.size() > 0)
           && request.resource.data.createdAt == request.time;
         // Anyone in the conversation reacts.
-        allow update: if signedIn() && inConversation() && reactsOnlyAsMe();
-        allow delete: if signedIn() && resource.data.authorId == uid();
+        allow update: if accountOk() && inConversation() && reactsOnlyAsMe();
+        allow delete: if accountOk() && resource.data.authorId == uid();
       }
 
       // "Typing…": each participant writes only their own, stamped by the
       // server, and deletes it when they send or clear the box.
       match /typing/{userId} {
         allow read: if signedIn() && inConversation();
-        allow create, update: if signedIn() && inConversation()
+        allow create, update: if accountOk() && inConversation()
           && userId == uid()
           && exists(convPath())
           && request.resource.data.keys().hasOnly(['at'])
           && request.resource.data.at == request.time;
-        allow delete: if signedIn() && userId == uid();
+        allow delete: if accountOk() && userId == uid();
       }
     }
 
@@ -3031,7 +3051,7 @@ service cloud.firestore {
       // Single-document lookups only; codes can't be listed.
       allow get: if signedIn();
       // Owners, coaches and captains of a team (not a group) mint codes.
-      allow create: if signedIn()
+      allow create: if accountOk()
         && request.resource.data.keys().hasOnly(
              ['teamId', 'createdBy', 'createdAt', 'ttl', 'expiresAt'])
         && request.resource.data.teamId is string
@@ -3048,7 +3068,7 @@ service cloud.firestore {
         && request.resource.data.expiresAt < request.time
              + duration.value(request.resource.data.ttl + 86400, 's');
       // The creator or the team's owner revokes one early.
-      allow delete: if signedIn()
+      allow delete: if accountOk()
         && (resource.data.get('createdBy', '') == uid()
             || isOwner(get(teamPath(resource.data.teamId)).data));
     }

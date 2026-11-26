@@ -18,7 +18,10 @@ let env: RulesTestEnvironment;
 const ME = "amy";
 const THEM = "zed"; // blocked by ME
 const FRIEND = "kim";
-const db = (uid: string) => env.authenticatedContext(uid).firestore();
+// A complete account (the account gate: verified email, ageOk, terms): the API sets the
+// claims; account_gate.rules.test.ts covers the incomplete ones.
+const COMPLETE = { email_verified: true, ageOk: true, terms: 1 };
+const db = (uid: string) => env.authenticatedContext(uid, COMPLETE).firestore();
 
 beforeAll(async () => {
   const rules = readFileSync(join(__dirname, "../../../firestore.rules"), "utf8");
