@@ -17,7 +17,7 @@ const shown = 5;
  * the card; tests/unit/sideTeamTints.test.ts holds all six to 4.5:1 in both themes. --team
  * and --personal are the theme-aware design tokens, so they stay readable in dark.
  */
-const tints = ["#665cc8", "#b7791f", "var(--team)", "#2f8f6b", "var(--personal)", "#c2622d"];
+const tints = ["#665cc8", "#b7791f", "var(--team)", "#0e7490", "var(--personal)", "#c2622d"];
 export function tint(id: string) {
   let h = 0;
   for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;

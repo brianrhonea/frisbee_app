@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const callApi = vi.fn();
 let pathname = "/";
-const user = { uid: "u1", displayName: "Sam Lee", email: "s@example.com" };
+let user = { uid: "u1", displayName: "Sam Lee", email: "s@example.com" };
 
 vi.mock("@/lib/client", () => ({ callApi: (...a: unknown[]) => callApi(...a) }));
 vi.mock("@/lib/firebase", () => ({ deleteOwnAccount: vi.fn() }));
@@ -13,7 +13,11 @@ vi.mock("next/navigation", () => ({ usePathname: () => pathname }));
 vi.mock("next/link", () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }));
 vi.mock("@/components/AuthProvider", () => ({ useAuth: () => ({ user }) }));
 vi.mock("@/components/AgreeTerms", () => ({ AgreeTerms: () => <p>AGREE-TERMS</p> }));
-vi.mock("@/components/PersonalDetailsForm", () => ({ PersonalDetailsForm: () => <p>DETAILS-FORM</p> }));
+vi.mock("@/components/PersonalDetailsForm", () => ({ PersonalDetailsForm: ({ onSaved }: { onSaved: () => void }) => (
+    <button type="button" onClick={onSaved}>
+      DETAILS-FORM
+    </button>
+  ) }));
 vi.mock("@/components/SignUpSteps", () => ({ SignUpSteps: () => null }));
 vi.mock("@/components/UsernameStep", () => ({
   stepAsksName: () => false,
@@ -30,6 +34,7 @@ const reply = (v: unknown) => (v instanceof Error ? Promise.reject(v) : Promise.
 
 beforeEach(() => {
   pathname = "/";
+  user = { uid: "u1", displayName: "Sam Lee", email: "s@example.com" };
   localStorage.clear();
   answers = { status: { complete: true, required: false }, agreement: { agreed: true }, me: {} };
   callApi.mockReset();
@@ -99,7 +104,7 @@ describe("PersonalGate fails closed", () => {
   it("still blocks a new account that is required and missing", async () => {
     answers.status = { complete: false, required: true };
     renderGate();
-    expect(await screen.findByText("DETAILS-FORM")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "DETAILS-FORM" })).toBeInTheDocument();
     expect(screen.queryByText("APP-CONTENT")).toBeNull();
   });
 
@@ -114,5 +119,58 @@ describe("PersonalGate fails closed", () => {
     answers.status = new Error("500");
     renderGate();
     expect(await screen.findByText("APP-CONTENT")).toBeInTheDocument();
+  });
+
+  it("blocks when the agreement answers 200 with a malformed body", async () => {
+    for (const bad of [{}, { agreed: "yes" }, null, "ok"]) {
+      answers.agreement = bad;
+      const { unmount } = renderGate();
+      expect(await screen.findByText("Couldn't check your account")).toBeInTheDocument();
+      expect(screen.queryByText("APP-CONTENT")).toBeNull();
+      unmount();
+    }
+  });
+
+  it("blocks when the status answers 200 with a malformed body", async () => {
+    for (const bad of [{}, { complete: true }, { required: false }, { complete: "true", required: false }, null]) {
+      answers.status = bad;
+      const { unmount } = renderGate();
+      expect(await screen.findByText("Couldn't check your account")).toBeInTheDocument();
+      expect(screen.queryByText("APP-CONTENT")).toBeNull();
+      unmount();
+    }
+  });
+
+  it("ignores a stale answer when the account changes mid-request", async () => {
+    let lateStatus!: (v: unknown) => void;
+    const first = new Promise((r) => (lateStatus = r));
+    callApi.mockImplementation((u: { uid: string }, path: string) => {
+      if (path === "/v1/me/personal/status") return u.uid === "u1" ? first : Promise.resolve({ complete: true, required: false });
+      return Promise.resolve({ agreed: true });
+    });
+    const view = renderGate();
+    user = { uid: "u2", displayName: "Alex Kim", email: "a@example.com" };
+    view.rerender(
+      <PersonalGate>
+        <p>APP-CONTENT</p>
+      </PersonalGate>,
+    );
+    expect(await screen.findByText("APP-CONTENT")).toBeInTheDocument();
+    // The first account's slow answer would block; it must be dropped.
+    lateStatus({ complete: false, required: true });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByRole("button", { name: "DETAILS-FORM" })).toBeNull();
+    expect(screen.getByText("APP-CONTENT")).toBeInTheDocument();
+  });
+
+  it("blocks when the refresh after finishing sign-up fails", async () => {
+    answers.status = { complete: false, required: true };
+    renderGate();
+    const finish = await screen.findByRole("button", { name: "DETAILS-FORM" });
+    answers.status = new Error("500");
+    fireEvent.click(finish);
+    expect(await screen.findByText("Couldn't check your account")).toBeInTheDocument();
+    expect(screen.queryByText("APP-CONTENT")).toBeNull();
+    expect(screen.queryByRole("button", { name: "DETAILS-FORM" })).toBeNull();
   });
 });
