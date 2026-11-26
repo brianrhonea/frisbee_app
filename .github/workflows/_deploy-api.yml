@@ -22,6 +22,14 @@
 #                               unset, they refresh within a minute
 #   API_PAYOUT_HOLD_DAYS_DEV/_PROD    days a finished event's fees wait
 #                               before going to hosts (0 to 30; default 3)
+#   API_PAYMENTS_DEV/_PROD      "on" or "off": whether the service gets the three
+#                               Stripe secrets (STRIPE_SECRET_KEY,
+#                               STRIPE_PLATFORM_WEBHOOK_SECRET,
+#                               STRIPE_WEBHOOK_SECRET from Secret Manager).
+#                               Default: on for dev (as before), off for prod.
+#                               Off: the API starts with payments off and
+#                               needs none of them. On: all three must exist
+#                               in that project or the revision fails.
 #   GCP_WIF_PROVIDER_DEV/_PROD, GCP_DEPLOYER_SA_DEV/_PROD
 
 name: Deploy API (shared)
@@ -85,6 +93,8 @@ jobs:
           SITE_PROD: ${{ vars.API_WEB_SITE_URL_PROD }}
           HOLD_DEV: ${{ vars.API_PAYOUT_HOLD_DAYS_DEV }}
           HOLD_PROD: ${{ vars.API_PAYOUT_HOLD_DAYS_PROD }}
+          PAYMENTS_DEV: ${{ vars.API_PAYMENTS_DEV }}
+          PAYMENTS_PROD: ${{ vars.API_PAYMENTS_PROD }}
           WIF_DEV: ${{ vars.GCP_WIF_PROVIDER_DEV }}
           WIF_PROD: ${{ vars.GCP_WIF_PROVIDER_PROD }}
           SA_DEV: ${{ vars.GCP_DEPLOYER_SA_DEV }}
@@ -96,10 +106,10 @@ jobs:
           case "$ENVIRONMENT" in
             dev)  project=frisbee-app-brianrhonea-dev; cors="$CORS_DEV"
                   appcheck="${APP_CHECK_DEV:-false}"; max="${MAX_DEV:-3}"
-                  wif="$WIF_DEV"; sa="$SA_DEV"; site="$SITE_DEV"; hold="${HOLD_DEV:-3}" ;;
+                  wif="$WIF_DEV"; sa="$SA_DEV"; site="$SITE_DEV"; hold="${HOLD_DEV:-3}"; payments="${PAYMENTS_DEV:-on}" ;;
             prod) project=frisbee-app-brianrhonea; cors="$CORS_PROD"
                   appcheck="${APP_CHECK_PROD:-false}"; max="${MAX_PROD:-10}"
-                  wif="$WIF_PROD"; sa="$SA_PROD"; site="$SITE_PROD"; hold="${HOLD_PROD:-3}" ;;
+                  wif="$WIF_PROD"; sa="$SA_PROD"; site="$SITE_PROD"; hold="${HOLD_PROD:-3}"; payments="${PAYMENTS_PROD:-off}" ;;
             *) echo "::error::environment must be dev or prod"; exit 1 ;;
           esac
           # An unset variable reads as empty: dev falls back to localhost.
@@ -108,6 +118,7 @@ jobs:
           [ -z "$site" ] && echo "::notice::API_WEB_SITE_URL_${ENVIRONMENT^^} is empty: the website's cached pages refresh within a minute instead of at once."
           case "$site" in ""|https://*) ;; *) echo "::error::API_WEB_SITE_URL_* must start with https://"; exit 1 ;; esac
           case "$appcheck" in true|false) ;; *) echo "::error::API_ENFORCE_APP_CHECK_* must be true or false"; exit 1 ;; esac
+          case "$payments" in on|off) ;; *) echo "::error::API_PAYMENTS_* must be on or off"; exit 1 ;; esac
           case "$hold" in [0-9]|[12][0-9]|30) ;; *) echo "::error::API_PAYOUT_HOLD_DAYS_* must be 0 to 30"; exit 1 ;; esac
           if [ -n "$wif" ]; then
             [ -n "$sa" ] || { echo "::error::GCP_WIF_PROVIDER_${ENVIRONMENT^^} is set but GCP_DEPLOYER_SA_${ENVIRONMENT^^} isn't."; exit 1; }
@@ -129,6 +140,7 @@ jobs:
             echo "max=$max"
             echo "site=$site"
             echo "hold=$hold"
+            echo "payments=$payments"
             echo "auth=$auth"
             echo "wif=$wif"
             echo "sa=$sa"
@@ -192,6 +204,7 @@ jobs:
           MAX_INSTANCES: ${{ steps.cfg.outputs.max }}
           WEB_SITE_URL: ${{ steps.cfg.outputs.site }}
           PAYOUT_HOLD_DAYS: ${{ steps.cfg.outputs.hold }}
+          PAYMENTS: ${{ steps.cfg.outputs.payments }}
           IMAGE: ${{ inputs.image || steps.build.outputs.image }}
           REPO: ${{ steps.cfg.outputs.repo }}
         run: |
@@ -203,7 +216,23 @@ jobs:
           export JOBS_AUDIENCE="$(gcloud run services describe api --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')"
           export JOBS_INVOKER="payments-scheduler@$PROJECT_ID.iam.gserviceaccount.com"
           vars='${REGION} ${PROJECT_ID} ${RUNTIME_SA} ${IMAGE} ${CORS_ORIGINS} ${ENFORCE_APP_CHECK} ${MAX_INSTANCES} ${WEB_SITE_URL} ${PAYOUT_HOLD_DAYS} ${JOBS_AUDIENCE} ${JOBS_INVOKER}'
-          envsubst "$vars" < apps/api/deploy/service.yaml > "$RUNNER_TEMP/service.yaml"
+          # Stripe's secret references can't be optional on Cloud Run, so
+          # they live in stripe-secrets.yaml and go in only when payments
+          # are on. A commit from before the marker (a rollback) has its own
+          # complete service.yaml and is used as it is.
+          marker='# @stripe-secrets@'
+          if grep -q "$marker" apps/api/deploy/service.yaml; then
+            if [ "$PAYMENTS" = on ]; then
+              sed -e "/^ *$marker\$/{r apps/api/deploy/stripe-secrets.yaml" -e 'd}' apps/api/deploy/service.yaml > "$RUNNER_TEMP/service.in.yaml"
+            else
+              sed -e "/^ *$marker\$/d" apps/api/deploy/service.yaml > "$RUNNER_TEMP/service.in.yaml"
+              echo "::notice::Payments are off for this deploy: no Stripe secrets are attached."
+            fi
+          else
+            cp apps/api/deploy/service.yaml "$RUNNER_TEMP/service.in.yaml"
+            echo "::notice::This commit's service.yaml predates the payments switch; used as it is."
+          fi
+          envsubst "$vars" < "$RUNNER_TEMP/service.in.yaml" > "$RUNNER_TEMP/service.yaml"
           cat "$RUNNER_TEMP/service.yaml"
           gcloud run services replace "$RUNNER_TEMP/service.yaml" \
             --project "$PROJECT_ID" --region "$REGION" --quiet
@@ -246,6 +275,7 @@ jobs:
           URL: ${{ steps.deploy.outputs.url }}
           IMAGE: ${{ steps.deploy.outputs.image }}
           AUTH: ${{ steps.cfg.outputs.auth }}
+          PAYMENTS: ${{ steps.cfg.outputs.payments }}
         run: |
           {
             echo "### API deployed to \`$ENVIRONMENT\`"
@@ -257,4 +287,5 @@ jobs:
             [ -n "${TAG:-}" ] && echo "- Release tag: \`$TAG\`"
             [ -n "$REASON" ] && echo "- Reason: $REASON"
             echo "- Signed in with: $AUTH"
+            echo "- Payments: ${PAYMENTS}"
           } >> "$GITHUB_STEP_SUMMARY"

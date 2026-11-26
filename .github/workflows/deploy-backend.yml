@@ -29,5 +29,8 @@ jobs:
       ref: ${{ inputs.ref }}
       tag: true
     secrets:
-      FIREBASE_SERVICE_ACCOUNT: ${{ inputs.environment == 'prod' && secrets.FIREBASE_SA_PROD || secrets.FIREBASE_SA_DEV }}
-      FIREBASE_WEB_API_KEY: ${{ inputs.environment == 'prod' && secrets.FIREBASE_WEB_API_KEY_PROD || secrets.FIREBASE_WEB_API_KEY_DEV }}
+      # The && || picks between two non-empty secret NAMES, so an unset prod
+      # secret reads as empty (and _deploy-backend.yml stops) instead of
+      # falling back to dev's value.
+      FIREBASE_SERVICE_ACCOUNT: ${{ secrets[inputs.environment == 'prod' && 'FIREBASE_SA_PROD' || 'FIREBASE_SA_DEV'] }}
+      FIREBASE_WEB_API_KEY: ${{ secrets[inputs.environment == 'prod' && 'FIREBASE_WEB_API_KEY_PROD' || 'FIREBASE_WEB_API_KEY_DEV'] }}

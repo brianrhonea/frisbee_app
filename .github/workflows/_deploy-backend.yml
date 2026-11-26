@@ -55,6 +55,19 @@ jobs:
       PROJECT: ${{ inputs.environment }}
       GROUPS: ${{ vars.FUNCTION_GROUPS || 'account,api,browse,communities,discord,follows,meetings,notifications,rankings,tournaments' }}
     steps:
+      # Prod never runs on dev's credentials: callers pick the secret by
+      # name, so an unset prod secret arrives empty, and this stops here.
+      - name: Check the credentials for this environment
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          case "$ENVIRONMENT" in dev|prod) ;; *) echo "::error::environment must be dev or prod"; exit 1 ;; esac
+          if [ -z "$SERVICE_ACCOUNT" ]; then
+            echo "::error::The FIREBASE_SA_${ENVIRONMENT^^} secret is empty or unset. Not falling back to another environment's credentials."
+            exit 1
+          fi
+
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref }}
