@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 
 import '../themes/theme.dart';
 
-/// A [SegmentedButton] whose selected segments also get an indigo
-/// ([AppColors.accent]) outline.
+/// The app's segmented control: a row of equal-width segments in one
+/// outlined pill. The selected segment is the soft indigo fill
+/// ([AppColors.accentSoft]) with its own indigo ([AppColors.accent]) outline
+/// and [AppColors.accentInk] label, so it reads without relying on the fill
+/// (about 1.1:1 against its neighbours).
 ///
-/// The selected fill alone ([AppColors.accentSoft]) is about 1.1:1 against
-/// its neighbours; Material draws one outline for the whole control and no
-/// per-segment one, so this paints it over the segments. The check icon,
-/// colours and everything else are the [SegmentedButton]'s (see
-/// `segmentedButtonTheme` in the app theme).
+/// Built from plain widgets (Material + InkWell per segment) so it follows the
+/// text direction and the text scale. Segments are at least 48 px tall and
+/// grow with their label. The API mirrors [SegmentedButton]'s, using
+/// [ButtonSegment] for the segment data.
 class AppSegmentedButton<T> extends StatelessWidget {
   const AppSegmentedButton({
     super.key,
@@ -21,137 +22,217 @@ class AppSegmentedButton<T> extends StatelessWidget {
     this.emptySelectionAllowed = false,
     this.showSelectedIcon = true,
     this.expandedInsets,
-    this.style,
   });
 
   final List<ButtonSegment<T>> segments;
   final Set<T> selected;
+
+  /// Null disables the whole control.
   final ValueChanged<Set<T>>? onSelectionChanged;
   final bool multiSelectionEnabled;
   final bool emptySelectionAllowed;
+
+  /// Shows a check in place of the segment's icon while it is selected.
   final bool showSelectedIcon;
+
+  /// When set, the control fills the available width (less these insets)
+  /// instead of sizing to its labels.
   final EdgeInsets? expandedInsets;
-  final ButtonStyle? style;
 
   /// Width of the selected outline.
   static const outlineWidth = 1.5;
 
+  /// Least height of a segment.
+  static const minHeight = 48.0;
+
+  void _tap(T value) {
+    final cb = onSelectionChanged;
+    if (cb == null) return;
+    final on = selected.contains(value);
+    if (multiSelectionEnabled) {
+      final next = {...selected};
+      on ? next.remove(value) : next.add(value);
+      if (next.isEmpty && !emptySelectionAllowed) return;
+      cb(next);
+    } else if (on) {
+      if (emptySelectionAllowed) cb(<T>{});
+    } else {
+      cb({value});
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    return _SelectedOutline(
-      selected: [for (final s in segments) selected.contains(s.value)],
-      color: c.accent,
-      child: SegmentedButton<T>(
-        segments: segments,
-        selected: selected,
-        onSelectionChanged: onSelectionChanged,
-        multiSelectionEnabled: multiSelectionEnabled,
-        emptySelectionAllowed: emptySelectionAllowed,
-        showSelectedIcon: showSelectedIcon,
-        expandedInsets: expandedInsets,
-        style: style,
+    final children = <Widget>[];
+    for (var i = 0; i < segments.length; i++) {
+      final s = segments[i];
+      final on = selected.contains(s.value);
+      if (i > 0) {
+        // A hairline between neighbours, unless a selected outline is there.
+        final prevOn = selected.contains(segments[i - 1].value);
+        children.add(
+          SizedBox(
+            width: 1,
+            child: ColoredBox(
+              color: on || prevOn ? Colors.transparent : c.border2,
+            ),
+          ),
+        );
+      }
+      final enabled = onSelectionChanged != null && s.enabled;
+      Widget label = _SegmentLabel(
+        selected: on,
+        icon: on && showSelectedIcon ? const Icon(Icons.check) : s.icon,
+        label: s.label,
+      );
+      if (s.tooltip != null) {
+        label = Tooltip(message: s.tooltip!, child: label);
+      }
+      children.add(
+        Expanded(
+          child: AppSegment(
+            selected: on,
+            onTap: enabled ? () => _tap(s.value) : null,
+            child: label,
+          ),
+        ),
+      );
+    }
+    Widget row = Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: children,
+    );
+    row = IntrinsicHeight(child: row);
+    final expanded = expandedInsets;
+    if (expanded == null) {
+      // Equal-width segments sized to the widest label.
+      row = IntrinsicWidth(child: row);
+    }
+    final bar = DecoratedBox(
+      decoration: ShapeDecoration(
+        color: c.card,
+        shape: StadiumBorder(side: BorderSide(color: c.border2)),
+      ),
+      child: row,
+    );
+    return expanded == null ? bar : Padding(padding: expanded, child: bar);
+  }
+}
+
+/// One segment: a tappable, rounded cell that is the soft accent fill with an
+/// accent outline when [selected]. The building block of
+/// [AppSegmentedButton]; use it directly where segments are driven by
+/// something else (a tab controller).
+class AppSegment extends StatelessWidget {
+  const AppSegment({
+    super.key,
+    required this.selected,
+    required this.onTap,
+    required this.child,
+  });
+
+  final bool selected;
+
+  /// Null shows the segment disabled.
+  final VoidCallback? onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    // Stadium ends match the control's own; the outline sits on top of the
+    // control's border on the sides it shares.
+    final shape = StadiumBorder(
+      side: selected
+          ? BorderSide(color: c.accent, width: AppSegmentedButton.outlineWidth)
+          : BorderSide.none,
+    );
+    return Semantics(
+      container: true,
+      button: true,
+      selected: selected,
+      enabled: onTap != null,
+      inMutuallyExclusiveGroup: true,
+      child: Material(
+        color: selected ? c.accentSoft : Colors.transparent,
+        shape: shape,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          customBorder: shape,
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minHeight: AppSegmentedButton.minHeight,
+            ),
+            child: Center(
+              child: DefaultTextStyle.merge(
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                  color: onTap == null
+                      ? c.muted
+                      : selected
+                      ? c.accentInk
+                      : c.ink2,
+                ),
+                child: IconTheme.merge(
+                  data: IconThemeData(
+                    size: 18,
+                    color: onTap == null
+                        ? c.muted
+                        : selected
+                        ? c.accentInk
+                        : c.ink2,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 6,
+                    ),
+                    child: child,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
 }
 
-class _SelectedOutline extends SingleChildRenderObjectWidget {
-  const _SelectedOutline({
+class _SegmentLabel extends StatelessWidget {
+  const _SegmentLabel({
     required this.selected,
-    required this.color,
-    required super.child,
+    required this.icon,
+    required this.label,
   });
 
-  final List<bool> selected;
-  final Color color;
+  final bool selected;
+  final Widget? icon;
+  final Widget? label;
 
   @override
-  RenderObject createRenderObject(BuildContext context) =>
-      _RenderSelectedOutline(selected, color);
-
-  @override
-  void updateRenderObject(
-    BuildContext context,
-    _RenderSelectedOutline renderObject,
-  ) {
-    renderObject
-      ..selected = selected
-      ..color = color;
-  }
-}
-
-class _RenderSelectedOutline extends RenderProxyBox {
-  _RenderSelectedOutline(this._selected, this._color);
-
-  List<bool> _selected;
-  Color _color;
-
-  set selected(List<bool> value) {
-    _selected = value;
-    markNeedsPaint();
-  }
-
-  set color(Color value) {
-    if (_color == value) return;
-    _color = value;
-    markNeedsPaint();
-  }
-
-  /// The segment buttons: the first descendant with exactly one child per
-  /// segment (the SegmentedButton's own render object).
-  RenderBox? _findSegments(RenderObject from) {
-    RenderBox? found;
-    void visit(RenderObject node) {
-      if (found != null) return;
-      var count = 0;
-      node.visitChildren((_) => count++);
-      if (node is RenderBox && count == _selected.length && count > 1) {
-        found = node;
-        return;
-      }
-      node.visitChildren(visit);
-    }
-
-    from.visitChildren(visit);
-    return found;
-  }
-
-  @override
-  void paint(PaintingContext context, Offset offset) {
-    super.paint(context, offset);
-    final row = _findSegments(this);
-    if (row == null) return;
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = AppSegmentedButton.outlineWidth
-      ..color = _color;
-    var i = 0;
-    row.visitChildren((child) {
-      final index = i++;
-      if (index >= _selected.length || !_selected[index]) return;
-      final box = child as RenderBox;
-      final origin = MatrixUtils.transformPoint(
-        box.getTransformTo(this),
-        Offset.zero,
-      );
-      // Inset by half the stroke so the line sits inside the control.
-      final rect = (offset + origin & box.size).deflate(
-        AppSegmentedButton.outlineWidth / 2,
-      );
-      final r = Radius.circular(rect.height / 2);
-      final first = index == 0;
-      final last = index == _selected.length - 1;
-      context.canvas.drawRRect(
-        RRect.fromRectAndCorners(
-          rect,
-          topLeft: first ? r : Radius.zero,
-          bottomLeft: first ? r : Radius.zero,
-          topRight: last ? r : Radius.zero,
-          bottomRight: last ? r : Radius.zero,
-        ),
-        paint,
-      );
-    });
+  Widget build(BuildContext context) {
+    final text = label == null
+        ? null
+        : DefaultTextStyle.merge(
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            child: label!,
+          );
+    if (icon == null) return text ?? const SizedBox.shrink();
+    if (text == null) return icon!;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        icon!,
+        const SizedBox(width: 6),
+        Flexible(child: text),
+      ],
+    );
   }
 }

@@ -2636,13 +2636,13 @@ class _ResultsTab extends StatelessWidget {
                       width: 48,
                       height: 48,
                       decoration: BoxDecoration(
-                        color: c.accentSoft,
+                        color: c.positiveSoft,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
                         Icons.emoji_events_outlined,
                         size: 26,
-                        color: c.accentInk,
+                        color: c.positive,
                       ),
                     ),
                     const SizedBox(width: 14),

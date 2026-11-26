@@ -277,10 +277,6 @@ class _LinePicker extends StatelessWidget {
     selected: {?line},
     emptySelectionAllowed: true,
     showSelectedIcon: false,
-    style: const ButtonStyle(
-      visualDensity: VisualDensity.compact,
-      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-    ),
     // Tapping the picked segment empties the set: that clears it.
     onSelectionChanged: (picked) =>
         onPick(picked.isEmpty ? line! : picked.single),

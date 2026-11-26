@@ -125,6 +125,7 @@ GoRouter router(
       path: Routes.chooseUsername,
       builder: (_, _) => chooseUsernamePage(),
     ),
+    GoRoute(path: Routes.accountCheck, builder: (_, _) => accountCheckPage()),
     GoRoute(path: Routes.agreeTerms, builder: (_, _) => agreeTermsPage()),
     GoRoute(
       path: Routes.finishSignUp,
@@ -1093,7 +1094,8 @@ Widget _settings(Widget Function(ProfileViewModel vm) screen) => ViewModelHost(
 );
 
 /// Sends signed-out users to sign-in (remembering where they were headed),
-/// signed-in users without a username to pick one, new accounts without
+/// signed-in users whose sign-up checks failed to a retry screen, those
+/// without a username to pick one, new accounts without
 /// personal details ([personal]) to give them, and everyone else away
 /// from the auth screens: to Community, or back to
 /// the invite link they opened so they can finish joining.
@@ -1123,6 +1125,21 @@ String? authRedirect(
           : {'from': target},
     ).toString();
   }
+  // The sign-up checks (terms, personal details) errored or came back
+  // unreadable: hold the app on "Couldn't check your account" until a retry
+  // gets a real answer. (Not having an answer yet doesn't hold anyone.)
+  final checkingAccount = path == Routes.accountCheck;
+  if ((agreement?.checkFailed ?? false) || (personal?.checkFailed ?? false)) {
+    if (checkingAccount) return null;
+    final target = public || path == splashPath ? from : uri.toString();
+    return Uri(
+      path: Routes.accountCheck,
+      queryParameters: target == null || target == Routes.home
+          ? null
+          : {'from': target},
+    ).toString();
+  }
+  if (checkingAccount) return from ?? Routes.home;
   // No username yet, or a new account without a name (Google and Apple
   // skip the form that asks them; Apple can hide the name): "Your name and
   // username" first, then carry on.

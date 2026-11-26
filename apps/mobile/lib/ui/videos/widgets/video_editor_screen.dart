@@ -288,7 +288,6 @@ class _VideoFormState extends State<_VideoForm> {
               ],
               selected: {vm.source},
               showSelectedIcon: false,
-              style: _segmentStyle(AppColors.of(context)),
               onSelectionChanged: vm.uploadProgress != null
                   ? null
                   : (s) => vm.source = s.single,
@@ -383,25 +382,6 @@ class _VideoFormState extends State<_VideoForm> {
     },
   );
 }
-
-/// The source picker as a two-way switch: the chosen side is a raised
-/// card on the field fill.
-ButtonStyle _segmentStyle(AppColors c) => ButtonStyle(
-  backgroundColor: WidgetStateProperty.resolveWith(
-    (s) => s.contains(WidgetState.selected) ? c.card : c.field,
-  ),
-  foregroundColor: WidgetStateProperty.resolveWith(
-    (s) => s.contains(WidgetState.selected) ? c.accent : c.muted,
-  ),
-  iconColor: WidgetStateProperty.resolveWith(
-    (s) => s.contains(WidgetState.selected) ? c.accent : c.muted,
-  ),
-  side: WidgetStatePropertyAll(BorderSide(color: c.border2)),
-  textStyle: const WidgetStatePropertyAll(
-    TextStyle(fontFamily: appFont, fontSize: 14, fontWeight: FontWeight.w700),
-  ),
-  minimumSize: const WidgetStatePropertyAll(Size(0, 44)),
-);
 
 /// The linked video's thumbnail beside what the check found.
 class _FoundCard extends StatelessWidget {

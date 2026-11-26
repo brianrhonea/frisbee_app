@@ -253,11 +253,15 @@ class PersonalDetailsStatus {
   /// The account is new enough that the app asks before anything else.
   final bool required;
 
-  factory PersonalDetailsStatus.fromMap(Map<String, Object?> m) =>
-      PersonalDetailsStatus(
-        complete: m['complete'] == true,
-        required: m['required'] == true,
-      );
+  /// Throws a [FormatException] unless both fields are plain booleans, so
+  /// an unreadable answer is an error rather than "nothing required".
+  factory PersonalDetailsStatus.fromMap(Map<String, Object?> m) {
+    final complete = m['complete'], required = m['required'];
+    if (complete is! bool || required is! bool) {
+      throw const FormatException('The status answer is not true/false');
+    }
+    return PersonalDetailsStatus(complete: complete, required: required);
+  }
 }
 
 /// Thrown when the API refuses details for being under [minimumAge].

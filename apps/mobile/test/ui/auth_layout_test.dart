@@ -6,6 +6,7 @@ import 'package:frisbee_app/ui/auth/widgets/auth_layout.dart';
 import 'package:frisbee_app/ui/auth/widgets/disc_throw_hero.dart';
 import 'package:frisbee_app/ui/auth/widgets/sign_in_screen.dart';
 import 'package:frisbee_app/ui/auth/widgets/sign_up_screen.dart';
+import 'package:frisbee_app/ui/core/themes/theme.dart';
 
 import '../testing/fakes.dart';
 
@@ -59,6 +60,27 @@ void main() {
     );
     expect(find.text('Good to see you again.'), findsOneWidget);
     expect(tester.hasRunningAnimations, isFalse);
+  });
+
+  testWidgets('the tagline is readable over the grass: full chalk, 4.5:1', (
+    tester,
+  ) async {
+    phone(tester);
+    await tester.pumpWidget(signIn());
+    await tester.pumpAndSettle();
+    final style = tester
+        .widget<Text>(find.text('Your team, from the pull to the final point.'))
+        .style!;
+    final colour = style.color!;
+    expect(colour.a, 1, reason: 'no alpha: it is composited over the grass');
+    double lum(Color c) => c.computeLuminance();
+    final hi = lum(colour) > lum(FieldColors.grass)
+        ? colour
+        : FieldColors.grass;
+    final lo = lum(colour) > lum(FieldColors.grass)
+        ? FieldColors.grass
+        : colour;
+    expect((lum(hi) + 0.05) / (lum(lo) + 0.05), greaterThanOrEqualTo(4.5));
   });
 
   testWidgets('tapping the field throws again; the form stays', (tester) async {

@@ -9,6 +9,10 @@ abstract final class Routes {
   /// AuthRepository.needsUsername).
   static const chooseUsername = '/welcome/username';
 
+  /// Shown instead of the app while the sign-up checks (terms, personal
+  /// details) can't be read: Try again or sign out.
+  static const accountCheck = '/welcome/check';
+
   /// Agreeing to the Community Guidelines and Terms (everyone, once per
   /// version; after the username, before personal details).
   static const agreeTerms = '/welcome/terms';

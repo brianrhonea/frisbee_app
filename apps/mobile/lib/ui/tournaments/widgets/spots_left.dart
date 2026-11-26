@@ -4,9 +4,9 @@ import '../../../domain/models/discover.dart';
 import '../../core/themes/theme.dart';
 
 /// "3 spots left" on a tournament card while registration is open, or a
-/// line per division ("Mixed: 3 left") when it has two or more: turf while
-/// there's room, neutral once full. Never amber, which is only for the
-/// user's own to-dos.
+/// line per division ("Mixed: 3 left") when it has two or more: indigo
+/// ([AppColors.accentInk]) while there's room, muted once full. Never
+/// amber, which is only for the user's own to-dos.
 class SpotsLeft extends StatelessWidget {
   const SpotsLeft({super.key, required this.spots});
 

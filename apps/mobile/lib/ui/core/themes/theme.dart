@@ -205,24 +205,6 @@ abstract final class AppTheme {
           side: BorderSide(color: c.border),
         ),
       ),
-      // A selected segment is the soft indigo fill, about 1.1:1 on its own;
-      // AppSegmentedButton adds the indigo outline (3:1 on the page and
-      // cards in both themes) and the check icon stays.
-      segmentedButtonTheme: SegmentedButtonThemeData(
-        style: ButtonStyle(
-          backgroundColor: WidgetStateProperty.resolveWith(
-            (s) => s.contains(WidgetState.selected) ? c.accentSoft : c.card,
-          ),
-          foregroundColor: WidgetStateProperty.resolveWith(
-            (s) => s.contains(WidgetState.disabled)
-                ? c.muted
-                : s.contains(WidgetState.selected)
-                ? c.accentInk
-                : c.ink2,
-          ),
-          side: WidgetStatePropertyAll(BorderSide(color: c.border2)),
-        ),
-      ),
       chipTheme: ChipThemeData(
         backgroundColor: c.card,
         selectedColor: c.chipOn,

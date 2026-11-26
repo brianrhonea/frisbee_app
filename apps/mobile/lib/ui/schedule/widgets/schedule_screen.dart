@@ -8,6 +8,7 @@ import '../../../domain/models/schedule_entry.dart';
 import '../../../domain/models/team_event.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
+import '../../core/ui/app_segmented_button.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/scoreboard.dart' show TeamDot;
 import '../../core/ui/status_views.dart';
@@ -524,7 +525,7 @@ class _MonthDayCell extends StatelessWidget {
   }
 }
 
-/// Week / Month as a segmented track.
+/// Week / Month as a segmented control.
 class _Segments<T> extends StatelessWidget {
   const _Segments({
     required this.values,
@@ -539,53 +540,18 @@ class _Segments<T> extends StatelessWidget {
   final ValueChanged<T> onSelect;
 
   @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: c.field,
-        borderRadius: BorderRadius.circular(controlRadius),
-      ),
-      child: Row(
-        children: [
-          for (final v in values)
-            Expanded(
-              child: Semantics(
-                selected: v == selected,
-                button: true,
-                child: Material(
-                  color: v == selected ? c.card : Colors.transparent,
-                  borderRadius: BorderRadius.circular(controlRadius - 2),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(controlRadius - 2),
-                    onTap: () => onSelect(v),
-                    child: SizedBox(
-                      height: 34,
-                      child: Center(
-                        child: Text(
-                          label(v),
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: v == selected
-                                ? FontWeight.w700
-                                : FontWeight.w600,
-                            color: v == selected ? c.ink : c.muted,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => AppSegmentedButton<T>(
+    expandedInsets: EdgeInsets.zero,
+    showSelectedIcon: false,
+    segments: [
+      for (final v in values) ButtonSegment(value: v, label: Text(label(v))),
+    ],
+    selected: {selected},
+    onSelectionChanged: (s) => onSelect(s.single),
+  );
 }
 
-/// All / Team / Personal as a segmented track, each with its schedule
+/// All / Team / Personal as a segmented control, each with its schedule
 /// colour's dot.
 class _FilterTabs extends StatelessWidget {
   const _FilterTabs({required this.selected, required this.onSelect});
@@ -596,60 +562,23 @@ class _FilterTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    Widget tab(ScheduleFilter f) {
-      final on = f == selected;
-      final dot = switch (f) {
-        ScheduleFilter.all => null,
-        ScheduleFilter.team => c.team,
-        ScheduleFilter.personal => c.personal,
-      };
-      return Expanded(
-        child: Semantics(
-          selected: on,
-          button: true,
-          child: Material(
-            color: on ? c.card : Colors.transparent,
-            borderRadius: BorderRadius.circular(controlRadius - 2),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(controlRadius - 2),
-              onTap: () => onSelect(f),
-              child: SizedBox(
-                height: 38,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (dot != null) ...[
-                      TeamDot(color: dot),
-                      const SizedBox(width: 6),
-                    ],
-                    Flexible(
-                      child: Text(
-                        f.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: on ? FontWeight.w700 : FontWeight.w600,
-                          color: on ? c.ink : c.muted,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+    return AppSegmentedButton<ScheduleFilter>(
+      expandedInsets: EdgeInsets.zero,
+      showSelectedIcon: false,
+      segments: [
+        for (final f in ScheduleFilter.values)
+          ButtonSegment(
+            value: f,
+            label: Text(f.label),
+            icon: switch (f) {
+              ScheduleFilter.all => null,
+              ScheduleFilter.team => TeamDot(color: c.team),
+              ScheduleFilter.personal => TeamDot(color: c.personal),
+            },
           ),
-        ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: c.field,
-        borderRadius: BorderRadius.circular(controlRadius),
-      ),
-      child: Row(children: [for (final f in ScheduleFilter.values) tab(f)]),
+      ],
+      selected: {selected},
+      onSelectionChanged: (s) => onSelect(s.single),
     );
   }
 }
