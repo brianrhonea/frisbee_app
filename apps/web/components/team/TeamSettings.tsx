@@ -14,7 +14,7 @@ import {
 } from "@stall10/shared";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
-import { callApi } from "@/lib/client";
+import { ApiError, callApi } from "@/lib/client";
 import { useAuth } from "../AuthProvider";
 import { ClubAgeNote } from "../ClubAge";
 import { roleLabel } from "../ProfileDashboard";
@@ -39,6 +39,9 @@ interface Details {
   description?: string;
   requiresApproval?: boolean;
 }
+
+/** Parallel to the app's team_form.dart notice. */
+export const switchToClubNote = "Switching to club needs everyone on the team to be 16 or over with a date of birth.";
 
 const levelLabels: Record<string, string> = { club: "Club", college: "College", youth: "Youth", league: "League", pickup: "Pickup" };
 
@@ -79,23 +82,26 @@ function useAct() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+  const [fields, setFields] = useState<Record<string, string>>({});
   async function act<T>(path: string, method: string, body?: unknown, done?: string): Promise<T | null> {
     if (!user) return null;
     setBusy(true);
     setError(null);
     setOk(null);
+    setFields({});
     try {
       const res = await callApi<T>(user, path, { method, body });
       if (done) setOk(done);
       return res;
     } catch (e) {
       setError((e as Error).message);
+      if (e instanceof ApiError && e.fields) setFields(e.fields);
       return null;
     } finally {
       setBusy(false);
     }
   }
-  return { act, busy, error, ok };
+  return { act, busy, error, ok, fields };
 }
 
 function Status({ error, ok }: { error: string | null; ok: string | null }) {
@@ -112,8 +118,10 @@ function DetailsForm() {
   const [city, setCity] = useState(team.city ?? "");
   const [description, setDescription] = useState(team.description ?? "");
   const [approval, setApproval] = useState(team.requiresApproval === true);
-  const { act, busy, error, ok } = useAct();
+  const { act, busy, error, ok, fields } = useAct();
   const group = kind !== "team";
+  // The API refuses a switch to club (412) with the reason under fields.level; show it by the field, not twice.
+  const levelError = fields.level;
 
   function save(e: FormEvent) {
     e.preventDefault();
@@ -138,13 +146,23 @@ function DetailsForm() {
         {!group && (
         <label>
           Level
-          <select value={level} onChange={(e) => setLevel(e.target.value)}>
+          <select
+            value={level}
+            onChange={(e) => setLevel(e.target.value)}
+            aria-invalid={levelError ? true : undefined}
+            aria-describedby={levelError ? "team-level-error" : undefined}
+          >
             {competitionLevels.map((l) => (
               <option key={l} value={l}>
                 {levelLabels[l]}
               </option>
             ))}
           </select>
+          {levelError && (
+            <span id="team-level-error" className="form-error" role="alert">
+              {levelError}
+            </span>
+          )}
         </label>
         )}
         <label>
@@ -152,8 +170,8 @@ function DetailsForm() {
           <input value={city} maxLength={80} onChange={(e) => setCity(e.target.value)} />
         </label>
       </div>
-      {/* A team moved to club keeps everyone on it; only new players must be 16 or over. */}
-      {!group && level === "club" && <ClubAgeNote more={(team.level ?? "club") === "club" ? undefined : "People already on the team stay on it."} />}
+      {/* Switching to club needs everyone on the team to be 16 or over with a birth date (the API checks, 412). */}
+      {!group && level === "club" && <ClubAgeNote more={(team.level ?? "club") === "club" ? undefined : switchToClubNote} />}
       {group && (
         <>
           <label>
@@ -167,7 +185,7 @@ function DetailsForm() {
         </>
       )}
       <div className="form-actions">
-        <Status error={error} ok={ok} />
+        <Status error={levelError ? null : error} ok={ok} />
         <button type="submit" className="btn btn-primary" disabled={busy}>
           Save
         </button>
