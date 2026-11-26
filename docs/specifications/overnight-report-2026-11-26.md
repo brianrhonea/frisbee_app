@@ -1,7 +1,7 @@
 # Overnight report: Sprint 1 UI foundation (started 2026-11-26)
 
 **Branch:** `feature/jan-4-release`. Merged locally only: **nothing pushed, deployed or merged to `development`/`main`.**
-**Your decisions** are collected in §4. Each one has my default, which I used so work could continue.
+**Your decisions** are collected in §7. Each one has my default, which I used so work could continue.
 
 ## 1. Where things stand (morning summary, HEAD `ee068fe`)
 
