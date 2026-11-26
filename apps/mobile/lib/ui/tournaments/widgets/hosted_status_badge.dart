@@ -42,7 +42,7 @@ class HostedStatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
       decoration: BoxDecoration(
-        color: open ? c.accentSoft : c.field,
+        color: open ? c.positiveSoft : c.field,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
@@ -51,7 +51,7 @@ class HostedStatusBadge extends StatelessWidget {
         style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w700,
-          color: open ? c.accentInk : c.ink2,
+          color: open ? c.positive : c.ink2,
         ),
       ),
     );

@@ -1027,7 +1027,7 @@ class _VoiceBar extends StatelessWidget {
     final vm = viewModel;
     final channel = vm.voiceChannel!;
     final status = vm.voiceConnected ? 'Voice Connected' : 'Connecting…';
-    final statusColor = vm.voiceConnected ? c.accent : c.muted;
+    final statusColor = vm.voiceConnected ? c.positive : c.muted;
     return Container(
       decoration: BoxDecoration(
         color: c.card,

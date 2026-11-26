@@ -6,6 +6,7 @@ import '../../../domain/models/hosted_tournament.dart';
 import '../../../domain/models/player_profile.dart';
 import '../../core/themes/theme.dart';
 import '../view_models/hosted_tournament_form_viewmodel.dart';
+import '../../core/ui/app_segmented_button.dart';
 
 /// The event form's Director step (the website's DirectorStep): a Stall 10
 /// member, found by name, or someone not on Stall 10 with their name,
@@ -82,7 +83,7 @@ class _DirectorSectionState extends State<DirectorSection> {
             style: TextStyle(fontSize: 12.5, color: c.muted),
           ),
           const SizedBox(height: 12),
-          SegmentedButton<bool>(
+          AppSegmentedButton<bool>(
             segments: const [
               ButtonSegment(value: true, label: Text('On Stall 10')),
               ButtonSegment(value: false, label: Text('Not on Stall 10')),

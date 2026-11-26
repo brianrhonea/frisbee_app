@@ -486,7 +486,7 @@ class StandingsTable extends StatelessWidget {
                   end: true,
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
-                    color: rows[i].pointDiff > 0 ? c.accent : c.ink,
+                    color: rows[i].pointDiff > 0 ? c.positive : c.ink,
                   ),
                 ),
               ],

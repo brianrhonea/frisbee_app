@@ -298,14 +298,14 @@ class HostChecklist extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: switch (s.state) {
-          GuideStepState.done => c.accentSoft,
+          GuideStepState.done => c.positiveSoft,
           GuideStepState.current => c.highlight,
           GuideStepState.todo => null,
         },
         border: todo ? Border.all(color: c.border2, width: 1.5) : null,
       ),
       child: s.state == GuideStepState.done
-          ? Icon(Icons.check, size: 16, color: c.accentInk)
+          ? Icon(Icons.check, size: 16, color: c.positive)
           : Text(
               '${i + 1}',
               style: TextStyle(

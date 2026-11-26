@@ -16,6 +16,7 @@ import '../../posts/widgets/post_composer.dart';
 import '../../posts/widgets/post_widgets.dart' show workoutIcon;
 import '../view_models/record_workout_viewmodel.dart';
 import 'route_widgets.dart';
+import '../../core/ui/app_segmented_button.dart';
 
 /// Records a run or ride: a live map of the route, the clock, distance and
 /// pace, and start, pause and finish. Finishing opens the composer to share
@@ -300,7 +301,7 @@ class _ActivityPicker extends StatelessWidget {
   final RecordWorkoutViewModel vm;
 
   @override
-  Widget build(BuildContext context) => SegmentedButton<WorkoutActivity>(
+  Widget build(BuildContext context) => AppSegmentedButton<WorkoutActivity>(
     showSelectedIcon: false,
     segments: [
       for (final a in WorkoutActivity.tracked)

@@ -16,6 +16,7 @@ import '../../teams/widgets/team_post_widgets.dart';
 import '../../workouts/widgets/route_widgets.dart';
 import '../../workouts/widgets/workout_fields.dart';
 import '../view_models/post_composer_viewmodel.dart';
+import '../../core/ui/app_segmented_button.dart';
 
 /// Opens the composer over the current page: a dialog on wide screens, a
 /// bottom sheet on phones. Writes a new post (or, with [workout], starts on
@@ -347,7 +348,7 @@ class _PostComposerState extends State<PostComposer> {
               children: [
                 if (vm.save.running) const LinearProgressIndicator(),
                 if (vm.isNew && vm.recorded == null)
-                  SegmentedButton<bool>(
+                  AppSegmentedButton<bool>(
                     segments: const [
                       ButtonSegment(
                         value: false,

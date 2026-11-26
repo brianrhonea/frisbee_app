@@ -12,6 +12,7 @@ import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/video_editor_viewmodel.dart';
 import 'youtube_player_view.dart';
+import '../../core/ui/app_segmented_button.dart';
 
 /// Adds a YouTube video to the team, or edits one: paste the link, and the
 /// title fills in from YouTube.
@@ -272,7 +273,7 @@ class _VideoFormState extends State<_VideoForm> {
         padding: const EdgeInsets.all(16),
         children: [
           if (vm.isNew) ...[
-            SegmentedButton<VideoSource>(
+            AppSegmentedButton<VideoSource>(
               segments: const [
                 ButtonSegment(
                   value: VideoSource.youTube,
@@ -464,7 +465,7 @@ class _LinkStatus extends StatelessWidget {
       ),
       LinkCheck.embeddable => (
         Icons.check_circle_outline,
-        c.accent,
+        c.positive,
         channel == null || channel!.isEmpty
             ? 'Ready to play in the app.'
             : 'Ready to play in the app · $channel',

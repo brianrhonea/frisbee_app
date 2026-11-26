@@ -11,7 +11,8 @@ enum Tone {
   amber(Color(0xFFB7791F), Color(0xFFF2C46B)),
   purple(Color(0xFF8A4FD1), Color(0xFFB794EC)),
   red(Color(0xFFD03A2F), Color(0xFFF58A80)),
-  green(Color(0xFF2F8F57), Color(0xFF8FD3A3));
+  // The success colours (AppColors.positive): green means done, open or OK.
+  green(Color(0xFF166534), Color(0xFF86EFAC));
 
   const Tone(this._light, this._dark);
   final Color _light;
@@ -20,19 +21,21 @@ enum Tone {
   Color of(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark ? _dark : _light;
 
-  /// The tone as text on its own 18% tint (a selected chip): the tone
-  /// itself, darkened in the light theme just enough to reach 4.5:1
-  /// against the tint over the page or a card.
-  Color ink(BuildContext context) {
+  /// The tone as text on its own tint ([tint] is the tint's opacity, 18%
+  /// for a selected chip): the tone itself, moved toward black in the light
+  /// theme (white in dark) just enough to reach 4.5:1 against the tint over
+  /// the page or a card.
+  Color ink(BuildContext context, {double tint = 0.18}) {
     final tone = of(context);
     final c = AppColors.of(context);
+    final dark = Theme.of(context).brightness == Brightness.dark;
     final grounds = [
-      Color.alphaBlend(tone.withValues(alpha: 0.18), c.background),
-      Color.alphaBlend(tone.withValues(alpha: 0.18), c.card),
+      Color.alphaBlend(tone.withValues(alpha: tint), c.background),
+      Color.alphaBlend(tone.withValues(alpha: tint), c.card),
     ];
     var ink = tone;
     for (var t = 0.0; t <= 1.0; t += 0.05) {
-      ink = Color.lerp(tone, Colors.black, t)!;
+      ink = Color.lerp(tone, dark ? Colors.white : Colors.black, t)!;
       if (grounds.every((g) => _contrast(ink, g) >= 4.5)) break;
     }
     return ink;
@@ -63,6 +66,8 @@ class ToneTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = tone.of(context);
+    // Text and icon in the tone's ink: it reaches 4.5:1 on the 14% tint.
+    final ink = tone.ink(context, tint: 0.14);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
@@ -74,7 +79,7 @@ class ToneTag extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 12, color: color),
+            Icon(icon, size: 12, color: ink),
             const SizedBox(width: 4),
           ],
           Text(
@@ -82,7 +87,7 @@ class ToneTag extends StatelessWidget {
             style: TextStyle(
               fontSize: 11.5,
               fontWeight: FontWeight.w700,
-              color: color,
+              color: ink,
             ),
           ),
         ],

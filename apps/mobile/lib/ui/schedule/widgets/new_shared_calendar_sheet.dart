@@ -8,6 +8,7 @@ import '../../calendar/widgets/calendars_screen.dart' show CalendarColorChoice;
 import '../../core/themes/theme.dart';
 import '../../core/ui/layout.dart' show PersonAvatar;
 import '../view_models/event_editor_viewmodel.dart';
+import '../../core/ui/app_segmented_button.dart';
 
 /// From the event editor: a new calendar to share, made on the spot (name,
 /// color, who to invite and what they may do), so sharing an event doesn't
@@ -109,7 +110,7 @@ class _NewSharedCalendarSheetState extends State<_NewSharedCalendarSheet> {
             onChanged: (v) => setState(() => _color = v),
           ),
           const SizedBox(height: 16),
-          SegmentedButton<CalendarRole>(
+          AppSegmentedButton<CalendarRole>(
             segments: [
               for (final r in CalendarRole.shareable)
                 ButtonSegment(value: r, label: Text(r.label)),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../domain/models/roster_player.dart';
 import '../../core/themes/theme.dart';
+import '../../core/ui/app_segmented_button.dart';
 
 enum PlayerSort { name, position }
 
@@ -77,7 +78,7 @@ class _PlayerChooserState extends State<PlayerChooser> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SegmentedButton<PlayerSort>(
+        AppSegmentedButton<PlayerSort>(
           segments: const [
             ButtonSegment(
               value: PlayerSort.name,

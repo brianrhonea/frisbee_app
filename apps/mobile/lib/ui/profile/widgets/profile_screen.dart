@@ -24,6 +24,7 @@ import '../../posts/widgets/post_composer.dart';
 import '../../core/ui/skeleton.dart';
 import '../../../domain/models/moderation.dart';
 import '../../moderation/widgets/report_sheet.dart';
+import '../../core/ui/app_segmented_button.dart';
 
 enum _Tab { overview, posts, stats, teams }
 
@@ -1084,7 +1085,7 @@ class _GameCard extends StatelessWidget {
               ScoreText(
                 '$result ${g.ourScore}–${g.theirScore}',
                 size: 20,
-                color: g.won ? c.accent : c.ink2,
+                color: g.won ? c.positive : c.ink2,
               ),
             ],
           ),
@@ -1494,7 +1495,7 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
                 style: TextStyle(fontSize: 12, color: c.muted),
               ),
               const SizedBox(height: 6),
-              SegmentedButton<ThrowingHand?>(
+              AppSegmentedButton<ThrowingHand?>(
                 showSelectedIcon: false,
                 segments: [
                   const ButtonSegment(value: null, label: Text('–')),

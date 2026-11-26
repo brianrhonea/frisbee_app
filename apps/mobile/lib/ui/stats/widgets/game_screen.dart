@@ -698,7 +698,7 @@ class _LineupCard extends StatelessWidget {
                       : '${vm.game!.opponent} scored. We receive.',
                   style: theme.textTheme.labelLarge?.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: result == PointResult.weScored ? c.accent : c.ink2,
+                    color: result == PointResult.weScored ? c.positive : c.ink2,
                   ),
                 ),
               ),
@@ -819,7 +819,7 @@ class _StartBar extends StatelessWidget {
             fontSize: 26,
             fontWeight: FontWeight.w800,
             color: vm.draftReady
-                ? AppColors.of(context).accent
+                ? AppColors.of(context).positive
                 : AppColors.of(context).muted,
           ),
         ),
@@ -1441,7 +1441,7 @@ class _PlayTag extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     final (bg, fg) = switch (tone) {
-      _PlayTone.good => (c.accentSoft, c.accentInk),
+      _PlayTone.good => (c.positiveSoft, c.positive),
       _PlayTone.bad => (c.field, c.ink),
       _PlayTone.plain => (c.field, c.muted),
     };
@@ -1609,9 +1609,9 @@ class _PointCard extends StatelessWidget {
     final (label, color) = switch (p.result) {
       PointResult.weScored when p.startedOn == Side.defense => (
         'Break',
-        ac.accent,
+        ac.positive,
       ),
-      PointResult.weScored => ('Score', ac.accent),
+      PointResult.weScored => ('Score', ac.positive),
       PointResult.theyScored => ('Opp score', ac.ink2),
       null => ('In play', ac.liveInk),
     };

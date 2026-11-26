@@ -7,6 +7,7 @@ import '../../../domain/models/team.dart';
 import '../../core/themes/theme.dart';
 import '../view_models/hosted_tournament_form_viewmodel.dart';
 import '../../core/ui/time_picker.dart';
+import '../../core/ui/app_segmented_button.dart';
 
 /// The one format every division of an event plays (field size, roster
 /// minimum, scoring, game length, fields and the first game's time), and
@@ -181,7 +182,7 @@ class EventFormatSection extends StatelessWidget {
         ],
       ],
       heading('Scoring'),
-      SegmentedButton<ScoringMode>(
+      AppSegmentedButton<ScoringMode>(
         segments: [
           for (final m in ScoringMode.values)
             ButtonSegment(value: m, label: Text(m.label)),

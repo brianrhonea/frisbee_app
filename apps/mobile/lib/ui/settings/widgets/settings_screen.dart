@@ -295,7 +295,7 @@ class _ThemeChoice extends StatelessWidget {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(9),
                     side: mode == value
-                        ? BorderSide(color: c.border)
+                        ? BorderSide(color: c.accent, width: 1.5)
                         : BorderSide.none,
                   ),
                   clipBehavior: Clip.antiAlias,

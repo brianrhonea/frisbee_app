@@ -12,6 +12,7 @@ import '../../payments/widgets/payment_widgets.dart';
 import '../view_models/hosted_tournament_form_viewmodel.dart';
 import 'director_section.dart';
 import 'event_format_section.dart';
+import '../../core/ui/app_segmented_button.dart';
 
 const _currencies = ['USD', 'CAD', 'EUR', 'GBP', 'AUD', 'MXN'];
 
@@ -253,7 +254,7 @@ class _HostedTournamentFormScreenState
     }
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: SegmentedButton<HostedKind>(
+      child: AppSegmentedButton<HostedKind>(
         segments: [
           for (final k in HostedKind.values)
             ButtonSegment(value: k, label: Text(k.label)),
@@ -280,7 +281,7 @@ class _HostedTournamentFormScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SegmentedButton<EntryChoice>(
+        AppSegmentedButton<EntryChoice>(
           segments: [
             for (final c in vm.entryChoices)
               ButtonSegment(value: c, label: Text(c.label)),
@@ -323,7 +324,7 @@ class _HostedTournamentFormScreenState
               onChanged: vm.setTeamEntry,
             ),
           const SizedBox(height: 4),
-          SegmentedButton<DraftMode>(
+          AppSegmentedButton<DraftMode>(
             segments: [
               for (final m in DraftMode.values)
                 ButtonSegment(value: m, label: Text(m.label)),
@@ -737,7 +738,7 @@ class _HostedTournamentFormScreenState
                     title: 'Who can play',
                     children: [
                       _entryPicker(theme),
-                      SegmentedButton<TournamentVisibility>(
+                      AppSegmentedButton<TournamentVisibility>(
                         segments: [
                           for (final v in TournamentVisibility.values)
                             ButtonSegment(value: v, label: Text(v.label)),

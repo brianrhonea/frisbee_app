@@ -197,6 +197,7 @@ class _EmojiButton extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: selected ? c.accentSoft : null,
+            border: selected ? Border.all(color: c.accent, width: 1.5) : null,
           ),
           child: Text(emoji, style: TextStyle(fontSize: size * 0.56)),
         ),

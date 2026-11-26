@@ -62,7 +62,7 @@ class PasswordStrengthMeter extends StatelessWidget {
                       Icon(
                         r.met ? Icons.check_circle : Icons.circle_outlined,
                         size: 14,
-                        color: r.met ? c.accent : c.muted,
+                        color: r.met ? c.positive : c.muted,
                       ),
                       const SizedBox(width: 4),
                       Text(r.label, style: small),

@@ -41,6 +41,7 @@ import 'team_post_widgets.dart';
 import 'team_community_sheet.dart';
 import 'team_section_screen.dart';
 import 'team_settings_screen.dart';
+import '../../core/ui/app_segmented_button.dart';
 
 enum _MenuAction { edit, settings, community, leave, delete }
 
@@ -591,7 +592,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
   );
 
   /// Members and Players side by side under Roster.
-  Widget _rosterSwitch(TeamSection section) => SegmentedButton<TeamSection>(
+  Widget _rosterSwitch(TeamSection section) => AppSegmentedButton<TeamSection>(
     segments: const [
       ButtonSegment(value: TeamSection.members, label: Text('Members')),
       ButtonSegment(value: TeamSection.roster, label: Text('Players')),

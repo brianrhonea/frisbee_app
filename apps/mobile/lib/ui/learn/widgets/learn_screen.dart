@@ -241,7 +241,7 @@ class _SectionRow extends StatelessWidget {
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: read ? c.accent : null,
+                color: read ? c.positive : null,
                 border: read ? null : Border.all(color: c.border2, width: 1.5),
               ),
               child: number == null
@@ -250,7 +250,7 @@ class _SectionRow extends StatelessWidget {
                   ? Icon(
                       Icons.check,
                       size: 16,
-                      color: c.onAccent,
+                      color: c.card,
                       semanticLabel: 'Read',
                     )
                   : Text(
@@ -393,7 +393,7 @@ class _Lesson extends StatelessWidget {
                 Icon(
                   Icons.check_circle,
                   size: 20,
-                  color: c.accent,
+                  color: c.positive,
                   semanticLabel: 'Read',
                 ),
             ],

@@ -147,7 +147,7 @@ class RsvpResponses extends StatelessWidget {
 
   Widget _group(AppColors c, RsvpGroup g) {
     final (labelColor, nameColor) = switch (g.tone) {
-      RsvpTone.yes => (c.accentInk, c.ink2),
+      RsvpTone.yes => (c.positive, c.ink2),
       RsvpTone.other => (c.ink2, c.ink2),
       RsvpTone.none => (c.muted, c.muted),
     };
@@ -302,7 +302,7 @@ class _Faces extends StatelessWidget {
                 height: size,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: i == 0 ? c.accentSoft : c.field,
+                  color: i == 0 ? c.positiveSoft : c.field,
                   shape: BoxShape.circle,
                   border: Border.all(color: c.card, width: 2),
                 ),
@@ -311,7 +311,7 @@ class _Faces extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
-                    color: i == 0 ? c.accentInk : c.ink2,
+                    color: i == 0 ? c.positive : c.ink2,
                   ),
                 ),
               ),
@@ -350,12 +350,12 @@ class RsvpStatusPill extends StatelessWidget {
     }
     final c = AppColors.of(context);
     final going = s == RsvpStatus.going;
-    final fg = going ? c.accentInk : (s == RsvpStatus.maybe ? c.ink2 : c.muted);
+    final fg = going ? c.positive : (s == RsvpStatus.maybe ? c.ink2 : c.muted);
     return Container(
       constraints: const BoxConstraints(maxWidth: 120),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: going ? c.accentSoft : c.field,
+        color: going ? c.positiveSoft : c.field,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(

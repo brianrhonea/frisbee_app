@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../domain/models/workout.dart';
 import '../../../domain/models/workout_route.dart';
 import '../../groups/widgets/group_map.dart';
+import '../../core/ui/app_segmented_button.dart';
 
 /// Miles or kilometres, from the device's region.
 /// Safe to call from `initState`: it doesn't depend on inherited widgets.
@@ -161,7 +162,7 @@ class _WorkoutSplitsState extends State<WorkoutSplits> {
           children: [
             Text('Splits', style: theme.textTheme.titleMedium),
             const Spacer(),
-            SegmentedButton<DistanceUnit>(
+            AppSegmentedButton<DistanceUnit>(
               showSelectedIcon: false,
               style: const ButtonStyle(visualDensity: VisualDensity.compact),
               segments: const [

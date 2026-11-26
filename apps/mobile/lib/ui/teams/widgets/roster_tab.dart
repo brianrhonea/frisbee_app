@@ -9,6 +9,7 @@ import '../../core/ui/scoreboard.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/team_detail_viewmodel.dart';
 import 'player_dialog.dart';
+import '../../core/ui/app_segmented_button.dart';
 
 class RosterTab extends StatelessWidget {
   const RosterTab({super.key, required this.viewModel});
@@ -268,7 +269,7 @@ class _LinePicker extends StatelessWidget {
   final ValueChanged<RosterLine> onPick;
 
   @override
-  Widget build(BuildContext context) => SegmentedButton<RosterLine>(
+  Widget build(BuildContext context) => AppSegmentedButton<RosterLine>(
     segments: [
       for (final l in RosterLine.values)
         ButtonSegment(value: l, label: Text(l.short), tooltip: l.label),
@@ -331,7 +332,7 @@ class _PaidBadge extends StatelessWidget {
     final badge = _Badge(
       icon: paid ? Icons.paid : Icons.money_off_outlined,
       label: paid ? 'Paid' : 'Unpaid',
-      color: paid ? scheme.primary : scheme.onSurfaceVariant,
+      color: paid ? AppColors.of(context).positive : scheme.onSurfaceVariant,
     );
     if (onTap == null) return badge;
     return Tooltip(

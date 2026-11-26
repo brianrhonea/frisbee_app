@@ -134,7 +134,7 @@ class GetStartedCard extends StatelessWidget {
                   Icon(
                     isDone ? Icons.check_circle : Icons.radio_button_unchecked,
                     size: 22,
-                    color: isDone ? c.accent : c.muted,
+                    color: isDone ? c.positive : c.muted,
                     semanticLabel: isDone ? 'Done' : null,
                   ),
                   const SizedBox(width: 10),

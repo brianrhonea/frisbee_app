@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../domain/models/roster_player.dart';
+import '../../core/ui/app_segmented_button.dart';
 
 /// Add/edit a roster player; pops with the updated player or null.
 class PlayerDialog extends StatefulWidget {
@@ -93,7 +94,7 @@ class _PlayerDialogState extends State<PlayerDialog> {
                 ],
               ),
               const SizedBox(height: 12),
-              SegmentedButton<PlayerPosition>(
+              AppSegmentedButton<PlayerPosition>(
                 segments: [
                   for (final p in PlayerPosition.values)
                     ButtonSegment(value: p, label: Text(p.label)),
