@@ -201,7 +201,7 @@ class _MeetingFormState extends State<_MeetingForm> {
     return Form(
       key: _formKey,
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpace.lg),
         children: [
           TextFormField(
             controller: _title,

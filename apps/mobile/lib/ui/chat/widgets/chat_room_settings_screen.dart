@@ -141,7 +141,7 @@ class _ChatRoomSettingsScreenState extends State<ChatRoomSettingsScreen> {
           body: ConstrainedContent(
             maxWidth: 720,
             child: ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppSpace.lg),
               children: [
                 if (busy) const LinearProgressIndicator(),
                 if (vm.isNew) ...[
@@ -328,7 +328,7 @@ class _KindCard extends StatelessWidget {
       child: Material(
         color: selected ? c.accentSoft : c.card,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadius.card),
           side: BorderSide(
             color: selected ? c.accent : c.border2,
             width: selected ? 2 : 1,
@@ -336,11 +336,11 @@ class _KindCard extends StatelessWidget {
         ),
         child: InkWell(
           customBorder: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.card),
           ),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(AppSpace.md),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -383,7 +383,7 @@ class _RowsCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: c.card,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.card),
         border: Border.all(color: c.border),
       ),
       child: Column(
@@ -455,7 +455,7 @@ class ChatAccessRow extends StatelessWidget {
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         color: c.field,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.control),
       ),
       child: Row(
         children: [

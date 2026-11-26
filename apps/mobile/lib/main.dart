@@ -31,6 +31,10 @@ import 'ui/meetings/widgets/meeting_alerts.dart';
 import 'routing/open_link.dart';
 import 'ui/notifications/view_models/in_app_notices_viewmodel.dart';
 import 'ui/notifications/widgets/in_app_notice_bubble.dart';
+import 'ui/update/view_models/update_gate_viewmodel.dart';
+import 'ui/update/widgets/update_gate.dart';
+import 'domain/models/meta_flags.dart';
+import 'data/repositories/meta_flags/meta_flags_repository.dart';
 
 /// Run with `--dart-define=USE_EMULATORS=true` to use local Firebase emulators.
 const _useEmulators = bool.fromEnvironment('USE_EMULATORS');
@@ -112,6 +116,19 @@ class _FrisbeeAppState extends State<FrisbeeApp> {
   late final NotificationRepository _notifications = context.read();
   late final GoRouter _router = router(_auth, context.read(), context.read());
   late final MeetingAlertsViewModel _meetingAlerts;
+
+  /// Whether this build is still allowed to run (meta/flags.minBuild, #6).
+  /// Started without waiting: the app shows at once and the "Update
+  /// required" screen covers it if the flags say so.
+  late final UpdateGateViewModel _updateGate = UpdateGateViewModel(
+    repository: context.read<MetaFlagsRepository>(),
+    platform: switch (defaultTargetPlatform) {
+      TargetPlatform.iOS => AppPlatform.ios,
+      TargetPlatform.android => AppPlatform.android,
+      _ => null,
+    },
+    build: appBuild,
+  );
   late final OutboxViewModel _outbox = OutboxViewModel(outbox: context.read());
   late final InAppNoticesViewModel _notices = InAppNoticesViewModel(
     authRepository: _auth,
@@ -129,6 +146,7 @@ class _FrisbeeAppState extends State<FrisbeeApp> {
   void initState() {
     super.initState();
     _auth.addListener(_onAuth);
+    unawaited(_updateGate.start());
     _meetingAlerts = MeetingAlertsViewModel(
       authRepository: _auth,
       notificationRepository: _notifications,
@@ -166,6 +184,7 @@ class _FrisbeeAppState extends State<FrisbeeApp> {
     _auth.removeListener(_onAuth);
     _opened?.cancel();
     _meetingAlerts.dispose();
+    _updateGate.dispose();
     _notices.dispose();
     _outbox.dispose();
     _router.dispose();
@@ -181,20 +200,23 @@ class _FrisbeeAppState extends State<FrisbeeApp> {
     themeMode: context.watch<ThemeRepository>().themeMode,
     routerConfig: _router,
     scaffoldMessengerKey: _messengerKey,
-    builder: (_, child) => TapOutsideUnfocus(
-      child: MeetingAlerts(
-        viewModel: _meetingAlerts,
-        router: _router,
-        messengerKey: _messengerKey,
-        child: InAppNoticeBubble(
-          viewModel: _notices,
-          onOpen: _router.openFromOutside,
-          child: OfflineBanner(
-            viewModel: _outbox,
-            messengerKey: _messengerKey,
-            navigatorContext: () =>
-                _router.routerDelegate.navigatorKey.currentContext,
-            child: child ?? const SizedBox.shrink(),
+    builder: (_, child) => UpdateGate(
+      viewModel: _updateGate,
+      child: TapOutsideUnfocus(
+        child: MeetingAlerts(
+          viewModel: _meetingAlerts,
+          router: _router,
+          messengerKey: _messengerKey,
+          child: InAppNoticeBubble(
+            viewModel: _notices,
+            onOpen: _router.openFromOutside,
+            child: OfflineBanner(
+              viewModel: _outbox,
+              messengerKey: _messengerKey,
+              navigatorContext: () =>
+                  _router.routerDelegate.navigatorKey.currentContext,
+              child: child ?? const SizedBox.shrink(),
+            ),
           ),
         ),
       ),

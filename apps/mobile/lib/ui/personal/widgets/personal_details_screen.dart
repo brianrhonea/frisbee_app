@@ -74,7 +74,7 @@ class PersonalDetailsScreen extends StatelessWidget {
           if (vm.load.error) {
             return Center(
               child: Padding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(AppSpace.xl),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -102,7 +102,7 @@ class _TooYoung extends StatelessWidget {
   @override
   Widget build(BuildContext context) => const Center(
     child: Padding(
-      padding: EdgeInsets.all(32),
+      padding: EdgeInsets.all(AppSpace.xxl),
       child: Text(
         "$tooYoungMessage We didn't keep your details, and you've been "
         'signed out.',
@@ -331,7 +331,7 @@ class _PersonalFormState extends State<_PersonalForm> {
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
               decoration: BoxDecoration(
                 color: c.accentSoft,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.control),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,

@@ -318,7 +318,7 @@ class _EventRow extends StatelessWidget {
                   height: 48,
                   decoration: BoxDecoration(
                     color: c.accentSoft,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.control),
                   ),
                   child: Icon(Icons.emoji_events_outlined, color: c.accentInk),
                 ),

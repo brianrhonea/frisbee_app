@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.56  | 2026-11-26 | `sprint2/lane-b-app`                    |                     |
 | 0.0.55  | 2026-11-24 | `feature/platform-payments`             |                     |
 | 0.0.54  | 2026-11-24 | `feature/platform-payments`             |                     |
 | 0.0.53  | 2026-11-24 | `development`                           |                     |
@@ -68,6 +69,15 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.56 — Sprint 2 app UI components, update gate
+
+- Shared components: `StatusPill`, `AppButton`, `SegmentedTabs`,
+  `AppFilterChips`, `Avatar`, `TeamLogo`, `AvatarStack`; old names wrap them.
+- Selected segments and chips are filled indigo (`chipOn`).
+- Update required screen from `meta/flags.minBuild` (#6).
+- Video upload hidden unless `meta/flags.videoUploads` is true (#13).
+- Home feed says when posts failed to load (#24).
 
 ## 0.0.55 — Notification bubble, red logo
 

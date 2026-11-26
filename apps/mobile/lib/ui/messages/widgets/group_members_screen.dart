@@ -191,7 +191,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
     final results = vm.results;
     if (results.isEmpty) {
       return Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(AppSpace.xl),
         child: Text(
           'Type at least ${GroupMembersViewModel.minQueryLength} letters of '
           'a name.',

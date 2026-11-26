@@ -6,6 +6,7 @@ import '../view_models/whiteboard_viewmodel.dart';
 import 'field_geometry.dart';
 import 'field_painter.dart';
 import 'play_canvas.dart';
+import '../../core/themes/theme.dart';
 
 /// The whiteboard's field: the pen draws, piece tools drop and drag pieces,
 /// the eraser removes what it touches. Bound to a [WhiteboardViewModel].
@@ -136,7 +137,7 @@ class _WhiteboardCanvasState extends State<WhiteboardCanvas> {
                 onPanEnd: (_) => _onPanEnd(g),
                 onPanCancel: () => _onPanEnd(g),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.control),
                   child: CustomPaint(
                     size: size,
                     painter: FieldPainter(

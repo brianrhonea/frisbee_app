@@ -139,7 +139,7 @@ class Pill extends StatelessWidget {
       PillTone.needsYou => (c.highlightSoft, c.highlightInk),
     };
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm, vertical: 3),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(999),

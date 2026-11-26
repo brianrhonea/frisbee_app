@@ -3,10 +3,9 @@ import 'package:flutter/material.dart';
 import '../themes/theme.dart';
 
 /// The app's segmented control: a row of equal-width segments in one
-/// outlined pill. The selected segment is the soft indigo fill
-/// ([AppColors.accentSoft]) with its own indigo ([AppColors.accent]) outline
-/// and [AppColors.accentInk] label, so it reads without relying on the fill
-/// (about 1.1:1 against its neighbours).
+/// outlined pill. The selected segment is filled indigo ([AppColors.chipOn])
+/// with an [AppColors.onChipOn] label, and bolder text, so it reads without
+/// relying on colour alone.
 ///
 /// Built from plain widgets (Material + InkWell per segment) so it follows the
 /// text direction and the text scale. Segments are at least 48 px tall and
@@ -120,8 +119,8 @@ class AppSegmentedButton<T> extends StatelessWidget {
   }
 }
 
-/// One segment: a tappable, rounded cell that is the soft accent fill with an
-/// accent outline when [selected]. The building block of
+/// One segment: a tappable, rounded cell that is filled indigo
+/// ([AppColors.chipOn]) with an [AppColors.onChipOn] label when [selected]. The building block of
 /// [AppSegmentedButton]; use it directly where segments are driven by
 /// something else (a tab controller).
 class AppSegment extends StatelessWidget {
@@ -145,7 +144,7 @@ class AppSegment extends StatelessWidget {
     // control's border on the sides it shares.
     final shape = StadiumBorder(
       side: selected
-          ? BorderSide(color: c.accent, width: AppSegmentedButton.outlineWidth)
+          ? BorderSide(color: c.chipOn, width: AppSegmentedButton.outlineWidth)
           : BorderSide.none,
     );
     return Semantics(
@@ -155,7 +154,7 @@ class AppSegment extends StatelessWidget {
       enabled: onTap != null,
       inMutuallyExclusiveGroup: true,
       child: Material(
-        color: selected ? c.accentSoft : Colors.transparent,
+        color: selected ? c.chipOn : Colors.transparent,
         shape: shape,
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -173,7 +172,7 @@ class AppSegment extends StatelessWidget {
                   color: onTap == null
                       ? c.muted
                       : selected
-                      ? c.accentInk
+                      ? c.onChipOn
                       : c.ink2,
                 ),
                 child: IconTheme.merge(
@@ -182,7 +181,7 @@ class AppSegment extends StatelessWidget {
                     color: onTap == null
                         ? c.muted
                         : selected
-                        ? c.accentInk
+                        ? c.onChipOn
                         : c.ink2,
                   ),
                   child: Padding(

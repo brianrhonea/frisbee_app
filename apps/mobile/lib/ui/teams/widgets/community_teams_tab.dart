@@ -133,7 +133,7 @@ class _CommunityTeamsTabState extends State<CommunityTeamsTab> {
       final teams = vm.teams;
       return ConstrainedContent(
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(AppSpace.lg),
           children: [
             Text(
               vm.canManage

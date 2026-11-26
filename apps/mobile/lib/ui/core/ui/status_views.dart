@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'error_message.dart';
 import 'skeleton.dart';
+import '../themes/theme.dart';
 
 /// A page or list on the way: placeholder rows, not a spinner.
 class LoadingView extends StatelessWidget {
@@ -21,7 +22,7 @@ class ErrorView extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Center(
     child: Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(AppSpace.xl),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -66,7 +67,7 @@ class EmptyView extends StatelessWidget {
     final theme = Theme.of(context);
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(AppSpace.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

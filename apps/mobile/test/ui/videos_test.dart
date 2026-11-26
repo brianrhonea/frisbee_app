@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frisbee_app/data/services/feature_flags.dart';
 import 'package:frisbee_app/data/services/file_picker_service.dart';
+import 'package:provider/provider.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/domain/models/team_video.dart';
 import 'package:frisbee_app/domain/models/video_folder.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
+import 'package:frisbee_app/ui/core/ui/app_segmented_button.dart';
 import 'package:frisbee_app/ui/videos/view_models/team_videos_viewmodel.dart';
 import 'package:frisbee_app/ui/videos/view_models/video_editor_viewmodel.dart';
 import 'package:frisbee_app/ui/videos/view_models/video_viewmodel.dart';
@@ -582,5 +585,108 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pumpAndSettle();
     expect(find.textContaining('"Allow embedding" is on'), findsOneWidget);
+  });
+
+  group('video uploads flag (#13)', () {
+    PickedFile mp4(String name, int size) => PickedFile(
+      name: name,
+      size: size,
+      read: () async => throw UnimplementedError(),
+      path: 'C:/film/$name',
+    );
+
+    test('closed: picking a file does nothing', () async {
+      picker.videoUploads = false;
+      final vm = editor(coach);
+      addTearDown(vm.dispose);
+      await pumpEventQueue();
+      vm.source = VideoSource.upload;
+      picker.nextVideo = mp4('tryouts.mp4', 1024 * 1024);
+      await vm.pickFile();
+      expect(vm.pickedFile, isNull);
+    });
+
+    test('closed: saving an upload is refused, nothing is stored', () async {
+      final vm = editor(coach);
+      addTearDown(vm.dispose);
+      await pumpEventQueue();
+      vm.source = VideoSource.upload;
+      picker.nextVideo = mp4('tryouts.mp4', 1024 * 1024);
+      await vm.pickFile();
+      expect(vm.pickedFile, isNotNull);
+      // The flag closes after the file was picked.
+      picker.videoUploads = false;
+      await vm.save.execute(const TeamVideo(id: '', title: 'Tryouts'));
+      expect(vm.save.error, isTrue);
+      expect(
+        vm.save.result.toString(),
+        contains("Video uploads aren't available right now."),
+      );
+      expect(videos.uploaded, isEmpty);
+      expect(videos.videos['t1'] ?? const [], isEmpty);
+    });
+
+    test('closed: a YouTube link still saves', () async {
+      picker.videoUploads = false;
+      final vm = editor(coach);
+      addTearDown(vm.dispose);
+      await pumpEventQueue();
+      await vm.save.execute(
+        const TeamVideo(id: '', youtubeId: film, title: 'Film'),
+      );
+      expect(vm.save.completed, isTrue);
+      expect(videos.videos['t1']!.single.isYouTube, isTrue);
+    });
+
+    Future<void> pumpEditor(WidgetTester tester, {required bool open}) async {
+      tester.view.physicalSize = const Size(390, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final vm = editor(coach);
+      addTearDown(vm.dispose);
+      await tester.pumpWidget(
+        ChangeNotifierProvider<FeatureFlags>.value(
+          value: FeatureFlags.fixed({'videoUploads': open}),
+          child: MaterialApp(
+            theme: AppTheme.light,
+            home: VideoEditorScreen(viewModel: vm),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('closed: the editor offers only the YouTube link', (
+      tester,
+    ) async {
+      await pumpEditor(tester, open: false);
+      expect(find.text('Upload file'), findsNothing);
+      expect(find.byType(AppSegmentedButton<VideoSource>), findsNothing);
+      expect(find.byType(TextField), findsWidgets);
+    });
+
+    testWidgets('open: the editor offers YouTube link or Upload file', (
+      tester,
+    ) async {
+      await pumpEditor(tester, open: true);
+      expect(find.text('Upload file'), findsOneWidget);
+      expect(find.byType(AppSegmentedButton<VideoSource>), findsOneWidget);
+    });
+
+    testWidgets('without any flags provider the editor fails closed', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(390, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final vm = editor(coach);
+      addTearDown(vm.dispose);
+      await pump(
+        tester,
+        VideoEditorScreen(viewModel: vm),
+        const Size(390, 900),
+      );
+      expect(find.text('Upload file'), findsNothing);
+    });
   });
 }

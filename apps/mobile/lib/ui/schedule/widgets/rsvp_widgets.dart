@@ -4,6 +4,7 @@ import '../../../domain/models/team_event.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/layout.dart';
 import '../../core/ui/scoreboard.dart';
+import '../../core/ui/status_pill.dart';
 
 /// One answer in an [RsvpChoice]: its label and how many gave it.
 typedef RsvpOption<T> = ({T value, String label, int count});
@@ -64,7 +65,10 @@ class RsvpChoice<T> extends StatelessWidget {
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 48),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpace.xs,
+                vertical: 6,
+              ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -348,40 +352,13 @@ class RsvpStatusPill extends StatelessWidget {
           ? NeedsYouPill('Needs RSVP', strong: strong)
           : const SizedBox.shrink();
     }
-    final c = AppColors.of(context);
     final going = s == RsvpStatus.going;
-    final fg = going ? c.positive : (s == RsvpStatus.maybe ? c.ink2 : c.muted);
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 120),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: going ? c.positiveSoft : c.field,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (going) ...[
-            Icon(Icons.check, size: 14, color: fg),
-            const SizedBox(width: 4),
-          ],
-          Flexible(
-            child: Text(
-              // Tournament answers are long; rows show the short one.
-              type == EventType.tournament && !going
-                  ? s.label
-                  : s.labelFor(type),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: fg,
-              ),
-            ),
-          ),
-        ],
-      ),
+    return StatusPill(
+      // Tournament answers are long; rows show the short one.
+      type == EventType.tournament && !going ? s.label : s.labelFor(type),
+      tone: going ? PillTone.success : PillTone.neutral,
+      icon: going ? Icons.check : null,
+      maxWidth: 120,
     );
   }
 }

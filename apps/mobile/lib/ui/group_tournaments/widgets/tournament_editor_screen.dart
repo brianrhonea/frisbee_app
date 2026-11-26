@@ -553,7 +553,7 @@ class _Stepper extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     return ListTile(
-      contentPadding: const EdgeInsets.only(left: 16, right: 4),
+      contentPadding: const EdgeInsets.only(left: AppSpace.lg, right: 4),
       title: Text(
         label,
         style: TextStyle(
@@ -642,7 +642,7 @@ class _Teams extends StatelessWidget {
         children: [
           if (others.isEmpty)
             const Padding(
-              padding: EdgeInsets.all(24),
+              padding: EdgeInsets.all(AppSpace.xl),
               child: Text('Every member is already in.'),
             ),
           for (final p in others)
@@ -968,7 +968,7 @@ class _SchedulePreview extends StatelessWidget {
                             .take(i)
                             .fold<int>(0, (sum, d) => sum + d.games))
                   Padding(
-                    padding: const EdgeInsets.only(top: 12, bottom: 4),
+                    padding: const EdgeInsets.only(top: AppSpace.md, bottom: 4),
                     child: Text(
                       'Day ${i + 1} · '
                       '${DateFormat('EEE, MMM d').format(day.startsAt)} · '

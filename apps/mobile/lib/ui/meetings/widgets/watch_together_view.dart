@@ -43,7 +43,7 @@ class WatchTogetherStage extends StatelessWidget {
       children: [
         Expanded(
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.control),
             child: ColoredBox(
               color: Colors.black,
               child: Stack(
@@ -295,7 +295,7 @@ class _VideoPickerState extends State<_VideoPicker> {
             child: vm.videos.isEmpty
                 ? const Center(
                     child: Padding(
-                      padding: EdgeInsets.all(24),
+                      padding: EdgeInsets.all(AppSpace.xl),
                       child: Text(
                         'No team videos yet. Add some in the team\'s Videos '
                         'section first.',

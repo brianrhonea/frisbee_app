@@ -56,7 +56,7 @@ class OverlayCard extends StatelessWidget {
           child: SafeArea(
             child: Center(
               child: Padding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(AppSpace.xl),
                 // Taps on the card stay on the card.
                 child: GestureDetector(
                   onTap: () {},

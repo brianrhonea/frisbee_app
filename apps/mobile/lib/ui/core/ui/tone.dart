@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../themes/theme.dart';
+import 'filter_chips.dart';
+import 'status_pill.dart';
 
 /// A color for a tournament's status or a team's kind. Each has a light- and
 /// a dark-theme shade.
@@ -51,7 +53,7 @@ enum Tone {
   }
 }
 
-/// A small pill in [tone]: tinted fill, [label] in the tone's color.
+/// A small pill in [tone]: a [StatusPill].
 class ToneTag extends StatelessWidget {
   const ToneTag({
     super.key,
@@ -65,43 +67,15 @@ class ToneTag extends StatelessWidget {
   final IconData? icon;
 
   @override
-  Widget build(BuildContext context) {
-    final color = tone.of(context);
-    // Text and icon in the tone's ink: it reaches 4.5:1 on the 14% tint.
-    final ink = tone.ink(context, tint: 0.14);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.35)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 12, color: ink),
-            const SizedBox(width: 4),
-          ],
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w700,
-              color: ink,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      StatusPill(label, tone: tone.pill, icon: icon);
 }
 
 /// One filter in a [ToneFilterBar]: [value] null is "All".
 typedef ToneFilter<T> = ({T? value, String label, Tone? tone, int count});
 
 /// A row of single-choice filter chips, each with its tone's dot and a
-/// count; scrolls sideways when it doesn't fit.
+/// count; scrolls sideways when it doesn't fit. An [AppFilterChips].
 class ToneFilterBar<T> extends StatelessWidget {
   const ToneFilterBar({
     super.key,
@@ -117,31 +91,22 @@ class ToneFilterBar<T> extends StatelessWidget {
   final EdgeInsets padding;
 
   @override
-  Widget build(BuildContext context) => SingleChildScrollView(
-    scrollDirection: Axis.horizontal,
+  Widget build(BuildContext context) => AppFilterChips<T>(
     padding: padding,
-    child: Row(
-      children: [
-        for (final f in filters)
-          Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: ChoiceChip(
-              showCheckmark: false,
-              visualDensity: VisualDensity.compact,
-              avatar: f.tone == null
-                  ? null
-                  : CircleAvatar(
-                      radius: 5,
-                      backgroundColor: f.tone!.of(context),
-                    ),
-              label: Text('${f.label} ${f.count}'),
-              selected: f.value == selected,
-              // Selected is the theme's indigo (chipOn) for every chip; the
-              // tone shows only as the dot.
-              onSelected: (_) => onSelected(f.value),
-            ),
-          ),
-      ],
-    ),
+    selected: selected,
+    onSelected: onSelected,
+    // Selected is the theme's indigo (chipOn) for every chip; the tone shows
+    // only as the dot.
+    options: [
+      for (final f in filters)
+        (
+          value: f.value,
+          label: f.label,
+          count: f.count,
+          leading: f.tone == null
+              ? null
+              : CircleAvatar(radius: 5, backgroundColor: f.tone!.of(context)),
+        ),
+    ],
   );
 }

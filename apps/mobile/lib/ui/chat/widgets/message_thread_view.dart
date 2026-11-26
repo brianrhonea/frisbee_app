@@ -26,6 +26,7 @@ import '../../core/ui/skeleton.dart';
 import '../../../domain/models/moderation.dart';
 import '../../moderation/widgets/report_sheet.dart';
 import '../../../domain/models/mentions.dart';
+import '../../core/ui/video_uploads.dart';
 
 /// Messages with a composer below, for a team room or a direct message.
 /// Shows [readOnlyNotice] in place of the composer when the user can't post.
@@ -327,7 +328,7 @@ class _MessageThreadViewState extends State<MessageThreadView>
           await Scrollable.ensureVisible(
             row,
             alignment: 0.5,
-            duration: const Duration(milliseconds: 300),
+            duration: AppMotion.sheet,
             curve: Curves.easeOut,
           );
           if (mounted) vm.jumpFinished(id);
@@ -733,7 +734,7 @@ class _MessageList extends StatelessWidget {
     return ListView.builder(
       controller: controller,
       reverse: true,
-      padding: const EdgeInsets.only(top: 12, bottom: 16),
+      padding: const EdgeInsets.only(top: AppSpace.md, bottom: 16),
       itemCount: count,
       itemBuilder: (context, i) {
         if (i == messages.length) {
@@ -744,7 +745,7 @@ class _MessageList extends StatelessWidget {
           return Center(
             child: vm.loadingMore
                 ? const Padding(
-                    padding: EdgeInsets.all(12),
+                    padding: EdgeInsets.all(AppSpace.md),
                     child: SizedBox.square(
                       dimension: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
@@ -995,10 +996,7 @@ class _RightSwipe extends HorizontalDragGestureRecognizer {
 /// them away again, as on a phone's messages app.
 class _TimeReveal {
   _TimeReveal(TickerProvider vsync)
-    : controller = AnimationController(
-        vsync: vsync,
-        duration: const Duration(milliseconds: 200),
-      );
+    : controller = AnimationController(vsync: vsync, duration: AppMotion.base);
 
   final AnimationController controller;
 
@@ -1904,7 +1902,7 @@ class _PhotoDialog extends StatelessWidget {
       children: [
         Flexible(child: InteractiveViewer(child: Image.memory(bytes))),
         Padding(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(AppSpace.sm),
           child: Row(
             children: [
               Expanded(
@@ -2067,7 +2065,7 @@ class _VideoDialogState extends State<_VideoDialog> {
   @override
   Widget build(BuildContext context) => Dialog(
     clipBehavior: Clip.antiAlias,
-    insetPadding: const EdgeInsets.all(16),
+    insetPadding: const EdgeInsets.all(AppSpace.lg),
     child: ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 900),
       child: Column(
@@ -2217,7 +2215,7 @@ class _ReplyBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(10, 4, 2, 4),
       decoration: BoxDecoration(
         color: c.field,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.control),
         border: Border(left: BorderSide(color: c.accent, width: 3)),
       ),
       child: Row(
@@ -2314,7 +2312,13 @@ class _Composer extends StatelessWidget {
                   shape: BoxShape.circle,
                   border: Border.all(color: c.border2),
                 ),
-                child: _attachMenu(context, c, vm, sending),
+                child: _attachMenu(
+                  context,
+                  c,
+                  vm,
+                  sending,
+                  videoOpen: videoUploadsOpen(context),
+                ),
               )
             : const SizedBox.shrink();
         return Container(
@@ -2447,8 +2451,9 @@ class _Composer extends StatelessWidget {
     BuildContext context,
     AppColors c,
     MessageThreadViewModel vm,
-    bool sending,
-  ) => PopupMenuButton<_AttachKind>(
+    bool sending, {
+    required bool videoOpen,
+  }) => PopupMenuButton<_AttachKind>(
     tooltip: 'Upload a photo, video or file',
     enabled: !sending && !vm.pickFiles.running && !vm.recordVideo.running,
     padding: EdgeInsets.zero,
@@ -2470,7 +2475,8 @@ class _Composer extends StatelessWidget {
             title: Text('Take photo'),
           ),
         ),
-      if (vm.canUseCamera)
+      // Recording is a native video upload: only while the flag is open.
+      if (vm.canUseCamera && videoOpen)
         const PopupMenuItem(
           value: _AttachKind.video,
           child: ListTile(
@@ -2522,7 +2528,11 @@ class _DraftChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     return Padding(
-      padding: const EdgeInsets.only(right: 8, top: 4, bottom: 4),
+      padding: const EdgeInsets.only(
+        right: AppSpace.sm,
+        top: AppSpace.xs,
+        bottom: 4,
+      ),
       child: Container(
         width: draft.isImage ? 64 : 180,
         decoration: BoxDecoration(

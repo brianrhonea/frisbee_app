@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../themes/theme.dart';
+import 'app_button.dart';
+import 'avatar.dart';
 import 'balanced_text.dart';
 import 'scroll_to_top.dart';
+import 'status_pill.dart';
 
 /// The three layouts the app is designed for.
 enum ScreenSize {
@@ -303,7 +306,10 @@ class CardLink extends StatelessWidget {
       borderRadius: BorderRadius.circular(6),
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpace.xs,
+          vertical: 4,
+        ),
         child: Text(
           label,
           style: TextStyle(
@@ -350,7 +356,8 @@ class FeatureCard extends StatelessWidget {
   }
 }
 
-/// A lime, full-width call to action on a [FeatureCard].
+/// A full-width call to action on a [FeatureCard]: an [AppButton.primary]
+/// that fills the width.
 class HighlightButton extends StatelessWidget {
   const HighlightButton({
     super.key,
@@ -364,28 +371,11 @@ class HighlightButton extends StatelessWidget {
   final IconData? icon;
 
   @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    final style = FilledButton.styleFrom(
-      backgroundColor: c.highlight,
-      foregroundColor: c.onHighlight,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    );
-    return SizedBox(
-      width: double.infinity,
-      child: icon == null
-          ? FilledButton(style: style, onPressed: onPressed, child: Text(label))
-          : FilledButton.icon(
-              style: style,
-              onPressed: onPressed,
-              icon: Icon(icon, size: 18),
-              label: Text(label),
-            ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      AppButton.primary(label, onPressed: onPressed, icon: icon, expand: true);
 }
 
-/// A small rounded tag, e.g. "Mixed club" or "PINNED".
+/// A small tag, e.g. "Mixed club" or "PINNED": a [StatusPill].
 class Tag extends StatelessWidget {
   const Tag(this.text, {super.key, this.strong = false, this.success = false});
 
@@ -394,31 +384,16 @@ class Tag extends StatelessWidget {
   /// In the success colours, for a confirmed state such as "You're on it".
   final bool success;
 
-  /// For use on navy: the secondary navy fill with white text.
+  /// A quieter grey fill instead of the accent tint.
   final bool strong;
 
   @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: strong
-            ? c.featureHighlight
-            : (success ? c.positiveSoft : c.accentSoft),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 10.5,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.2,
-          color: strong ? c.onFeature : (success ? c.positive : c.accentInk),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => StatusPill(
+    text,
+    tone: strong
+        ? PillTone.neutral
+        : (success ? PillTone.success : PillTone.accent),
+  );
 }
 
 /// The mark of an official organizer (Team.official), e.g. Stall 10, and
@@ -542,17 +517,9 @@ class DateBadge extends StatelessWidget {
 }
 
 /// Initials of [name]: the first letters of its first two words.
-String initialsOf(String name) {
-  final letters = name
-      .split(RegExp(r'\s+'))
-      .where((w) => w.isNotEmpty)
-      .take(2)
-      .map((w) => w[0].toUpperCase())
-      .join();
-  return letters.isEmpty ? '?' : letters;
-}
+String initialsOf(String name) => initialsOfName(name);
 
-/// A person's photo, or their initials in a circle.
+/// A person's photo, or their initials in a circle: an [Avatar].
 class PersonAvatar extends StatelessWidget {
   const PersonAvatar({
     super.key,
@@ -566,30 +533,13 @@ class PersonAvatar extends StatelessWidget {
   final double radius;
 
   @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    final photo = photoUrl;
-    final hasPhoto = photo != null && photo.isNotEmpty;
-    return CircleAvatar(
-      radius: radius,
-      backgroundColor: c.accentSoft,
-      foregroundColor: c.ink,
-      backgroundImage: hasPhoto ? NetworkImage(photo) : null,
-      child: hasPhoto
-          ? null
-          : Text(
-              initialsOf(name),
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: radius * 0.72,
-              ),
-            ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      Avatar(name: name, imageUrl: photoUrl, size: radius * 2);
 }
 
-/// A team's mark: a rounded dark green square with a mountain-like crest
-/// (or a people icon for community groups).
+/// A team's mark: its initials in the condensed face (a rounded square for a
+/// team, a circle for a community), or a crest icon (or a people icon for
+/// community groups) without a [name]: a [TeamLogo].
 class TeamBadge extends StatelessWidget {
   const TeamBadge({
     super.key,
@@ -601,86 +551,31 @@ class TeamBadge extends StatelessWidget {
   final double size;
   final bool community;
 
-  /// When given, the team's initials in the condensed face instead of an
-  /// icon: a team-blue rounded square for a team, a turf circle for a
-  /// community.
+  /// When given, the team's initials instead of an icon.
   final String? name;
 
   @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    final initials = name;
-    if (initials != null) {
-      return Container(
-        width: size,
-        height: size,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: community ? c.accent : c.badge,
-          borderRadius: BorderRadius.circular(
-            community ? size / 2 : size * 0.27,
-          ),
-        ),
-        child: Text(
-          initialsOf(initials),
-          maxLines: 1,
-          softWrap: false,
-          style: TextStyle(
-            fontFamily: scoreFont,
-            fontWeight: FontWeight.w800,
-            fontSize: size * 0.45,
-            height: 1,
-            color: community ? c.onAccent : Colors.white,
-          ),
-        ),
-      );
-    }
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: c.accentSoft,
-        borderRadius: BorderRadius.circular(size * 0.28),
-      ),
-      child: Icon(
-        community ? Icons.diversity_3_outlined : Icons.landscape_outlined,
-        size: size * 0.56,
-        color: c.accentInk,
-      ),
-    );
-  }
+  Widget build(BuildContext context) => TeamLogo(
+    name: name,
+    size: size,
+    kind: community ? TeamLogoKind.community : TeamLogoKind.team,
+    decorative: true,
+  );
 }
 
-/// An unread count in a disc-amber pill, for navigation items and rows.
+/// An unread count in a solid pill, for navigation items and rows: a
+/// [StatusPill.count].
 class CountPill extends StatelessWidget {
   const CountPill(this.count, {super.key, this.dark = false});
 
   final int count;
 
-  /// Navy with white text, e.g. on a selected nav item.
+  /// Neutral (ink) instead of the accent, e.g. on a selected nav item.
   final bool dark;
 
   @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    return Container(
-      constraints: const BoxConstraints(minWidth: 20),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: dark ? c.feature : c.highlight,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(
-        count > 99 ? '99+' : '$count',
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: dark ? c.onFeature : c.onHighlight,
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      StatusPill.count(count, tone: dark ? PillTone.neutral : PillTone.accent);
 }
 
 /// "2 hours ago", "Yesterday", "Mon", or "Oct 3" for [time] relative to

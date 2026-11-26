@@ -8,6 +8,7 @@ import '../../core/ui/error_message.dart';
 import '../../core/ui/view_model_host.dart';
 import '../view_models/location_picker_viewmodel.dart';
 import 'group_map.dart';
+import '../../core/themes/theme.dart';
 
 /// Opens the location picker. Returns the chosen location, or null if
 /// cancelled.
@@ -90,7 +91,7 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
                     labelText: 'Search an address or park',
                     suffixIcon: vm.search.running
                         ? const Padding(
-                            padding: EdgeInsets.all(12),
+                            padding: EdgeInsets.all(AppSpace.md),
                             child: SizedBox.square(
                               dimension: 20,
                               child: CircularProgressIndicator(strokeWidth: 2),
@@ -141,7 +142,7 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
                   ),
                 const SizedBox(height: 12),
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.control),
                   child: SizedBox(
                     height: 240,
                     child: GroupMap(

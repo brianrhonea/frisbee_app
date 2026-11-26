@@ -106,12 +106,12 @@ class _PollCardBodyState extends State<_PollCardBody> {
     final decoration = BoxDecoration(
       color: c.card,
       border: Border.all(color: c.border),
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppRadius.card),
     );
     if (poll == null) {
       return Container(
         margin: const EdgeInsets.only(top: 4),
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(AppSpace.md),
         decoration: decoration,
         child: Text(
           'Poll no longer available',
@@ -133,7 +133,7 @@ class _PollCardBodyState extends State<_PollCardBody> {
     return Container(
       margin: const EdgeInsets.only(top: 4),
       constraints: const BoxConstraints(maxWidth: 480),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(AppSpace.md),
       decoration: decoration,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -224,7 +224,7 @@ class _PollOption extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     final share = total == 0 ? 0.0 : count / total;
-    final radius = BorderRadius.circular(12);
+    final radius = BorderRadius.circular(AppRadius.control);
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Semantics(
@@ -326,7 +326,10 @@ Future<void> _showVoters(BuildContext context, ChatPollCardViewModel vm) =>
                 if (poll != null)
                   for (var i = 0; i < poll.options.length; i++) ...[
                     Padding(
-                      padding: const EdgeInsets.only(top: 8, bottom: 2),
+                      padding: const EdgeInsets.only(
+                        top: AppSpace.sm,
+                        bottom: 2,
+                      ),
                       child: Text(
                         '${poll.options[i]} · ${vm.votersFor(i).length}',
                         style: TextStyle(

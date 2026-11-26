@@ -263,7 +263,7 @@ class _CommandPaletteState extends State<CommandPalette> {
                 Flexible(
                   child: results.isEmpty
                       ? Padding(
-                          padding: const EdgeInsets.all(24),
+                          padding: const EdgeInsets.all(AppSpace.xl),
                           child: Text(
                             'Nothing matches',
                             textAlign: TextAlign.center,

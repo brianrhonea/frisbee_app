@@ -221,7 +221,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                         controller: _scroll,
                         child: ListView(
                           controller: _scroll,
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(AppSpace.lg),
                           children: [
                             UserPostCard(
                               post: post,
@@ -243,7 +243,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                             if (post.workout case final w? when w.route != null)
                               Card(
                                 child: Padding(
-                                  padding: const EdgeInsets.all(16),
+                                  padding: const EdgeInsets.all(AppSpace.lg),
                                   child: WorkoutSplits(workout: w),
                                 ),
                               ),
@@ -252,7 +252,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                               _CommentsHeading(count: comments?.length),
                               if (comments == null)
                                 const Padding(
-                                  padding: EdgeInsets.all(24),
+                                  padding: EdgeInsets.all(AppSpace.xl),
                                   child: Center(
                                     child: CircularProgressIndicator(),
                                   ),
@@ -260,7 +260,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                               else if (vm.commentsError != null &&
                                   comments.isEmpty)
                                 Padding(
-                                  padding: const EdgeInsets.all(16),
+                                  padding: const EdgeInsets.all(AppSpace.lg),
                                   child: Text(errorMessage(vm.commentsError)),
                                 )
                               else if (comments.isEmpty)

@@ -53,17 +53,21 @@ void main() {
         await t.pumpWidget(
           _app(e.value, ToneTag(label: 'Open', tone: tone, icon: Icons.check)),
         );
+        // ToneTag is a StatusPill now: its soft fill is opaque, so the text
+        // is checked against that fill.
         final ink = t.widget<Text>(find.text('Open')).style!.color!;
-        final base = tone.of(t.element(find.byType(ToneTag)));
-        final tint = base.withValues(alpha: 0.14);
-        for (final ground in [c.background, c.card]) {
-          final on = Color.alphaBlend(tint, ground);
-          expect(
-            _contrast(ink, on),
-            greaterThanOrEqualTo(4.5),
-            reason: '${tone.name} ${e.key} on $ground',
-          );
-        }
+        final box = t.widget<Container>(
+          find.descendant(
+            of: find.byType(ToneTag),
+            matching: find.byType(Container),
+          ),
+        );
+        final fill = (box.decoration! as BoxDecoration).color!;
+        expect(
+          _contrast(ink, fill),
+          greaterThanOrEqualTo(4.5),
+          reason: '${tone.name} ${e.key}',
+        );
       });
     }
 

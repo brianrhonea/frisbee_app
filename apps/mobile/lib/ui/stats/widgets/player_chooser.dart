@@ -36,7 +36,7 @@ class JerseyNumber extends StatelessWidget {
     backgroundColor: AppColors.of(context).accentSoft,
     foregroundColor: AppColors.of(context).accentInk,
     child: Padding(
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(AppSpace.xs),
       child: FittedBox(
         child: Text(
           '$number',
@@ -97,7 +97,7 @@ class _PlayerChooserState extends State<PlayerChooser> {
         ),
         for (final (pos, group) in sortPlayers(widget.players, _sort)) ...[
           Padding(
-            padding: const EdgeInsets.only(top: 12, bottom: 6),
+            padding: const EdgeInsets.only(top: AppSpace.md, bottom: 6),
             child: Text(
               pos == null ? 'All players' : '${pos.label}s',
               style: theme.textTheme.labelMedium?.copyWith(

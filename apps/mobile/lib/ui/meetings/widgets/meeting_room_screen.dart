@@ -161,14 +161,14 @@ class _Lobby extends StatelessWidget {
                           Expanded(
                             flex: 3,
                             child: Padding(
-                              padding: const EdgeInsets.all(24),
+                              padding: const EdgeInsets.all(AppSpace.xl),
                               child: preview,
                             ),
                           ),
                           Expanded(
                             flex: 2,
                             child: SingleChildScrollView(
-                              padding: const EdgeInsets.all(24),
+                              padding: const EdgeInsets.all(AppSpace.xl),
                               child: panel,
                             ),
                           ),
@@ -178,7 +178,7 @@ class _Lobby extends StatelessWidget {
                   );
                 }
                 return ListView(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(AppSpace.lg),
                   children: [preview, const SizedBox(height: 16), panel],
                 );
               },
@@ -204,7 +204,7 @@ class _Preview extends StatelessWidget {
         AspectRatio(
           aspectRatio: 16 / 9,
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.card),
             child: ColoredBox(
               color: AppColors.of(context).feature,
               child: Stack(
@@ -418,7 +418,7 @@ class _LeftView extends StatelessWidget {
       appBar: AppBar(title: const Text('Meeting room')),
       body: Center(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(AppSpace.xl),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [

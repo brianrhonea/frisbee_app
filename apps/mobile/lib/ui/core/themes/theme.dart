@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'button_styles.dart';
+
+export 'button_styles.dart';
+
 /// The app's typeface, for body text and headings alike.
 const appFont = 'Inter';
 
@@ -19,6 +23,137 @@ const controlRadius = 12.0;
 /// Digits all the same width, so counts, scores and timers don't shift
 /// as they change. On by default for all text.
 const tabularFigures = [FontFeature.tabularFigures()];
+
+/// Type scale, shared with the website through
+/// packages/shared/fixtures/design_tokens/tokens.json (`text`). Size and
+/// line height are in logical pixels (`height` is line / size); colour is
+/// left to the caller so the theme's ink colours apply. Digits are tabular,
+/// as everywhere else.
+abstract final class AppText {
+  static const caption = TextStyle(
+    fontFamily: appFont,
+    fontSize: 12,
+    height: 16 / 12,
+    fontWeight: FontWeight.w500,
+    fontFeatures: tabularFigures,
+  );
+  static const secondary = TextStyle(
+    fontFamily: appFont,
+    fontSize: 14,
+    height: 20 / 14,
+    fontWeight: FontWeight.w400,
+    fontFeatures: tabularFigures,
+  );
+  static const label = TextStyle(
+    fontFamily: appFont,
+    fontSize: 14,
+    height: 20 / 14,
+    fontWeight: FontWeight.w600,
+    fontFeatures: tabularFigures,
+  );
+  static const body = TextStyle(
+    fontFamily: appFont,
+    fontSize: 16,
+    height: 24 / 16,
+    fontWeight: FontWeight.w400,
+    fontFeatures: tabularFigures,
+  );
+  static const bodyStrong = TextStyle(
+    fontFamily: appFont,
+    fontSize: 16,
+    height: 24 / 16,
+    fontWeight: FontWeight.w600,
+    fontFeatures: tabularFigures,
+  );
+  static const section = TextStyle(
+    fontFamily: appFont,
+    fontSize: 20,
+    height: 28 / 20,
+    fontWeight: FontWeight.w700,
+    fontFeatures: tabularFigures,
+  );
+  static const heading3 = TextStyle(
+    fontFamily: appFont,
+    fontSize: 24,
+    height: 32 / 24,
+    fontWeight: FontWeight.w700,
+    fontFeatures: tabularFigures,
+  );
+  static const heading2 = TextStyle(
+    fontFamily: appFont,
+    fontSize: 28,
+    height: 36 / 28,
+    fontWeight: FontWeight.w800,
+    fontFeatures: tabularFigures,
+  );
+  static const heading1 = TextStyle(
+    fontFamily: appFont,
+    fontSize: 32,
+    height: 40 / 32,
+    fontWeight: FontWeight.w800,
+    fontFeatures: tabularFigures,
+  );
+  static const scoreSmall = TextStyle(
+    fontFamily: scoreFont,
+    fontSize: 24,
+    height: 28 / 24,
+    fontWeight: FontWeight.w800,
+    fontFeatures: tabularFigures,
+  );
+  static const score = TextStyle(
+    fontFamily: scoreFont,
+    fontSize: 40,
+    height: 44 / 40,
+    fontWeight: FontWeight.w800,
+    fontFeatures: tabularFigures,
+  );
+}
+
+/// Spacing scale (`space` in the shared tokens).
+abstract final class AppSpace {
+  static const xs = 4.0;
+  static const sm = 8.0;
+  static const md = 12.0;
+  static const lg = 16.0;
+  static const xl = 24.0;
+  static const xxl = 32.0;
+  static const xxxl = 48.0;
+
+  /// Left and right edge of a page.
+  static const pageEdge = 16.0;
+
+  /// Padding inside a card.
+  static const card = 16.0;
+
+  /// Padding inside a control.
+  static const control = 12.0;
+}
+
+/// Corner radii (`radius` in the shared tokens). [card] and [control] equal
+/// [cardRadius] and [controlRadius].
+abstract final class AppRadius {
+  static const card = cardRadius;
+  static const control = controlRadius;
+  static const pill = 999.0;
+}
+
+/// Animation durations and curve (`motion` in the shared tokens). When the
+/// platform asks for reduced motion, pass durations through [of] so they
+/// become zero.
+abstract final class AppMotion {
+  static const fast = Duration(milliseconds: 120);
+  static const base = Duration(milliseconds: 200);
+  static const sheet = Duration(milliseconds: 300);
+  static const reduced = Duration.zero;
+
+  /// cubic-bezier(0.2, 0, 0, 1).
+  static const easing = Cubic(0.2, 0, 0, 1);
+
+  /// [d], or [Duration.zero] when the platform's reduce-motion /
+  /// disable-animations setting is on.
+  static Duration of(BuildContext context, Duration d) =>
+      MediaQuery.disableAnimationsOf(context) ? reduced : d;
+}
 
 abstract final class AppTheme {
   static ThemeData get light => _build(Brightness.light, AppColors.light);
@@ -66,16 +201,6 @@ abstract final class AppTheme {
       double spacing = -0.3,
     }) => s?.copyWith(fontWeight: w, letterSpacing: spacing, color: c.ink);
     final text = _withTabularFigures(base.textTheme);
-    final controlShape = RoundedSuperellipseBorder(
-      borderRadius: BorderRadius.circular(controlRadius),
-    );
-    const buttonText = TextStyle(
-      fontFamily: appFont,
-      fontFeatures: tabularFigures,
-      fontWeight: FontWeight.w600,
-      fontSize: 14,
-    );
-    const buttonPadding = EdgeInsets.symmetric(horizontal: 18, vertical: 14);
     return base.copyWith(
       scaffoldBackgroundColor: c.background,
       extensions: [c],
@@ -119,28 +244,18 @@ abstract final class AppTheme {
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          shape: controlShape,
-          textStyle: buttonText,
-          padding: buttonPadding,
+        style: AppButtonStyles.of(
+          c,
+          AppButtonVariant.primary,
+          AppButtonSize.medium,
+          false,
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          shape: controlShape,
-          textStyle: buttonText,
-          padding: buttonPadding,
-          foregroundColor: c.ink,
-          backgroundColor: c.card,
-          side: BorderSide(color: c.border2),
-        ),
+        style: AppButtonStyles.of(c, AppButtonVariant.secondary),
       ),
       textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          shape: controlShape,
-          textStyle: buttonText,
-          foregroundColor: c.ink,
-        ),
+        style: AppButtonStyles.of(c, AppButtonVariant.ghost),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: c.accent,
@@ -212,11 +327,7 @@ abstract final class AppTheme {
         shape: const StadiumBorder(),
         // Filter chips: outlined, and filled navy (light) or ink (dark)
         // when selected, so their label switches to its contrasting ink.
-        labelStyle: TextStyle(
-          fontFamily: appFont,
-          fontFeatures: tabularFigures,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
+        labelStyle: AppText.label.copyWith(
           color: WidgetStateColor.resolveWith(
             (s) => s.contains(WidgetState.selected) ? c.onChipOn : c.ink,
           ),

@@ -7,6 +7,7 @@ import '../../../utils/result.dart';
 import '../../core/ui/error_message.dart';
 import '../view_models/create_team_viewmodel.dart';
 import 'team_form.dart';
+import '../../core/themes/theme.dart';
 
 class CreateTeamScreen extends StatefulWidget {
   const CreateTeamScreen({
@@ -60,7 +61,7 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
         }),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(AppSpace.xl),
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520),

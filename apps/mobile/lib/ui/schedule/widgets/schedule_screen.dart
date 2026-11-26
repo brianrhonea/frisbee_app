@@ -139,7 +139,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           ),
           // In the header rather than floating, so it never covers events.
           Padding(
-            padding: const EdgeInsets.only(left: 4, right: 12),
+            padding: const EdgeInsets.only(left: AppSpace.xs, right: 12),
             child: FilledButton.icon(
               style: FilledButton.styleFrom(
                 minimumSize: const Size(0, 40),
@@ -392,7 +392,9 @@ class _MonthHeader extends StatelessWidget {
                             color: picked
                                 ? c.accentSoft.withValues(alpha: 0.45)
                                 : Colors.transparent,
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(
+                              AppRadius.control,
+                            ),
                           ),
                           child: Row(
                             children: [

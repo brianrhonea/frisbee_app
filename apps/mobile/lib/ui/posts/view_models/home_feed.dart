@@ -34,38 +34,54 @@ class HomeFeed extends ChangeNotifier {
     required UserPostRepository userPostRepository,
     this.teamsOnly = false,
   }) : _teamPosts = teamPostRepository,
-       _userPosts = userPostRepository {
+       _userPosts = userPostRepository,
+       _followRepo = followRepository,
+       _teamRepo = teamRepository {
     if (uid.isEmpty) {
       _followsLoaded = _teamsLoaded = true;
       return;
     }
+    _listen();
+  }
+
+  /// Follows the user's follows and teams (follows only when not
+  /// [teamsOnly]). A stream that fails sets the matching error flag instead
+  /// of passing for "nothing there"; [refresh] listens again.
+  void _listen() {
+    _followsSub?.cancel();
+    _teamsSub?.cancel();
+    _followsError = _teamsError = false;
     if (teamsOnly) {
       _followsLoaded = true;
     } else {
-      _followsSub = followRepository
+      _followsSub = _followRepo
           .watchFollows(uid)
           .listen(
             (f) {
               _follows = f;
               _followsLoaded = true;
+              _followsError = false;
               _sync();
             },
             onError: (Object _) {
               _followsLoaded = true;
+              _followsError = true;
               _sync();
             },
           );
     }
-    _teamsSub = teamRepository
+    _teamsSub = _teamRepo
         .watchMyTeams(uid)
         .listen(
           (t) {
             _teams = t;
             _teamsLoaded = true;
+            _teamsError = false;
             _sync();
           },
           onError: (Object _) {
             _teamsLoaded = true;
+            _teamsError = true;
             _sync();
           },
         );
@@ -83,6 +99,8 @@ class HomeFeed extends ChangeNotifier {
 
   /// Only the user's teams' posts.
   final bool teamsOnly;
+  final FollowRepository _followRepo;
+  final TeamRepository _teamRepo;
   final TeamPostRepository _teamPosts;
   final UserPostRepository _userPosts;
 
@@ -92,6 +110,8 @@ class HomeFeed extends ChangeNotifier {
   List<Team> _teams = const [];
   bool _followsLoaded = false;
   bool _teamsLoaded = false;
+  bool _followsError = false;
+  bool _teamsError = false;
   bool _loadingMore = false;
   bool _disposed = false;
 
@@ -99,6 +119,12 @@ class HomeFeed extends ChangeNotifier {
   final _sources = <String, _FeedSource>{};
 
   bool get loaded => _followsLoaded && _teamsLoaded;
+
+  /// Something failed to load: the follows or teams, a source's newest posts
+  /// or an older page. The feed then can't say "you're all caught up" or
+  /// "no posts": it shows what it has and offers to try again ([refresh]).
+  bool get error =>
+      _followsError || _teamsError || _sources.values.any((s) => s.failed);
 
   /// What the user follows, newest first.
   List<Follow> get follows => _follows;
@@ -144,6 +170,9 @@ class HomeFeed extends ChangeNotifier {
       s.dispose();
     }
     _sources.clear();
+    if (uid.isNotEmpty && (_followsError || _teamsError)) {
+      _listen();
+    }
     _sync();
   }
 
@@ -382,6 +411,7 @@ class _FeedSource {
       onError: (Object _) {
         _live = const [];
         _liveLoaded = true;
+        failed = true;
         onChange();
       },
     );
@@ -395,6 +425,9 @@ class _FeedSource {
   bool _liveLoaded = false;
   final _older = <String, FeedItem>{};
   bool _fetchedAll = false;
+
+  /// The live query or an older page failed (cleared when one succeeds).
+  bool failed = false;
 
   List<FeedItem> get items => [..._older.values, ..._live];
 
@@ -439,6 +472,7 @@ class _FeedSource {
     }
     _live = next;
     _liveLoaded = true;
+    failed = false;
     onChange();
   }
 
@@ -450,7 +484,9 @@ class _FeedSource {
       return;
     }
     final page = await fetch(before, limit);
-    // A failed fetch stops paging this source rather than retrying.
+    // A failed fetch stops paging this source rather than retrying, and
+    // leaves the feed marked as failed so it isn't called "caught up".
+    if (page == null) failed = true;
     if (page == null || page.length < limit) _fetchedAll = true;
     for (final i in page ?? const <FeedItem>[]) {
       _older[i.id] = i;

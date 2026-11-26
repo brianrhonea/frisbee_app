@@ -71,7 +71,7 @@ class _CalendarsScreenState extends State<CalendarsScreen> {
           title: 'Calendars',
           children: [
             Padding(
-              padding: EdgeInsets.all(24),
+              padding: EdgeInsets.all(AppSpace.xl),
               child: Text(
                 "Shared calendars aren't available in this version of "
                 'the app. Update the app, or use stall10.app.',
@@ -87,7 +87,7 @@ class _CalendarsScreenState extends State<CalendarsScreen> {
           if (calendars == null)
             vm.load.error
                 ? Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(AppSpace.xl),
                     child: Column(
                       children: [
                         const Text("Couldn't load your calendars."),
@@ -99,7 +99,7 @@ class _CalendarsScreenState extends State<CalendarsScreen> {
                     ),
                   )
                 : const Padding(
-                    padding: EdgeInsets.all(32),
+                    padding: EdgeInsets.all(AppSpace.xxl),
                     child: Center(child: CircularProgressIndicator()),
                   )
           else ...[
@@ -241,7 +241,7 @@ class _InviteCard extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: c.highlightSoft,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.card),
       ),
       // Side by side on wide screens, buttons underneath on phones.
       child: LayoutBuilder(
@@ -651,7 +651,7 @@ class _CalendarDetailScreenState extends State<CalendarDetailScreen> {
           title: 'Calendar',
           children: [
             Padding(
-              padding: EdgeInsets.all(24),
+              padding: EdgeInsets.all(AppSpace.xl),
               child: Text('This calendar was deleted.'),
             ),
           ],
@@ -711,7 +711,7 @@ class _CalendarDetailScreenState extends State<CalendarDetailScreen> {
             children: [
               if (others.isEmpty && cal.pending.isEmpty)
                 Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(AppSpace.lg),
                   child: Text(
                     'Only you. Invite people below.',
                     style: TextStyle(color: c.muted),
@@ -823,7 +823,7 @@ class _CalendarDetailScreenState extends State<CalendarDetailScreen> {
             )
           else
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppSpace.lg),
               child: Text(
                 'A calendar can have up to ${CalendarsViewModel.maxPeople} '
                 'people.',
@@ -832,7 +832,7 @@ class _CalendarDetailScreenState extends State<CalendarDetailScreen> {
             ),
           if (!cal.isDefault)
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppSpace.lg),
               child: OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Theme.of(context).colorScheme.error,

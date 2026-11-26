@@ -82,7 +82,7 @@ class _PinList extends StatelessWidget {
             ),
             if (pins.isEmpty)
               const Padding(
-                padding: EdgeInsets.all(24),
+                padding: EdgeInsets.all(AppSpace.xl),
                 child: Text('Nothing is pinned.', textAlign: TextAlign.center),
               )
             else
@@ -100,10 +100,10 @@ class _PinList extends StatelessWidget {
                       color: c.card,
                       shape: RoundedRectangleBorder(
                         side: BorderSide(color: c.border),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppRadius.control),
                       ),
                       child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppRadius.control),
                         onTap: onTap == null ? null : () => onTap!(m),
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
@@ -193,12 +193,12 @@ class _EventCardBody extends StatelessWidget {
     final decoration = BoxDecoration(
       color: c.card,
       border: Border.all(color: c.border),
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppRadius.card),
     );
     if (e == null) {
       return Container(
         margin: const EdgeInsets.only(top: 4),
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(AppSpace.md),
         decoration: decoration,
         child: Row(
           children: [
@@ -223,10 +223,10 @@ class _EventCardBody extends StatelessWidget {
       child: Material(
         type: MaterialType.transparency,
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadius.card),
           onTap: () => context.push(Routes.event(vm.teamId, e.id)),
           child: Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(AppSpace.md),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -337,7 +337,9 @@ class _RsvpButton extends StatelessWidget {
         EdgeInsets.symmetric(horizontal: 12),
       ),
       shape: WidgetStatePropertyAll(
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.control),
+        ),
       ),
       textStyle: const WidgetStatePropertyAll(
         TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
@@ -431,14 +433,14 @@ class _EventPicker extends StatelessWidget {
             ),
             if (!vm.loaded)
               const Padding(
-                padding: EdgeInsets.all(24),
+                padding: EdgeInsets.all(AppSpace.xl),
                 child: Center(child: CircularProgressIndicator()),
               )
             else if (vm.error != null)
               ErrorView(error: vm.error)
             else if (events.isEmpty)
               Padding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(AppSpace.xl),
                 child: Text(
                   vm.team.isOrganization
                       ? 'No upcoming events for everyone.'

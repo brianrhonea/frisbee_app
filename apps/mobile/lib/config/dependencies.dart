@@ -85,10 +85,14 @@ import '../firebase_options.dart';
 import '../data/repositories/moderation/moderation_repository.dart';
 import '../data/repositories/moderation/moderation_repository_api.dart';
 import '../data/repositories/tournament_chat/tournament_chat_repository.dart';
+import '../data/repositories/meta_flags/meta_flags_repository.dart';
+import '../data/repositories/meta_flags/meta_flags_repository_firebase.dart';
 
 /// Services and repositories backed by Firebase.
 List<SingleChildWidget> get firebaseProviders => [
   ChangeNotifierProvider(create: (_) => FeatureFlags()..start()),
+  // meta/flags before sign-in: the minimum-build gate.
+  Provider<MetaFlagsRepository>(create: (_) => MetaFlagsRepositoryFirebase()),
   // The Stall 10 API (apps/api); null when the build has no API_BASE_URL.
   Provider<ApiClient?>(create: (_) => ApiClient.fromEnvironment()),
   Provider(

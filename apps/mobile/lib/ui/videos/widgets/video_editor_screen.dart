@@ -13,6 +13,7 @@ import '../../core/ui/status_views.dart';
 import '../view_models/video_editor_viewmodel.dart';
 import 'youtube_player_view.dart';
 import '../../core/ui/app_segmented_button.dart';
+import '../../core/ui/video_uploads.dart';
 
 /// Adds a YouTube video to the team, or edits one: paste the link, and the
 /// title fills in from YouTube.
@@ -268,11 +269,14 @@ class _VideoFormState extends State<_VideoForm> {
     listenable: Listenable.merge([vm, vm.save]),
     builder: (context, _) {
       final editingFile = !vm.isNew && !vm.initial.isYouTube;
+      final videoOpen = videoUploadsOpen(context);
       final c = AppColors.of(context);
       final fields = ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpace.lg),
         children: [
-          if (vm.isNew) ...[
+          // A new video is a YouTube link, or an uploaded file while video
+          // upload is open (#13); with it closed there is only the link.
+          if (vm.isNew && videoOpen) ...[
             AppSegmentedButton<VideoSource>(
               segments: const [
                 ButtonSegment(
@@ -301,7 +305,7 @@ class _VideoFormState extends State<_VideoForm> {
               title: Text(vm.initial.file!.name),
               subtitle: Text(TeamVideo.formatBytes(vm.initial.file!.size)),
             )
-          else if (vm.source == VideoSource.upload)
+          else if (vm.source == VideoSource.upload && videoOpen)
             ..._uploadFields(context)
           else
             ..._youTubeFields(),

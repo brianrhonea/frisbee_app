@@ -255,6 +255,10 @@ class HomeViewModel extends ChangeNotifier {
   List<FeedItem> get posts => removals.visible(feed.items);
   bool get hasMorePosts => feed.hasMore;
   bool get loadingMorePosts => feed.loadingMore;
+
+  /// The For you feed (or the follows and teams behind it) failed to load,
+  /// so "caught up" and "no posts" would be untrue.
+  bool get postsError => feed.error;
   void loadMorePosts() => feed.loadMore();
 
   /// Back to the newest posts (Home tapped again, or pulled down), in the
@@ -330,6 +334,9 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   bool get teamPostsLoaded => _teamFeed?.loaded ?? false;
+
+  /// The Your teams feed failed to load (see [postsError]).
+  bool get teamPostsError => _teamFeed?.error ?? false;
 
   /// The tab's posts, less any being deleted.
   List<FeedItem> get teamPosts =>

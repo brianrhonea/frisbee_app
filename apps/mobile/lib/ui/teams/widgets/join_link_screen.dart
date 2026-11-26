@@ -74,7 +74,7 @@ class _JoinLinkScreenState extends State<JoinLinkScreen> {
         final name = vm.teamName;
         return Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(AppSpace.xl),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
               child: Column(

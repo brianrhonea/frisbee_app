@@ -117,7 +117,7 @@ class _InlineComposerState extends State<InlineComposer> {
         Scrollable.ensureVisible(
           ctx,
           alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
-          duration: const Duration(milliseconds: 200),
+          duration: AppMotion.base,
         );
       }
     });

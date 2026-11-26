@@ -550,7 +550,7 @@ class _LiveDraftScreenState extends State<LiveDraftScreen> {
           ),
           if (draft.mixed && details != null)
             Padding(
-              padding: const EdgeInsets.only(top: 4, bottom: 2),
+              padding: const EdgeInsets.only(top: AppSpace.xs, bottom: 2),
               child: GenderSplitBar(
                 mmp: mmp,
                 wmp: wmp,

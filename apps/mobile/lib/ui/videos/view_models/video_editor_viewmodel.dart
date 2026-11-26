@@ -10,6 +10,7 @@ import '../../../domain/models/team_video.dart';
 import '../../../domain/models/video_folder.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
+import '../../../domain/models/meta_flags.dart';
 
 /// Whether a pasted link points at a video the team can watch here.
 enum LinkCheck {
@@ -142,6 +143,7 @@ class VideoEditorViewModel extends ChangeNotifier {
   /// Picks a video file and checks its type and the per-file and per-team
   /// limits.
   Future<void> pickFile() async {
+    if (!_picker.videoUploads) return;
     final file = await _picker.pickVideo(VideoFile.types.keys.toList());
     if (file == null || _disposed) return;
     _file = file;
@@ -225,6 +227,10 @@ class VideoEditorViewModel extends ChangeNotifier {
       return Result.error(Exception('Only admins can post videos.'));
     }
     final uploading = isNew && _source == VideoSource.upload;
+    // Closed video upload (meta/flags, #13): the server refuses it too.
+    if (uploading && !_picker.videoUploads) {
+      return const Result.error(videoUploadsClosed);
+    }
     final keepsFile = _original?.isYouTube == false;
     if (!uploading &&
         !keepsFile &&

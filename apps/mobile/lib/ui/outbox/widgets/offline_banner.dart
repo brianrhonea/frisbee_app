@@ -146,7 +146,7 @@ class OutboxSheet extends StatelessWidget {
             ),
             if (jobs.isEmpty)
               const Padding(
-                padding: EdgeInsets.all(16),
+                padding: EdgeInsets.all(AppSpace.lg),
                 child: Text('Everything has been sent.'),
               ),
             Flexible(

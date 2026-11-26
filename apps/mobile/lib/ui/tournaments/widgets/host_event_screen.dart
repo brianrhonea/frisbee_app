@@ -31,7 +31,7 @@ class HostEventScreen extends StatelessWidget {
           final sections = viewModel.sections;
           return ConstrainedContent(
             child: ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppSpace.lg),
               children: [
                 const SectionHeader('What are you hosting?'),
                 _TypePicker(

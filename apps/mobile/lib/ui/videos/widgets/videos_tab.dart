@@ -656,7 +656,7 @@ class _PlayBadge extends StatelessWidget {
   Widget build(BuildContext context) => const DecoratedBox(
     decoration: BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
     child: Padding(
-      padding: EdgeInsets.all(4),
+      padding: EdgeInsets.all(AppSpace.xs),
       child: Icon(Icons.play_arrow, color: Colors.white, size: 24),
     ),
   );

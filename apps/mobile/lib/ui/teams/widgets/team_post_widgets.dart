@@ -313,7 +313,7 @@ class PostToTeamBox extends StatelessWidget {
     final c = AppColors.of(context);
     return Card(
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.card),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
@@ -327,7 +327,7 @@ class PostToTeamBox extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: c.field,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.control),
                   ),
                   child: Text(
                     '$label…',

@@ -94,13 +94,13 @@ class _DiscordImportScreenState extends State<DiscordImportScreen> {
             : ConstrainedContent(
                 maxWidth: 720,
                 child: ListView(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(AppSpace.lg),
                   children: [
                     if (busy) const LinearProgressIndicator(),
                     // Step one in a card: the server's template link.
                     SectionCard(
                       title: 'Connect your server',
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(AppSpace.lg),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -223,7 +223,7 @@ class _ChannelPicker extends StatelessWidget {
     final busy = vm.preview.running || vm.apply.running;
     return SectionCard(
       title: 'Pick channels',
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpace.lg),
       action: total == 0
           ? null
           : Row(
@@ -320,7 +320,7 @@ class _Preview extends StatelessWidget {
     final c = AppColors.of(context);
     final folderNames = {for (final f in import.folders) f.id: f.name};
     Widget heading(String text) => Padding(
-      padding: const EdgeInsets.only(top: 16, bottom: 4),
+      padding: const EdgeInsets.only(top: AppSpace.lg, bottom: 4),
       child: Text(
         text,
         style: TextStyle(
@@ -468,7 +468,7 @@ class _TeamSorting extends StatelessWidget {
           Card(
             margin: const EdgeInsets.only(top: 12),
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(AppSpace.md),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

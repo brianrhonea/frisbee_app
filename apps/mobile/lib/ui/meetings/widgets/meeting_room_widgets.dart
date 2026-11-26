@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../data/services/meeting_call.dart';
 import '../../core/ui/layout.dart' show PersonAvatar;
 import '../view_models/meeting_room_viewmodel.dart';
+import '../../core/themes/theme.dart';
 
 /// A person's photo or initials at [size].
 class MeetingAvatar extends StatelessWidget {
@@ -136,7 +137,7 @@ class JoinRequestList extends StatelessWidget {
       final requests = viewModel.pendingRequests;
       if (requests.isEmpty) {
         return const Padding(
-          padding: EdgeInsets.all(24),
+          padding: EdgeInsets.all(AppSpace.xl),
           child: Text('Nobody is waiting.', textAlign: TextAlign.center),
         );
       }

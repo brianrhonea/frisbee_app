@@ -7,6 +7,7 @@ import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
 import 'package:frisbee_app/data/repositories/chat/chat_repository.dart';
 import 'package:frisbee_app/data/repositories/direct_message/direct_message_repository.dart';
 import 'package:frisbee_app/data/repositories/team/team_repository.dart';
+import 'package:frisbee_app/data/services/feature_flags.dart';
 import 'package:frisbee_app/data/services/file_picker_service.dart';
 import 'package:provider/provider.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
@@ -103,6 +104,10 @@ void main() {
       Provider<ChatRepository>.value(value: chats),
       ChangeNotifierProvider<AuthRepository>.value(value: auth),
       Provider<FilePickerService>.value(value: FakeFilePickerService()),
+      // Video upload is open here; the #13 tests below close it.
+      ChangeNotifierProvider<FeatureFlags>.value(
+        value: FeatureFlags.fixed(const {'videoUploads': true}),
+      ),
     ],
     child: child,
   );
@@ -391,6 +396,114 @@ void main() {
         ),
         findsOneWidget,
       );
+    });
+
+    group('video uploads flag (#13)', () {
+      test('closed: recording is refused, nothing is attached', () async {
+        final picker = FakeFilePickerService()
+          ..videoUploads = false
+          ..canUseCamera = true
+          ..nextRecording = FakeFilePickerService.file('clip.mp4', 5000);
+        final vm = await chat(picker);
+        await vm.recordVideo.execute();
+        expect(vm.recordVideo.error, isTrue);
+        expect(
+          vm.recordVideo.result.toString(),
+          contains("Video uploads aren't available right now."),
+        );
+        expect(vm.drafts, isEmpty);
+      });
+
+      test(
+        'closed: a picked video file is refused, photos still attach',
+        () async {
+          final picker = FakeFilePickerService()
+            ..videoUploads = false
+            ..next = [FakeFilePickerService.file('film.mov', 5000)];
+          final vm = await chat(picker);
+          await vm.pickFiles.execute(false);
+          expect(vm.pickFiles.error, isTrue);
+          expect(vm.drafts, isEmpty);
+
+          picker.next = [
+            FakeFilePickerService.file('huck.jpg', 5000),
+            FakeFilePickerService.file('notes.pdf', 5000),
+          ];
+          await vm.pickFiles.execute(false);
+          expect(vm.pickFiles.error, isFalse);
+          expect(vm.drafts, hasLength(2));
+        },
+      );
+
+      test(
+        'a video among photos refuses the whole pick (nothing half-added)',
+        () async {
+          final picker = FakeFilePickerService()
+            ..videoUploads = false
+            ..next = [
+              FakeFilePickerService.file('huck.jpg', 5000),
+              FakeFilePickerService.file('film.mp4', 5000),
+            ];
+          final vm = await chat(picker);
+          await vm.pickFiles.execute(false);
+          expect(vm.pickFiles.error, isTrue);
+          expect(vm.drafts, isEmpty);
+        },
+      );
+
+      test('open: recording and video files work as before', () async {
+        final picker = FakeFilePickerService()
+          ..videoUploads = true
+          ..canUseCamera = true
+          ..nextRecording = FakeFilePickerService.file('clip.mp4', 5000)
+          ..next = [FakeFilePickerService.file('film.mov', 5000)];
+        final vm = await chat(picker);
+        await vm.recordVideo.execute();
+        await vm.pickFiles.execute(false);
+        expect(vm.drafts, hasLength(2));
+        expect(vm.drafts.every((d) => d.isVideo), isTrue);
+      });
+
+      Future<void> openMenu(WidgetTester tester, {required bool flag}) async {
+        final picker = FakeFilePickerService()..canUseCamera = true;
+        final vm = await chat(picker, settle: false);
+        await tester.pumpWidget(
+          withRepos(
+            MaterialApp(
+              theme: AppTheme.light,
+              home: Scaffold(
+                body: ChangeNotifierProvider<FeatureFlags>.value(
+                  value: FeatureFlags.fixed({'videoUploads': flag}),
+                  child: MessageThreadView(
+                    viewModel: vm,
+                    videoPlayer: (url) => Text('playing $url'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.tap(find.byTooltip('Upload a photo, video or file'));
+        await tester.pumpAndSettle();
+      }
+
+      testWidgets('the attach menu hides Record video while closed', (
+        tester,
+      ) async {
+        await openMenu(tester, flag: false);
+        expect(find.text('Record video'), findsNothing);
+        expect(find.text('Take photo'), findsOneWidget);
+        expect(find.text('Photo'), findsOneWidget);
+        expect(find.text('File'), findsOneWidget);
+      });
+
+      testWidgets('the attach menu shows Record video while open', (
+        tester,
+      ) async {
+        await openMenu(tester, flag: true);
+        expect(find.text('Record video'), findsOneWidget);
+      });
     });
   });
 

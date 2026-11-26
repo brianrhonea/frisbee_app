@@ -13,6 +13,7 @@ import '../view_models/send_post_viewmodel.dart';
 import '../../core/ui/app_search_field.dart';
 import '../../core/ui/skeleton.dart';
 import '../../core/ui/tap_outside_unfocus.dart';
+import '../../core/themes/theme.dart';
 
 /// Sends [post] to people as a direct message, one tap each, or shares its
 /// link to another app. Nothing is focused when it opens or after it
@@ -190,7 +191,7 @@ class _PeopleList extends StatelessWidget {
     final list = people;
     final muted = Theme.of(context).colorScheme.onSurfaceVariant;
     Widget note(String text) => Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(AppSpace.xl),
       child: Text(
         text,
         textAlign: TextAlign.center,
