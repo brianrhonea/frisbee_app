@@ -426,6 +426,22 @@ Until the API has `STRIPE_SECRET_KEY`, a webhook secret and a return
 address (`PAYMENTS_RETURN_URL`, else `WEB_SITE_URL`), the payment routes
 say payments aren't set up and the app and website hide them.
 
+**Payments on or off per environment.** Cloud Run secret references can't
+be optional, so `deploy/service.yaml` does not list the Stripe secrets; the
+deploy workflow adds `deploy/stripe-secrets.yaml` (the three secret
+references) only when the repository variable `API_PAYMENTS_DEV` /
+`API_PAYMENTS_PROD` is `on`. Default: `on` for dev, `off` for prod. Off, the
+service starts with payments off and needs no Stripe secrets. To turn
+production payments on, create the three secrets (below) and set
+`API_PAYMENTS_PROD=on`, then deploy.
+
+**Startup checks** (`src/startup_env.ts`). When deployed (`NODE_ENV=production`,
+which the image sets, or Cloud Run's `K_SERVICE`), the API refuses to start
+unless `FIREBASE_PROJECT_ID` is set; it no longer falls back to the dev
+project. A live Stripe key (`sk_live_`/`rk_live_`) is only accepted with the
+production project, a test key (`sk_test_`/`rk_test_`) only with another.
+Local runs (neither variable set) keep defaulting to the dev project.
+
 1. In the Stripe Dashboard (test mode for dev): Connect → get started as
    a platform, with the **Recipient** configuration (Stall 10 collects
    and pays out). Hosts' accounts are made by the API with Accounts v2

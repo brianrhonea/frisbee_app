@@ -67,24 +67,13 @@ spec:
             # moment they change. Empty: they refresh within a minute.
             - name: WEB_SITE_URL
               value: "${WEB_SITE_URL}"
-            # Payments (DEPLOY.md, Payments): Stripe's key and the two webhook
-            # signing secrets (Stall 10's own account, and hosts' accounts).
-            # Each secret must exist in the project, or the revision fails.
-            - name: STRIPE_SECRET_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: STRIPE_SECRET_KEY
-                  key: latest
-            - name: STRIPE_PLATFORM_WEBHOOK_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: STRIPE_PLATFORM_WEBHOOK_SECRET
-                  key: latest
-            - name: STRIPE_WEBHOOK_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: STRIPE_WEBHOOK_SECRET
-                  key: latest
+            # Payments (DEPLOY.md, Payments): Stripe's secrets are NOT listed
+            # here. Cloud Run secret references can't be optional (a missing
+            # secret fails the revision), so the deploy workflow replaces the
+            # next line with stripe-secrets.yaml only when payments are on
+            # for that environment (repository variable API_PAYMENTS_<ENV>).
+            # Without them the API starts with payments off.
+            # @stripe-secrets@
             # Days a finished event's fees wait before going to hosts (0 to 30).
             - name: PAYOUT_HOLD_DAYS
               value: "${PAYOUT_HOLD_DAYS}"
