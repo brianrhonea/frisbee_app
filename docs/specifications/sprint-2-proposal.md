@@ -105,6 +105,47 @@
 - **D18:** short-lived playback URLs move to Sprint 3.
 - **D19:** the few-second window before `photoCheck` runs is accepted; no pending marker.
 
+## Resumed and integrated (2026-11-26, owner away)
+
+The owner asked for the work to be finished with the orchestrator's recommended defaults, and for UI to review by end of day. All local merges into `feature/jan-4-release` were made by the orchestrator. Nothing was pushed or deployed.
+
+**Release branch now at `b471e30`:** API 0.52.1, web 0.61.0, app 0.0.58.
+- **Web C1–C4** (`959d6e3`, review fixes `9484518`): StatusPill, Button, SegmentedTabs and FilterChips, Avatar/TeamLogo/AvatarStack, and a `/dev/ui` gallery that returns 404 in production. #6 on the web needs no change, because the contract has no web build gate.
+- **App lane B** (`0bd9569`, review fixes `d5d5e71`):
+  - K6/K7 finished, so K8 runs with 0 skips;
+  - C1–C4;
+  - #24: home feed errors;
+  - #6: minimum-build gate and "Update required" screen;
+  - #13: video upload behind the flag in the app.
+- **#3a** (`f5e6085`): 3a-C app and web, 3a-S fixes, and the re-check fixes for N1–N4, N6 and N7. Then `b471e30`: app callables follow the `account_incomplete` contract (QA Medium).
+- **Reviews:**
+  - Security re-check of #3a: OK to merge. Its new Medium findings N1–N3 are fixed.
+  - UI reviews of web and app C1–C4: one app blocker (clipped team header buttons) and the should-fix items are fixed.
+  - Independent QA on the integrated branch: pass.
+- **Tests at `b471e30`:**
+  - from earlier runs on this branch: shared 929, API 1587, web unit 385, rules 626, functions 361 + 30 server, API emulator 56 (+1 expected fail), Playwright 64 passed (48 env-gated skips), `next build` OK;
+  - at `b471e30` itself: Flutter 1819 passed and 68 skipped (screenshot generators), `flutter analyze` clean, version check OK.
+- **Rollout runbook:** `3a-rollout-runbook.md`.
+
+**Waiting for the owner:**
+- Visual OK on K2–K8 and C1–C4. The before/after gallery is at https://claude.ai/artifact/MmDZmm4GTs21mUjCypBQya.
+- Confirm the `ageRefusals/{uid}` collection (a new data shape for F3).
+- Retention policy for disabled under-13 accounts. Decide whether `ageRefusals` belongs in the data export, and whether to clean up legacy 13–17 profiles.
+- **#7 app Crashlytics:** not started. It needs native setup (dSYM upload, plist) that only the owner can do.
+- **3a-R:** every deploy step in the runbook. Device checks.
+- **Product calls:**
+  - whether legacy `.btn-danger` (ink) becomes red;
+  - whether live meetings use the live (red) or accent tone;
+  - whether Google photos on lh4–lh6 should be trusted as well as lh3;
+  - the iOS App Store or TestFlight link for the "Update required" button (`--dart-define=IOS_UPDATE_URL`).
+
+**Follow-ups (not done, not in scope):**
+- move app screens onto `AppText`, and the ~15 raw Material chip and segment uses onto the components;
+- other raw `profiles.photoUrl` reads in the API (calendar, membership, roster, browse);
+- N5: the lh3 path restriction;
+- `checkRevoked` on writes;
+- multi-select chips in the app.
+
 ## Paused (owner, 2026-11-26)
 
 - **Release branch:** at `a8eb380`, with lanes A and C, #13 web and the `/v1/client-errors` endpoint merged. **The #3a branch** `hold/3a-account-gate` is at `502176d`, with 3a-C web and app and #13 web merged.
