@@ -15,6 +15,7 @@ import {
   shouldPush,
   wants,
 } from "./model";
+import { ownedByOthers } from "../devices/owners";
 import { filterText } from "../moderation/word_filter";
 
 // FIDs FCM no longer knows; their device docs are deleted.
@@ -104,7 +105,17 @@ async function deliverTo(db: Firestore, messaging: Messaging, uid: string, notic
   const { text, push } = written;
   if (!push) return;
 
-  const devices = await user.collection("devices").get();
+  const all = await user.collection("devices").get();
+  // A phone that signed in as someone else since: the old account's copy
+  // of its device doc is stale (fidOwners, kept by functions/src/devices).
+  // One batched read; a FID with no mapping yet is sent to as before.
+  const others = await ownedByOthers(db, uid, all.docs.map((d) => d.id));
+  const devices = { docs: all.docs.filter((d) => !others.has(d.id)), empty: false };
+  devices.empty = devices.docs.length === 0;
+  if (others.size > 0) {
+    logger.warn("Skipped devices owned by another account", { uid, count: others.size });
+    await Promise.all(all.docs.filter((d) => others.has(d.id)).map((d) => d.ref.delete()));
+  }
   if (devices.empty) {
     // Feed only: they've never turned push on, or their phone couldn't
     // register (Notification settings on the phone says why).

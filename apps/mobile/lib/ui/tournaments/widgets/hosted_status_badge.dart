@@ -5,16 +5,17 @@ import '../../core/themes/theme.dart';
 import '../../core/ui/scoreboard.dart';
 import '../../core/ui/tone.dart';
 
-/// Each status's color, so a list reads at a glance. Amber is kept for
-/// what's the user's to do, so no status is amber.
+/// Each status's dot color (website parity: registration green, live red,
+/// the rest grey). Amber is kept for what's the user's to do, so no status
+/// is amber.
 extension HostedStatusTone on HostedStatus {
   Tone get tone => switch (this) {
     HostedStatus.draft => Tone.grey,
     HostedStatus.registration => Tone.green,
-    HostedStatus.seeding => Tone.teal,
-    HostedStatus.scheduled => Tone.blue,
+    HostedStatus.seeding => Tone.grey,
+    HostedStatus.scheduled => Tone.grey,
     HostedStatus.live => Tone.red,
-    HostedStatus.finished => Tone.purple,
+    HostedStatus.finished => Tone.grey,
   };
 
   IconData get icon => switch (this) {

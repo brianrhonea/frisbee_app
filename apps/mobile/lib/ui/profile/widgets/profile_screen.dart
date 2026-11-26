@@ -1281,13 +1281,10 @@ class _TeamsCard extends StatelessWidget {
   }
 }
 
-/// Each kind of team's color and names on a profile's Teams card.
+/// Each kind of team's tone and names on a profile's Teams card.
 extension on TeamKind {
-  Tone get tone => switch (this) {
-    TeamKind.team => Tone.blue,
-    TeamKind.community => Tone.teal,
-    TeamKind.organization => Tone.purple,
-  };
+  /// Neutral for every kind: the label says which, not a hue.
+  Tone get tone => Tone.grey;
 
   String get shortLabel => switch (this) {
     TeamKind.team => 'Team',

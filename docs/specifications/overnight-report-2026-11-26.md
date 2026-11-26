@@ -230,3 +230,82 @@ The owner approved the defaults for D1–D13.
 - **Still open:**
   - D1 and D2. Their default was "waiting", so they still need real answers.
   - D9 and D11. Their default was "not changed / not built", so the recommendation (neutral statuses; the `fidOwners` collection and function) still needs an explicit yes.
+- **Later the same morning:** D1 yes (Q5 and Q6), D2 about 20 hours a week, D9 yes (neutral), D11 yes (build the function, but don't deploy it).
+
+  Started:
+  - #3a: the server-side age, Terms and verified-email check, enforced by the API and the rules;
+  - the `deviceOwnership` function and `fidOwners` collection;
+  - neutral status tags in the app.
+
+  The #3a contract will be written to `docs/specifications/contracts/account-gate.md`. It covers the claim name and the error code, and needs owner approval before the clients use it in Sprint 2.
+
+## 14. Merged after your morning answers
+
+- `623125e` **D9:** the app's status and team-kind tags are grey; red is for live and green for registration open.
+  - Selected filter chips are indigo, and the status shows as a dot.
+  - App 1,627 passed / 72 skipped / 0 failed. The count fell because the contrast checks for the 3 removed colours went with them.
+- `f771e6b` **D11:** `fidOwners/{fid}` map, the `deviceOwnership` trigger, a check in push delivery, and a dev-only backfill script. **Not deployed.**
+  - Functions 318 passed, server tests 26 passed, rules 381 passed.
+  - `cceffc3` adds `deviceOwnership` to the default deploy groups. If you set the `FUNCTION_GROUPS` variable, add it there too.
+
+**D11 rollout order (owner's session, dev first; each step needs your go-ahead):**
+1. `firebase deploy --only functions:deviceOwnership --project frisbee-app-brianrhonea-dev`
+2. Dry-run the backfill: `cd firebase/functions && npx tsx scripts/backfill-fid-owners.ts --project frisbee-app-brianrhonea-dev`. Then run it again with `--apply`.
+3. Deploy the `notifications` group, which carries the delivery check.
+4. Phone check: sign out of account A while offline, sign in as B, message A, and confirm B's phone gets nothing.
+
+**2026-11-26:** the owner approved step 1, and `deviceOwnership-fidOwner` was deployed to dev from `35e9a94`: v2, a Firestore write trigger, us-central1, Node 22. Steps 2–4 are not done.
+**2026-11-26:** the owner approved step 2. The backfill ran on dev: the dry run found 2 devices, 2 FIDs and 0 stale copies. `--apply` wrote 2 mappings and deleted 0 device docs. A second dry run afterwards found nothing stale. Steps 3–4 (`notifications` deploy and the phone test) are not done.
+**2026-11-26:** the owner approved step 3. The `notifications` group was deployed to dev from `60083b8`, and all 28 functions show ACTIVE with today's update time. Step 4 (the phone test) is still to do.
+
+## 15. #3a server account check: built and held, not merged
+
+The check lives on local branch `hold/3a-account-gate` (`b59dda6`, `641f062`, `7d223df`).
+
+**Tests:** API 1,477 pass, API emulator 56 pass, rules 510 pass, shared 922 pass.
+
+**Contract:** `docs/specifications/contracts/account-gate.md` on that branch. It needs your approval.
+- **Two claims:**
+  - `ageOk: true`, set when a saved birth date shows the person is 18+.
+  - `terms: <version>`, set when the person agrees to the Terms.
+
+  Both are set only by the API.
+- **Writes are refused** with `403 account_incomplete` unless the account has a verified email and both claims. The `fields` list names what is missing: `email_unverified`, `age`, `terms`.
+- **Reads and onboarding stay open.**
+- **Birth date:** under 18 gets `412`. Once saved, the birth date is locked; nobody can override it yet.
+- **Rules:** `accountOk()` now guards about 125 Firestore writes and all Storage uploads.
+- **Existing complete accounts** get their claims the next time they call the status check.
+
+**Why it is held:**
+1. Today's app and website never call the status check or refresh their sign-in token. Once the API carries this check, every write from today's TestFlight build fails with an error the app doesn't handle.
+2. The SEC-4 API deploy you still have to approve comes from this branch. Merging #3a would ship the check along with it.
+
+The contract's order is: API, then the app and website (Sprint 2), then the rules last.
+
+**Decisions:**
+- **D14:** approve the contract.
+- **D15:** existing dev accounts aged 13–17 become read-only for good, because their birth date is locked. Delete them, add a staff override, or leave them?
+- **D16:** is a staff route to correct a mistyped birth date wanted for launch?
+
+**Not part of this:** App Check, which is the rest of SEC-2. Also, the payer's email is passed to Stripe Checkout, so whether Stripe sends receipts is a Dashboard setting (Q5 note).
+
+**Owner, 2026-11-26:**
+- **D14:** contract approved, recorded on `hold/3a-account-gate`.
+- **D16:** no staff birth-date override.
+- **D15:** delete the 13–17 dev accounts. A read-only check of dev found **none to delete**:
+  - Dev has 4 personal-details records. Each was decrypted server-side in a scratchpad script, and all 4 are 18+; none are 13–17 or under 13.
+  - No birth date is stored anywhere else.
+  - Nothing was deleted.
+
+## 16. SEC-4 deployed to dev (owner approved, 2026-11-26)
+
+1. **API 0.49.0** (`3753d63`) is on Cloud Run as revision `api-00029-md8` with 100% of traffic.
+   - The image was built on Cloud Build from a `git archive` of the commit, digest `sha256:ca60bcb5…`.
+   - The configuration is the live one, with only the image changed; its environment variable names match `service.yaml`.
+   - Smoke test:
+     - `/health` returns 0.49.0 and `/ready` is OK; the new startup checks passed.
+     - An unsigned PATCH of a team returns 401.
+     - Public events return 200.
+2. **Firestore rules** from `3753d63` were released to dev. Clients can no longer write `level`. Storage rules are unchanged.
+
+**SEC-4 is now closed on dev.** It still needs your check on a device: try switching a team that has an under-16 member, or someone with no birth date, to club, in the app and on the website. You should see the refusal message.
