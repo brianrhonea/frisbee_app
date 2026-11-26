@@ -1,6 +1,10 @@
 # Phase-1 writes through the API (release-audit #17, Sprint 3 item 17-C)
 
-**Status:** DRAFT, waiting for owner approval (Sprint 3 gate 17-C). No code has been written against it.
+**Status:** APPROVED by the owner on 2026-11-26 (Sprint 3 gate 17-C). Decisions D1–D11 in §12 were all taken as recommended.
+
+**Estimates revised:**
+- 17-W (website): about 1 h, a verification pass only.
+- 17-B (app): about 12–15 h, including the `/v1/uploads` client and the outbox mapping.
 
 **Baseline:** `feature/jan-4-release` at `0a012d4`.
 
