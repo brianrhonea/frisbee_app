@@ -253,3 +253,5 @@ The owner approved the defaults for D1–D13.
 2. Dry-run the backfill: `cd firebase/functions && npx tsx scripts/backfill-fid-owners.ts --project frisbee-app-brianrhonea-dev`. Then run it again with `--apply`.
 3. Deploy the `notifications` group, which carries the delivery check.
 4. Phone check: sign out of account A while offline, sign in as B, message A, and confirm B's phone gets nothing.
+
+**2026-11-26:** the owner approved step 1, and `deviceOwnership-fidOwner` was deployed to dev from `35e9a94`: v2, a Firestore write trigger, us-central1, Node 22. Steps 2–4 are not done.
