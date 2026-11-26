@@ -150,7 +150,8 @@ class _Wordmark extends StatelessWidget {
                   fontFamily: appFont,
                   fontSize: 13.5,
                   fontWeight: FontWeight.w500,
-                  color: chalk.withValues(alpha: 0.7),
+                  // Full chalk: 70% over the grass was about 3.2:1.
+                  color: chalk,
                 ),
               ),
             ),
