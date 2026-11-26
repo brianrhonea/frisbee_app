@@ -12,6 +12,7 @@ import '../../core/ui/brand.dart' show appName;
 import '../../../utils/command.dart';
 import '../../../utils/invite_links.dart';
 import '../../../utils/result.dart';
+import '../../core/themes/theme.dart';
 
 /// An invite link to share anywhere, people search (each person invited
 /// gets an in-app invite plus the link as a direct message), and a group's
@@ -28,7 +29,7 @@ class InviteMembersViewModel extends ChangeNotifier {
     required DirectMessageRepository directMessageRepository,
     required AuthRepository authRepository,
     this.withLink = true,
-    this.debounce = const Duration(milliseconds: 300),
+    this.debounce = AppMotion.sheet,
   }) : _teams = teamRepository,
        _people = directMessageRepository,
        _auth = authRepository {

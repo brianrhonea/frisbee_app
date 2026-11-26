@@ -26,7 +26,7 @@ class InviteCodeCard extends StatelessWidget {
         return Card(
           color: theme.colorScheme.primaryContainer,
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(AppSpace.lg),
             child: Row(
               children: [
                 Expanded(

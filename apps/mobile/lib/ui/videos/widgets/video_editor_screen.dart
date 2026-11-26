@@ -270,7 +270,7 @@ class _VideoFormState extends State<_VideoForm> {
       final editingFile = !vm.isNew && !vm.initial.isYouTube;
       final c = AppColors.of(context);
       final fields = ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpace.lg),
         children: [
           if (vm.isNew) ...[
             AppSegmentedButton<VideoSource>(

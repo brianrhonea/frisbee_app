@@ -64,10 +64,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
 
   void _onChanged(String text) {
     _debounce?.cancel();
-    _debounce = Timer(
-      const Duration(milliseconds: 300),
-      () => vm.search.execute(text),
-    );
+    _debounce = Timer(AppMotion.sheet, () => vm.search.execute(text));
   }
 
   @override
@@ -191,7 +188,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
     final results = vm.results;
     if (results.isEmpty) {
       return Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(AppSpace.xl),
         child: Text(
           'Type at least ${GroupMembersViewModel.minQueryLength} letters of '
           'a name.',

@@ -699,7 +699,7 @@ class _OverviewTab extends StatelessWidget {
                 Card(
                   margin: const EdgeInsets.only(top: 12),
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(AppSpace.lg),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -1546,7 +1546,7 @@ class _TeamsTabState extends State<_TeamsTab> {
                   ReorderableDragStartListener(
                     index: index,
                     child: Padding(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(AppSpace.sm),
                       child: Icon(Icons.drag_handle, color: c.muted),
                     ),
                   ),
@@ -2172,7 +2172,7 @@ class _PublishCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(top: 12),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpace.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -2629,7 +2629,7 @@ class _ResultsTab extends StatelessWidget {
           if (places.isNotEmpty) ...[
             Card(
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(AppSpace.lg),
                 child: Row(
                   children: [
                     Container(
@@ -2637,7 +2637,7 @@ class _ResultsTab extends StatelessWidget {
                       height: 48,
                       decoration: BoxDecoration(
                         color: c.positiveSoft,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppRadius.control),
                       ),
                       child: Icon(
                         Icons.emoji_events_outlined,
@@ -2717,7 +2717,7 @@ class _ResultsTab extends StatelessWidget {
             for (final e in pools.entries) ...[
               if (pools.length > 1)
                 Padding(
-                  padding: const EdgeInsets.only(top: 4, bottom: 6),
+                  padding: const EdgeInsets.only(top: AppSpace.xs, bottom: 6),
                   child: Text(
                     'Pool ${e.key}',
                     style: TextStyle(
@@ -2948,7 +2948,7 @@ class OrganizerChatsCard extends StatelessWidget {
         return Card(
           margin: const EdgeInsets.only(top: 12),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(AppSpace.lg),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

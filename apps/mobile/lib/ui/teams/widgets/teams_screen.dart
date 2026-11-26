@@ -606,7 +606,10 @@ class _AddTiles extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpace.sm,
+              vertical: 12,
+            ),
             child: Column(
               children: [
                 Container(
@@ -680,7 +683,7 @@ class _InviteTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: c.highlightSoft,
         border: Border.all(color: c.border),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.card),
       ),
       child: Row(
         children: [

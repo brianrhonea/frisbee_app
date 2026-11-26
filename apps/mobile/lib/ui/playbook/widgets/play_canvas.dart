@@ -5,6 +5,7 @@ import '../../../domain/models/play.dart';
 import '../view_models/play_editor_viewmodel.dart';
 import 'field_geometry.dart';
 import 'field_painter.dart';
+import '../../core/themes/theme.dart';
 
 /// Field sized to fit its constraints at the correct aspect ratio, rotated to
 /// landscape when there is more horizontal room.
@@ -192,7 +193,7 @@ class _PlayCanvasState extends State<PlayCanvas> {
                 onPanEnd: (_) => _onPanEnd(g),
                 onPanCancel: () => _onPanEnd(g),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.control),
                   child: CustomPaint(
                     size: size,
                     painter: FieldPainter(

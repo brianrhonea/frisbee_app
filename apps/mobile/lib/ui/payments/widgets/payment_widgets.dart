@@ -242,7 +242,7 @@ class PayoutsCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(top: 12),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpace.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -684,7 +684,7 @@ class PayoutsStatusChip extends StatelessWidget {
       PayoutStatus.none => 'Not set up',
     };
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm, vertical: 3),
       decoration: BoxDecoration(
         color: on ? c.positiveSoft : c.highlightSoft,
         borderRadius: BorderRadius.circular(999),

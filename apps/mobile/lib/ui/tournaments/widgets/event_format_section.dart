@@ -52,7 +52,7 @@ class EventFormatSection extends StatelessWidget {
     );
 
     Widget heading(String text) => Padding(
-      padding: const EdgeInsets.only(top: 16, bottom: 6),
+      padding: const EdgeInsets.only(top: AppSpace.lg, bottom: 6),
       child: Text(
         text,
         style: TextStyle(
@@ -193,7 +193,7 @@ class EventFormatSection extends StatelessWidget {
             : null,
       ),
       Padding(
-        padding: const EdgeInsets.only(top: 4, bottom: 4),
+        padding: const EdgeInsets.only(top: AppSpace.xs, bottom: 4),
         child: Text(
           s.timed
               ? 'Most points when time runs out wins. Tied at time, they '

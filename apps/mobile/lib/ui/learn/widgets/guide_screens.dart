@@ -161,7 +161,7 @@ class GuidePoints extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.only(top: 8, right: 10),
+                  padding: const EdgeInsets.only(top: AppSpace.sm, right: 10),
                   child: Icon(Icons.circle, size: 6, color: c.accent),
                 ),
                 Expanded(child: Text(p, style: style)),

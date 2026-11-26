@@ -17,6 +17,7 @@ import '../../workouts/widgets/route_widgets.dart';
 import '../../workouts/widgets/workout_fields.dart';
 import '../view_models/post_composer_viewmodel.dart';
 import '../../core/ui/app_segmented_button.dart';
+import '../../core/themes/theme.dart';
 
 /// Opens the composer over the current page: a dialog on wide screens, a
 /// bottom sheet on phones. Writes a new post (or, with [workout], starts on
@@ -523,7 +524,7 @@ class _PostComposerState extends State<PostComposer> {
     ];
     return [
       ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.control),
         child: SizedBox(
           height: 180,
           child: RouteMap(

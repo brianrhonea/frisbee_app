@@ -594,7 +594,7 @@ class _GameOver extends StatelessWidget {
     };
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpace.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -664,7 +664,7 @@ class _LineupCard extends StatelessWidget {
     final previous = vm.points.lastOrNull;
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpace.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -965,7 +965,10 @@ class _Banner extends StatelessWidget {
     final c = AppColors.of(context);
     // Amber when the next tap is the user's to do; field grey otherwise.
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpace.md,
+        vertical: 10,
+      ),
       decoration: BoxDecoration(
         color: highlight ? c.highlightSoft : c.field,
         borderRadius: BorderRadius.circular(controlRadius),
@@ -1637,7 +1640,11 @@ class _PointCard extends StatelessWidget {
         side = side.flipped;
         rows.add(
           Padding(
-            padding: const EdgeInsets.only(left: 4, top: 2, bottom: 6),
+            padding: const EdgeInsets.only(
+              left: AppSpace.xs,
+              top: 2,
+              bottom: 6,
+            ),
             child: Text(
               side == Side.offense
                   ? '↳ Our disc. We\'re on O.'

@@ -300,7 +300,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Center(
           child: vm.loadingMorePosts
               ? const Padding(
-                  padding: EdgeInsets.all(12),
+                  padding: EdgeInsets.all(AppSpace.md),
                   child: SizedBox.square(
                     dimension: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
@@ -371,7 +371,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (feed.loadingMore)
           const Center(
             child: Padding(
-              padding: EdgeInsets.all(12),
+              padding: EdgeInsets.all(AppSpace.md),
               child: SizedBox.square(
                 dimension: 20,
                 child: CircularProgressIndicator(strokeWidth: 2),
@@ -478,7 +478,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (feed.loading)
           const Center(
             child: Padding(
-              padding: EdgeInsets.all(12),
+              padding: EdgeInsets.all(AppSpace.md),
               child: SizedBox.square(
                 dimension: 20,
                 child: CircularProgressIndicator(strokeWidth: 2),

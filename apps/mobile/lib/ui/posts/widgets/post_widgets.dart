@@ -202,7 +202,7 @@ class UserPostCard extends StatelessWidget {
                 ],
               ),
               Padding(
-                padding: const EdgeInsets.only(right: 12, left: 4),
+                padding: const EdgeInsets.only(right: AppSpace.md, left: 4),
                 child: repostOf == null
                     ? _PostContent(post: post, loadImage: loadImage)
                     : Column(
@@ -401,12 +401,15 @@ class _EmbeddedPost extends StatelessWidget {
       color: Colors.transparent,
       clipBehavior: Clip.antiAlias,
       shape: RoundedSuperellipseBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.control),
         side: BorderSide(color: scheme.outlineVariant),
       ),
       child: InkWell(
         onTap: onTap,
-        child: Padding(padding: const EdgeInsets.all(12), child: child),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpace.md),
+          child: child,
+        ),
       ),
     );
     if (!loaded) {
@@ -671,11 +674,11 @@ class _RepostDialogState extends State<_RepostDialog> {
             else
               DecoratedBox(
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.control),
                   border: Border.all(color: theme.colorScheme.outlineVariant),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(AppSpace.md),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -758,13 +761,13 @@ class SharedEventCard extends StatelessWidget {
       color: scheme.surfaceContainerLow,
       clipBehavior: Clip.antiAlias,
       shape: RoundedSuperellipseBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.control),
         side: BorderSide(color: scheme.outlineVariant),
       ),
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(AppSpace.md),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -889,11 +892,11 @@ class WorkoutSummary extends StatelessWidget {
     final muted = TextStyle(fontSize: 11.5, color: c.muted);
     return DecoratedBox(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.control),
         border: Border.all(color: c.border),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.control),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

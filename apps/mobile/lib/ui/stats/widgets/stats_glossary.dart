@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/stats.dart';
+import '../../core/themes/theme.dart';
 
 /// How a stat is calculated: a fraction or a list of terms.
 sealed class _Formula {
@@ -389,7 +390,7 @@ class _Glossary extends StatelessWidget {
               ),
               for (final (title, entries) in _sections) ...[
                 Padding(
-                  padding: const EdgeInsets.only(top: 24, bottom: 10),
+                  padding: const EdgeInsets.only(top: AppSpace.xl, bottom: 10),
                   child: Text(
                     title,
                     style: theme.textTheme.titleLarge?.copyWith(
@@ -422,7 +423,7 @@ class _AbbrBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm, vertical: 3),
       decoration: BoxDecoration(
         color: theme.colorScheme.primaryContainer,
         borderRadius: BorderRadius.circular(6),

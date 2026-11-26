@@ -764,7 +764,7 @@ class _SwipeActionsState extends State<_SwipeActions>
 
   late final _offset = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 200),
+    duration: AppMotion.base,
   );
 
   double get _width => _buttonWidth * widget.actions.length;

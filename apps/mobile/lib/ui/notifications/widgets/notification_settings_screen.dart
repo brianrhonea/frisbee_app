@@ -185,7 +185,7 @@ class _PushTile extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
         decoration: BoxDecoration(
           color: vm.deviceRegistered ? c.positiveSoft : c.accentSoft,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadius.card),
         ),
         child: Row(
           children: [
@@ -333,7 +333,10 @@ class _TeamOverrides extends StatelessWidget {
       children: [
         for (final category in NotificationCategory.teamCategories)
           SwitchListTile(
-            contentPadding: const EdgeInsets.only(left: 32, right: 16),
+            contentPadding: const EdgeInsets.only(
+              left: AppSpace.xxl,
+              right: 16,
+            ),
             title: Text(category.label),
             value: prefs.isOnFor(category, team.id),
             onChanged: (on) =>

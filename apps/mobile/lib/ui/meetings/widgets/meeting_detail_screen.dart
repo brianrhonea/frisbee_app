@@ -205,7 +205,7 @@ class _Header extends StatelessWidget {
     final c = AppColors.of(context);
     final m = meeting;
     return SectionCard(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpace.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

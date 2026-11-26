@@ -1882,7 +1882,7 @@ class _SectionsHint extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: Material(
         color: c.accentSoft,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.card),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onOpen,
@@ -2426,7 +2426,7 @@ class _MembersCard extends StatelessWidget {
                 SizedBox(
                   width: width,
                   child: Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(AppSpace.md),
                     decoration: BoxDecoration(
                       color: c.field,
                       borderRadius: BorderRadius.circular(controlRadius),

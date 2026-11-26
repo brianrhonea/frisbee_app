@@ -437,7 +437,7 @@ class _GroupTournamentScreenState extends State<GroupTournamentScreen> {
         };
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpace.lg),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

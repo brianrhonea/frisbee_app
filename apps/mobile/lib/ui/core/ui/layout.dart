@@ -303,7 +303,10 @@ class CardLink extends StatelessWidget {
       borderRadius: BorderRadius.circular(6),
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpace.xs,
+          vertical: 4,
+        ),
         child: Text(
           label,
           style: TextStyle(
@@ -401,7 +404,7 @@ class Tag extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm, vertical: 3),
       decoration: BoxDecoration(
         color: strong
             ? c.featureHighlight

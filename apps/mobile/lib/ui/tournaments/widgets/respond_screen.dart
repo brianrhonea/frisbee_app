@@ -70,7 +70,7 @@ class RespondScreen extends StatelessWidget {
     final c = AppColors.of(context);
     if (vm.blocked case final why?) {
       return Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(AppSpace.xl),
         child: Text(why, style: TextStyle(color: c.ink2, fontSize: 15)),
       );
     }
@@ -326,7 +326,7 @@ class RespondScreen extends StatelessWidget {
             ),
             if (players == null)
               const Padding(
-                padding: EdgeInsets.all(16),
+                padding: EdgeInsets.all(AppSpace.lg),
                 child: Center(child: CircularProgressIndicator()),
               )
             else if (players.isEmpty)

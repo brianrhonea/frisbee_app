@@ -132,7 +132,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     // searches wait for a pause in typing.
     widget.events?.setQuery(_ready(text) ? text.trim() : '');
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 300), () => _search(text));
+    _debounce = Timer(AppMotion.sheet, () => _search(text));
   }
 
   /// Whether the chip picked shows [f]'s results (All shows every kind).
@@ -422,7 +422,7 @@ class _LiveCard extends StatelessWidget {
     final t = tournament;
     final divisions = t.divisions.map((d) => d.label).join(', ');
     return FeatureCard(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpace.lg),
       onTap: () => context.push(Routes.tournament(t.id, tab: 'schedule')),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -654,7 +654,7 @@ class _FilterChipsState extends State<_FilterChips> {
       if (clamped != pos.pixels) {
         _scroll.animateTo(
           clamped,
-          duration: const Duration(milliseconds: 200),
+          duration: AppMotion.base,
           curve: Curves.easeOut,
         );
       }

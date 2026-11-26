@@ -65,7 +65,7 @@ class _VoiceChannelViewState extends State<VoiceChannelView> {
         final elsewhere = vm.elsewhere;
         return Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(AppSpace.xl),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
               child: Column(
@@ -143,7 +143,7 @@ class _VoiceChannelViewState extends State<VoiceChannelView> {
         children: [
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(AppSpace.xl),
               child: Center(
                 child: Wrap(
                   spacing: 16,
@@ -177,7 +177,7 @@ class _ParticipantTile extends StatelessWidget {
       height: 140,
       decoration: BoxDecoration(
         color: c.card,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.card),
         border: Border.all(
           color: p.isSpeaking ? c.accent : c.border,
           width: p.isSpeaking ? 2.5 : 1,

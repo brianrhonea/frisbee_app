@@ -214,7 +214,7 @@ class _BlankWhiteboardCard extends StatelessWidget {
               child: ColoredBox(
                 color: FieldColors.grass,
                 child: Padding(
-                  padding: EdgeInsets.all(8),
+                  padding: EdgeInsets.all(AppSpace.sm),
                   child: IgnorePointer(
                     child: PlayDiagram(
                       play: Play(id: '', name: ''),

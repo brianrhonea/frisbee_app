@@ -12,6 +12,7 @@ import '../../../domain/models/payments.dart';
 import '../../../utils/invite_links.dart';
 import '../../../utils/result.dart';
 import '../../core/ui/error_message.dart';
+import '../../core/themes/theme.dart';
 
 /// Stripe's payments setup inside the app: the website's `/embed/payouts`
 /// page (Stripe's embedded onboarding) in a WebView, so the owner never
@@ -219,7 +220,7 @@ class _PayoutsSetupScreenState extends State<PayoutsSetupScreen> {
       body: _error != null
           ? Center(
               child: Padding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(AppSpace.xl),
                 child: Text(_error!, textAlign: TextAlign.center),
               ),
             )
@@ -251,7 +252,7 @@ class _PayoutsSetupScreenState extends State<PayoutsSetupScreen> {
       _ => 'Confirm',
     };
     return ListView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(AppSpace.xl),
       children: [
         Text(
           payoutsReauthMessage,

@@ -116,7 +116,7 @@ class SkeletonPost extends StatelessWidget {
   @override
   Widget build(BuildContext context) => const Card(
     child: Padding(
-      padding: EdgeInsets.all(16),
+      padding: EdgeInsets.all(AppSpace.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -165,7 +165,7 @@ class SkeletonList extends StatelessWidget {
       const widths = [150.0, 110.0, 170.0, 130.0, 90.0, 160.0];
       return ClipRect(
         child: Padding(
-          padding: padding ?? const EdgeInsets.all(16),
+          padding: padding ?? const EdgeInsets.all(AppSpace.lg),
           child: Skeleton(
             child: Column(
               mainAxisSize: MainAxisSize.min,

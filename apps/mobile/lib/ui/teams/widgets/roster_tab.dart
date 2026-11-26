@@ -112,7 +112,7 @@ class RosterTab extends StatelessWidget {
               )
             else if (roster.isEmpty)
               const Padding(
-                padding: EdgeInsets.all(24),
+                padding: EdgeInsets.all(AppSpace.xl),
                 child: Center(child: Text('Everyone has paid.')),
               ),
             // O-line, D-line, Both lines, Unassigned; one list until anyone
@@ -334,7 +334,7 @@ class _PaidBadge extends StatelessWidget {
     return Tooltip(
       message: paid ? 'Mark unpaid' : 'Mark paid',
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.control),
         onTap: onTap,
         child: badge,
       ),
@@ -354,7 +354,7 @@ class _Badge extends StatelessWidget {
     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
     decoration: BoxDecoration(
       border: Border.all(color: color.withValues(alpha: 0.6)),
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppRadius.control),
     ),
     child: Row(
       mainAxisSize: MainAxisSize.min,

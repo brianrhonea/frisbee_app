@@ -441,10 +441,10 @@ class InviteQrDialog extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(AppSpace.md),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.control),
             ),
             // A fixed size: the dialog measures its content, and the QR
             // view's LayoutBuilder can't be measured.

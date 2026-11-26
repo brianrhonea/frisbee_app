@@ -64,7 +64,10 @@ class RsvpChoice<T> extends StatelessWidget {
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 48),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpace.xs,
+                vertical: 6,
+              ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [

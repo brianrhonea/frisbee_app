@@ -273,10 +273,10 @@ class _ThemeChoice extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     return Container(
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(AppSpace.xs),
       decoration: BoxDecoration(
         color: c.field,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.control),
       ),
       child: Row(
         children: [

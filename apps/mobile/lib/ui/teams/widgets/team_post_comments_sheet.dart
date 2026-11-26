@@ -126,7 +126,7 @@ class _TeamPostCommentsSheetState extends State<TeamPostCommentsSheet> {
               Flexible(
                 child: !vm.loaded
                     ? const Padding(
-                        padding: EdgeInsets.all(24),
+                        padding: EdgeInsets.all(AppSpace.xl),
                         child: Center(child: CircularProgressIndicator()),
                       )
                     : vm.error != null
@@ -208,7 +208,7 @@ class _TeamPostCommentsSheetState extends State<TeamPostCommentsSheet> {
                 )
               else
                 const Padding(
-                  padding: EdgeInsets.all(16),
+                  padding: EdgeInsets.all(AppSpace.lg),
                   child: Text('Update the app to comment.'),
                 ),
             ],

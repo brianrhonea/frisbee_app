@@ -73,7 +73,7 @@ class _LearnScreenState extends State<LearnScreen> {
     if (target == null) return;
     Scrollable.ensureVisible(
       target,
-      duration: const Duration(milliseconds: 300),
+      duration: AppMotion.sheet,
       curve: Curves.easeOut,
     );
   }

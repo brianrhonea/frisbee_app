@@ -70,7 +70,7 @@ class ToneTag extends StatelessWidget {
     // Text and icon in the tone's ink: it reaches 4.5:1 on the 14% tint.
     final ink = tone.ink(context, tint: 0.14);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(999),

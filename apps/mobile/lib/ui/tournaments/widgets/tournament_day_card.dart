@@ -75,7 +75,7 @@ class TournamentDayCard extends StatelessWidget {
 
     return FeatureCard(
       onTap: open,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpace.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

@@ -36,7 +36,7 @@ class MembersTab extends StatelessWidget {
       });
     return ConstrainedContent(
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpace.lg),
         children: [
           if (viewModel.canManageMembers) ...[
             Align(
@@ -558,7 +558,7 @@ class _RolesHelp extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.only(top: 4, right: 6),
+                    padding: const EdgeInsets.only(top: AppSpace.xs, right: 6),
                     child: RoleDot(color: r.color, size: 10),
                   ),
                   SizedBox(

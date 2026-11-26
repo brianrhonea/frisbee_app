@@ -267,11 +267,11 @@ class _RoomCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     return Padding(
-      padding: const EdgeInsets.only(top: 4, bottom: 6),
+      padding: const EdgeInsets.only(top: AppSpace.xs, bottom: 6),
       child: Container(
         decoration: BoxDecoration(
           color: c.card,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadius.card),
           border: Border.all(color: c.border),
         ),
         clipBehavior: Clip.antiAlias,
@@ -395,10 +395,10 @@ class _UnfiledDropZone extends StatelessWidget {
       )),
       builder: (context, candidates, _) => Container(
         margin: const EdgeInsets.only(bottom: 6),
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(AppSpace.md),
         decoration: BoxDecoration(
           color: candidates.isEmpty ? null : c.accentSoft,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadius.card),
           border: Border.all(color: c.accent),
         ),
         child: Text(
@@ -487,7 +487,7 @@ class _FolderHeader extends StatelessWidget {
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: c.card,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.control),
                   boxShadow: const [
                     BoxShadow(blurRadius: 8, color: Colors.black26),
                   ],
@@ -950,7 +950,7 @@ class _RoomRowState extends State<_RoomRow> {
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
           color: c.card,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.control),
           border: Border.all(color: c.border),
           boxShadow: const [BoxShadow(blurRadius: 8, color: Colors.black26)],
         ),

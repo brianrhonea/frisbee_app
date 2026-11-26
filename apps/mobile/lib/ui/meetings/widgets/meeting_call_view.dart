@@ -309,11 +309,11 @@ class _Stage extends StatelessWidget {
         final side = c.maxWidth >= 700;
         final strip = ListView(
           scrollDirection: side ? Axis.vertical : Axis.horizontal,
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(AppSpace.sm),
           children: [
             for (final p in people)
               Padding(
-                padding: const EdgeInsets.all(4),
+                padding: const EdgeInsets.all(AppSpace.xs),
                 child: SizedBox(
                   width: side ? null : 160,
                   height: side ? 120 : null,
@@ -342,7 +342,7 @@ class _Stage extends StatelessWidget {
     if (watch != null && watch.active) {
       return featured(
         Padding(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(AppSpace.sm),
           child: WatchTogetherStage(viewModel: watch, player: videoPlayer),
         ),
       );
@@ -351,9 +351,9 @@ class _Stage extends StatelessWidget {
     if (presenter != null) {
       return featured(
         Padding(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(AppSpace.sm),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.control),
             child: ColoredBox(
               color: AppColors.of(context).media,
               child: Stack(

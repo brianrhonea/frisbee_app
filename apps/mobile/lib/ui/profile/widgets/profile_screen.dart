@@ -680,7 +680,7 @@ class _ImageMenu extends StatelessWidget {
             : PopupMenuButton<_ImageAction>(
                 tooltip: 'Change ${kind.label}',
                 iconSize: size,
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(AppSpace.sm),
                 icon: Icon(icon),
                 onSelected: (a) => switch (a) {
                   _ImageAction.choose => vm.changeImage.execute((
@@ -733,7 +733,10 @@ class _PrivateNotice extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+      padding: const EdgeInsets.symmetric(
+        vertical: AppSpace.xxl,
+        horizontal: 24,
+      ),
       child: Column(
         children: [
           Icon(Icons.lock_outline, size: 40, color: c.muted),
@@ -929,7 +932,9 @@ class _NumbersCard extends StatelessWidget {
                             ),
                             decoration: BoxDecoration(
                               color: c.card,
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(
+                                AppRadius.control,
+                              ),
                               border: Border.all(color: c.border),
                             ),
                             child: Column(

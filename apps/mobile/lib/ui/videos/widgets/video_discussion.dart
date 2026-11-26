@@ -87,9 +87,9 @@ class VideoEventTag extends StatelessWidget {
     }
     return Material(
       color: c.field,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppRadius.control),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.control),
         onTap: () => context.push(Routes.teamEvent(vm.teamId, event)),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
@@ -419,7 +419,7 @@ class _CommentRow extends StatelessWidget {
     ].join(' · ');
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppRadius.control),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Row(
@@ -427,7 +427,10 @@ class _CommentRow extends StatelessWidget {
           children: [
             if (time case final t?) ...[
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpace.sm,
+                  vertical: 3,
+                ),
                 decoration: BoxDecoration(
                   color: c.accentSoft,
                   borderRadius: BorderRadius.circular(999),

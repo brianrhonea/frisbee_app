@@ -95,7 +95,7 @@ class PlayerSignupCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(top: 16),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpace.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

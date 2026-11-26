@@ -572,7 +572,7 @@ class _RequestBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: c.card,
         border: Border.all(color: c.border),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
