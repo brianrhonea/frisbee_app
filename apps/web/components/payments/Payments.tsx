@@ -184,7 +184,7 @@ export function EmbeddedOnboarding({
         const connect = loadConnectAndInitialize({
           publishableKey,
           fetchClientSecret,
-          appearance: { variables: { colorPrimary: "#12805C", fontFamily: "inherit", borderRadius: "10px" } },
+          appearance: { variables: { colorPrimary: "#4338CA", fontFamily: "inherit", borderRadius: "10px" } },
         });
         if (view === "manage") {
           elements = [connect.create("notification-banner"), connect.create("account-management"), connect.create("payouts")];
