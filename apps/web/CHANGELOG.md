@@ -4,6 +4,25 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.59.11 — 2026-11-26
+
+C3: SegmentedTabs and FilterChips (Sprint 2).
+
+- New `SegmentedTabs` and `FilterChips` (components/ui): the selected tab or
+  chip is filled indigo with heavier text; the bar scrolls sideways instead of
+  wrapping (holds up at 320 px and large text); each is a 48 px target.
+  `SegmentedTabs` is a proper ARIA tablist (one Tab stop, Left/Right with wrap,
+  Home/End, `aria-selected`, optional `aria-controls`); `variant="underline"`
+  draws the line style. `FilterChips` is a radio group (one choice) or toggle
+  buttons with `aria-pressed` (`multiple`). Parity with the app's
+  SegmentedTabs and FilterChip.
+- Moved onto them: the Home feed tabs (their own key code is gone), schedule
+  view and filter, notifications filter, Explore chips, following settings,
+  draft divisions, invite dialog, meeting panel and list, playbook, game and
+  tournament stats tabs, group tournament tabs. Tabs that are links (Messages,
+  team schedule) and the play editor's steps are left as they are.
+- Their old per-page button styling is removed from the stylesheets.
+
 ## 0.59.10 — 2026-11-26
 
 C2: Button and IconButton (Sprint 2).

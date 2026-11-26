@@ -1206,13 +1206,8 @@ button.person-row:hover { background: var(--field); }
 .huddle-main { display: grid; gap: var(--space-lg); min-width: 0; max-width: 760px; width: 100%; justify-self: center; }
 .huddle-side { display: grid; gap: var(--space-lg); position: sticky; top: 88px; }
 .huddle-side .card { padding: var(--space-lg) 18px; }
-.feed-tabs { display: flex; gap: var(--space-xs); border-bottom: 1px solid var(--line); margin-top: var(--space-xs); }
-.feed-tabs button, .feed-tabs a {
-  border: 0; background: none; font: inherit; font-weight: 700; color: var(--muted); cursor: pointer;
-  padding: 10px 14px; margin-bottom: -1px; border-bottom: 2px solid transparent; text-decoration: none;
-}
-.feed-tabs button:hover, .feed-tabs a:hover { color: var(--ink); }
-.feed-tabs .on { color: var(--accent); border-bottom-color: var(--accent); }
+/* The tabs themselves are SegmentedTabs (components/ui); this is their place on the page. */
+.feed-tabs { margin-top: var(--space-xs); }
 .see-all { font-size: 0.85rem; font-weight: 700; color: var(--accent); text-decoration: none; }
 .see-all:hover { text-decoration: underline; }
 .date-list { display: grid; }
@@ -1488,7 +1483,7 @@ button.poll-option.on { border-color: var(--accent); }
 dialog.dialog:has(.invite-dialog) { width: min(100% - 32px, 560px); }
 .invite-dialog { display: grid; gap: 14px; }
 .invite-dialog > * { margin: 0; }
-.invite-dialog .segmented { justify-self: start; }
+.invite-dialog .ui-tabs { justify-self: start; }
 .invite-dialog [role="tabpanel"][hidden] { display: none; }
 .invite-dialog .form-actions { justify-content: flex-end; }
 .invite-share p { margin: 0; }
@@ -1603,7 +1598,6 @@ dialog.dialog:has(.invite-dialog) { width: min(100% - 32px, 560px); }
 .feed-pager { flex-direction: column; align-items: center; gap: var(--space-sm); margin-top: 10px; }
 .feed-pager > p:empty { display: none; }
 .feed-sentinel { display: block; width: 100%; height: 1px; }
-.feed-tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 8px; }
 
 /* The new-member checklist and the no-team card. */
 .get-started .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-sm); margin-bottom: var(--space-xs); }

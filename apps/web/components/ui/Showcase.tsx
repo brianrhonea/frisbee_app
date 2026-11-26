@@ -1,15 +1,22 @@
 "use client";
-import type { CSSProperties } from "react";
+import { type CSSProperties, useState } from "react";
 import { NeedsPill, RsvpPill } from "../RsvpPill";
 import { Button, buttonClass, IconButton } from "./Button";
+import { FilterChips } from "./FilterChips";
+import { SegmentedTabs } from "./SegmentedTabs";
 import { StatusPill } from "./StatusPill";
 
 const row: CSSProperties = { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" };
 
 /** The component gallery at /dev/ui (non-production only). Synthetic content. */
 export function Showcase() {
+  const [seg, setSeg] = useState("chats");
+  const [line, setLine] = useState("teams");
+  const [long, setLong] = useState("t3");
+  const [chip, setChip] = useState("all");
+  const [many, setMany] = useState<string[]>(["games"]);
   return (
-    <div className="page" style={{ display: "grid", gap: 24 }}>
+    <div className="page" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 24 }}>
       <h1>Components</h1>
 
       <section className="card" data-showcase="statuspill" aria-labelledby="sc-pill">
@@ -80,6 +87,69 @@ export function Showcase() {
             Link as button
           </a>
         </div>
+      </section>
+
+      <section className="card" data-showcase="tabs" aria-labelledby="sc-tabs">
+        <h2 id="sc-tabs">Segmented tabs</h2>
+        <SegmentedTabs
+          label="Inbox"
+          items={[
+            { id: "chats", label: "Chats" },
+            { id: "requests", label: "Requests (2)" },
+            { id: "archived", label: "Archived" },
+            { id: "off", label: "Disabled", disabled: true },
+          ]}
+          value={seg}
+          onChange={setSeg}
+        />
+        <div style={{ height: 12 }} />
+        <SegmentedTabs
+          variant="underline"
+          label="Feed"
+          items={[
+            { id: "teams", label: "Your teams" },
+            { id: "following", label: "Following" },
+            { id: "everyone", label: "Everyone" },
+          ]}
+          value={line}
+          onChange={setLine}
+        />
+        <div style={{ height: 12 }} />
+        <SegmentedTabs
+          label="Many tabs, scrolling"
+          items={["Overview", "Schedule", "Roster", "Stats", "Playbook", "Videos", "Meetings", "Settings"].map((l, i) => ({ id: `t${i}`, label: l }))}
+          value={long}
+          onChange={setLong}
+        />
+      </section>
+
+      <section className="card" data-showcase="chips" aria-labelledby="sc-chips">
+        <h2 id="sc-chips">Filter chips</h2>
+        <FilterChips
+          label="Show"
+          items={[
+            { id: "all", label: "All" },
+            { id: "games", label: "Games" },
+            { id: "practice", label: "Practices" },
+            { id: "tourney", label: "Tournaments" },
+            { id: "social", label: "Social" },
+          ]}
+          value={chip}
+          onChange={setChip}
+        />
+        <div style={{ height: 12 }} />
+        <FilterChips
+          multiple
+          label="Types"
+          items={[
+            { id: "games", label: "Games" },
+            { id: "practice", label: "Practices" },
+            { id: "tourney", label: "Tournaments" },
+            { id: "off", label: "Disabled", disabled: true },
+          ]}
+          value={many}
+          onChange={setMany}
+        />
       </section>
     </div>
   );

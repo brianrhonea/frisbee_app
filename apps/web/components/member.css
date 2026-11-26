@@ -48,9 +48,7 @@
 .huddle .huddle-date { color: var(--muted); font-size: 0.9rem; font-weight: 600; }
 
 /* The feed's tabs: Your teams / Following / Everyone. */
-.huddle .feed-tabs { margin-top: 2px; border-bottom-color: var(--line); }
-.huddle .feed-tabs button { padding: 10px 14px; color: var(--muted); font-weight: 600; }
-.huddle .feed-tabs button.on { color: var(--ink); font-weight: 700; border-bottom-color: var(--accent); }
+.huddle .feed-tabs { margin-top: 2px; }
 
 /* The composer: a soft field to type in, Post in turf. */
 .huddle .composer-card { padding: 16px 18px; box-shadow: none; }
@@ -104,11 +102,6 @@
 .schedule-page .sched-card { padding: 18px 0 6px; box-shadow: none; }
 .schedule-page .sched-card > .card-head, .schedule-page .sched-card > .schedule-filter,
 .schedule-page .sched-card > .event-editor, .schedule-page .sched-card > p { margin-left: 18px; margin-right: 18px; }
-.schedule-page .schedule-filter.segmented { background: none; border: 0; padding: 0; gap: 6px; }
-.schedule-page .schedule-filter.segmented button {
-  border: 1px solid var(--line-2); background: var(--card); color: var(--ink); font-size: 0.86rem; padding: 6px 14px;
-}
-.schedule-page .schedule-filter.segmented button.on { background: var(--chip-on); color: var(--on-chip-on); border-color: var(--chip-on); box-shadow: none; }
 .sched-days { display: grid; }
 .sched-day-head {
   margin: 0; padding: 14px 18px 6px; border-top: 1px solid var(--line);
@@ -146,8 +139,7 @@
    (magenta) and still to answer (amber); today in turf, the picked day
    outlined. */
 .schedule-page .sched-card > .card-head { flex-wrap: wrap; gap: 8px; }
-.schedule-page .schedule-view.segmented { margin-left: auto; }
-.schedule-page .schedule-view.segmented button { padding: 5px 12px; font-size: 0.84rem; }
+.schedule-page .schedule-view { margin-left: auto; }
 .schedule-page .sched-month-head { display: flex; align-items: center; gap: 6px; margin: 12px 18px 6px; }
 .schedule-page .sched-month-head p { flex: 1; display: grid; justify-items: center; margin: 0; line-height: 1.3; }
 .schedule-page .sched-month-head small { font-size: 0.76rem; }
@@ -219,11 +211,6 @@
 
 /* --- Notifications (Notifications.tsx) ------------------------------------ */
 .notifications .toolbar { gap: 8px 10px; }
-.notifications .segmented { background: none; border: 0; padding: 0; gap: 6px; }
-.notifications .segmented button {
-  border: 1px solid var(--line-2); background: var(--card); color: var(--ink); font-size: 0.86rem; padding: 6px 14px;
-}
-.notifications .segmented button.on { background: var(--chip-on); color: var(--on-chip-on); border-color: var(--chip-on); box-shadow: none; }
 .notifications .notice-mark { font-weight: 700; text-decoration: none; }
 .notifications .notice-mark:hover:not(:disabled) { text-decoration: underline; }
 .notice-group {

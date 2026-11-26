@@ -48,6 +48,60 @@ test("every button and icon button has a 48 px target", async ({ page }) => {
   }
 });
 
+test("tabs and chips: arrows, Home and End work in the browser", async ({ page }) => {
+  await open(page, "/dev/ui");
+  const first = page.getByRole("tab", { name: "Chats" });
+  await first.focus();
+  await page.keyboard.press("ArrowRight");
+  const requests = page.getByRole("tab", { name: "Requests (2)" });
+  await expect(requests).toBeFocused();
+  await expect(requests).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("ArrowRight"); // Archived
+  await page.keyboard.press("ArrowRight"); // skips the disabled tab, wrapping to Chats
+  await expect(first).toBeFocused();
+  await page.keyboard.press("End");
+  await expect(page.getByRole("tab", { name: "Archived" })).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Home");
+  await expect(first).toHaveAttribute("aria-selected", "true");
+
+  const all = page.getByRole("radio", { name: "All" });
+  await all.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("radio", { name: "Games" })).toBeChecked();
+});
+
+test("tabs and chips: targets are 48 px tall", async ({ page }) => {
+  await open(page, "/dev/ui");
+  const boxes = await page.locator('[data-showcase="tabs"] [role="tab"], [data-showcase="chips"] button').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
+  expect(boxes.length).toBeGreaterThan(15);
+  for (const h of boxes) expect(h).toBeGreaterThanOrEqual(48);
+});
+
+test("tabs and chips hold up at a 320 px width and large text: they scroll, the page does not", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 700 });
+  await open(page, "/dev/ui");
+  // 200% text: the root size doubles for everything that is in rem/em and the bars still fit by scrolling.
+  await page.addStyleTag({ content: ".ui-tabs, .ui-tabs button { font-size: 200% !important; }" });
+  const page_overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(page_overflow).toBeLessThanOrEqual(0);
+  const long = page.getByRole("tablist", { name: "Many tabs, scrolling" });
+  const scrolls = await long.evaluate((el) => el.scrollWidth > el.clientWidth);
+  expect(scrolls).toBe(true);
+  // Every tab stays on one line.
+  const lines = await long.locator("[role=tab] .ui-face").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
+  for (const h of lines) expect(h).toBeLessThan(100);
+  // A selected tab off to the right is scrolled into view by the keyboard.
+  const last = page.getByRole("tab", { name: "Settings" });
+  await page.getByRole("tab", { name: "Playbook" }).focus();
+  await page.keyboard.press("End");
+  await expect(last).toBeFocused();
+  const inView = await last.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return r.right <= window.innerWidth + 1;
+  });
+  expect(inView).toBe(true);
+});
+
 test("a loading button is busy and keeps focus", async ({ page }) => {
   await open(page, "/dev/ui");
   const saving = page.getByRole("button", { name: "Saving", exact: true }).first();

@@ -151,9 +151,6 @@ li.st-chip { cursor: default; }
 /* A tracked tournament: the at-a-glance numbers, underlined tabs. */
 .card.st-glance { padding: 16px 18px; }
 .st-tile-label { font-size: 0.75rem; font-weight: 700; color: var(--muted); }
-.segmented.st-tabs { display: flex; padding: 0; gap: 4px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; flex-wrap: nowrap; overflow-x: auto; }
-.segmented.st-tabs button { flex: none; border-radius: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; padding: 10px 14px; font-size: 0.95rem; }
-.segmented.st-tabs button.on { background: none; box-shadow: none; color: var(--accent); border-bottom-color: var(--accent); font-weight: 700; }
 /* Line and roster chips: turf for who's picked. */
 .st-chip.on { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--accent); }
 li.st-chip { background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; font-weight: 600; }

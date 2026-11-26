@@ -32,6 +32,7 @@ import { useGameTracker } from "./useTracker";
 import "./stats.css";
 import { isTyping } from "@/lib/text";
 import { Dialog } from "../../Dialog";
+import { SegmentedTabs } from "../../ui/SegmentedTabs";
 
 type Tab = "track" | "lines" | "points" | "stats";
 type Act = (fn: (t: GameTracker) => void) => void;
@@ -121,20 +122,18 @@ function Game({ gameId }: { gameId: string }) {
       {panel === "gameTo" && <GameToPanel t={t} act={act} onClose={() => setPanel(null)} />}
       {panel === "timeouts" && <TimeoutsPanel t={t} act={act} onClose={() => setPanel(null)} />}
 
-      <div className="segmented st-tabs" role="tablist" aria-label="Game">
-        {(
-          [
-            ["track", "Track"],
-            ["lines", "Lines"],
-            ["points", "Points"],
-            ["stats", "Stats"],
-          ] as const
-        ).map(([k, label]) => (
-          <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>
-            {label}
-          </button>
-        ))}
-      </div>
+      <SegmentedTabs
+        variant="underline"
+        label="Game"
+        items={[
+          { id: "track", label: "Track" },
+          { id: "lines", label: "Lines" },
+          { id: "points", label: "Points" },
+          { id: "stats", label: "Stats" },
+        ]}
+        value={tab}
+        onChange={(k) => setTab(k as typeof tab)}
+      />
       {tab === "track" && (
         <TrackTab t={t} act={act} saveError={saveError} onLines={() => setTab("lines")} onStats={() => setTab("stats")} onGameTo={() => setPanel("gameTo")} onTimeouts={() => setPanel("timeouts")} />
       )}

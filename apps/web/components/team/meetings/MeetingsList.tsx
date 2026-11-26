@@ -8,6 +8,7 @@ import "./meetings.css";
 import { DateTile } from "../DateTile";
 import { startOfToday } from "@/lib/dates";
 import { meetingAnswer, needsRsvp, RsvpPill } from "../../RsvpPill";
+import { SegmentedTabs } from "../../ui/SegmentedTabs";
 
 /**
  * The team's video meetings (/teams/:id/meetings): live ones first, then
@@ -42,14 +43,15 @@ export function MeetingsList() {
             New meeting
           </Link>
         )}
-        <div className="segmented" role="tablist" aria-label="Show">
-          <button type="button" role="tab" className={past ? "" : "on"} aria-selected={!past} onClick={() => setPast(false)}>
-            Upcoming
-          </button>
-          <button type="button" role="tab" className={past ? "on" : ""} aria-selected={past} onClick={() => setPast(true)}>
-            Past
-          </button>
-        </div>
+        <SegmentedTabs
+          label="Show"
+          items={[
+            { id: "upcoming", label: "Upcoming" },
+            { id: "past", label: "Past" },
+          ]}
+          value={past ? "past" : "upcoming"}
+          onChange={(v) => setPast(v === "past")}
+        />
       </div>
       {!past && live.length > 0 && (
         <section className="card">

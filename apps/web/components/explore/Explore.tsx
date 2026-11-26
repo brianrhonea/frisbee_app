@@ -44,6 +44,7 @@ import { type ExploreFilter, eventsFor, exploreHref, hostedFor, listingsFor, mat
 import "./explore.css";
 import { useMyTeams } from "../useMyTeams";
 import { StatusPill } from "../ui/StatusPill";
+import { FilterChips } from "../ui/FilterChips";
 
 const chips: Array<[string, ExploreFilter | null]> = [
   ["All", null],
@@ -286,13 +287,13 @@ function SearchCard({
           Search
         </button>
       </form>
-      <div className="segmented explore-chips" role="group" aria-label="Show">
-        {shownChips.map(([label, filter]) => (
-          <button key={label} type="button" className={only === filter ? "on" : ""} aria-pressed={only === filter} onClick={() => pick(filter)}>
-            {label}
-          </button>
-        ))}
-      </div>
+      <FilterChips
+        className="explore-chips"
+        label="Show"
+        items={shownChips.map(([label]) => ({ id: label, label }))}
+        value={shownChips.find(([, filter]) => filter === only)?.[0] ?? ""}
+        onChange={(label) => pick(shownChips.find(([l]) => l === label)?.[1] ?? null)}
+      />
       {user === null && (
         <p className="muted small explore-people-note">
           Looking for a player? <Link href={`/sign-in?next=${encodeURIComponent(exploreHref(query, "players"))}`}>Log in to search people</Link>.

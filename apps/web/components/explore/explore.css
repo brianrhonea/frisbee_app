@@ -50,13 +50,6 @@
 /* Restyle (Turf & Disc): search and chips, Live now on the scoreboard navy. */
 .explore-search .search-form input { background: var(--field); }
 .explore-search .search-form .btn { min-width: 96px; }
-.segmented.explore-chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; background: none; border: 0; border-radius: 0; }
-.segmented.explore-chips button {
-  padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--card);
-  color: var(--ink); font-size: 0.88rem; font-weight: 600;
-}
-.segmented.explore-chips button:hover { border-color: var(--ink-soft); color: var(--ink); }
-.segmented.explore-chips button.on { background: var(--chip-on); color: var(--on-chip-on); border-color: var(--chip-on); box-shadow: none; }
 .explore-heading { font-weight: 800; }
 .explore-division { background: var(--card); border-color: var(--line-2); color: var(--ink); }
 .explore-division.on { background: var(--chip-on); color: var(--on-chip-on); border-color: var(--chip-on); }
