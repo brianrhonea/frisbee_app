@@ -33,7 +33,7 @@ describe("startup environment", () => {
   it("deployed without the personal-details KMS key fails, unless emulated; local runs need none", () => {
     fails({ NODE_ENV: "production", FIREBASE_PROJECT_ID: DEV_PROJECT_ID }, /PERSONAL_DETAILS_KMS_KEY must be set/);
     fails({ K_SERVICE: "api", FIREBASE_PROJECT_ID: PROD_PROJECT_ID, PERSONAL_DETAILS_KMS_KEY: "  " }, /PERSONAL_DETAILS_KMS_KEY must be set/);
-    expect(assertStartupEnvironment({ K_SERVICE: "api", FIREBASE_PROJECT_ID: DEV_PROJECT_ID, FIRESTORE_EMULATOR_HOST: "127.0.0.1:8080" })).toBe(DEV_PROJECT_ID);
+    expect(assertStartupEnvironment({ NODE_ENV: "production", FIREBASE_PROJECT_ID: DEV_PROJECT_ID, FIRESTORE_EMULATOR_HOST: "127.0.0.1:8080" })).toBe(DEV_PROJECT_ID);
     expect(assertStartupEnvironment({ FIREBASE_PROJECT_ID: DEV_PROJECT_ID })).toBe(DEV_PROJECT_ID);
   });
 

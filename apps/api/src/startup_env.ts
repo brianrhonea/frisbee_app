@@ -27,6 +27,21 @@ export function isDeployed(env: Env = process.env): boolean {
   return Boolean(env.K_SERVICE?.trim()) || env.NODE_ENV === "production";
 }
 
+const EMULATOR_HOST_VARS = ["FIRESTORE_EMULATOR_HOST", "FIREBASE_AUTH_EMULATOR_HOST", "FIREBASE_STORAGE_EMULATOR_HOST"] as const;
+
+/**
+ * On Cloud Run (K_SERVICE) no emulator variable may be present: the Admin SDK
+ * would accept unsigned emulator tokens and the emulator waivers below would
+ * skip the KMS and gate checks (security review 3.1). Names only, never values.
+ */
+export function assertNoEmulatorOnCloudRun(env: Env = process.env): void {
+  if (!env.K_SERVICE?.trim()) return;
+  const present = EMULATOR_HOST_VARS.filter((k) => env[k] !== undefined && env[k]!.trim() !== "");
+  if (present.length > 0) {
+    throw new StartupConfigError(`${present.join(", ")} must not be set on Cloud Run (K_SERVICE is set): emulator settings are for local runs only.`);
+  }
+}
+
 /** "live" for sk_live_/rk_live_, "test" for sk_test_/rk_test_, else unknown. */
 export function stripeKeyMode(key: string): "live" | "test" | "unknown" {
   if (key.startsWith("sk_live_") || key.startsWith("rk_live_")) return "live";
@@ -41,6 +56,7 @@ export function stripeKeyMode(key: string): "live" | "test" | "unknown" {
  * Throws StartupConfigError.
  */
 export function assertStartupEnvironment(env: Env = process.env): string {
+  assertNoEmulatorOnCloudRun(env);
   const deployed = isDeployed(env);
   const explicit = env.FIREBASE_PROJECT_ID?.trim();
   if (deployed && !explicit) {
@@ -89,6 +105,7 @@ export function assertStartupEnvironment(env: Env = process.env): string {
  * set, and age and birth-date rules enforced, in both modes. Throws StartupConfigError.
  */
 export function accountGateModeFromEnv(env: Env = process.env): AccountGateMode {
+  assertNoEmulatorOnCloudRun(env);
   const v = env.ACCOUNT_GATE_MODE?.trim().toLowerCase();
   if (!v) {
     // Deployed (and not emulated, as for the KMS key): an explicit value, so a missing variable can't quietly leave the gate report-only (N3).

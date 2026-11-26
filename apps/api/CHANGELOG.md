@@ -7,6 +7,19 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.52.2 — 2026-11-26
+
+Hardening from the independent #3a security review (all Low).
+
+- 3.1: on Cloud Run (`K_SERVICE` set) the API refuses to start if `FIRESTORE_EMULATOR_HOST`,
+  `FIREBASE_AUTH_EMULATOR_HOST` or `FIREBASE_STORAGE_EMULATOR_HOST` is present, so a deployed
+  service can't accept unsigned emulator tokens or skip the KMS and gate checks. The message
+  names the variables, never their values.
+- 4.1: lifting a suspension runs the under-13 check before changing anything (if it throws,
+  `limits` and Auth are untouched). `ModerationService`'s `disabledForAge` is now required
+  (no fail-open default). A refusal whose `refusedAt` isn't a Date is judged on the birth date
+  itself, so the account stays disabled. Not changed: the check-then-write race (4.1b).
+
 ## 0.52.1 â€” 2026-11-26
 
 Account gate re-check fixes (#3a, docs/specifications/contracts/account-gate.md section 9).
