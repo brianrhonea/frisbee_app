@@ -327,11 +327,7 @@ abstract final class AppTheme {
         shape: const StadiumBorder(),
         // Filter chips: outlined, and filled navy (light) or ink (dark)
         // when selected, so their label switches to its contrasting ink.
-        labelStyle: TextStyle(
-          fontFamily: appFont,
-          fontFeatures: tabularFigures,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
+        labelStyle: AppText.label.copyWith(
           color: WidgetStateColor.resolveWith(
             (s) => s.contains(WidgetState.selected) ? c.onChipOn : c.ink,
           ),

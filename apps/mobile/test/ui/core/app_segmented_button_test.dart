@@ -1,4 +1,4 @@
-// The shared segmented control: accent outline on the selected segment only,
+// The shared segmented control: filled chipOn on the selected segment only,
 // 48 px tall, direction-aware, survives large text, and says what is selected.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -143,14 +143,14 @@ void main() {
     );
     expect(
       (_material(t, 'Schedule').shape! as OutlinedBorder).side.color,
-      AppColors.light.accent,
+      AppColors.light.chipOn,
     );
     await t.tap(find.text('Teams'));
     await t.pumpAndSettle();
     expect(controller.index, 2);
     expect(
       (_material(t, 'Teams').shape! as OutlinedBorder).side.color,
-      AppColors.light.accent,
+      AppColors.light.chipOn,
     );
     expect(
       (_material(t, 'Schedule').shape! as OutlinedBorder).side,
@@ -170,18 +170,18 @@ void main() {
     final c = dark ? AppColors.dark : AppColors.light;
     final theme = dark ? AppTheme.dark : AppTheme.light;
 
-    testWidgets('selected segment has the accent outline, others none '
-        '($name)', (t) async {
+    testWidgets('selected segment is filled chipOn with onChipOn text, others '
+        'none ($name)', (t) async {
       await t.pumpWidget(_app(_control(), theme: theme));
       final on = _material(t, 'One');
       final side = (on.shape! as OutlinedBorder).side;
-      expect(side.color, c.accent);
+      expect(side.color, c.chipOn);
       expect(side.width, AppSegmentedButton.outlineWidth);
-      expect(on.color, c.accentSoft);
+      expect(on.color, c.chipOn);
       final off = _material(t, 'Two');
       expect((off.shape! as OutlinedBorder).side, BorderSide.none);
       expect(off.color, Colors.transparent);
-      expect(_labelColor(t, 'One'), c.accentInk);
+      expect(_labelColor(t, 'One'), c.onChipOn);
     });
   }
 

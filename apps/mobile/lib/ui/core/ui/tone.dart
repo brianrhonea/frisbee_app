@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../themes/theme.dart';
+import 'filter_chips.dart';
 import 'status_pill.dart';
 
 /// A color for a tournament's status or a team's kind. Each has a light- and
@@ -74,7 +75,7 @@ class ToneTag extends StatelessWidget {
 typedef ToneFilter<T> = ({T? value, String label, Tone? tone, int count});
 
 /// A row of single-choice filter chips, each with its tone's dot and a
-/// count; scrolls sideways when it doesn't fit.
+/// count; scrolls sideways when it doesn't fit. An [AppFilterChips].
 class ToneFilterBar<T> extends StatelessWidget {
   const ToneFilterBar({
     super.key,
@@ -90,31 +91,22 @@ class ToneFilterBar<T> extends StatelessWidget {
   final EdgeInsets padding;
 
   @override
-  Widget build(BuildContext context) => SingleChildScrollView(
-    scrollDirection: Axis.horizontal,
+  Widget build(BuildContext context) => AppFilterChips<T>(
     padding: padding,
-    child: Row(
-      children: [
-        for (final f in filters)
-          Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: ChoiceChip(
-              showCheckmark: false,
-              visualDensity: VisualDensity.compact,
-              avatar: f.tone == null
-                  ? null
-                  : CircleAvatar(
-                      radius: 5,
-                      backgroundColor: f.tone!.of(context),
-                    ),
-              label: Text('${f.label} ${f.count}'),
-              selected: f.value == selected,
-              // Selected is the theme's indigo (chipOn) for every chip; the
-              // tone shows only as the dot.
-              onSelected: (_) => onSelected(f.value),
-            ),
-          ),
-      ],
-    ),
+    selected: selected,
+    onSelected: onSelected,
+    // Selected is the theme's indigo (chipOn) for every chip; the tone shows
+    // only as the dot.
+    options: [
+      for (final f in filters)
+        (
+          value: f.value,
+          label: f.label,
+          count: f.count,
+          leading: f.tone == null
+              ? null
+              : CircleAvatar(radius: 5, backgroundColor: f.tone!.of(context)),
+        ),
+    ],
   );
 }

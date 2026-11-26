@@ -44,12 +44,7 @@ Widget _gallery() => Padding(
               icon: Icons.check,
               solid: solid,
             ),
-            StatusPill(
-              'Live',
-              tone: PillTone.live,
-              dot: true,
-              solid: solid,
-            ),
+            StatusPill('Live', tone: PillTone.live, dot: true, solid: solid),
             StatusPill(
               'Needs you',
               tone: PillTone.warning,
