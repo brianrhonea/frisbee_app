@@ -1,0 +1,42 @@
+# Checks the Flutter app (apps/mobile) on pull requests and pushes to the
+# integration branches. Codemagic builds and tests too, but only after a
+# push; this gives the PR a result first.
+#
+# `flutter test` needs no secrets or --dart-define-from-file. Golden tests
+# compare only on Windows (apps/mobile/test/ui_harness/harness.dart), so
+# they skip on this Linux runner; that is expected, not a failure.
+
+name: CI (Flutter)
+
+on:
+  push:
+    branches: [development, main, "feature/jan-4-release"]
+    paths:
+      - "apps/mobile/**"
+      - ".github/workflows/ci-flutter.yml"
+  pull_request:
+    paths:
+      - "apps/mobile/**"
+      - ".github/workflows/ci-flutter.yml"
+
+concurrency:
+  group: ci-flutter-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          # Same version as codemagic.yaml and _deploy-backend.yml.
+          flutter-version: 3.41.2
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test

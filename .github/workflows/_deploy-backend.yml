@@ -88,6 +88,23 @@ jobs:
           npm run build
           npm test
 
+      # The rules ship only if their tests pass (they need the emulators).
+      # Commits from before the rules tests existed have no script.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Test the rules
+        working-directory: ${{ env.FB_DIR }}/functions
+        run: |
+          if grep -q '"test:rules"' package.json; then
+            npm install -g firebase-tools@15.8.0
+            npm run test:rules
+          else
+            echo "::notice::No test:rules script in this commit; rules tests skipped."
+          fi
+
       # For older commits' Flutter web build (scripts/build_site.sh).
       - name: Set up Flutter
         if: env.FLUTTER_SITE == 'true'

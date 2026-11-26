@@ -13,6 +13,7 @@ import { AgreeTerms } from "./AgreeTerms";
 import { PersonalDetailsForm } from "./PersonalDetailsForm";
 import "./member.css";
 import { SignUpSteps } from "./SignUpSteps";
+import { ErrorNote } from "./StatusViews";
 import { stepAsksName, UsernameStep, usernameStepCopy } from "./UsernameStep";
 
 /** Readable without finishing sign-up: the legal pages and help. */
@@ -38,9 +39,12 @@ function dismissed(uid: string): boolean {
 /**
  * Around every page. A new account (made since personalDetailsRequiredSince)
  * that hasn't given its details sees only the form until it does; older
- * accounts get a card they can dismiss. If the status can't be read (the
- * API is down, or this site's API has no encryption key), nobody is held
- * up: the gate only stops someone on a definite "required and missing".
+ * accounts get a card they can dismiss (that dismissal covers only that
+ * card). The gate fails closed: if the personal status or the Terms
+ * agreement can't be read (API error), the member sees a blocking "Couldn't
+ * check your account" state with a retry instead of the app, so an outage
+ * can't skip Terms or the birth date. The legal pages stay readable. While
+ * a first answer is still loading nothing is held up.
  */
 export function PersonalGate({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -49,6 +53,9 @@ export function PersonalGate({ children }: { children: ReactNode }) {
   // The Community Guidelines and Terms: null while unknown (nobody waits).
   const [agreed, setAgreed] = useState<boolean | null>(null);
   const [hidePrompt, setHidePrompt] = useState(false);
+  // A check failed: the member is held at a retry, never let through.
+  const [statusFailed, setStatusFailed] = useState(false);
+  const [agreeFailed, setAgreeFailed] = useState(false);
   // Under 13: the account is removed and signed out, and this stays up.
   const [tooYoung, setTooYoung] = useState<"removing" | "removed" | null>(null);
   // Bumped when the name step saves: reloading the user changes its
@@ -61,31 +68,63 @@ export function PersonalGate({ children }: { children: ReactNode }) {
   const load = useCallback((u: User) => {
     const mine = ++latest.current;
     callApi<PersonalDetailsStatus>(u, "/v1/me/personal/status").then(
-      (s) => mine === latest.current && setStatus(s),
-      () => mine === latest.current && setStatus(null),
+      (s) => {
+        if (mine !== latest.current) return;
+        setStatus(s);
+        setStatusFailed(false);
+      },
+      () => {
+        if (mine !== latest.current) return;
+        setStatus(null);
+        setStatusFailed(true);
+      },
     );
   }, []);
 
+  const agreeLatest = useRef(0);
+  const loadAgreement = useCallback((u: User) => {
+    const mine = ++agreeLatest.current;
+    callApi<AgreementStatus>(u, agreementPath).then(
+      (a) => {
+        if (mine !== agreeLatest.current) return;
+        setAgreed(a.agreed);
+        setAgreeFailed(false);
+      },
+      () => {
+        if (mine !== agreeLatest.current) return;
+        setAgreed(null);
+        setAgreeFailed(true);
+      },
+    );
+  }, []);
   useEffect(() => {
     latest.current += 1;
+    agreeLatest.current += 1;
     setStatus(null);
     setAgreed(null);
+    setStatusFailed(false);
+    setAgreeFailed(false);
     if (!user) return;
     setHidePrompt(dismissed(user.uid));
     load(user);
-    let live = true;
-    callApi<AgreementStatus>(user, agreementPath).then(
-      (a) => live && setAgreed(a.agreed),
-      () => live && setAgreed(null),
-    );
+    loadAgreement(user);
     return () => {
-      live = false;
+      // Invalidate in-flight answers for this account.
+      latest.current += 1;
+      agreeLatest.current += 1;
     };
-  }, [user, load]);
+  }, [user, load, loadAgreement]);
 
   const refresh = useCallback(() => {
     if (user) load(user);
   }, [user, load]);
+
+  // Retries only what failed.
+  const retry = useCallback(() => {
+    if (!user) return;
+    if (statusFailed) load(user);
+    if (agreeFailed) loadAgreement(user);
+  }, [user, statusFailed, agreeFailed, load, loadAgreement]);
 
   const openPath = open.some((p) => path === p || path.startsWith(`${p}/`));
   // A new account finishes sign-up first: its name and username (Google
@@ -98,6 +137,7 @@ export function PersonalGate({ children }: { children: ReactNode }) {
   const needsName = profileKnown && nameMissing(user!.displayName);
   const missing = !!user && status !== null && !status.complete;
   const blocked = missing && status.required && !openPath;
+  const checkFailed = !!user && (statusFailed || agreeFailed) && !openPath;
   const prompt = missing && !status.required && !hidePrompt && path !== "/settings/personal";
 
   return (
@@ -116,6 +156,11 @@ export function PersonalGate({ children }: { children: ReactNode }) {
               Back to Stall 10
             </Link>
           )}
+        </div>
+      ) : checkFailed ? (
+        <div className="auth-card">
+          <h1>Couldn&apos;t check your account</h1>
+          <ErrorNote onRetry={retry}>We couldn&apos;t confirm your account details. Check your connection and retry.</ErrorNote>
         </div>
       ) : (needsUsername || needsName) && !openPath && user ? (
         <NameStep user={user} needsUsername={needsUsername} onDone={() => setNamed((n) => n + 1)} />

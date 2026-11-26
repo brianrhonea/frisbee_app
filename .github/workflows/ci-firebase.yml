@@ -1,0 +1,46 @@
+# Checks firebase/functions (unit tests, Firestore and Storage rules tests,
+# server tests on the emulator) when Firebase or the shared package change.
+# The rules and server tests need the Firestore/Storage emulators (Java 21
+# plus firebase-tools).
+
+name: CI (Firebase)
+
+on:
+  push:
+    branches: [development, main, "feature/jan-4-release"]
+    paths:
+      - "firebase/**"
+      - "packages/shared/**"
+      - ".github/workflows/ci-firebase.yml"
+  pull_request:
+    paths:
+      - "firebase/**"
+      - "packages/shared/**"
+      - ".github/workflows/ci-firebase.yml"
+
+concurrency:
+  group: ci-firebase-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  functions:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firebase/functions
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: firebase/functions/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm install -g firebase-tools@15.8.0
+      - run: npm ci
+      - run: npm test
+      - run: npm run test:rules
+      - run: npm run test:server
