@@ -1,6 +1,6 @@
 # Account gate contract (SEC-2, release-audit item #3a)
 
-Status: **proposed, implemented on branch, awaiting owner approval before release.**
+Status: **approved by the owner 2026-11-26 (D14).** No staff birth-date override (D16). Held on its branch until the Sprint 2 client work is ready; deploy order API → clients → rules.
 Owner decisions this rests on: Q5 (email is limited to Firebase verification and
 password reset) and Q6 (adult-only launch: 18+, enforced on the server).
 
