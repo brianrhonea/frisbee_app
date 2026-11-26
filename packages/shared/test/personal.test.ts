@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { adultOnlyMessage } from "../src/account_gate.js";
 import {
   ageOn,
   birthDateProblem,
@@ -26,17 +27,20 @@ describe("age rules", () => {
     expect(ageOn("2008-02-29", "2026-03-01")).toBe(18);
   });
 
-  it("refuses under 13, the future and impossible dates", () => {
+  it("refuses under 18 (under 13 with its own message), the future and impossible dates", () => {
     expect(birthDateProblem("2014-01-01", today)).toBe(tooYoungMessage);
-    expect(birthDateProblem("2013-11-20", today)).toBeNull();
+    expect(birthDateProblem("2013-11-20", today)).toBe(adultOnlyMessage);
+    expect(birthDateProblem("2008-11-21", today)).toBe(adultOnlyMessage);
+    expect(birthDateProblem("2008-11-20", today)).toBeNull();
     expect(birthDateProblem("2027-01-01", today)).toBe("That date is in the future.");
     expect(birthDateProblem("1890-01-01", today)).not.toBeNull();
     expect(isCalendarDate("2001-02-29")).toBe(false);
     expect(isCalendarDate("2000-02-29")).toBe(true);
   });
 
-  it("needs a guardian under 18 only", () => {
-    expect(personalDetailsProblem({ birthDate: "2010-01-01" }, today)?.field).toBe("guardian");
+  it("is adults only: under 18 is a birthDate problem, never a guardian step", () => {
+    expect(personalDetailsProblem({ birthDate: "2010-01-01" }, today)).toEqual({ field: "birthDate", message: adultOnlyMessage });
+    expect(personalDetailsProblem({ birthDate: "2020-01-01" }, today)).toEqual({ field: "birthDate", message: tooYoungMessage });
     expect(personalDetailsProblem({ birthDate: "2000-01-01" }, today)).toBeNull();
   });
 });
