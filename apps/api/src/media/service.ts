@@ -437,22 +437,26 @@ export class UploadService {
 
   /** Marks a still-pending upload failed with [error] (a removed one stays removed), and deletes its raw file. */
   /**
-   * Whether SafeSearch refuses the photo. If Vision can't be reached the
-   * photo is let through (and logged), so an outage doesn't stop uploads.
+   * Whether SafeSearch refuses the photo. Fails CLOSED (#14): if Vision
+   * can't be reached or gives no answer, the photo isn't saved and the
+   * caller gets 503 `unavailable`; the upload stays pending, so the client
+   * can call complete again. (No checker configured: not screened; the
+   * deployment sets one, see server.ts.)
    */
   private async unsafe(id: string, image: Buffer): Promise<boolean> {
     const checker = this.opts.images;
     if (!checker) return false;
     try {
       const s = await checker.safeSearch(image);
+      if (s == null) throw new Error("SafeSearch gave no answer");
       if (isUnsafeImage(s)) {
         console.warn(JSON.stringify({ severity: "WARNING", message: "Photo refused by SafeSearch", uploadId: id, safeSearch: s }));
         return true;
       }
       return false;
     } catch (e) {
-      console.error(JSON.stringify({ severity: "ERROR", message: "SafeSearch failed; photo let through", uploadId: id, error: String(e) }));
-      return false;
+      console.error(JSON.stringify({ severity: "ERROR", message: "SafeSearch failed; photo not saved", uploadId: id, error: String(e) }));
+      throw new ApiError("unavailable", "We couldn't check that photo right now. Try again in a minute.");
     }
   }
 
@@ -466,11 +470,12 @@ export class UploadService {
   }
 }
 
+const videosOff = "Video uploads aren't available right now.";
+
 /**
  * Videos outside chat wait on the transcode job (ARCHITECTURE.md §10 item
  * 4): until a queue is wired, they're refused rather than left processing.
  */
-const videosOff = "Video uploads aren't available right now.";
 const videosNotYet = "Video uploads aren't available here yet.";
 
 const quotaPath = (uid: string) => `uploadQuotas/${uid}`;

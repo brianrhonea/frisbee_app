@@ -791,9 +791,18 @@ describe("photo checks (SafeSearch)", () => {
     expect([...storage.files.keys()].filter((k) => k.includes(id))).toEqual([]);
   });
 
-  it("lets the photo through when Vision fails", async () => {
+  it("fails closed when Vision fails: nothing saved, 503, the upload stays pending to retry", async () => {
     answer = new Error("Vision 503");
-    expect((await uploadPhoto()).done.statusCode).toBe(200);
+    const { id, done } = await uploadPhoto();
+    expect(done.statusCode).toBe(503);
+    expect(done.json().error.code).toBe("unavailable");
+    expect(store.doc(`uploads/${id}`)).toMatchObject({ status: "pending" });
+    expect([...storage.files.keys()].filter((k) => k.includes(id) && !k.startsWith("uploads/raw/"))).toEqual([]);
+  });
+
+  it("fails closed when Vision gives no answer", async () => {
+    answer = null;
+    expect((await uploadPhoto()).done.statusCode).toBe(503);
   });
 });
 
