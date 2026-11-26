@@ -4,6 +4,7 @@ import Script from "next/script";
 import type { ReactNode } from "react";
 import { AppFrame } from "@/components/AppFrame";
 import { AuthProvider } from "@/components/AuthProvider";
+import { ErrorReporter } from "@/components/ErrorReporter";
 import { PersonalGate } from "@/components/PersonalGate";
 import { SiteFooter } from "@/components/SiteFooter";
 import { VoiceProvider } from "@/components/voice/VoiceProvider";
@@ -47,6 +48,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <Script id="theme" strategy="beforeInteractive">
           {themeScript}
         </Script>
+        <ErrorReporter />
         <AuthProvider>
           {/* Above the frame, so a voice call stays up from page to page. */}
           <VoiceProvider>
