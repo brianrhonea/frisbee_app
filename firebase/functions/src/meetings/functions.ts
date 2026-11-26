@@ -24,6 +24,7 @@ import {
   voiceDecision,
   voiceRoomName,
 } from "./model";
+import { requireCompleteAccount } from "../account/gate";
 import { enforceAppCheck } from "../options";
 
 const livekitUrl = defineSecret("LIVEKIT_URL");
@@ -42,6 +43,7 @@ const validId = (v: unknown): v is string => typeof v === "string" && /^[A-Za-z0
 export const joinToken = onCall({ secrets, enforceAppCheck }, async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in to join meetings.");
+  requireCompleteAccount(req.auth!);
   const { teamId, meetingId } = (req.data ?? {}) as Record<string, unknown>;
   if (!validId(teamId) || !validId(meetingId)) {
     throw new HttpsError("invalid-argument", "Unknown meeting.");
@@ -91,6 +93,7 @@ export const joinToken = onCall({ secrets, enforceAppCheck }, async (req) => {
 export const voiceToken = onCall({ secrets, enforceAppCheck }, async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in to join voice channels.");
+  requireCompleteAccount(req.auth!);
   const { teamId, roomId } = (req.data ?? {}) as Record<string, unknown>;
   if (!validId(teamId) || !validId(roomId)) {
     throw new HttpsError("invalid-argument", "Unknown channel.");

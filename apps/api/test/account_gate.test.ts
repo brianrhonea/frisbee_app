@@ -33,7 +33,7 @@ function setup() {
   });
   const call = (kind: string, method: "GET" | "PUT" | "POST" | "PATCH" | "DELETE", url: string, body?: object, uid = "u1") =>
     app.inject({ method, url, payload: body, headers: { authorization: `Bearer ${kind}:${uid}` } });
-  return { store, users, app, call };
+  return { store, users, cipher, app, call };
 }
 
 let s: ReturnType<typeof setup>;
@@ -128,11 +128,6 @@ describe("the onboarding routes stay open to an incomplete account", () => {
   });
 
   it.each([
-    ["PUT", "/v1/me/identity"],
-    ["POST", "/v1/me/username"],
-    ["PUT", "/v1/me/profile/details"],
-    ["PUT", "/v1/me/profile/privacy"],
-    ["PUT", "/v1/me/profile/visibility"],
     ["PUT", "/v1/me/message-policy"],
     ["PUT", "/v1/me/read-receipts"],
     ["PUT", "/v1/me/notification-settings/category"],
@@ -141,6 +136,40 @@ describe("the onboarding routes stay open to an incomplete account", () => {
   ] as const)("%s %s is not gated (a bad body may fail validation, never account_incomplete)", async (method, url) => {
     const res = await s.call("bare", method, url, {});
     expect(res.body).not.toContain("account_incomplete");
+  });
+});
+
+/** Identity, username and profile writes build a searchable profile: they need the adult check (F1). */
+const ageGated = [
+  ["PUT", "/v1/me/identity"],
+  ["POST", "/v1/me/username"],
+  ["PUT", "/v1/me/profile/details"],
+  ["PUT", "/v1/me/profile/privacy"],
+  ["PUT", "/v1/me/profile/visibility"],
+] as const;
+
+describe("profile, username and identity writes need ageOk, and nothing else (F1)", () => {
+  it.each(ageGated)("%s %s refuses an account with no age claim, naming only age", async (method, url) => {
+    for (const kind of ["bare", "noage"]) {
+      const res = await s.call(kind, method, url, {});
+      expect(res.statusCode).toBe(403);
+      expect(res.json().error.code).toBe("account_incomplete");
+      expect(Object.keys(res.json().error.fields)).toEqual(["age"]);
+    }
+  });
+
+  it.each(ageGated)("%s %s lets an adult through while the email or Terms are pending", async (method, url) => {
+    for (const kind of ["unverified", "noterms", "oldterms"]) {
+      const res = await s.call(kind, method, url, {});
+      expect(res.body).not.toContain("account_incomplete");
+    }
+  });
+
+  it("a refused minor never gets the claim, so never a profile", async () => {
+    await s.call("bare", "PUT", "/v1/me/personal/birth-date", { birthDate: "2009-06-01" });
+    expect(s.users.claims.size).toBe(0);
+    const res = await s.call("bare", "PUT", "/v1/me/profile/details", {});
+    expect(res.statusCode).toBe(403);
   });
 });
 
@@ -170,12 +199,13 @@ describe("the claims", () => {
     expect(s.users.claims.size).toBe(0);
   });
 
-  it("an under-18 birth date is refused and sets no claim, nor leaves a record", async () => {
-    for (const birthDate of ["2008-11-22", "2010-01-01"]) {
-      const res = await s.call("bare", "PUT", "/v1/me/personal/birth-date", { birthDate });
-      expect(res.statusCode).toBe(412);
-      expect(res.json().error.message).toBe(adultOnlyMessage);
-    }
+  it("an under-18 birth date is refused and sets no claim, nor leaves a readable record", async () => {
+    const res = await s.call("bare", "PUT", "/v1/me/personal/birth-date", { birthDate: "2008-11-22" });
+    expect(res.statusCode).toBe(412);
+    expect(res.json().error.message).toBe(adultOnlyMessage);
+    // A different date afterwards is refused as locked, not tried again (F3).
+    const other = await s.call("bare", "PUT", "/v1/me/personal/birth-date", { birthDate: "1990-01-01" });
+    expect(other.statusCode).toBe(412);
     expect(s.users.claims.size).toBe(0);
     expect(s.store.doc("personalDetails/u1")).toBeUndefined();
     // And so the account still can't write.
@@ -242,10 +272,50 @@ describe("existing accounts (lazy backfill through the status endpoint)", () => 
   });
 
   it("someone else's records never earn the caller a claim", async () => {
+    // u1 has an adult birth date and an agreement on file; u2 has nothing.
     await existing("1995-04-02");
-    s.store.docs.delete("personalDetails/u1");
-    s.store.docs.delete("users/u1");
-    await s.call("bare", "GET", "/v1/me/personal/status", undefined, "u2");
+    const res = await s.call("bare", "GET", "/v1/me/personal/status", undefined, "u2");
+    expect(res.json().refreshToken).toBeUndefined();
+    expect(s.users.claims.has("u2")).toBe(false);
+    expect(s.users.claims.has("u1")).toBe(false);
+  });
+
+  it("a record copied to the caller's path doesn't open, and earns nothing (the path is the cipher's context)", async () => {
+    await existing("1995-04-02");
+    s.store.put("personalDetails/u2", s.store.doc("personalDetails/u1")!);
+    const res = await s.call("bare", "GET", "/v1/me/personal/status", undefined, "u2");
+    expect(res.statusCode).toBe(200);
+    expect(s.users.claims.has("u2")).toBe(false);
+  });
+
+  it("opens the birth date only while the token lacks ageOk (incomplete token)", async () => {
+    await existing("1995-04-02");
+    const open = () => (s.cipher as FakeCipher).calls.open;
+    await s.call("token", "GET", "/v1/me/personal/status");
+    expect(open()).toBe(0);
+    await s.call("noage", "GET", "/v1/me/personal/status");
+    expect(open()).toBe(1);
+    expect(s.users.claims.get("u1")).toEqual({ ageOk: true });
+  });
+
+  it("a decrypt failure grants no age claim, doesn't break status, and still grants terms (F9)", async () => {
+    await existing("1995-04-02");
+    s.cipher.open = async () => {
+      throw new Error("kms down");
+    };
+    const res = await s.call("bare", "GET", "/v1/me/personal/status");
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ complete: true, required: true, refreshToken: true });
+    expect(s.users.claims.get("u1")).toEqual({ terms: termsVersion });
+  });
+
+  it("a decrypt failure on a record with nothing else to grant is a plain 200", async () => {
+    await existing("1995-04-02", false);
+    s.cipher.open = async () => {
+      throw new Error("kms down");
+    };
+    const res = await s.call("bare", "GET", "/v1/me/personal/status");
+    expect(res.statusCode).toBe(200);
     expect(s.users.claims.size).toBe(0);
   });
 });

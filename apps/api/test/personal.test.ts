@@ -77,7 +77,8 @@ describe("PUT /v1/me/personal", () => {
       fields: { birthDate: tooYoungMessage },
     });
     expect(s.store.doc(D)).toBeUndefined();
-    expect(s.cipher.calls.seal).toBe(0);
+    // Only the sealed refusal is kept (F3), never anything readable.
+    expect(Object.keys(s.store.doc("ageRefusals/u1")!).sort()).toEqual(["ciphertext", "format", "key", "refusedAt"]);
   });
 
   it("counts 18th birthdays in the furthest-ahead time zone (UTC+14)", async () => {
@@ -110,7 +111,8 @@ describe("PUT /v1/me/personal", () => {
       });
     }
     expect(s.store.doc(D)).toBeUndefined();
-    expect(s.cipher.calls.seal).toBe(0);
+    // Only the sealed refusal is kept (F3), never anything readable.
+    expect(Object.keys(s.store.doc("ageRefusals/u1")!).sort()).toEqual(["ciphertext", "format", "key", "refusedAt"]);
   });
 
   it("never keeps a guardian (everyone is an adult)", async () => {
@@ -273,7 +275,8 @@ describe("PUT /v1/me/personal/birth-date (sign-up)", () => {
       fields: { birthDate: tooYoungMessage },
     });
     expect(s.store.doc(D)).toBeUndefined();
-    expect(s.cipher.calls.seal).toBe(0);
+    // Only the sealed refusal is kept (F3), never anything readable.
+    expect(Object.keys(s.store.doc("ageRefusals/u1")!).sort()).toEqual(["ciphertext", "format", "key", "refusedAt"]);
   });
 
   it.each(["2008-11-22", "2010-01-01", "2013-11-21"])("refuses %s (under 18, adults only) and saves nothing", async (birthDate) => {
@@ -285,7 +288,8 @@ describe("PUT /v1/me/personal/birth-date (sign-up)", () => {
       fields: { birthDate: adultOnlyMessage },
     });
     expect(s.store.doc(D)).toBeUndefined();
-    expect(s.cipher.calls.seal).toBe(0);
+    // Only the sealed refusal is kept (F3), never anything readable.
+    expect(Object.keys(s.store.doc("ageRefusals/u1")!).sort()).toEqual(["ciphertext", "format", "key", "refusedAt"]);
   });
 
   it("allows an 18th birthday today in UTC+14", async () => {
@@ -331,5 +335,105 @@ describe("LocalCipher (emulators)", () => {
   });
   it("refuses a short key", () => {
     expect(() => new LocalCipher("c2hvcnQ=")).toThrow();
+  });
+});
+
+describe("a refused birth date is remembered (F3)", () => {
+  const B = "/v1/me/personal/birth-date";
+
+  it("a refused 17-year-old can't then save an adult date, on either route", async () => {
+    expect((await s.call("PUT", B, { birthDate: "2009-06-01" })).statusCode).toBe(412);
+    for (const res of [await s.call("PUT", B, { birthDate: "1995-04-02" }), await s.call("PUT", "/v1/me/personal", adult)]) {
+      expect(res.statusCode).toBe(412);
+      expect(res.json().error.message).toBe(birthDateLockedMessage);
+    }
+    expect(s.store.doc(D)).toBeUndefined();
+    expect(s.users.claims.size).toBe(0);
+  });
+
+  it("the full form's refusal is remembered against the sign-up form too", async () => {
+    await s.call("PUT", "/v1/me/personal", { ...adult, birthDate: "2009-06-01" });
+    expect((await s.call("PUT", B, { birthDate: "1995-04-02" })).json().error.message).toBe(birthDateLockedMessage);
+  });
+
+  it("the same refused date again is refused the same way and changes nothing", async () => {
+    await s.call("PUT", B, { birthDate: "2009-06-01" });
+    const kept = JSON.stringify(s.store.doc("ageRefusals/u1"));
+    const again = await s.call("PUT", B, { birthDate: "2009-06-01" });
+    expect(again.statusCode).toBe(412);
+    expect(again.json().error.message).toBe(adultOnlyMessage);
+    expect(JSON.stringify(s.store.doc("ageRefusals/u1"))).toBe(kept);
+  });
+
+  it("keeps the refusal sealed and bound to the account, never readable", async () => {
+    await s.call("PUT", B, { birthDate: "2009-06-01" });
+    const doc = s.store.doc("ageRefusals/u1")!;
+    expect(Object.keys(doc).sort()).toEqual(["ciphertext", "format", "key", "refusedAt"]);
+    expect(JSON.stringify(doc)).not.toContain("2009");
+    // Copied to another user's path it doesn't open (the path is the cipher's context).
+    s.store.put("ageRefusals/u2", doc);
+    expect((await s.call("PUT", B, { birthDate: "1995-04-02" }, "u2")).statusCode).toBe(500);
+  });
+
+  it("one user's refusal doesn't touch another's", async () => {
+    await s.call("PUT", B, { birthDate: "2009-06-01" });
+    s.users.records.set("u2", { name: "Sam", createdAt: "2026-11-15T09:00:00.000Z" });
+    expect((await s.call("PUT", B, { birthDate: "1995-04-02" }, "u2")).statusCode).toBe(200);
+  });
+
+  it("an under-13 attempt disables the Auth account; under 18 does not", async () => {
+    await s.call("PUT", B, { birthDate: "2009-06-01" });
+    expect(s.users.disabled.has("u1")).toBe(false);
+    s.users.records.set("u2", { name: "Kit", createdAt: "2026-11-15T09:00:00.000Z" });
+    const res = await s.call("PUT", B, { birthDate: "2015-01-01" }, "u2");
+    expect(res.json().error.message).toBe(tooYoungMessage);
+    expect(s.users.disabled.has("u2")).toBe(true);
+  });
+
+  it("an under-13 attempt through the full form disables the account too", async () => {
+    await s.call("PUT", "/v1/me/personal", { ...adult, birthDate: "2015-01-01" });
+    expect(s.users.disabled.has("u1")).toBe(true);
+  });
+
+  it("an adult with a saved date can't be disabled by trying a child's date", async () => {
+    await s.call("PUT", "/v1/me/personal", adult);
+    const res = await s.call("PUT", "/v1/me/personal", { ...adult, birthDate: "2015-01-01" });
+    expect(res.json().error.message).toBe(birthDateLockedMessage);
+    expect(s.users.disabled.size).toBe(0);
+    expect(s.store.doc("ageRefusals/u1")).toBeUndefined();
+  });
+
+  it("a refused 17-year-old trying an under-13 date is locked, not disabled", async () => {
+    await s.call("PUT", B, { birthDate: "2009-06-01" });
+    const res = await s.call("PUT", B, { birthDate: "2015-01-01" });
+    expect(res.json().error.message).toBe(birthDateLockedMessage);
+    expect(s.users.disabled.size).toBe(0);
+  });
+
+  it("there is no override: a staff token can't clear it", async () => {
+    await s.call("PUT", B, { birthDate: "2009-06-01" });
+    const res = await s.app.inject({ method: "PUT", url: B, payload: { birthDate: "1995-04-02" }, headers: { authorization: "Bearer staff:u1" } });
+    expect(res.statusCode).toBe(412);
+  });
+});
+
+describe("PUT /v1/me/personal is rate limited (F3)", () => {
+  it("5 a minute per account, then 429; another account is unaffected", async () => {
+    const codes: number[] = [];
+    for (let i = 0; i < 6; i++) codes.push((await s.call("PUT", "/v1/me/personal", adult)).statusCode);
+    expect(codes.slice(0, 5)).toEqual([200, 200, 200, 200, 200]);
+    expect(codes[5]).toBe(429);
+    s.users.records.set("u2", { name: "Sam", createdAt: "2026-11-15T09:00:00.000Z" });
+    expect((await s.call("PUT", "/v1/me/personal", adult, "u2")).statusCode).toBe(200);
+  });
+});
+
+describe("GET /v1/me/personal/status is rate limited (F4)", () => {
+  it("10 a minute per account, then 429", async () => {
+    const codes: number[] = [];
+    for (let i = 0; i < 11; i++) codes.push((await s.call("GET", "/v1/me/personal/status")).statusCode);
+    expect(codes.slice(0, 10).every((c) => c === 200)).toBe(true);
+    expect(codes[10]).toBe(429);
+    expect((await s.call("GET", "/v1/me/personal/status", undefined, "u2")).statusCode).toBe(200);
   });
 });

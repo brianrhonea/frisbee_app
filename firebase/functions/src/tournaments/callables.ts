@@ -4,6 +4,7 @@ import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 
+import { requireCompleteAccount } from "../account/gate";
 import { enforceAppCheck } from "../options";
 import {
   canManageEvents,
@@ -36,6 +37,7 @@ const idPattern = /^[A-Za-z0-9_-]{1,60}$/;
 export const createLeagueTeams = onCall({ enforceAppCheck }, async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in to create teams.");
+  requireCompleteAccount(req.auth!);
   const { tournamentId, divisionId } = (req.data ?? {}) as { tournamentId?: unknown; divisionId?: unknown };
   if (typeof tournamentId !== "string" || !idPattern.test(tournamentId)) {
     throw new HttpsError("invalid-argument", "Pick a league.");

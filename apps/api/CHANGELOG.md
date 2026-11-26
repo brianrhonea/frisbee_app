@@ -7,6 +7,32 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.52.0 — 2026-11-26
+
+Account gate fixes from the #3a security review (docs/specifications/contracts/account-gate.md).
+
+- **Rollout switch.** `ACCOUNT_GATE_MODE` is `report` (the default when unset) or
+  `enforce`. In `report` the API logs `account_incomplete` (event, uid, what is
+  missing, route; never the body) and lets the write through; the claims are
+  still set and the age rules below still apply. Any other value stops startup.
+  With `enforce` the API refuses to start without a personal-details cipher
+  (`PERSONAL_DETAILS_KMS_KEY`, or the local key with the emulators) (F8).
+- F1: `PUT /v1/me/identity`, `POST /v1/me/username`, `PUT /v1/me/profile/details`,
+  `/profile/privacy` and `/profile/visibility` need the `ageOk` claim (route
+  `accountGate: "age"`); a pending email or Terms no longer blocks them, a
+  missing adult check does.
+- F3: an under-18 birth date is remembered in `ageRefusals/{uid}` (sealed like
+  personal details, closed to clients, deleted with the account). A different
+  date afterwards, on either route, is refused 412 with the birth-date-locked
+  message. An under-13 refusal also disables the Firebase Auth account and
+  revokes its sessions. No staff override. `PUT /v1/me/personal` is limited to
+  5 a minute and 20 a day per account.
+- F4: `GET /v1/me/personal/status` is limited to 10 a minute and 200 a day per
+  account. Setting claims skips the Auth write when nothing changes.
+- F9: a decrypt failure while looking for the age claim is logged
+  (`account_gate_decrypt_failed`, no detail) and grants no age claim; status
+  still answers.
+
 ## 0.50.0 â€” 2026-11-26
 
 - Uploads (#13): `POST /v1/uploads` and `/complete` refuse every video

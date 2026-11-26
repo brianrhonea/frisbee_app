@@ -10,7 +10,7 @@
 
 import type { AccountGateMode } from "./auth.js";
 
-export const DEV_PROJECT_ID ="frisbee-app-brianrhonea-dev";
+export const DEV_PROJECT_ID = "frisbee-app-brianrhonea-dev";
 export const PROD_PROJECT_ID = "frisbee-app-brianrhonea";
 
 export class StartupConfigError extends Error {
@@ -57,7 +57,13 @@ export function assertStartupEnvironment(env: Env = process.env): string {
     throw new StartupConfigError("PERSONAL_DETAILS_KMS_KEY must be set when deployed: without it date-of-birth checks fail closed and block every member.");
   }
 
-  accountGateModeFromEnv(env);
+  // F8: with the gate enforcing, no cipher means nobody's birth date can be
+  // opened, so no account ever earns `ageOk` and every write is refused. Fail at
+  // boot rather than lock everyone out (report-only runs without one, locally).
+  const mode = accountGateModeFromEnv(env);
+  if (mode === "enforce" && !env.PERSONAL_DETAILS_KMS_KEY?.trim() && !env.PERSONAL_DETAILS_LOCAL_KEY?.trim()) {
+    throw new StartupConfigError("PERSONAL_DETAILS_KMS_KEY (or PERSONAL_DETAILS_LOCAL_KEY with the emulators) must be set when ACCOUNT_GATE_MODE=enforce: without a cipher no account can earn the age claim.");
+  }
 
   const key = env.STRIPE_SECRET_KEY?.trim();
   if (key) {
@@ -75,15 +81,16 @@ export function assertStartupEnvironment(env: Env = process.env): string {
 
 /**
  * How the API treats a write by an incomplete account (ACCOUNT_GATE_MODE,
- * docs/specifications/contracts/account-gate.md): `enforce` (the default,
- * also when unset) refuses it with account_incomplete; `report` logs
- * account_incomplete and lets it through, for a first rollout while the
- * clients and claims catch up. Anything else is a startup error, so a
- * typo can't quietly turn the gate off. Throws StartupConfigError.
+ * docs/specifications/contracts/account-gate.md): `report` (the default,
+ * also when unset) logs account_incomplete and lets it through, so the first
+ * rollout can't lock anyone out while the claims and clients catch up;
+ * `enforce` refuses it with 403 account_incomplete. Anything else is a
+ * startup error, so a typo can't quietly turn the gate off. The claims are
+ * set, and age and birth-date rules enforced, in both modes. Throws StartupConfigError.
  */
 export function accountGateModeFromEnv(env: Env = process.env): AccountGateMode {
   const v = env.ACCOUNT_GATE_MODE?.trim().toLowerCase();
-  if (!v) return "enforce";
+  if (!v) return "report";
   if (v === "enforce" || v === "report") return v;
   throw new StartupConfigError("ACCOUNT_GATE_MODE must be enforce or report.");
 }
