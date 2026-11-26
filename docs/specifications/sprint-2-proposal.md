@@ -109,7 +109,24 @@
 
 The owner asked for the work to be finished with the orchestrator's recommended defaults, and for UI to review by end of day. All local merges into `feature/jan-4-release` were made by the orchestrator. Nothing was pushed or deployed.
 
-**Release branch now at `b471e30`:** API 0.52.1, web 0.61.0, app 0.0.58.
+**Release branch now at `cc4fb3a`:** API 0.52.2, web 0.61.0, app 0.0.59.
+
+**Later the same day:**
+- **A second security review**, of everything after `0136df0`: OK. Its Low findings 3.1, 4.1 (a, c, d) and 5.1 are fixed in API 0.52.2 (`475cc3a`).
+- **A full scan of 48 app before/after screens** found three layout regressions from the 48 px buttons. They are fixed (`cc4fb3a`):
+  - the Schedule title (Today and New event became icons on phones);
+  - the join-request rows;
+  - the organization teams rows.
+- **Open Low items (follow-up):**
+  - legacy profile-photo copies in calendar, membership, roster, the meetings function, rankings, notifications and browse;
+  - lh3 path breadth;
+  - the 4.1b race;
+  - the unreadable refusal-date branch;
+  - the Dart `code` cast in `api_client.dart:204`.
+- **Pre-existing failures:** three screenshot generators (home, play, tournaments registration) fail when run with `--dart-define=SCREENSHOTS`.
+- **One flaky run:** a root `pnpm test` run during parallel Flutter tests had 19 API failures. Two reruns passed 1596/1596.
+
+**Earlier in the day:** API 0.52.1, web 0.61.0, app 0.0.58, at `b471e30`.
 - **Web C1–C4** (`959d6e3`, review fixes `9484518`): StatusPill, Button, SegmentedTabs and FilterChips, Avatar/TeamLogo/AvatarStack, and a `/dev/ui` gallery that returns 404 in production. #6 on the web needs no change, because the contract has no web build gate.
 - **App lane B** (`0bd9569`, review fixes `d5d5e71`):
   - K6/K7 finished, so K8 runs with 0 skips;
