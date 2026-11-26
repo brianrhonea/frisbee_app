@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../themes/theme.dart';
 
-/// A color for telling kinds of things apart at a glance: a tournament's
-/// status, a team's kind. Each has a light- and a dark-theme shade.
+/// A color for a tournament's status or a team's kind. Each has a light- and
+/// a dark-theme shade.
+///
+/// The rule (zinc + indigo): kinds and most statuses are grey; red is for
+/// live, green only for success (open, done), amber only for what needs the
+/// user. There are no other hues, so a new tag cannot pick one by accident.
 enum Tone {
   grey(Color(0xFF6B7280), Color(0xFFB0B7C3)),
-  blue(Color(0xFF2F6FD0), Color(0xFF6AA6F5)),
-  teal(Color(0xFF1F8A8A), Color(0xFF6FD3CF)),
   amber(Color(0xFFB7791F), Color(0xFFF2C46B)),
-  purple(Color(0xFF8A4FD1), Color(0xFFB794EC)),
   red(Color(0xFFD03A2F), Color(0xFFF58A80)),
   // The success colours (AppColors.positive): green means done, open or OK.
   green(Color(0xFF166534), Color(0xFF86EFAC));
@@ -135,12 +136,8 @@ class ToneFilterBar<T> extends StatelessWidget {
                     ),
               label: Text('${f.label} ${f.count}'),
               selected: f.value == selected,
-              selectedColor: f.tone?.of(context).withValues(alpha: 0.18),
-              // The theme's selected label is white on navy; on a tinted
-              // chip it must be the tone's own ink.
-              labelStyle: f.tone != null && f.value == selected
-                  ? TextStyle(color: f.tone!.ink(context))
-                  : null,
+              // Selected is the theme's indigo (chipOn) for every chip; the
+              // tone shows only as the dot.
               onSelected: (_) => onSelected(f.value),
             ),
           ),

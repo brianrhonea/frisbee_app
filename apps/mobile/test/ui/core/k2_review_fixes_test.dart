@@ -79,7 +79,6 @@ void main() {
             ),
           ),
         );
-        final ctx = t.element(find.byType(ChoiceChip));
         final label = t.widget<RichText>(
           find
               .descendant(
@@ -88,15 +87,15 @@ void main() {
               )
               .first,
         );
+        // Selected is the theme's indigo for every tone, label on it >= 4.5:1.
         final color = label.text.style!.color!;
-        expect(color, isNot(c.onChipOn));
-        final tint = tone.of(ctx).withValues(alpha: 0.18);
-        for (final ground in [c.background, c.card]) {
-          expect(
-            _contrast(color, Color.alphaBlend(tint, ground)),
-            greaterThanOrEqualTo(4.5),
-          );
-        }
+        expect(color, c.onChipOn);
+        expect(_contrast(color, c.chipOn), greaterThanOrEqualTo(4.5));
+        expect(
+          t.widget<ChoiceChip>(find.byType(ChoiceChip)).selectedColor,
+          isNull,
+          reason: 'falls through to the theme chipOn',
+        );
       });
     }
   }

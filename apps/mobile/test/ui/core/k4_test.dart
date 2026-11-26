@@ -7,7 +7,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/core/ui/app_segmented_button.dart';
 import 'package:frisbee_app/ui/core/ui/layout.dart';
+import 'package:frisbee_app/domain/models/hosted_tournament.dart';
 import 'package:frisbee_app/ui/core/ui/tone.dart';
+import 'package:frisbee_app/ui/tournaments/widgets/hosted_status_badge.dart';
 
 Widget _app(ThemeData theme, Widget child) => MaterialApp(
   theme: theme,
@@ -20,6 +22,26 @@ double _contrast(Color a, Color b) {
 }
 
 void main() {
+  test('tone palette has no blue, teal or purple (zinc + indigo rule)', () {
+    expect(
+      Tone.values.map((t) => t.name),
+      unorderedEquals(['grey', 'amber', 'red', 'green']),
+    );
+  });
+
+  test('hosted statuses: live red, registration green, the rest grey', () {
+    expect(HostedStatus.live.tone, Tone.red);
+    expect(HostedStatus.registration.tone, Tone.green);
+    for (final s in [
+      HostedStatus.draft,
+      HostedStatus.seeding,
+      HostedStatus.scheduled,
+      HostedStatus.finished,
+    ]) {
+      expect(s.tone, Tone.grey, reason: s.name);
+    }
+  });
+
   final themes = {'light': AppTheme.light, 'dark': AppTheme.dark};
 
   for (final e in themes.entries) {
