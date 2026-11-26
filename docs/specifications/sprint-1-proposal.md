@@ -1,6 +1,6 @@
 # Sprint 1 proposal (Nov 30 – Dec 6, 2026)
 
-**Status:** approved by the owner on 2026-11-26. Nothing has been implemented yet. Q5, Q6 and Q10 are still open: #3a waits on Q5/Q6, and if they are not decided lane A takes #8.
+**Status:** approved by the owner on 2026-11-26. Q5 and Q6 answered yes and Q10 answered (about 20 hours a week) on 2026-11-26; #3a started.
 
 **Baseline:** `feature/jan-4-release` at `28f3ebe`.
 
@@ -112,7 +112,7 @@ All work merges locally into `feature/jan-4-release`. At the sprint's end, a PR 
    - Adult-only (18+) launch enforced on the server.
 
    Both are needed for #3a. If they're not decided, lane A takes #8 instead.
-3. **Q10:** your weekly hours until Jan 18, which set the cut line.
+3. **Q10:** answered 2026-11-26: about 20 hours a week.
 4. **Early answers would help Sprint 2:**
    - **Q9:** beta on prod or dev.
    - **Q15:** Crashlytics plus Cloud Error Reporting.

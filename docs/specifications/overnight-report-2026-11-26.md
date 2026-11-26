@@ -230,3 +230,11 @@ The owner approved the defaults for D1–D13.
 - **Still open:**
   - D1 and D2. Their default was "waiting", so they still need real answers.
   - D9 and D11. Their default was "not changed / not built", so the recommendation (neutral statuses; the `fidOwners` collection and function) still needs an explicit yes.
+- **Later the same morning:** D1 yes (Q5 and Q6), D2 about 20 hours a week, D9 yes (neutral), D11 yes (build the function, but don't deploy it).
+
+  Started:
+  - #3a: the server-side age, Terms and verified-email check, enforced by the API and the rules;
+  - the `deviceOwnership` function and `fidOwners` collection;
+  - neutral status tags in the app.
+
+  The #3a contract will be written to `docs/specifications/contracts/account-gate.md`. It covers the claim name and the error code, and needs owner approval before the clients use it in Sprint 2.
