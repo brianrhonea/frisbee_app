@@ -30,7 +30,7 @@ import { PublicRankingService } from "./rankings/public_service.js";
 import type { PublicTournamentRepository } from "./tournaments/public_repository.js";
 import { publicTournamentRoutes } from "./tournaments/public_routes.js";
 import { PublicTournamentService } from "./tournaments/public_service.js";
-import { registerAuth, type TokenVerifier, type UserLookup } from "./auth.js";
+import { type AccountGateMode, registerAuth, type TokenVerifier, type UserLookup } from "./auth.js";
 import { registerCors } from "./cors.js";
 import { errorHandler } from "./errors.js";
 import type { BrowseRepository } from "./browse/repository.js";
@@ -125,6 +125,8 @@ export interface AppDeps {
   /** SafeSearch on uploaded photos (Cloud Vision); none in tests and with the emulators. */
   images?: ImageChecker;
   enforceAppCheck?: boolean;
+  /** "report": the account gate logs account_incomplete and lets writes through (ACCOUNT_GATE_MODE); default "enforce". */
+  accountGateMode?: AccountGateMode;
   /** true for Fastify's default logger, or pino options (cloudLoggingOptions). */
   logger?: boolean | LoggerOptions;
   now?: () => number;
@@ -185,7 +187,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     }
   });
   registerCors(app, deps.corsOrigins ?? []);
-  registerAuth(app, deps.verifier, deps.enforceAppCheck ?? false);
+  registerAuth(app, deps.verifier, deps.enforceAppCheck ?? false, deps.accountGateMode ?? "enforce");
   const writes = new MemoryRateLimiter(deps.now);
   if (deps.writeLimits !== false) registerWriteLimits(app, writes);
 
@@ -220,7 +222,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     accountRoutes(app, new AccountService(deps.store, deps.users, deps.media), revalidate, gate);
     const queries = deps.queries ?? listDocQueries(deps.store);
     teamDeletionRoutes(app, new TeamDeletion(deps.store, deps.teams, deps.media, queries));
-    if (personal) personalRoutes(app, personal, gate);
+    if (personal) personalRoutes(app, personal, gate, deps.writeLimits !== false ? writes : undefined);
     if (deps.exports) exportRoutes(app, new ExportService(deps.exports, deps.store, deps.users, personal, deps.now));
     const reads = deps.writeLimits !== false ? writes : undefined;
     rosterRoutes(app, new RosterService(deps.store, deps.browse?.photoBuckets ?? []), reads);

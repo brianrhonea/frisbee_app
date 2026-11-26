@@ -33,7 +33,8 @@ import { livekitFromEnv } from "./meetings/livekit.js";
 import { jobVerifierFromEnv } from "./payments/jobs.js";
 import { payoutHoldDaysFromEnv, platformFeeFromEnv } from "./payments/service.js";
 import { stripeFromEnv } from "./payments/stripe.js";
-import { assertStartupEnvironment, StartupConfigError } from "./startup_env.js";
+import { setMergedClaims } from "./account/claims.js";
+import { accountGateModeFromEnv, assertStartupEnvironment, StartupConfigError } from "./startup_env.js";
 
 // Fails fast (INF-6) when deployed without FIREBASE_PROJECT_ID or with a
 // Stripe key whose mode doesn't match the project; see startup_env.ts.
@@ -68,6 +69,8 @@ const imageUrl = storageUrl(process.env.STORAGE_BUCKET || `${projectId}.firebase
 const app = buildApp({
   logger: cloudLoggingOptions(),
   enforceAppCheck: process.env.ENFORCE_APP_CHECK === "true",
+  // The account gate: enforce (default) or report-only (ACCOUNT_GATE_MODE, startup_env.ts).
+  accountGateMode: accountGateModeFromEnv(),
   // Cloud Scheduler's payment jobs (JOBS_AUDIENCE, JOBS_INVOKER).
   jobs: jobVerifierFromEnv(),
   corsOrigins: parseCorsOrigins(process.env.CORS_ORIGINS),
@@ -115,9 +118,8 @@ const app = buildApp({
       });
     },
     async setClaims(uid, claims) {
-      // Merged, so other claims (staff) stay.
-      const existing = (await auth.getUser(uid)).customClaims ?? {};
-      await auth.setCustomUserClaims(uid, { ...existing, ...claims });
+      // Merged, so other claims (staff) stay; no write when nothing changes.
+      await setMergedClaims(auth, uid, claims);
     },
     async setDisabled(uid, disabled) {
       await auth.updateUser(uid, { disabled });

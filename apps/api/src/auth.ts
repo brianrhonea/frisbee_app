@@ -38,12 +38,14 @@ declare module "fastify" {
      */
     public?: boolean;
     /**
-     * "open": a write a new account may make before it is complete (the
-     * account gate, docs/specifications/contracts/account-gate.md):
-     * onboarding and own settings. Every other write by a signed-in caller
-     * needs a verified email, the `ageOk` claim and the current `terms`.
+     * The account gate (docs/specifications/contracts/account-gate.md) for
+     * a write by a signed-in caller. Unset: a verified email, the `ageOk`
+     * claim and the current `terms`. "open": a write a new account may make
+     * before it is complete (onboarding, own settings). "age": needs only
+     * `ageOk`: building a searchable profile while the email or Terms are
+     * still pending, but never for an account that isn't an adult.
      */
-    accountGate?: "open";
+    accountGate?: "open" | "age";
   }
 }
 
@@ -82,7 +84,7 @@ export function callerLabel(caller: Caller): string {
  * absent) and checks the App Check header the way callables do: required
  * when [enforceAppCheck], otherwise checked only to log bad ones.
  */
-export function registerAuth(app: FastifyInstance, verifier: TokenVerifier, enforceAppCheck: boolean) {
+export function registerAuth(app: FastifyInstance, verifier: TokenVerifier, enforceAppCheck: boolean, gateMode: AccountGateMode = "enforce") {
   app.decorateRequest("caller", null);
   app.addHook("onRequest", async (req) => {
     if (req.url === "/health") return;
@@ -109,32 +111,55 @@ export function registerAuth(app: FastifyInstance, verifier: TokenVerifier, enfo
     }
     // The account gate: every write except the open ones. Before the body
     // is read, so nothing about an incomplete account's request is used.
-    if (req.caller && !open && req.routeOptions.config?.accountGate !== "open" && !readMethods.has(req.method)) {
-      requireCompleteAccount(req.caller);
+    const gate = req.routeOptions.config?.accountGate;
+    if (req.caller && !open && gate !== "open" && !readMethods.has(req.method)) {
+      const missing = accountGateMissing(req.caller, gate === "age" ? ["age"] : undefined);
+      if (missing.length > 0) {
+        // Report-only (ACCOUNT_GATE_MODE=report), for a first rollout: say what
+        // would have been refused and let the request through.
+        if (gateMode === "report") {
+          req.log.warn(
+            { event: "account_incomplete", mode: "report", uid: req.caller.uid, missing, route: `${req.method} ${req.routeOptions.url ?? ""}` },
+            "account_incomplete (report only)",
+          );
+        } else {
+          throw accountIncomplete(missing);
+        }
+      }
     }
   });
 }
 
+/** `enforce` refuses incomplete accounts' writes; `report` only logs them (ACCOUNT_GATE_MODE). */
+export type AccountGateMode = "enforce" | "report";
+
 const readMethods = new Set(["GET", "HEAD", "OPTIONS"]);
 
-/** What [caller]'s token lacks of a complete account, in report order. */
-export function accountGateMissing(caller: Caller): AccountGateField[] {
+/**
+ * What [caller]'s token lacks of a complete account, in report order; only
+ * the [checks] given when set (the age-only gate checks just "age").
+ */
+export function accountGateMissing(caller: Caller, checks: readonly AccountGateField[] = accountGateFields): AccountGateField[] {
   const missing: AccountGateField[] = [];
   if (caller.emailVerified !== true) missing.push("email_unverified");
   if (caller.ageOk !== true) missing.push("age");
   if (typeof caller.terms !== "number" || caller.terms < termsVersion) missing.push("terms");
-  return accountGateFields.filter((f) => missing.includes(f));
+  return accountGateFields.filter((f) => missing.includes(f) && checks.includes(f));
+}
+
+/** The account_incomplete (403) error for what is [missing]. */
+function accountIncomplete(missing: AccountGateField[]): ApiError {
+  return new ApiError(
+    "account_incomplete",
+    accountGateMessages[missing[0]!],
+    Object.fromEntries(missing.map((f) => [f, accountGateMessages[f]])),
+  );
 }
 
 /** Throws account_incomplete (403) unless [caller] is a complete account. */
 export function requireCompleteAccount(caller: Caller): void {
   const missing = accountGateMissing(caller);
-  if (missing.length === 0) return;
-  throw new ApiError(
-    "account_incomplete",
-    accountGateMessages[missing[0]!],
-    Object.fromEntries(missing.map((f) => [f, accountGateMessages[f]])),
-  );
+  if (missing.length > 0) throw accountIncomplete(missing);
 }
 
 /** The caller, or a 401 for routes that need one. */
