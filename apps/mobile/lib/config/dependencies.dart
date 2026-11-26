@@ -114,6 +114,8 @@ List<SingleChildWidget> get firebaseProviders => [
       accountService: context.read<AccountService>(),
       api: context.read<ApiClient?>(),
       flags: context.read<FeatureFlags>(),
+      beforeSignOut: (uid) =>
+          context.read<NotificationRepository>().unregisterDevice(uid),
     ),
   ),
   // Reports and blocks; the block list is live for the signed-in user.

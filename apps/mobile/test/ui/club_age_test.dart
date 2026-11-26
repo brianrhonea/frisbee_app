@@ -217,7 +217,9 @@ void main() {
       expect(find.text(clubTooYoungMessage), findsNothing);
     });
 
-    testWidgets('moving a team to club says everyone on it must be 16+', (tester) async {
+    testWidgets('moving a team to club says everyone on it must be 16+', (
+      tester,
+    ) async {
       await pump(
         tester,
         initial: const NewTeam(

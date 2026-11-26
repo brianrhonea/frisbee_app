@@ -38,11 +38,8 @@ class ProfileViewModel extends ChangeNotifier {
     setThemeMode = Command1<void, ThemeMode>(_theme.setThemeMode);
     _theme.addListener(notifyListeners);
     updateDisplayName = Command1<void, String>(_auth.updateDisplayName);
-    // Stop this device's pushes first; afterwards the rules won't let us.
-    signOut = Command0<void>(() async {
-      await _unregister();
-      return _auth.signOut();
-    });
+    // The auth repository stops this device's pushes before signing out.
+    signOut = Command0<void>(_auth.signOut);
     deleteAccount = Command1<void, String?>(_deleteAccount);
     downloadData = Command0<DataExportFile>(_downloadData);
     changePassword = Command1<void, (String, String)>(

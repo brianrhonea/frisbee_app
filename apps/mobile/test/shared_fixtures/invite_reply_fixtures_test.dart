@@ -10,10 +10,8 @@ import 'fixture_file.dart';
 void main() {
   final start = DateTime.utc(2026, 12, 5, 9);
   final now = DateTime.utc(2026, 11, 14, 12);
-  String? iso(DateTime? d) => d?.toUtc().toIso8601String().replaceFirst(
-    RegExp(r'\.\d+Z$|Z$'),
-    '.000Z',
-  );
+  String? iso(DateTime? d) =>
+      d?.toUtc().toIso8601String().replaceFirst(RegExp(r'\.\d+Z$|Z$'), '.000Z');
 
   test('invite reply-by (invite_reply/cases.json)', () {
     final replyCases = [
