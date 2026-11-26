@@ -637,13 +637,16 @@ service cloud.firestore {
 
       // The kind never changes, and only groups have group fields. Nor
       // does a team's division: team names are unique per division, and
-      // changing it goes through support.
+      // changing it goes through support. Nor can a client change the
+      // level (SEC-4): a switch to club must re-check every member's age,
+      // so it goes through PATCH /v1/teams/:id. A write that carries the
+      // level unchanged is still fine (changed() ignores it).
       function editDetails() {
         return can(resource.data, 'manageTeam')
           && changed().hasOnly(isGroup(resource.data)
-               ? ['name', 'level', 'city', 'description',
+               ? ['name', 'city', 'description',
                   'requiresApproval', 'location']
-               : ['name', 'level', 'city'])
+               : ['name', 'city'])
           && validTeamFields(request.resource.data);
       }
 
