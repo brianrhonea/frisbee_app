@@ -6,6 +6,7 @@ import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { beforeAll, describe, expect, it } from "vitest";
 
+import { currentTermsVersion } from "../../src/account/gate";
 import { createLeagueTeams } from "../../src/tournaments/callables";
 import { draftControl, draftPick, finishDraft, startDraft } from "../../src/tournaments/draft";
 
@@ -13,8 +14,10 @@ initializeApp({ projectId: "demo-frisbee" });
 const db = getFirestore();
 
 type Callable = { run: (req: never) => unknown };
-const call = (fn: Callable, uid: string, data: Record<string, unknown>) =>
-  Promise.resolve(fn.run({ auth: { uid, token: {} }, data, rawRequest: {} } as never));
+// A complete account (account gate): verified email, adult check, current Terms.
+const complete = { email_verified: true, ageOk: true, terms: currentTermsVersion };
+const call = (fn: Callable, uid: string, data: Record<string, unknown>, token: Record<string, unknown> = complete) =>
+  Promise.resolve(fn.run({ auth: { uid, token }, data, rawRequest: {} } as never));
 
 const DIV = "div1";
 let next = 0;
@@ -190,5 +193,24 @@ describe("captains' draft callables", { timeout: 60_000 }, () => {
     await expect(call(startDraft, "director", { ...args, captainIds: ["p0", "p1"] })).rejects.toMatchObject({
       code: "failed-precondition",
     });
+  });
+});
+
+describe("the account gate on the draft and league callables (F2)", () => {
+  it.each([
+    ["no claims", {}],
+    ["no ageOk", { email_verified: true, terms: currentTermsVersion }],
+    ["an unverified email", { ...complete, email_verified: false }],
+    ["an older Terms version", { ...complete, terms: currentTermsVersion - 1 }],
+  ])("refuses an account with %s before reading anything, and changes nothing", async (_, token) => {
+    const id = await league();
+    const args = { tournamentId: id, divisionId: DIV };
+    for (const fn of [startDraft, draftPick, draftControl, finishDraft, createLeagueTeams]) {
+      await expect(call(fn, "director", { ...args, captainIds: ["p0", "p1"] }, token)).rejects.toMatchObject({
+        code: "permission-denied",
+        details: { code: "account_incomplete" },
+      });
+    }
+    expect(await draftOf(id)).toBeUndefined();
   });
 });
