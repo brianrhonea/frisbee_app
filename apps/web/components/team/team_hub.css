@@ -41,7 +41,7 @@
    circle for a community, navy circle for a school or club. */
 .team-hub .team-badge, .team-badge {
   display: inline-grid; place-items: center; flex: none; line-height: 1;
-  border-radius: 27%; background: var(--team); color: var(--on-board);
+  border-radius: 27%; background: var(--team); color: #FFFFFF;
   font-family: var(--font-score); font-weight: 800; letter-spacing: 0.01em;
 }
 .team-badge.community { border-radius: 50%; background: var(--accent); color: var(--on-accent); }
@@ -297,15 +297,30 @@
    for live games), cone orange. Built from the site tokens; move these
    to site.css's token blocks if they're wanted elsewhere. */
 .team-hub {
-  --play-offense: color-mix(in srgb, var(--team) 85%, var(--board));
-  --play-defense: var(--board);
-  --play-cone: color-mix(in srgb, var(--disc) 72%, var(--live));
-  --play-on-piece: var(--on-board);
+  --play-offense: color-mix(in srgb, #2C6FB7 85%, #0F1A2A);
+  --play-defense: #14213A;
+  --play-cone: color-mix(in srgb, #FFB627 72%, #D93636);
+  --play-on-piece: #FFFFFF;
+  --play-disc-edge: #0F1A2A;
   /* Pen strokes (drawings), as the app's FieldColors pens. */
   --play-pen-ink: #14213A;
   --play-pen-turf: #7FDDB4;
   --play-pen-amber: #FFB627;
   --play-pen-white: #FFFFFF;
+}
+/* Playbook colours are the sport surface, not app chrome: they keep the old
+   palette's literals (design-tokens.md "Not changed"), per theme. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .team-hub {
+    --play-offense: color-mix(in srgb, #7FB0EE 85%, #1A2940);
+    --play-cone: color-mix(in srgb, #FFC24D 72%, #FF5A5A);
+    --play-disc-edge: #1A2940;
+  }
+}
+:root[data-theme="dark"] .team-hub {
+  --play-offense: color-mix(in srgb, #7FB0EE 85%, #1A2940);
+  --play-cone: color-mix(in srgb, #FFC24D 72%, #FF5A5A);
+  --play-disc-edge: #1A2940;
 }
 .team-hub .field-pen { fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .team-hub .field-pen.ink { stroke: var(--play-pen-ink); }
@@ -317,7 +332,7 @@
 .team-hub .field-el.cone path { fill: var(--play-cone); }
 .team-hub .field-el.offense text, .team-hub .field-el.defense text { fill: var(--play-on-piece); }
 .team-hub .field-el circle, .team-hub .field-el path { stroke: var(--play-on-piece); stroke-width: 0.3; }
-.team-hub .field-el.disc circle { stroke: var(--board); }
+.team-hub .field-el.disc circle { stroke: var(--play-disc-edge); }
 .team-hub .play-tool-icon.offense { background: var(--play-offense); }
 .team-hub .play-tool-icon.defense { background: var(--play-defense); }
 .team-hub .play-tool-icon.cone { background: var(--play-cone); }
@@ -376,19 +391,19 @@
 
 /* The room: the call on navy surfaces; Leave and End are neutral. */
 .team-hub .meeting-call .call-stage-wrap {
-  padding: 12px; border-radius: var(--radius); background: var(--board); color: var(--on-board);
+  padding: 12px; border-radius: var(--radius); background: var(--media); color: var(--on-media);
 }
-.team-hub .meeting-call .call-tile { background: var(--board-2); }
+.team-hub .meeting-call .call-tile { background: var(--media-2); }
 .team-hub .meeting-call .call-tile.speaking { border-color: var(--accent); }
-.team-hub .meeting-call .call-tile-face .avatar { background: var(--board); color: var(--on-board); }
+.team-hub .meeting-call .call-tile-face .avatar { background: var(--media); color: var(--on-media); }
 .team-hub .meeting-call .call-controls {
-  padding: 10px; border-radius: var(--radius); background: var(--board);
+  padding: 10px; border-radius: var(--radius); background: var(--media);
 }
-.team-hub .meeting-call .call-controls .btn { min-height: 40px; border-radius: 999px; background: var(--board-2); color: var(--on-board); border: 1px solid transparent; }
+.team-hub .meeting-call .call-controls .btn { min-height: 40px; border-radius: 999px; background: var(--media-2); color: var(--on-media); border: 1px solid transparent; }
 .team-hub .meeting-call .call-controls .btn[aria-pressed="true"]:not(.off) { background: var(--accent-soft); color: var(--accent-ink); }
-.team-hub .meeting-call .call-controls .btn.off { background: transparent; border-color: var(--board-muted); color: var(--board-muted); }
+.team-hub .meeting-call .call-controls .btn.off { background: transparent; border-color: var(--on-media-muted); color: var(--on-media-muted); }
 .team-hub .meeting-call .call-controls .call-leave { background: var(--card); color: var(--ink); }
-.team-hub .meeting-call .call-controls .call-end { background: transparent; border-color: var(--board-muted); color: var(--on-board); }
+.team-hub .meeting-call .call-controls .call-end { background: transparent; border-color: var(--on-media-muted); color: var(--on-media); }
 .team-hub .meeting-call .call-head .card-title { font-size: 1.2rem; font-weight: 800; }
 .team-hub .call-requests { background: var(--disc-soft); border-color: transparent; }
 .team-hub .call-requests .card-title { color: var(--disc-ink); text-transform: uppercase; font-size: 0.78rem; letter-spacing: 0.06em; }

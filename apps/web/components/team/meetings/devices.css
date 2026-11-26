@@ -1,10 +1,10 @@
 /* Meeting devices: the lobby's camera preview and the mic, camera, speaker and volume settings. */
 .lobby-preview {
   position: relative; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden;
-  background: var(--board); margin-bottom: 12px; display: flex; align-items: center; justify-content: center;
+  background: var(--media); margin-bottom: 12px; display: flex; align-items: center; justify-content: center;
 }
 .lobby-preview .call-video { position: absolute; inset: 0; }
-.lobby-preview-off { color: var(--board-muted); font-size: 0.9rem; }
+.lobby-preview-off { color: var(--on-media-muted); font-size: 0.9rem; }
 .device-settings { display: grid; gap: 10px; margin-top: 12px; }
 .device-pick { display: grid; gap: 4px; font-weight: 600; font-size: 0.9rem; }
 .device-pick select {
