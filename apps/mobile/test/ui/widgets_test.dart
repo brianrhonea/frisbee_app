@@ -62,7 +62,7 @@ void main() {
 
       // Under 13: no account.
       await pickBirthday('01/01/${DateTime.now().year - 5}');
-      expect(find.text(tooYoungMessage), findsOneWidget);
+      expect(find.text(adultOnlyMessage), findsOneWidget);
       await tester.enterText(field('Confirm password'), 'pull12345');
       await tester.tap(find.widgetWithText(FilledButton, 'Create account'));
       await tester.pumpAndSettle();
@@ -70,7 +70,7 @@ void main() {
       expect(auth.currentUser, isNull);
 
       await pickBirthday('04/02/1995');
-      expect(find.text(tooYoungMessage), findsNothing);
+      expect(find.text(adultOnlyMessage), findsNothing);
 
       await tester.enterText(field('Confirm password'), 'pull1234');
       await tester.tap(find.widgetWithText(FilledButton, 'Create account'));

@@ -68,8 +68,8 @@ void main() {
       routes['PUT /v1/me/personal/birth-date'] = () => json({
         'error': {
           'code': 'failed_precondition',
-          'message': tooYoungMessage,
-          'fields': {'birthDate': tooYoungMessage},
+          'message': adultOnlyMessage,
+          'fields': {'birthDate': adultOnlyMessage},
         },
       }, 412);
       final result = await repo().saveSignUpBirthDate(DateTime(2020, 1, 1));

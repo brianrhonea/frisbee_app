@@ -97,8 +97,9 @@ List<SingleChildWidget> get firebaseProviders => [
   // The Stall 10 API (apps/api); null when the build has no API_BASE_URL.
   Provider<ApiClient?>(create: (_) => ApiClient.fromEnvironment()),
   Provider(
-    create: (_) => CallableClient(
+    create: (context) => CallableClient(
       projectId: DefaultFirebaseOptions.currentPlatform.projectId,
+      api: context.read<ApiClient?>(),
     ),
   ),
   Provider(
@@ -288,8 +289,9 @@ List<SingleChildWidget> get firebaseProviders => [
     create: (context) => FilePickerService(flags: context.read<FeatureFlags>()),
   ),
   Provider(
-    create: (_) => MeetingTokenService(
+    create: (context) => MeetingTokenService(
       projectId: DefaultFirebaseOptions.currentPlatform.projectId,
+      api: context.read<ApiClient?>(),
     ),
   ),
   Provider<MeetingRepository>(

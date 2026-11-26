@@ -106,13 +106,7 @@ class ApiClient {
       return await _sendOnce(method, path, body, timeout);
     } on ApiException catch (e) {
       if (!e.accountIncomplete || path == _statusPath) rethrow;
-      var refreshed = false;
-      try {
-        final status = await _sendOnce('GET', _statusPath, null, _timeout);
-        refreshed = status['refreshToken'] == true;
-      } on Exception {
-        // The original refusal stands.
-      }
+      final refreshed = await refreshFromAccountStatus();
       if (!refreshed) {
         onAccountIncomplete?.call(e.fields);
         rethrow;
@@ -123,6 +117,20 @@ class ApiClient {
         if (again.accountIncomplete) onAccountIncomplete?.call(again.fields);
         rethrow;
       }
+    }
+  }
+
+  /// Asks the account status route (never gated), which sets any claims the
+  /// account already earns. True when it said `refreshToken: true`, in which
+  /// case the ID token is already refreshed (see [_sendOnce]) and a refused
+  /// write is worth one retry. A failing status call is false: the original
+  /// refusal stands. Shared with callables (account_gate_retry.dart).
+  Future<bool> refreshFromAccountStatus() async {
+    try {
+      final status = await _sendOnce('GET', _statusPath, null, _timeout);
+      return status['refreshToken'] == true;
+    } on Exception {
+      return false;
     }
   }
 
