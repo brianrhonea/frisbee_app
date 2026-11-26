@@ -288,3 +288,11 @@ The contract's order is: API, then the app and website (Sprint 2), then the rule
 - **D16:** is a staff route to correct a mistyped birth date wanted for launch?
 
 **Not part of this:** App Check, which is the rest of SEC-2. Also, the payer's email is passed to Stripe Checkout, so whether Stripe sends receipts is a Dashboard setting (Q5 note).
+
+**Owner, 2026-11-26:**
+- **D14:** contract approved, recorded on `hold/3a-account-gate`.
+- **D16:** no staff birth-date override.
+- **D15:** delete the 13–17 dev accounts. A read-only check of dev found **none to delete**:
+  - Dev has 4 personal-details records. Each was decrypted server-side in a scratchpad script, and all 4 are 18+; none are 13–17 or under 13.
+  - No birth date is stored anywhere else.
+  - Nothing was deleted.
