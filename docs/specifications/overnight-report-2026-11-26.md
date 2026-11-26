@@ -296,3 +296,16 @@ The contract's order is: API, then the app and website (Sprint 2), then the rule
   - Dev has 4 personal-details records. Each was decrypted server-side in a scratchpad script, and all 4 are 18+; none are 13–17 or under 13.
   - No birth date is stored anywhere else.
   - Nothing was deleted.
+
+## 16. SEC-4 deployed to dev (owner approved, 2026-11-26)
+
+1. **API 0.49.0** (`3753d63`) is on Cloud Run as revision `api-00029-md8` with 100% of traffic.
+   - The image was built on Cloud Build from a `git archive` of the commit, digest `sha256:ca60bcb5…`.
+   - The configuration is the live one, with only the image changed; its environment variable names match `service.yaml`.
+   - Smoke test:
+     - `/health` returns 0.49.0 and `/ready` is OK; the new startup checks passed.
+     - An unsigned PATCH of a team returns 401.
+     - Public events return 200.
+2. **Firestore rules** from `3753d63` were released to dev. Clients can no longer write `level`. Storage rules are unchanged.
+
+**SEC-4 is now closed on dev.** It still needs your check on a device: try switching a team that has an under-16 member, or someone with no birth date, to club, in the app and on the website. You should see the refusal message.
