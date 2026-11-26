@@ -217,7 +217,7 @@ void main() {
       expect(find.text(clubTooYoungMessage), findsNothing);
     });
 
-    testWidgets('moving a team to club keeps who is on it', (tester) async {
+    testWidgets('moving a team to club says everyone on it must be 16+', (tester) async {
       await pump(
         tester,
         initial: const NewTeam(
@@ -233,7 +233,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         find.text(
-          '$clubTooYoungMessage People already on the team stay on it.',
+          '$clubTooYoungMessage Switching an existing team to club needs '
+          'everyone on it to be 16 or over with a date of birth.',
         ),
         findsOneWidget,
       );

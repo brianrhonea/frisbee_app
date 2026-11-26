@@ -585,6 +585,17 @@ class TeamRepositoryFirebase implements TeamRepository {
       await api.patch('/v1/teams/${team.id}', team.toEditableMap());
       return;
     }
+    // The level changes only through the API, which checks every member's
+    // age when a team goes club; the direct write never carries it.
+    final current = await _teams.doc(team.id).get();
+    if (current.exists &&
+        team.hasDivision &&
+        current.data()?['level'] != team.level.name) {
+      throw const ApiException(
+        'unavailable',
+        "The level can't be changed right now. Try again later.",
+      );
+    }
     final listed = await _directory.doc(team.id).get();
     final before = listed.exists
         ? TeamListing.fromMap(listed.id, plainData(listed.data()))
@@ -602,7 +613,10 @@ class TeamRepositoryFirebase implements TeamRepository {
       );
     }
     await (_db.batch()
-          ..update(_teams.doc(team.id), team.toEditableMap())
+          ..update(
+            _teams.doc(team.id),
+            Map.of(team.toEditableMap())..remove('level'),
+          )
           ..set(_directory.doc(team.id), TeamListing.of(team).toMap()))
         .commit();
   });
