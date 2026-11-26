@@ -256,3 +256,35 @@ The owner approved the defaults for D1–D13.
 
 **2026-11-26:** the owner approved step 1, and `deviceOwnership-fidOwner` was deployed to dev from `35e9a94`: v2, a Firestore write trigger, us-central1, Node 22. Steps 2–4 are not done.
 **2026-11-26:** the owner approved step 2. The backfill ran on dev: the dry run found 2 devices, 2 FIDs and 0 stale copies. `--apply` wrote 2 mappings and deleted 0 device docs. A second dry run afterwards found nothing stale. Steps 3–4 (`notifications` deploy and the phone test) are not done.
+**2026-11-26:** the owner approved step 3. The `notifications` group was deployed to dev from `60083b8`, and all 28 functions show ACTIVE with today's update time. Step 4 (the phone test) is still to do.
+
+## 15. #3a server account check: built and held, not merged
+
+The check lives on local branch `hold/3a-account-gate` (`b59dda6`, `641f062`, `7d223df`).
+
+**Tests:** API 1,477 pass, API emulator 56 pass, rules 510 pass, shared 922 pass.
+
+**Contract:** `docs/specifications/contracts/account-gate.md` on that branch. It needs your approval.
+- **Two claims:**
+  - `ageOk: true`, set when a saved birth date shows the person is 18+.
+  - `terms: <version>`, set when the person agrees to the Terms.
+
+  Both are set only by the API.
+- **Writes are refused** with `403 account_incomplete` unless the account has a verified email and both claims. The `fields` list names what is missing: `email_unverified`, `age`, `terms`.
+- **Reads and onboarding stay open.**
+- **Birth date:** under 18 gets `412`. Once saved, the birth date is locked; nobody can override it yet.
+- **Rules:** `accountOk()` now guards about 125 Firestore writes and all Storage uploads.
+- **Existing complete accounts** get their claims the next time they call the status check.
+
+**Why it is held:**
+1. Today's app and website never call the status check or refresh their sign-in token. Once the API carries this check, every write from today's TestFlight build fails with an error the app doesn't handle.
+2. The SEC-4 API deploy you still have to approve comes from this branch. Merging #3a would ship the check along with it.
+
+The contract's order is: API, then the app and website (Sprint 2), then the rules last.
+
+**Decisions:**
+- **D14:** approve the contract.
+- **D15:** existing dev accounts aged 13–17 become read-only for good, because their birth date is locked. Delete them, add a staff override, or leave them?
+- **D16:** is a staff route to correct a mistyped birth date wanted for launch?
+
+**Not part of this:** App Check, which is the rest of SEC-2. Also, the payer's email is passed to Stripe Checkout, so whether Stripe sends receipts is a Dashboard setting (Q5 note).
