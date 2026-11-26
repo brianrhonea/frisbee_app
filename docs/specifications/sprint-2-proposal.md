@@ -58,3 +58,15 @@
 - Shells S1–S3, navigation N1–N12, screens H/Q/L.
 - #10 Android.
 - New board features (L3).
+
+## #3a security review (2026-11-26): OK to merge with fixes
+
+**Fixes queued as 3a-S** (lane A, on the held branch, after lane A's current work):
+- **F1 High:** accounts without `ageOk`, including refused minors, can still publish a searchable profile that adults can DM. Profile, username, avatar and identity writes will require `ageOk`. The app and website lanes were told to write the profile only after `ageOk`.
+- **F2 High:** the LiveKit call callables (`joinToken`, `voiceToken`) and the draft and league callables don't check the account. They get the same check as the API.
+- **F3 Medium:** an under-18 refusal isn't remembered, so the person can retry with an adult date. The refusal will be remembered server-side, and a different date refused afterwards. `PUT /v1/me/personal` gets a rate limit.
+- **F4 Medium:** the status endpoint can run up KMS and Auth costs. It gets a rate limit, and `setClaims` will skip writes that change nothing.
+- **F5 Medium (pre-existing):** clients can skip the photo check with metadata, and `photoUrl`/`headerUrl` accept any URL. Clients will be denied that metadata, and photo URLs limited to our bucket.
+- **F6:** the rules will check the current Terms version as a literal, with a test that keeps it in step with `termsVersion`.
+- **F8 and F9:** the API refuses to start without the cipher when a store is configured. A decrypt failure during backfill grants nothing but no longer breaks status.
+- **Test gaps:** the "someone else's records" test, an incomplete-token decryption test, `oldterms` at the current version minus 1, and a static test that every rules write is gated or on the exempt list.
