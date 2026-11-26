@@ -1,21 +1,19 @@
 "use client";
 import {
-  adultAge,
-  ageOn,
-  birthDateProblem,
+  adultOnlyMessage,
+  birthDateLockedMessage,
   type Gender,
   genderLabels,
   genders,
   type PersonalDetails,
   type PersonalDetailsInput,
-  personalDetailsProblem,
   personalDetailsSchema,
   personalLimits,
   splitDisplayName,
-  tooYoungMessage,
 } from "@stall10/shared";
 import type { User } from "firebase/auth";
 import { type FormEvent, useMemo, useState } from "react";
+import { adultBirthDateProblem, localToday } from "@/lib/accountGate";
 import { ApiError, callApi, problem } from "@/lib/client";
 
 /** Countries offered first; any other ISO code can be typed under "Other". */
@@ -33,12 +31,10 @@ function countryName(code: string) {
   }
 }
 
-/** Today's calendar date where the browser is, YYYY-MM-DD. */
-export function localToday(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
+/** Where a locked birth date points people. */
+export const supportEmail = "support@stall10.app";
+
+export { localToday };
 
 type Form = {
   legalFirstName: string;
@@ -52,10 +48,6 @@ type Form = {
   region: string;
   postalCode: string;
   country: string;
-  gName: string;
-  gRelationship: string;
-  gEmail: string;
-  gPhone: string;
 };
 
 /** Where a new form starts: the names just typed, else the profile name split. */
@@ -76,10 +68,6 @@ function initialForm(d: PersonalDetails | null, prefill: Prefill): Form {
     region: d?.address.region ?? "",
     postalCode: d?.address.postalCode ?? "",
     country: d?.address.country ?? "US",
-    gName: d?.guardian?.name ?? "",
-    gRelationship: d?.guardian?.relationship ?? "",
-    gEmail: d?.guardian?.email ?? "",
-    gPhone: d?.guardian?.phone ?? "",
   };
 }
 
@@ -91,16 +79,12 @@ const fieldOf: Record<string, keyof Form> = {
   "address.region": "region",
   "address.postalCode": "postalCode",
   "address.country": "country",
-  "guardian.name": "gName",
-  "guardian.relationship": "gRelationship",
-  "guardian.email": "gEmail",
-  "guardian.phone": "gPhone",
-  guardian: "gName",
 };
 
 /**
  * The player's personal details (`PUT /v1/me/personal`): legal name,
- * birthday, phone, gender, address and, under 18, a parent or guardian.
+ * birthday, phone, gender and address. Adults only (18+), so no guardian. The
+ * birthday is read-only once saved.
  * Only they see them; the API keeps them encrypted.
  */
 export function PersonalDetailsForm({
@@ -110,7 +94,8 @@ export function PersonalDetailsForm({
   prefill = {},
   submitLabel = "Save",
   onSaved,
-  onTooYoung,
+  onUnderAge,
+  birthDateLocked = false,
 }: {
   user: User;
   email: string | null;
@@ -118,15 +103,16 @@ export function PersonalDetailsForm({
   prefill?: Prefill;
   submitLabel?: string;
   onSaved?: () => void;
-  /** The API refused them for being under 13. */
-  onTooYoung?: () => void;
+  /** Under 18 (the form's check or the API's 412): the caller shows the dead-end page. Without it, the message shows in the form. */
+  onUnderAge?: () => void;
+  /** A birth date is already saved: shown read-only (the API refuses changes). */
+  birthDateLocked?: boolean;
 }) {
   const [form, setForm] = useState<Form>(() => initialForm(initial, prefill));
   const [errors, setErrors] = useState<Partial<Record<keyof Form | "_", string>>>({});
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const today = useMemo(localToday, []);
-  const minor = /^\d{4}-\d{2}-\d{2}$/.test(form.birthDate) && ageOn(form.birthDate, today) < adultAge;
   const us = form.country === "US";
   const otherCountry = !countryCodes.includes(form.country);
 
@@ -151,9 +137,6 @@ export function PersonalDetailsForm({
         postalCode: form.postalCode,
         country: form.country,
       },
-      ...(minor && {
-        guardian: { name: form.gName, relationship: form.gRelationship, email: form.gEmail, phone: form.gPhone },
-      }),
     };
   }
 
@@ -172,16 +155,20 @@ export function PersonalDetailsForm({
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    // Finishing sign-up (e.g. after Google, which asks no birthday first):
-    // under 13 ends here, without sending anything.
-    if (onTooYoung && birthDateProblem(form.birthDate, today) === tooYoungMessage) return onTooYoung();
+    // Adults only: under 18 ends here, without sending anything. A saved
+    // (locked) date is the server's to judge.
+    const ageProblem = birthDateLocked ? null : adultBirthDateProblem(form.birthDate, today);
+    if (ageProblem === adultOnlyMessage) {
+      if (onUnderAge) return onUnderAge();
+      return showErrors({ birthDate: ageProblem });
+    }
     const parsed = personalDetailsSchema.safeParse(body());
     if (!parsed.success) {
       const fields: Record<string, string> = {};
       for (const i of parsed.error.issues) fields[i.path.join(".") || "_"] ??= i.message;
       return showErrors(fields);
     }
-    const wrong = personalDetailsProblem(parsed.data, today);
+    const wrong = birthDateLocked ? null : adultBirthDateProblem(parsed.data.birthDate, today) && { field: "birthDate", message: adultBirthDateProblem(parsed.data.birthDate, today)! };
     if (wrong) return showErrors({ [wrong.field]: wrong.message });
     setBusy(true);
     try {
@@ -189,8 +176,10 @@ export function PersonalDetailsForm({
       setSaved(true);
       onSaved?.();
     } catch (err) {
-      if (err instanceof ApiError && err.code === "failed_precondition" && err.fields?.birthDate) {
-        if (onTooYoung) return onTooYoung();
+      if (err instanceof ApiError && err.status === 412 && err.fields?.birthDate) {
+        // Locked: say so and where to go. Anything else on the birth date is the age rule.
+        if (err.message === birthDateLockedMessage) return showErrors({ birthDate: err.message });
+        if (onUnderAge) return onUnderAge();
       }
       if (err instanceof ApiError && err.fields) showErrors(err.fields);
       else setErrors({ _: problem(err, "Couldn't save. Try again.") });
@@ -235,7 +224,14 @@ export function PersonalDetailsForm({
       </fieldset>
 
       <div className="form-grid">
-        {field("birthDate", "Date of birth", { type: "date", autoComplete: "bday", max: today, min: "1900-01-01" })}
+        {field(
+          "birthDate",
+          "Date of birth",
+          birthDateLocked
+            ? { type: "date", autoComplete: "bday", readOnly: true, "aria-readonly": true }
+            : { type: "date", autoComplete: "bday", max: today, min: "1900-01-01" },
+          birthDateLocked ? `${birthDateLockedMessage} Email ${supportEmail}.` : undefined,
+        )}
         <label>
           Gender
           <select
@@ -297,19 +293,6 @@ export function PersonalDetailsForm({
         </div>
       </fieldset>
 
-      {minor && (
-        <fieldset className="personal-guardian">
-          <legend>Parent or guardian</legend>
-          <p className="muted small">Players under {adultAge} need a parent or guardian&apos;s details.</p>
-          <div className="form-grid">
-            {field("gName", "Name", { maxLength: personalLimits.name })}
-            {field("gRelationship", "Relationship (optional)", { maxLength: personalLimits.relationship, placeholder: "e.g. Mother" })}
-            {field("gEmail", "Email", { type: "email", maxLength: personalLimits.email })}
-            {field("gPhone", "Phone", { type: "tel", maxLength: personalLimits.phone })}
-          </div>
-        </fieldset>
-      )}
-
       <div className="form-actions">
         {errors._ && (
           <span className="form-error" role="alert">
@@ -326,4 +309,4 @@ export function PersonalDetailsForm({
 }
 
 /** For the sign-up page's first step: the birthday's problem, or null. */
-export const signUpBirthDateProblem = (birthDate: string) => birthDateProblem(birthDate, localToday());
+export const signUpBirthDateProblem = (birthDate: string) => adultBirthDateProblem(birthDate, localToday());
