@@ -105,6 +105,18 @@
 - **D18:** short-lived playback URLs move to Sprint 3.
 - **D19:** the few-second window before `photoCheck` runs is accepted; no pending marker.
 
+## Approved (owner, 2026-11-26)
+
+The owner reviewed everything and approved it: "it all looks good".
+- Approved: K2–K8 and C1–C4, with the open choices kept as built:
+  - legacy danger buttons stay ink;
+  - the 48 px band on the website;
+  - scrolling bars;
+  - logos coloured by kind;
+  - profile routes lenient in report-only mode.
+- The `ageRefusals` collection and contract §9 are accepted.
+- Still to do: the #3a rollout steps, #7 Crashlytics and the device checks. These carry into Sprint 3 (`sprint-3-proposal.md`).
+
 ## Resumed and integrated (2026-11-26, owner away)
 
 The owner asked for the work to be finished with the orchestrator's recommended defaults, and for UI to review by end of day. All local merges into `feature/jan-4-release` were made by the orchestrator. Nothing was pushed or deployed.
