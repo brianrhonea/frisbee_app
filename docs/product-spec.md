@@ -109,8 +109,12 @@ and events; everything else in the hub is for members. A private group
   (`apps/api/src/teams/club_age.ts`; it never shows anyone the date),
   so `firestore.rules` refuses direct joins and creates of club teams.
   Invites can still be sent (an invitee's age is private); accepting is
-  checked. People already on a club team stay, and changing a team's
-  level to club removes no one. Community roles don't add anyone to a
+  checked. People already on a club team stay. Changing a team's level
+  to club goes only through the API (`PATCH /v1/teams/:id`; rules refuse
+  a client write of `level`) and is refused while anyone on the team, or
+  any account linked to a roster spot, is under 16 or has no date of
+  birth; the refusal gives a count, never names, and a team gets at most
+  3 failed attempts a day. Community roles don't add anyone to a
   club team: its players join with an invite. Free-text roster spots
   aren't accounts, so they aren't checked; linking a spot only links an
   existing member. Groups and other levels (college, youth, league,

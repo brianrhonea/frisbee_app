@@ -221,3 +221,12 @@ At most three implementation agents ran at once.
 **Not run:** API emulator tests; Maestro or devices; the 3 known screenshot failures were not re-checked.
 
 **Flaky:** one rules test failed once at `45c4ab1` and has passed in four runs since; the browser tests failed once on a cold start (above).
+
+## 13. Owner decisions (2026-11-26, morning)
+
+The owner approved the defaults for D1–D13.
+- **D3–D8, D10, D12 and D13:** kept as built.
+- **D7:** `docs/product-spec.md` now describes the club-switch refusal.
+- **Still open:**
+  - D1 and D2. Their default was "waiting", so they still need real answers.
+  - D9 and D11. Their default was "not changed / not built", so the recommendation (neutral statuses; the `fidOwners` collection and function) still needs an explicit yes.
