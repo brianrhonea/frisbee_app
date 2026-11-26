@@ -104,3 +104,16 @@
 - **D17:** yes, refuse the photo when Vision errors.
 - **D18:** short-lived playback URLs move to Sprint 3.
 - **D19:** the few-second window before `photoCheck` runs is accepted; no pending marker.
+
+## Paused (owner, 2026-11-26)
+
+- **Release branch:** at `a8eb380`, with lanes A and C, #13 web and the `/v1/client-errors` endpoint merged. **The #3a branch** `hold/3a-account-gate` is at `502176d`, with 3a-C web and app and #13 web merged.
+- **Stopped mid-task**, with the work left in their worktrees and not merged:
+  - 3a-S, the #3a security fixes and rollout switch, in `.claude/worktrees/agent-a3352841a43c9f2e6` on `sprint2/3a-fixes`;
+  - lane B (app: K6/K7, #6, #13, #24) in `.claude/worktrees/agent-ad82cff501485ca43`.
+- **To do on resume:**
+  - review the partial work, then re-run or continue 3a-S and lane B;
+  - then the app's Crashlytics (#7) and an up-front account check matching the website (on the #3a branch);
+  - C1–C4, once the owner has given the visual OK on K2–K5;
+  - a full regression, then the #3a rollout runbook.
+- Nothing pushed. The only deploys are the ones listed earlier (dev).

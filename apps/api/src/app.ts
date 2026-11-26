@@ -30,6 +30,7 @@ import type { PublicTournamentRepository } from "./tournaments/public_repository
 import { publicTournamentRoutes } from "./tournaments/public_routes.js";
 import { PublicTournamentService } from "./tournaments/public_service.js";
 import { registerAuth, type TokenVerifier, type UserLookup } from "./auth.js";
+import { type ClientErrorOptions, clientErrorRoutes } from "./client_errors/routes.js";
 import { registerCors } from "./cors.js";
 import { errorHandler } from "./errors.js";
 import type { BrowseRepository } from "./browse/repository.js";
@@ -115,6 +116,8 @@ export interface AppDeps {
   calendar?: CalendarRepository;
   /** The API's public address, for calendar subscription links (PUBLIC_API_URL). */
   publicUrl?: string;
+  /** The website's error reports (`POST /v1/client-errors`); tests pass a sink. */
+  clientErrors?: ClientErrorOptions;
   /** Encrypts personal details; with [store], enables /v1/me/personal. Off without one: never stored in the clear. */
   personal?: PersonalCipher;
   /** Cloud Storage; with [store], enables /v1/uploads. */
@@ -193,6 +196,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     reply.header(versionHeader, apiVersion);
   });
   app.get("/health", async () => ({ ok: true, version: apiVersion }));
+  clientErrorRoutes(app, { now: deps.now, ...deps.clientErrors });
   const revalidate = deps.revalidate ?? noRevalidate;
   // Club teams' age rule reads birth dates from personal details: none
   // without the key, so club joins are refused rather than unchecked.
