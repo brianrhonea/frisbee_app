@@ -6,6 +6,7 @@ import { stripeFromEnv } from "../src/payments/stripe.js";
 import { assertStartupEnvironment, DEV_PROJECT_ID, isDeployed, PROD_PROJECT_ID, StartupConfigError, stripeKeyMode } from "../src/startup_env.js";
 import { FakeStore, FakeTeamRepository, FakeUsers, FakeVerifier } from "./fakes.js";
 
+const kms = { PERSONAL_DETAILS_KMS_KEY: "projects/p/locations/l/keyRings/r/cryptoKeys/k" };
 const fails = (env: Record<string, string>, re: RegExp) => expect(() => assertStartupEnvironment(env)).toThrow(re);
 
 describe("startup environment", () => {
@@ -24,9 +25,16 @@ describe("startup environment", () => {
   });
 
   it("deployed with the project set, with or without Stripe, boots", () => {
-    expect(assertStartupEnvironment({ K_SERVICE: "api", FIREBASE_PROJECT_ID: PROD_PROJECT_ID })).toBe(PROD_PROJECT_ID);
-    expect(assertStartupEnvironment({ NODE_ENV: "production", FIREBASE_PROJECT_ID: DEV_PROJECT_ID, STRIPE_SECRET_KEY: "rk_test_x" })).toBe(DEV_PROJECT_ID);
-    expect(assertStartupEnvironment({ NODE_ENV: "production", FIREBASE_PROJECT_ID: PROD_PROJECT_ID, STRIPE_SECRET_KEY: "rk_live_x" })).toBe(PROD_PROJECT_ID);
+    expect(assertStartupEnvironment({ ...kms, K_SERVICE: "api", FIREBASE_PROJECT_ID: PROD_PROJECT_ID })).toBe(PROD_PROJECT_ID);
+    expect(assertStartupEnvironment({ ...kms, NODE_ENV: "production", FIREBASE_PROJECT_ID: DEV_PROJECT_ID, STRIPE_SECRET_KEY: "rk_test_x" })).toBe(DEV_PROJECT_ID);
+    expect(assertStartupEnvironment({ ...kms, NODE_ENV: "production", FIREBASE_PROJECT_ID: PROD_PROJECT_ID, STRIPE_SECRET_KEY: "rk_live_x" })).toBe(PROD_PROJECT_ID);
+  });
+
+  it("deployed without the personal-details KMS key fails, unless emulated; local runs need none", () => {
+    fails({ NODE_ENV: "production", FIREBASE_PROJECT_ID: DEV_PROJECT_ID }, /PERSONAL_DETAILS_KMS_KEY must be set/);
+    fails({ K_SERVICE: "api", FIREBASE_PROJECT_ID: PROD_PROJECT_ID, PERSONAL_DETAILS_KMS_KEY: "  " }, /PERSONAL_DETAILS_KMS_KEY must be set/);
+    expect(assertStartupEnvironment({ K_SERVICE: "api", FIREBASE_PROJECT_ID: DEV_PROJECT_ID, FIRESTORE_EMULATOR_HOST: "127.0.0.1:8080" })).toBe(DEV_PROJECT_ID);
+    expect(assertStartupEnvironment({ FIREBASE_PROJECT_ID: DEV_PROJECT_ID })).toBe(DEV_PROJECT_ID);
   });
 
   it("a live key with a non-production project fails, even locally", () => {
@@ -40,7 +48,7 @@ describe("startup environment", () => {
   });
 
   it("an unrecognised key fails when deployed only", () => {
-    fails({ NODE_ENV: "production", FIREBASE_PROJECT_ID: DEV_PROJECT_ID, STRIPE_SECRET_KEY: "whsec_nope" }, /isn't a Stripe/);
+    fails({ ...kms, NODE_ENV: "production", FIREBASE_PROJECT_ID: DEV_PROJECT_ID, STRIPE_SECRET_KEY: "whsec_nope" }, /isn't a Stripe/);
     expect(assertStartupEnvironment({ STRIPE_SECRET_KEY: "whsec_nope" })).toBe(DEV_PROJECT_ID);
     expect(stripeKeyMode("sk_live_a")).toBe("live");
     expect(stripeKeyMode("junk")).toBe("unknown");

@@ -24,6 +24,8 @@ export const routeWriteLimits: Record<string, Limit[]> = {
   // Once per sign-up; each one is a KMS encrypt.
   "PUT /v1/me/personal/birth-date": [{ max: 5, windowMs: minute }, { max: 20, windowMs: day }],
   "DELETE /v1/teams/:teamId": [{ max: 3, windowMs: minute }],
+  // Team details; a switch to club decrypts every member's birth date (KMS) and answers how many fail.
+  "PATCH /v1/teams/:teamId": [{ max: 5, windowMs: minute }, { max: 30, windowMs: day }],
   "POST /v1/conversations": [{ max: 10, windowMs: minute }, { max: 100, windowMs: day }],
   "POST /v1/conversations/groups": [{ max: 5, windowMs: minute }, { max: 30, windowMs: day }],
   // Publishing a schedule rewrites up to thousands of games.

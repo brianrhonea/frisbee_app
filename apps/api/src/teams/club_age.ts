@@ -26,8 +26,9 @@ export const clubAgeUnavailableMessage = "Club teams can't take new players righ
 const lookupBatch = 20;
 
 /** Why a team can't become a club team yet ([count] people fail); names are never given. */
+export const clubSwitchPrefix = "This team can't switch to the club level";
 export const clubSwitchMessage = (count: number) =>
-  `This team can't switch to the club level: ${count === 1 ? "1 person on it is" : `${count} people on it are`} under ${clubMinimumAge} or ` +
+  `${clubSwitchPrefix}: ${count === 1 ? "1 person on it is" : `${count} people on it are`} under ${clubMinimumAge} or ` +
   "haven't added a date of birth. Club teams are for players 16 and over.";
 
 export class ClubAgeGate {
