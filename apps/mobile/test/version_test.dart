@@ -11,6 +11,11 @@ void main() {
       multiLine: true,
     ).firstMatch(pubspec)?.group(1);
     expect(version, appVersion);
+    final build = RegExp(
+      r'^version:\s*[0-9.]+\+(\d+)',
+      multiLine: true,
+    ).firstMatch(pubspec)?.group(1);
+    expect(build, '$appBuild', reason: 'meta/flags.minBuild compares this');
 
     final changelog = File('../../docs/CHANGELOG.md').readAsStringSync();
     expect(changelog, contains('## $appVersion'));
