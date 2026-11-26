@@ -12,7 +12,7 @@
   border: 1px solid var(--line); color: var(--ink-soft); vertical-align: middle;
 }
 /* Live: the scoreboard navy (red is only for live games). */
-.meeting-badge.live { background: var(--board); border-color: var(--board); color: var(--on-board); }
+.meeting-badge.live { background: var(--board); border-color: var(--line); color: var(--on-board); }
 .meeting-notes { white-space: pre-wrap; }
 .meeting-group h3 { margin: 12px 0 4px; }
 .meeting-names { margin: 0; }

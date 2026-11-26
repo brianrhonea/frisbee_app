@@ -61,7 +61,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  background: var(--board);
+  background: var(--board); border: 1px solid var(--line);
   color: var(--on-board);
 }
 .draft-banner > div { display: grid; gap: 2px; min-width: 0; }

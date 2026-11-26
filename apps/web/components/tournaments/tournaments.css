@@ -27,7 +27,7 @@
 
 .hosted-board {
   background: var(--board); color: var(--on-board); border-radius: var(--radius);
-  padding: 22px 24px; align-items: flex-start;
+  padding: 22px 24px; border: 1px solid var(--line); align-items: flex-start;
 }
 .hosted-board .hosted-meta, .hosted-board .hosted-eyebrow { color: var(--board-muted); }
 .hosted-board .hosted-eyebrow a:hover { color: var(--on-board); }

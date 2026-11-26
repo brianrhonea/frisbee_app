@@ -64,7 +64,7 @@
 .explore-rank { font-family: var(--font-score); font-size: 1.2rem; font-variant-numeric: normal; }
 .explore-card-link { color: var(--accent); font-weight: 700; }
 .explore-coming > .section-title, .explore-section-head .section-title { font-size: 1.15rem; }
-.explore-live { background: var(--board); color: var(--on-board); border-color: transparent; }
+.explore-live { background: var(--board); color: var(--on-board); border-color: var(--line); }
 .explore-live .card-title { display: flex; align-items: center; gap: 8px; color: var(--on-board); }
 .live-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--live); flex: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--live) 30%, transparent); }
 .explore-live .row-card { background: var(--board-2); border-color: transparent; color: var(--on-board); }

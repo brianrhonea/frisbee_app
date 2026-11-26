@@ -45,7 +45,7 @@
   font-family: var(--font-score); font-weight: 800; letter-spacing: 0.01em;
 }
 .team-badge.community { border-radius: 50%; background: var(--accent); color: var(--on-accent); }
-.team-badge.organization { border-radius: 50%; background: var(--board); color: var(--on-board); }
+.team-badge.organization { border-radius: 50%; background: var(--accent-soft); color: var(--accent-ink); }
 /* White initials need a deeper blue than dark mode's light --team. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .team-badge.team { background: color-mix(in srgb, var(--team) 55%, var(--board)); }
@@ -124,12 +124,12 @@
 .team-hub .sched-main small { color: var(--muted); font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .team-hub .rsvp-line { display: flex; align-items: center; gap: 10px; }
 .team-hub .rsvp-line > small { color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
-/* Today (and a live meeting): the scoreboard navy. */
-.team-hub .sched-list a.team-sched-row.today { background: var(--board); color: var(--on-board); }
-.team-hub .sched-list a.team-sched-row.today small, .team-hub .sched-list a.team-sched-row.today .rsvp-line > small { color: var(--board-muted); }
-.team-hub .sched-list a.team-sched-row.today .date-tile { background: var(--board-2); color: var(--on-board); }
-.team-hub .sched-list a.team-sched-row.today .type-dot { background: var(--on-board); }
-.team-hub .sched-list a.team-sched-row.today.active { box-shadow: inset 3px 0 0 var(--accent); }
+/* Today: a soft accent tint with a 2px accent outline (visible on the white card in both themes). */
+.team-hub .sched-list a.team-sched-row.today { background: var(--accent-soft); color: var(--accent-ink); box-shadow: inset 0 0 0 2px var(--accent); }
+.team-hub .sched-list a.team-sched-row.today small, .team-hub .sched-list a.team-sched-row.today .rsvp-line > small { color: var(--accent-ink); }
+.team-hub .sched-list a.team-sched-row.today .date-tile { background: var(--card); color: var(--accent-ink); }
+.team-hub .sched-list a.team-sched-row.today .type-dot { background: var(--accent-ink); }
+.team-hub .sched-list a.team-sched-row.today.active { box-shadow: inset 3px 0 0 var(--accent), inset 0 0 0 2px var(--accent); }
 .team-hub .schedule-meeting .type-dot { background: var(--personal); }
 .team-hub .sched-card + .pager { margin-top: 12px; }
 
