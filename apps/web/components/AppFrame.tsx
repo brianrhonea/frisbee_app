@@ -27,19 +27,22 @@ type Tab = {
 };
 
 /**
- * Members: the app's five tabs (Home, Discover, Schedule, Teams, Chats;
- * docs/redesign-plan.md) and Learn. Discover is /explore, which also
- * holds what Events and Find tournaments did.
+ * Members: the five tabs, in the approved order Home, Discover, Teams,
+ * Schedule, Chats (UI-Q11, the app's bottom bar too). Discover is /explore,
+ * which also holds what Events and Find tournaments did, and now Learn
+ * (UI-Q5): /learn keeps its route and opens under Discover.
  */
 const memberTabs: Tab[] = [
   // The community feed and posts are Home's (its Everyone tab).
   { href: "/", label: "Home", icon: "home", also: ["/community", "/posts"] },
-  { href: "/explore", label: "Discover", icon: "explore", also: ["/players", "/rankings", "/tournaments", "/events", "/discover"] },
-  { href: "/schedule", label: "Schedule", icon: "events" },
+  { href: "/explore", label: "Discover", icon: "explore", also: ["/players", "/rankings", "/tournaments", "/events", "/discover", "/learn"] },
   { href: "/teams", label: "Teams", icon: "teams" },
+  { href: "/schedule", label: "Schedule", icon: "events" },
   { href: "/messages", label: "Chats", icon: "messages" },
-  { href: "/learn", label: "Learn", icon: "learn" },
 ];
+
+/** Under Discover in the sidebar, where the labels show (members; visitors keep Learn as a tab). */
+const learnEntry: Tab = { href: "/learn", label: "Learn to play", icon: "learn" };
 
 /**
  * Visitors (and everyone while the browser restores a session): what they
@@ -134,13 +137,13 @@ function isActive(path: string, tab: Tab, only: string | null, tabs: Tab[]) {
   return tab.also?.some((p) => under(path, p)) ?? false;
 }
 
-type TabLinksProps = { tabs: Tab[]; className: string; path: string; only: string | null; chats?: number };
+type TabLinksProps = { tabs: Tab[]; className: string; path: string; only: string | null; chats?: number; withLearn?: boolean };
 
 /** The tabs as links. Teams always opens the list of your teams, even with only one. */
-function TabLinks({ tabs, className, path, only, chats = 0 }: TabLinksProps) {
+function TabLinks({ tabs, className, path, only, chats = 0, withLearn = false }: TabLinksProps) {
   return tabs.map((t) => {
     const active = isActive(path, t, only, tabs);
-    return (
+    const link = (
       <Link
         key={t.href}
         href={t.href}
@@ -161,6 +164,15 @@ function TabLinks({ tabs, className, path, only, chats = 0 }: TabLinksProps) {
         <span>{t.label}</span>
       </Link>
     );
+    if (!(withLearn && t.href === "/explore")) return link;
+    // Learn, indented under Discover; the icon rail hides it (Discover's page links to it).
+    const learn = under(path, learnEntry.href);
+    return [
+      link,
+      <Link key={learnEntry.href} href={learnEntry.href} className={`${className}-sub${learn ? " active" : ""}`} aria-current={learn ? "page" : undefined}>
+        <span>{learnEntry.label}</span>
+      </Link>,
+    ];
   });
 }
 
@@ -171,9 +183,10 @@ function TabLinksWithFilter(props: Omit<TabLinksProps, "only">) {
 }
 
 /**
- * The page frame: a top bar (brand, search, account) over the tabs in a
- * left sidebar (an icon rail on tablets), the page, and upcoming events on
- * the right on wide screens. Phones get the tabs as a row under the top bar.
+ * The page frame: a top bar (brand, search, account picture) over the tabs
+ * in a left sidebar (900 px and up; an icon rail from 600 to 899), the page
+ * (capped at 1600 px), and upcoming events on the right from 1200 px.
+ * Phones (under 600) get the tabs as a bar fixed to the bottom.
  */
 export function AppFrame({ children, footer }: { children: ReactNode; footer: ReactNode }) {
   const path = usePathname() ?? "/";
@@ -199,8 +212,8 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
     router.push(q ? `/explore?q=${encodeURIComponent(q)}` : "/explore");
   }
 
-  const tabLinks = (className: string) => {
-    const props = { tabs, className, path, chats };
+  const tabLinks = (className: string, withLearn = false) => {
+    const props = { tabs, className, path, chats, withLearn: withLearn && !!user };
     return (
       <Suspense fallback={<TabLinks {...props} only={null} />}>
         <TabLinksWithFilter {...props} />
@@ -213,6 +226,9 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
 
   return (
     <div className={`frame${aside ? " with-aside" : ""}${fab ? " has-fab" : ""}`}>
+      <a className="skip-link" href="#main">
+        Skip to content
+      </a>
       <header className="top-bar">
         <div className="top-brand">
           <Link className="brand wordmark" href="/" aria-label="Stall 10 home">
@@ -252,14 +268,10 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
         </div>
       </header>
 
-      <nav aria-label="Tabs" className="tab-bar">
-        {tabLinks("tab-item")}
-      </nav>
-
       <aside className="side-nav">
         <nav aria-label="Site" className="side-tabs">
           <h2 className="side-label">Your sideline</h2>
-          {tabLinks("nav-item")}
+          {tabLinks("nav-item", true)}
         </nav>
         {user ? (
           <button type="button" className="btn btn-primary side-create" onClick={() => compose(router)}>
@@ -296,7 +308,9 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
 
       <div className="frame-main">
         {user && <OfflineBanner />}
-        <main>{children}</main>
+        <main id="main" tabIndex={-1}>
+          {children}
+        </main>
         {user && <VoiceBar />}
         {user && <MeetingAlerts />}
         {footer}
@@ -307,6 +321,11 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
           <UpcomingAside />
         </aside>
       )}
+
+      {/* Phones: the tabs as a bar fixed to the foot of the screen (last in the page, so Tab reaches it after the content). */}
+      <nav aria-label="Tabs" className="tab-bar">
+        {tabLinks("tab-item")}
+      </nav>
     </div>
   );
 }

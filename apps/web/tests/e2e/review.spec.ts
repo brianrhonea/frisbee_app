@@ -14,6 +14,8 @@ const pages = [
   ["discover", "/explore"],
   ["teams", "/teams"],
   ["tournaments", "/tournaments"],
+  ["learn", "/learn"],
+  ["events", "/events"],
   ["sign-in", "/sign-in"],
 ] as const;
 // [showcase section, picture name]
@@ -39,6 +41,7 @@ for (const theme of ["light", "dark"] as const) {
   test(`showcase ${theme}`, async ({ page }, info) => {
     const size = info.project.name === "phone" ? "mobile" : "desktop";
     await open(page, "/dev/ui", theme);
+    await page.screenshot({ path: `${out}/gallery_${size}_${theme}_${phase}.png`, fullPage: true });
     for (const [section, name] of showcases) {
       await page.locator(`[data-showcase="${section}"]`).screenshot({ path: `${out}/${name}_${size}_${theme}_${phase}.png` });
     }
