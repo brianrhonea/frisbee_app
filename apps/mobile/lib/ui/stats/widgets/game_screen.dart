@@ -429,7 +429,10 @@ class _Scoreboard extends StatelessWidget {
     );
     return Material(
       color: c.feature,
-      borderRadius: BorderRadius.circular(cardRadius),
+      shape: RoundedSuperellipseBorder(
+        borderRadius: BorderRadius.circular(cardRadius),
+        side: BorderSide(color: c.border),
+      ),
       clipBehavior: Clip.antiAlias,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),

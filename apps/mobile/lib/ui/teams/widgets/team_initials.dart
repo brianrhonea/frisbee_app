@@ -25,7 +25,7 @@ class TeamInitials extends StatelessWidget {
     final (fill, ink) = switch (kind) {
       TeamKind.team => (c.badge, Colors.white),
       TeamKind.community => (c.accent, c.onAccent),
-      TeamKind.organization => (c.feature, c.onFeature),
+      TeamKind.organization => (c.accentSoft, c.accentInk),
     };
     return Container(
       width: size,

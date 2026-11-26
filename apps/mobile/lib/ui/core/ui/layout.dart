@@ -333,9 +333,14 @@ class FeatureCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
+    // The same edge as the standard card (see the card theme): the card
+    // colour is white on a near-white page, so the border carries it.
     return Material(
       color: c.feature,
-      borderRadius: BorderRadius.circular(cardRadius),
+      shape: RoundedSuperellipseBorder(
+        borderRadius: BorderRadius.circular(cardRadius),
+        side: BorderSide(color: c.border),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,

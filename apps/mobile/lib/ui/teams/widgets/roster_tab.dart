@@ -176,6 +176,7 @@ class RosterTab extends StatelessWidget {
         decoration: BoxDecoration(
           color: c.feature,
           borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: c.border),
         ),
         child: ScoreText(
           p.number?.toString() ?? '–',
