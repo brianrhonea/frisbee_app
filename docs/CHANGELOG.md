@@ -75,7 +75,8 @@ Plain-language notes for testers are in
 
 ## 0.0.59 — Layout fixes after the 48 px buttons (C2)
 
-- Schedule: Today is a 48 px icon button (tooltip "Today"), so the
+- Schedule: Today is a 48 px icon button (tooltip "Today"), and "New event"
+  is an icon-only 48 px button (same tooltip) below 480 px wide, so the
   "Schedule" title is readable at 360 px again.
 - Join-request rows (members) and organization team rows: Decline/Approve/
   Add use tighter horizontal padding and keep the 48 px height, so names

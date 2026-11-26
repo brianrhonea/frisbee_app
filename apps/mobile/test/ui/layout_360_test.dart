@@ -52,6 +52,7 @@ void main() {
     tester,
   ) async {
     await phone(tester);
+    final semantics = tester.ensureSemantics();
     final teams = FakeTeamRepository();
     teams.teams['t1'] = teamWith({
       'owner': TeamRole.owner,
@@ -68,7 +69,14 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light,
-        home: ScheduleScreen(viewModel: vm),
+        home: ScheduleScreen(
+          viewModel: vm,
+          // The shell's avatar, as on the Schedule tab.
+          leading: const Padding(
+            padding: EdgeInsets.all(8),
+            child: CircleAvatar(child: Text('A')),
+          ),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -77,7 +85,10 @@ void main() {
     await tester.tap(find.byTooltip('Next week'));
     await tester.pumpAndSettle();
     expect(find.byTooltip('Today'), findsOneWidget);
-    expect(find.text('New event'), findsOneWidget);
+    // New event is an icon here, with its tooltip as its label.
+    expect(find.byTooltip('New event'), findsOneWidget);
+    final node = tester.getSemantics(find.byTooltip('New event'));
+    expect('${node.label} ${node.tooltip}', contains('New event'));
     expect(tester.takeException(), isNull);
     expectWholeLine(tester, 'Schedule');
     // The Today button is still a 48 px target.
@@ -86,6 +97,7 @@ void main() {
     await tester.tap(find.byTooltip('Today'));
     await tester.pumpAndSettle();
     expect(find.byTooltip('Today'), findsNothing);
+    semantics.dispose();
   });
 
   testWidgets('a join request keeps the name on one line', (tester) async {

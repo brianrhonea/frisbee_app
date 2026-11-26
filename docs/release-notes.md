@@ -13,7 +13,7 @@ Firebase project; App Store builds come from `main` and use production.
 ## 0.0.59
 
 - **Tidier rows on small phones:** the Schedule title is no longer cut off
-  (Today is now an icon), and names in join requests and organization
+  (Today and New event are icons on phones), and names in join requests and organization
   teams stay on one line.
 
 ## 0.0.58

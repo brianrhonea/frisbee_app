@@ -527,7 +527,7 @@ void main() {
     );
     await tapTab(tester, 'Schedule');
     expect(find.byType(ScheduleScreen), findsOneWidget);
-    expect(find.text('New event'), findsOneWidget);
+    expect(find.byTooltip('New event'), findsOneWidget);
     // No switch to a second view any more.
     expect(find.text('My schedule'), findsNothing);
     expect(find.text('Find events'), findsNothing);
