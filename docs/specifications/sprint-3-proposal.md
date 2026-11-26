@@ -1,6 +1,22 @@
 # Sprint 3 proposal
 
-**Status:** proposed 2026-11-26. Waiting for owner approval. Nothing here has started.
+**Status:** approved by the owner on 2026-11-26. It starts now (Nov 27 – Dec 11).
+
+**Owner answers (2026-11-26):**
+- **S3-1:** start now.
+- **Q17:** yes. Keep the payment ledger rows; delete everything else the cascade needs to.
+- **D-AR:** yes. `ageRefusals` is deleted with the account and left out of the data export.
+- **D-U13:** yes. Delete disabled under-13 accounts and their data after 30 days.
+- **D-1317:** yes. Hide legacy 13–17 profiles from search and DMs when enforcement turns on.
+- **D11:** yes, the `fidOwners` map and trigger.
+- **Q12 (staff MFA): held for later.** The owner is the only staff member. #26 leaves the January plan.
+- **Q13:** yes, the two-week beta exit criteria.
+- **Q16:** yes, one scorekeeper at a time (lease) for January.
+- **D9, D-PT, D-LIVE, D-LH:** as recommended:
+  - neutral status tags;
+  - `previewTemplate` stays ungated;
+  - live meetings keep indigo;
+  - only `lh3` Google photos are trusted.
 
 **Baseline:** `feature/jan-4-release` at `bde38aa` or later. That holds the Sprint 2 work the owner approved on 2026-11-26.
 
