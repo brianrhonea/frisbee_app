@@ -4,6 +4,20 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.59.14 — 2026-11-26
+
+Review fixes 2 for C1-C4 (Sprint 2).
+
+- Visitor home: the "From the community" link is drawn as the single feed tab
+  again (accent text and underline); it lost its style when the feed tabs
+  moved to SegmentedTabs.
+- A loading button keeps full colour (only disabled buttons dim), and a
+  disabled button no longer takes the hover fill.
+- Scrolling tab and chip bars fade at the end (or start) that has more, only
+  while they overflow.
+- Avatar: a picture is not treated as broken just because an SVG reports no
+  natural width.
+
 ## 0.59.13 — 2026-11-26
 
 Review fixes for C1-C4 (Sprint 2).

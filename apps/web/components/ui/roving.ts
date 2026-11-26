@@ -1,4 +1,29 @@
-import type { KeyboardEvent } from "react";
+import { type RefObject, useEffect, type KeyboardEvent } from "react";
+
+/** Marks a scrolling bar with which end has more (`data-edges`), for the fade; none when it fits. */
+export function useEdgeFade(ref: RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => {
+      const more = el.scrollWidth - el.clientWidth > 1;
+      const start = more && el.scrollLeft > 1;
+      const end = more && el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+      if (start && end) el.dataset.edges = "both";
+      else if (end) el.dataset.edges = "end";
+      else if (start) el.dataset.edges = "start";
+      else delete el.dataset.edges;
+    };
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
+    ro?.observe(el);
+    return () => {
+      el.removeEventListener("scroll", update);
+      ro?.disconnect();
+    };
+  });
+}
 
 /**
  * The keyboard half of the ARIA tabs and radio-group patterns: Left and Right

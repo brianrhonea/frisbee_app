@@ -35,7 +35,8 @@ function Face({ className, name, url, size, letters, label, glyph }: { className
   const img = useRef<HTMLImageElement>(null);
   useEffect(() => {
     const el = img.current;
-    if (el && el.complete && el.naturalWidth === 0) setBroken(true);
+    // SVG sources can report no natural width while being fine.
+    if (el && el.complete && el.naturalWidth === 0 && !/\.svg(\?|#|$)|^data:image\/svg/i.test(el.currentSrc || el.src)) setBroken(true);
   }, [url]);
   const style = { width: size, height: size, fontSize: size * (letters === 1 ? 0.42 : 0.45) };
   const a11y = label ? ({ role: "img", "aria-label": label } as const) : ({ "aria-hidden": true } as const);

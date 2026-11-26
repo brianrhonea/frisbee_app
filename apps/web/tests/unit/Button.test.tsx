@@ -171,6 +171,19 @@ describe("button states exist in the stylesheets", () => {
     has(/\.icon-btn:active:not\(:disabled\)/);
   });
 
+  it("loading keeps full colour; disabled dims and does not hover", () => {
+    has(/\.btn:disabled,\s*\.btn\[aria-disabled="true"\]:not\(\[aria-busy="true"\]\)\s*\{[^}]*opacity:\s*0\.6/);
+    has(/\.btn:where\(:hover:not\(:disabled\):not\(\[aria-disabled="true"\]\)\)/);
+    expect(css).not.toMatch(/\.btn\[aria-disabled="true"\]\s*\{[^}]*opacity/);
+  });
+
+  it("the visitor home's single feed tab keeps an accent look", () => {
+    const page = readFileSync(join(root, "app/page.tsx"), "utf8");
+    expect(page).toContain('className="feed-tabs"');
+    has(/\.feed-tabs > a\s*\{[^}]*color:\s*var\(--accent\)[^}]*\}/);
+    has(/\.feed-tabs > a\s*\{[^}]*border-bottom:\s*2px solid var\(--accent\)/);
+  });
+
   it("focus-visible has one ring for buttons and icon buttons", () => {
     has(/\.btn:focus-visible,\s*\.icon-btn:focus-visible/);
   });

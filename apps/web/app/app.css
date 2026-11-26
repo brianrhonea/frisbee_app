@@ -1207,6 +1207,13 @@ button.person-row:hover { background: var(--field); }
 .huddle-side .card { padding: var(--space-lg) 18px; }
 /* The tabs themselves are SegmentedTabs (components/ui); this is their place on the page. */
 .feed-tabs { margin-top: var(--space-xs); }
+/* Home for visitors: one link standing as the feed's single tab (app/page.tsx). */
+.feed-tabs > a {
+  display: inline-flex; align-items: center; min-height: 48px; padding: 0 14px; border-bottom: 2px solid var(--accent);
+  color: var(--accent); font-weight: 700; text-decoration: none;
+}
+.feed-tabs > a:hover { color: var(--accent-ink); }
+.feed-tabs > a:focus-visible { outline-offset: -2px; }
 .see-all { font-size: 0.85rem; font-weight: 700; color: var(--accent); text-decoration: none; }
 .see-all:hover { text-decoration: underline; }
 .date-list { display: grid; }

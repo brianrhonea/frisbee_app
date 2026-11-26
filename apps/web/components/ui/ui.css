@@ -27,6 +27,10 @@
   display: flex; align-items: center; gap: var(--space-xs); min-width: 0; max-width: 100%;
   overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
 }
+/* A fade at the end that has more (set by the component while the bar overflows). */
+.ui-tabs[data-edges="end"] { mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); }
+.ui-tabs[data-edges="start"] { mask-image: linear-gradient(to left, #000 calc(100% - 32px), transparent); }
+.ui-tabs[data-edges="both"] { mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent); }
 .ui-tabs::-webkit-scrollbar { display: none; }
 .ui-tabs > button {
   flex: none; display: inline-flex; align-items: center; min-height: 48px; padding: 0; border: 0; background: none;
