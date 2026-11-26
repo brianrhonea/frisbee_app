@@ -36,12 +36,18 @@
 - 3a-S lands on the held branch before 3a-R.
 - K6/K7 come before C1–C4.
 
+## Owner answers (2026-11-26)
+
+- **Q9:** the Jan 4 beta runs on **dev**. Prod stand-up (#9, #11, #12) is needed only for the Jan 18 public release, so it moves to Sprint 3–4.
+- **Q14: yes**, separate dev and prod iOS bundle IDs before the beta. This is planned for Sprint 3 and needs owner console steps:
+  - a new App ID and TestFlight app;
+  - the iOS app registered in the dev Firebase project;
+  - its config file placed by the owner.
+- **Android:** not in the beta. #10 moves after the beta.
+
 ## Still open
 
 - Visual OK on K2–K5.
-- Q9: beta on prod or dev.
-- Q14: separate bundle IDs.
-- Android in the beta.
 - Q16 and Q17 for later sprints.
 
 ## Not in this sprint
