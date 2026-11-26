@@ -4,6 +4,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frisbee_app/data/repositories/account_gate/account_gate.dart';
+import 'package:frisbee_app/data/repositories/agreement/agreement_repository.dart';
+import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
+import 'package:frisbee_app/data/repositories/personal/personal_repository.dart';
+import 'package:frisbee_app/routing/router.dart';
+import 'package:frisbee_app/routing/routes.dart';
+import 'package:frisbee_app/ui/auth/widgets/agree_terms_screen.dart';
+import 'package:provider/provider.dart';
 import 'package:frisbee_app/config/store_links.dart';
 import 'package:frisbee_app/data/repositories/meta_flags/meta_flags_repository.dart';
 import 'package:frisbee_app/domain/models/meta_flags.dart';
@@ -12,6 +20,7 @@ import 'package:frisbee_app/ui/update/view_models/update_gate_viewmodel.dart';
 import 'package:frisbee_app/ui/update/widgets/update_gate.dart';
 import 'package:frisbee_app/ui/update/widgets/update_required_screen.dart';
 
+import '../testing/fakes.dart';
 import '../ui_harness/harness.dart';
 
 class _FakeFlags implements MetaFlagsRepository {
@@ -279,6 +288,58 @@ void main() {
       await t.binding.handlePopRoute();
       await t.pump();
       expect(find.byType(UpdateRequiredScreen), findsOneWidget);
+      vm.dispose();
+    });
+  });
+
+  group('UpdateGate over the real router with an account-gate redirect', () {
+    testWidgets('the update screen wins, and the redirect works once it is '
+        'lifted', (t) async {
+      final repo = _FakeFlags()..next = _min(90);
+      final vm = _vm(repo);
+      await t.runAsync(vm.start);
+      final auth = FakeAuthRepository(user: testUser);
+      final personal = FakePersonalDetailsRepository();
+      final agreement = FakeAgreementRepository();
+      final gate = AccountGate(auth: auth)..report(['terms']);
+      final appRouter = router(auth, personal, agreement, gate: gate);
+      addTearDown(appRouter.dispose);
+      await t.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<AuthRepository>.value(value: auth),
+            ChangeNotifierProvider<PersonalDetailsRepository>.value(
+              value: personal,
+            ),
+            ChangeNotifierProvider<AgreementRepository>.value(value: agreement),
+            ChangeNotifierProvider<AccountGate>.value(value: gate),
+          ],
+          child: MaterialApp.router(
+            theme: AppTheme.light,
+            routerConfig: appRouter,
+            builder: (_, child) => UpdateGate(viewModel: vm, child: child!),
+          ),
+        ),
+      );
+      await t.pumpAndSettle();
+
+      // The gate sent the router to the Terms step, but the update screen
+      // covers it: nothing underneath is reachable.
+      expect(
+        appRouter.routeInformationProvider.value.uri.path,
+        Routes.agreeTerms,
+        reason: 'the redirect ran underneath',
+      );
+      expect(find.byType(UpdateRequiredScreen), findsOneWidget);
+      expect(find.byType(AgreeTermsScreen), findsNothing);
+
+      await t.runAsync(() async {
+        repo.live.add(_min(0));
+        await pumpEventQueue();
+      });
+      await t.pumpAndSettle();
+      expect(find.byType(UpdateRequiredScreen), findsNothing);
+      expect(find.byType(AgreeTermsScreen), findsOneWidget);
       vm.dispose();
     });
   });

@@ -11,9 +11,6 @@ const adultAge = 18;
 /// packages/shared/src/account_gate.ts); the website shows the same.
 const adultOnlyMessage = 'You must be $adultAge or older to use Stall 10.';
 
-/// Kept for callers that still name it: the same message.
-const tooYoungMessage = adultOnlyMessage;
-
 /// The birth date is saved once (`birthDateLockedMessage` in
 /// packages/shared/src/account_gate.ts).
 const birthDateLockedMessage =

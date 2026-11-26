@@ -4,14 +4,19 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 
 import '../../domain/models/meeting.dart';
+import 'account_gate_retry.dart';
+import 'api_client.dart';
 import 'app_check.dart';
 
 /// Thrown when the `meetings-joinToken` function turns the request down,
 /// e.g. the meeting hasn't started or the user hasn't been let in.
 class MeetingAccessException implements Exception {
-  const MeetingAccessException(this.message);
+  const MeetingAccessException(this.message, {this.fields});
 
   final String message;
+
+  /// Set when the function refused with `account_incomplete`: what is missing.
+  final Map<String, String>? fields;
 
   @override
   String toString() => message;
@@ -28,7 +33,9 @@ class MeetingTokenService {
     FirebaseAuth? auth,
     http.Client? client,
     String region = 'us-central1',
+    ApiClient? api,
   }) : _auth = auth,
+       _gate = AccountGateRetry(api),
        _client = client ?? http.Client(),
        _endpoint = _useEmulators
            ? Uri.parse(
@@ -43,8 +50,16 @@ class MeetingTokenService {
   final FirebaseAuth? _auth;
   final http.Client _client;
   final Uri _endpoint;
+  final AccountGateRetry _gate;
 
-  Future<MeetingAccess> joinToken(String teamId, String meetingId) async {
+  /// Follows the account gate contract on an `account_incomplete` refusal
+  /// (see [AccountGateRetry]); other refusals are thrown as before.
+  Future<MeetingAccess> joinToken(String teamId, String meetingId) => _gate.run(
+    () => _joinOnce(teamId, meetingId),
+    (e) => e is MeetingAccessException ? e.fields : null,
+  );
+
+  Future<MeetingAccess> _joinOnce(String teamId, String meetingId) async {
     final user = (_auth ?? FirebaseAuth.instance).currentUser;
     if (user == null) throw const MeetingAccessException('Not signed in.');
     final idToken = await user.getIdToken();
@@ -79,6 +94,7 @@ class MeetingTokenService {
       error is Map && error['message'] is String
           ? error['message'] as String
           : "Couldn't join the meeting (${response.statusCode}).",
+      fields: accountIncompleteFields(error),
     );
   }
 }

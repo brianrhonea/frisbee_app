@@ -10,6 +10,11 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.58
+
+- **Joining meetings, voice rooms and league drafts** now guides you to the
+  missing step (verify email, birth date, Terms) instead of just failing.
+
 ## 0.0.55
 
 - **Notification bubbles show what happened:** a heart for a like,
