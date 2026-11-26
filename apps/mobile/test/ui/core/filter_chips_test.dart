@@ -120,6 +120,33 @@ void main() {
     );
   });
 
+  testWidgets('a count is read as "All, 12", not "All 12"', (t) async {
+    final handle = t.ensureSemantics();
+    await pumpInApp(t, const _Host());
+    expect(find.bySemanticsLabel('All, 12'), findsOneWidget);
+    expect(find.bySemanticsLabel('All 12'), findsNothing);
+    handle.dispose();
+  });
+
+  testWidgets('a selected chip shows the check instead of its dot', (t) async {
+    const dotted = <FilterOption<String>>[
+      (
+        value: 'a',
+        label: 'Hosted',
+        count: 3,
+        leading: CircleAvatar(radius: 5, backgroundColor: Colors.grey),
+      ),
+    ];
+    await pumpInApp(t, const _Host(options: dotted));
+    expect(find.byType(CircleAvatar), findsOneWidget);
+    await pumpInApp(t, const SizedBox.shrink());
+    await pumpInApp(t, const _Host(options: dotted, initial: 'a'));
+    expect(find.byType(CircleAvatar), findsNothing);
+    final chip = t.widget<ChoiceChip>(find.byType(ChoiceChip));
+    expect(chip.selected, isTrue);
+    expect(chip.showCheckmark, isTrue);
+  });
+
   testWidgets('scrolls sideways when the chips do not fit', (t) async {
     await pumpInApp(t, const _Host());
     final scroll = t.state<ScrollableState>(find.byType(Scrollable));

@@ -285,6 +285,37 @@ void main() {
       await tester.pumpAndSettle();
     }
 
+    testWidgets('header action buttons are 48 px tall and not clipped', (
+      tester,
+    ) async {
+      addTeam({testUser.uid: TeamRole.coach, 'owner': TeamRole.owner});
+      tester.view.physicalSize = const Size(560, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final vm = homeVm();
+      addTearDown(vm.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: TeamHomeScreen(viewModel: vm),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+
+      for (final label in ['Invite players', 'Message']) {
+        final button = find.ancestor(
+          of: find.text(label),
+          matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
+        );
+        expect(button, findsOneWidget, reason: label);
+        expect(tester.getSize(button).height, 48, reason: label);
+        // The whole button sits inside the header area, so nothing clips it.
+        final area = tester.getRect(find.byType(NestedScrollView));
+        expect(area.contains(tester.getRect(button).bottomCenter), isTrue);
+      }
+    });
+
     testWidgets("on a phone, tabs stay on the page and fold the header", (
       tester,
     ) async {

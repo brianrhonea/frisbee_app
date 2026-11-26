@@ -341,7 +341,7 @@ class RsvpStatusPill extends StatelessWidget {
   final EventType type;
   final bool needsRsvp;
 
-  /// "Needs RSVP" in solid amber, e.g. on a row already tinted amber.
+  /// "Needs RSVP" in solid indigo (token decision 1: the old solid amber became indigo).
   final bool strong;
 
   @override

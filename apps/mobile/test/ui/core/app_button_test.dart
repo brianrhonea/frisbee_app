@@ -181,6 +181,25 @@ void main() {
     handle.dispose();
   });
 
+  testWidgets('loading keeps the enabled colours and a foreground spinner', (
+    t,
+  ) async {
+    await t.pumpWidget(_host(const AppButton('Save', onPressed: _noop)));
+    final idle = t.widget<FilledButton>(find.byType(FilledButton));
+    await t.pumpWidget(
+      _host(const AppButton('Save', onPressed: _noop, loading: true)),
+    );
+    final busy = t.widget<FilledButton>(find.byType(FilledButton));
+    expect(busy.onPressed, isNotNull, reason: 'not the disabled look');
+    final c = AppColors.light;
+    expect(busy.style?.backgroundColor?.resolve({}), c.accent);
+    expect(idle.style?.backgroundColor?.resolve({}), c.accent);
+    final spinner = t.widget<CircularProgressIndicator>(
+      find.byType(CircularProgressIndicator),
+    );
+    expect(spinner.color, c.onAccent);
+  });
+
   testWidgets('loading keeps the button width', (t) async {
     await t.pumpWidget(_host(const AppButton('Save', onPressed: _noop)));
     final idle = t.getSize(find.byType(FilledButton));

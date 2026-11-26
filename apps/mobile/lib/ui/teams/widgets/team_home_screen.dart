@@ -1707,7 +1707,7 @@ class _TeamHeaderDelegate extends SliverPersistentHeaderDelegate {
   });
 
   static const _identity = 64.0;
-  static const _actions = 52.0;
+  static const _actions = 56.0; // 48 px buttons + 8 px bottom padding
   static const _tabs = 44.0;
 
   final double topPadding;
