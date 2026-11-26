@@ -699,6 +699,7 @@ class _DaySection extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: c.feature,
                     borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: c.border),
                   ),
                   child: Text(
                     'TODAY',

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../themes/theme.dart';
+
 /// A color for telling kinds of things apart at a glance: a tournament's
 /// status, a team's kind. Each has a light- and a dark-theme shade.
 enum Tone {
@@ -17,6 +19,32 @@ enum Tone {
 
   Color of(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark ? _dark : _light;
+
+  /// The tone as text on its own 18% tint (a selected chip): the tone
+  /// itself, darkened in the light theme just enough to reach 4.5:1
+  /// against the tint over the page or a card.
+  Color ink(BuildContext context) {
+    final tone = of(context);
+    final c = AppColors.of(context);
+    final grounds = [
+      Color.alphaBlend(tone.withValues(alpha: 0.18), c.background),
+      Color.alphaBlend(tone.withValues(alpha: 0.18), c.card),
+    ];
+    var ink = tone;
+    for (var t = 0.0; t <= 1.0; t += 0.05) {
+      ink = Color.lerp(tone, Colors.black, t)!;
+      if (grounds.every((g) => _contrast(ink, g) >= 4.5)) break;
+    }
+    return ink;
+  }
+
+  static double _contrast(Color a, Color b) {
+    final la = a.computeLuminance();
+    final lb = b.computeLuminance();
+    final hi = la > lb ? la : lb;
+    final lo = la > lb ? lb : la;
+    return (hi + 0.05) / (lo + 0.05);
+  }
 }
 
 /// A small pill in [tone]: tinted fill, [label] in the tone's color.
@@ -103,6 +131,11 @@ class ToneFilterBar<T> extends StatelessWidget {
               label: Text('${f.label} ${f.count}'),
               selected: f.value == selected,
               selectedColor: f.tone?.of(context).withValues(alpha: 0.18),
+              // The theme's selected label is white on navy; on a tinted
+              // chip it must be the tone's own ink.
+              labelStyle: f.tone != null && f.value == selected
+                  ? TextStyle(color: f.tone!.ink(context))
+                  : null,
               onSelected: (_) => onSelected(f.value),
             ),
           ),

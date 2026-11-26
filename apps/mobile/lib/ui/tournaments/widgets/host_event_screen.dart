@@ -277,7 +277,7 @@ class _HostSectionView extends StatelessWidget {
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
                             color: switch (t.kind) {
-                              TeamKind.organization => c.feature,
+                              TeamKind.organization => c.accentSoft,
                               TeamKind.community => c.accentSoft,
                               TeamKind.team => c.team,
                             },
@@ -289,7 +289,7 @@ class _HostSectionView extends StatelessWidget {
                               fontSize: 13,
                               fontWeight: FontWeight.w800,
                               color: switch (t.kind) {
-                                TeamKind.organization => c.onFeature,
+                                TeamKind.organization ||
                                 TeamKind.community => c.accentInk,
                                 TeamKind.team => c.card,
                               },
