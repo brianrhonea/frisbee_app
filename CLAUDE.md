@@ -16,6 +16,8 @@ Stall10 is an ultimate frisbee ecosystem combining:
 
 Stall10 will remain focused on ultimate frisbee for the initial release. Multi-sport expansion and rebranding are deferred.
 
+**Naming:** "Hylite" is the working name in engineering docs, agents and skills (previously Stall10). Do not rename anything in the product (app strings, bundle IDs, domains, package names such as `@stall10/*`) without an approved task.
+
 ## 2. Current Release Objective
 
 - Founding-team beta: January 4, 2027
@@ -217,6 +219,7 @@ Do not claim physical-device compatibility based solely on simulator results.
 - Production branch: `main`
 - Integration branch: `development`
 - Implementation: isolated feature or fix branches
+- January release integration branch: `feature/jan-4-release` (cut from `development` at `39c8a53`). All January work lands there first and reaches `development` only through a pull request the product owner approves.
 
 Confirm the current branch strategy before making changes.
 
@@ -300,7 +303,7 @@ The January objective is a polished, secure and reliable Stall10 release, not co
 
 ## UI/UX Implementation Authority
 
-Reference `docs/design-system/Stall10_UI_Implementation_Guide.md` for all UI modernization tasks.
+Reference `docs/specifications/audit/Stall10_UI_Implementation_Guide.md` for all UI modernization tasks.
 
 Consult Document 17 and the UI-updated product specifications for original visual concepts and mockups.
 
@@ -316,3 +319,17 @@ Requirements:
 - Add widget, golden or browser screenshot tests where appropriate.
 - Do not introduce new functionality solely because it appears in a design concept.
 - Obtain product owner approval for deviations from the design system.
+
+## 16. Standing Owner Rules
+
+These apply to every session and every agent:
+
+- **Secret files:** never read, edit, parse, copy or list the keys of secret files: `*.local.json` (including `secrets.local.json` and `secrets.prod.local.json`), `.env*`, `*.plist`, `google-services.json` and signing keys. If a change needs one, tell the product owner what to change.
+- **Pushing:** never push or merge to `development` or `main` without asking each time. Codemagic builds are pay-as-you-go.
+- **Deploys:** deploy nothing without explicit approval. Cloud Functions deploy only by named group. After an approved change to Firestore or Storage rules, deploy the rules to dev.
+- **Flutter runs and builds:** every `flutter run` and `flutter build` takes `--dart-define-from-file=secrets.local.json`. Pass the flag but never open the file. `flutter test` does not need it.
+- **Architecture:** the Flutter app follows the official Flutter MVVM guide with `provider` + `ChangeNotifier`. No Riverpod, Bloc or other state library.
+- **USA Ultimate:** no USA Ultimate data or features (removed 2026-11-06; there are no data rights).
+- **Parity:** the app and the website keep exact feature parity, each in its own design. A change on one platform names its counterpart task, and tests are mirrored.
+- **Golden tests:** these compare only on Windows (`apps/mobile/test/ui_harness/harness.dart`). On another OS, report them as not run.
+- **Agents and skills:** the orchestration setup is in `.claude/agents/` and `.claude/skills/`, described in `docs/specifications/agent-orchestration-setup.md`.
