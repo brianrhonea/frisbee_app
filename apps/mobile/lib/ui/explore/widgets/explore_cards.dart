@@ -307,7 +307,6 @@ class RankingKindToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) => AppSegmentedButton<RankingKind>(
     showSelectedIcon: false,
-    style: const ButtonStyle(visualDensity: VisualDensity.compact),
     segments: const [
       ButtonSegment(
         value: RankingKind.teams,

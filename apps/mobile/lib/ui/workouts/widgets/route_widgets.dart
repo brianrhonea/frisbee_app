@@ -164,7 +164,6 @@ class _WorkoutSplitsState extends State<WorkoutSplits> {
             const Spacer(),
             AppSegmentedButton<DistanceUnit>(
               showSelectedIcon: false,
-              style: const ButtonStyle(visualDensity: VisualDensity.compact),
               segments: const [
                 ButtonSegment(value: DistanceUnit.mi, label: Text('mi')),
                 ButtonSegment(value: DistanceUnit.km, label: Text('km')),

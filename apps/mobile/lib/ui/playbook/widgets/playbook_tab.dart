@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../domain/models/play.dart';
 import '../../../routing/routes.dart';
 import '../../core/themes/theme.dart';
+import '../../core/ui/app_segmented_button.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/status_views.dart';
 import '../../teams/view_models/team_detail_viewmodel.dart';
@@ -162,7 +163,7 @@ class _PlaybookTabState extends State<PlaybookTab> {
       );
 }
 
-/// "Plays | Whiteboard" at the top of the playbook, turf when selected.
+/// "Plays | Whiteboard" at the top of the playbook, accent-outlined when selected.
 class _ViewSwitch extends StatelessWidget {
   const _ViewSwitch({required this.view, required this.onChanged});
 
@@ -171,8 +172,7 @@ class _ViewSwitch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    return SegmentedButton<PlaybookView>(
+    return AppSegmentedButton<PlaybookView>(
       segments: const [
         ButtonSegment(value: PlaybookView.plays, label: Text('Plays')),
         ButtonSegment(
@@ -183,15 +183,6 @@ class _ViewSwitch extends StatelessWidget {
       selected: {view},
       showSelectedIcon: false,
       expandedInsets: EdgeInsets.zero,
-      style: ButtonStyle(
-        backgroundColor: WidgetStateProperty.resolveWith(
-          (s) => s.contains(WidgetState.selected) ? c.accent : c.card,
-        ),
-        foregroundColor: WidgetStateProperty.resolveWith(
-          (s) => s.contains(WidgetState.selected) ? c.onAccent : c.ink2,
-        ),
-        side: WidgetStatePropertyAll(BorderSide(color: c.border2)),
-      ),
       onSelectionChanged: (s) => onChanged(s.single),
     );
   }

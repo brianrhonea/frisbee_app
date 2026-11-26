@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/themes/theme.dart';
+import '../../core/ui/app_segmented_button.dart';
 
 /// Shared pieces of the hat tournament, signup and draft screens in the
 /// "Turf & Disc" design.
@@ -92,60 +93,51 @@ class LegendDot extends StatelessWidget {
   }
 }
 
-/// A tab bar drawn as a segmented control: tabs on the field grey, the
-/// selected one raised on a card. For a few tabs that fit across.
+/// A tab bar drawn as a segmented control, built from the shared
+/// [AppSegment]: the selected tab is outlined in the accent. Reads the
+/// enclosing [DefaultTabController]. For a few tabs that fit across.
 class SegmentedTabBar extends StatelessWidget implements PreferredSizeWidget {
   const SegmentedTabBar({
     super.key,
-    required this.tabs,
+    required this.labels,
     this.padding = const EdgeInsets.fromLTRB(16, 4, 16, 10),
   });
 
-  final List<Widget> tabs;
+  final List<String> labels;
   final EdgeInsets padding;
 
   @override
-  Size get preferredSize => Size.fromHeight(42 + padding.vertical);
+  Size get preferredSize =>
+      Size.fromHeight(AppSegmentedButton.minHeight + padding.vertical);
 
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
+    final controller = DefaultTabController.of(context);
     return Padding(
       padding: padding,
-      child: Container(
-        height: 42,
-        padding: const EdgeInsets.all(3),
-        decoration: BoxDecoration(
-          color: c.field,
-          borderRadius: BorderRadius.circular(controlRadius),
+      child: DecoratedBox(
+        decoration: ShapeDecoration(
+          color: c.card,
+          shape: StadiumBorder(side: BorderSide(color: c.border2)),
         ),
-        child: TabBar(
-          tabs: tabs,
-          dividerColor: Colors.transparent,
-          indicatorSize: TabBarIndicatorSize.tab,
-          labelPadding: const EdgeInsets.symmetric(horizontal: 4),
-          labelStyle: const TextStyle(
-            fontFamily: appFont,
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
-          ),
-          unselectedLabelStyle: const TextStyle(
-            fontFamily: appFont,
-            fontSize: 13.5,
-            fontWeight: FontWeight.w600,
-          ),
-          labelColor: c.ink,
-          unselectedLabelColor: c.muted,
-          splashBorderRadius: BorderRadius.circular(10),
-          indicator: BoxDecoration(
-            color: c.card,
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: [
-              BoxShadow(
-                color: c.ink.withValues(alpha: 0.06),
-                blurRadius: 3,
-                offset: const Offset(0, 1),
-              ),
+        child: ListenableBuilder(
+          listenable: controller,
+          builder: (context, _) => Row(
+            children: [
+              for (var i = 0; i < labels.length; i++)
+                Expanded(
+                  child: AppSegment(
+                    selected: controller.index == i,
+                    onTap: () => controller.animateTo(i),
+                    child: Text(
+                      labels[i],
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
             ],
           ),
         ),

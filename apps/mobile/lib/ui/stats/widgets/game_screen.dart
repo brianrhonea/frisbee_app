@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../domain/models/roster_player.dart';
 import '../../../domain/models/stats.dart';
 import '../../core/themes/theme.dart';
+import '../../core/ui/app_segmented_button.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/scoreboard.dart';
@@ -523,29 +524,9 @@ class _Scoreboard extends StatelessWidget {
             const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
-              child: SegmentedButton<Side>(
-                style: ButtonStyle(
-                  backgroundColor: WidgetStateProperty.resolveWith(
-                    (s) => s.contains(WidgetState.selected)
-                        ? c.accent
-                        : c.featureHighlight,
-                  ),
-                  foregroundColor: WidgetStateProperty.resolveWith(
-                    (s) => s.contains(WidgetState.selected)
-                        ? c.onAccent
-                        : s.contains(WidgetState.disabled)
-                        ? c.onFeatureMuted.withValues(alpha: 0.6)
-                        : c.onFeature,
-                  ),
-                  iconColor: WidgetStateProperty.resolveWith(
-                    (s) => s.contains(WidgetState.selected)
-                        ? c.onAccent
-                        : c.onFeatureMuted,
-                  ),
-                  side: WidgetStatePropertyAll(
-                    BorderSide(color: c.featureHighlight),
-                  ),
-                ),
+              child: AppSegmentedButton<Side>(
+                expandedInsets: EdgeInsets.zero,
+                showSelectedIcon: false,
                 segments: const [
                   ButtonSegment(
                     value: Side.offense,

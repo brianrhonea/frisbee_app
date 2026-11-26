@@ -152,10 +152,10 @@ class _GroupTournamentScreenState extends State<GroupTournamentScreen> {
         }
         final format = t.settings.format;
         final tabs = [
-          const Tab(text: 'Schedule'),
-          if (format.hasPools) const Tab(text: 'Standings'),
-          if (format.hasBracket) const Tab(text: 'Bracket'),
-          const Tab(text: 'Teams'),
+          'Schedule',
+          if (format.hasPools) 'Standings',
+          if (format.hasBracket) 'Bracket',
+          'Teams',
         ];
         return DefaultTabController(
           length: tabs.length,
@@ -174,7 +174,7 @@ class _GroupTournamentScreenState extends State<GroupTournamentScreen> {
                     ],
                   ),
               ],
-              bottom: SegmentedTabBar(tabs: tabs),
+              bottom: SegmentedTabBar(labels: tabs),
             ),
             body: TabBarView(
               children: [
