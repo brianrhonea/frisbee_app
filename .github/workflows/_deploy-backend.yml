@@ -53,7 +53,7 @@ jobs:
       contents: write # to push the release tag
     env:
       PROJECT: ${{ inputs.environment }}
-      GROUPS: ${{ vars.FUNCTION_GROUPS || 'account,api,browse,communities,discord,follows,meetings,notifications,rankings,tournaments' }}
+      GROUPS: ${{ vars.FUNCTION_GROUPS || 'account,api,browse,communities,deviceOwnership,discord,follows,meetings,notifications,rankings,tournaments' }}
     steps:
       # Prod never runs on dev's credentials: callers pick the secret by
       # name, so an unset prod secret arrives empty, and this stops here.
