@@ -6,6 +6,7 @@ import { buildApp } from "../src/app.js";
 import { configurePhotoTrust, trustedPhotoUrl, trustedProfilePhoto } from "../src/media/photo_url.js";
 import { reportId } from "../src/moderation/service.js";
 import { accountGateModeFromEnv, assertStartupEnvironment, DEV_PROJECT_ID, StartupConfigError } from "../src/startup_env.js";
+import type { PersonalCipher } from "../src/personal/cipher.js";
 import { FakeCipher, FakeStore, FakeTeamRepository, FakeUsers, FakeVerifier } from "./fakes.js";
 
 const now = Date.UTC(2026, 10, 20, 12);
@@ -92,7 +93,8 @@ describe("N3: ACCOUNT_GATE_MODE when deployed", () => {
   });
   it("local and emulator runs keep the report default", () => {
     expect(accountGateModeFromEnv({})).toBe("report");
-    expect(accountGateModeFromEnv({ K_SERVICE: "api", FIRESTORE_EMULATOR_HOST: "127.0.0.1:8080" })).toBe("report");
+    // K_SERVICE with an emulator is refused outright now (review 3.1); a production build run against emulators keeps the waiver.
+    expect(accountGateModeFromEnv({ NODE_ENV: "production", FIRESTORE_EMULATOR_HOST: "127.0.0.1:8080" })).toBe("report");
   });
 });
 
@@ -143,5 +145,92 @@ describe("N4: lifting a suspension and an under-13 account", () => {
     expect(s.users.disabled.has("pat")).toBe(true);
     await s.call("POST", `/v1/staff/reports/${id}`, { action: "unsuspend" }, "boss", "staff");
     expect(s.users.disabled.has("pat")).toBe(false);
+  });
+});
+
+describe("review 4.1: lifting a suspension fails closed", () => {
+  class ThrowingCipher extends FakeCipher {
+    broken = false;
+    override async open(...args: Parameters<FakeCipher["open"]>) {
+      if (this.broken) throw new Error("kms unavailable");
+      return super.open(...args);
+    }
+  }
+  function setup(cipher?: PersonalCipher) {
+    const store = new FakeStore(() => now);
+    const users = new FakeUsers();
+    const app = buildApp({ verifier: new FakeVerifier(), users, teams: new FakeTeamRepository(), store, ...(cipher && { personal: cipher }), now: () => now });
+    const call = (method: "POST" | "PUT", url: string, body?: object, uid = "me", kind = "token") =>
+      app.inject({ method, url, ...(body && { payload: body }), headers: { authorization: `Bearer ${kind}:${uid}` } });
+    return { store, users, call };
+  }
+  const details = { legalFirstName: "P", legalLastName: "L", birthDate: "", phone: "+1 555 010 2030", gender: "woman", address: { line1: "1 Main St", city: "Boston", region: "MA", postalCode: "02110" } };
+
+  /** Reports and suspends pat; returns a function that lifts it. */
+  async function suspended(s: ReturnType<typeof setup>) {
+    s.users.records.set("pat", { name: "Pat" });
+    s.store.put("profiles/pat", { name: "Pat" });
+    s.store.put("posts/p1", { authorId: "pat", authorName: "Pat", kind: "text", body: "x" });
+    await s.call("POST", "/v1/reports", { target: { kind: "post", postId: "p1" }, reason: "spam" }, "me");
+    const id = reportId("me", { kind: "post", postId: "p1" });
+    const staff = (action: string) => s.call("POST", `/v1/staff/reports/${id}`, { action }, "boss", "staff");
+    expect((await staff("suspend")).statusCode).toBe(204);
+    return () => staff("unsuspend");
+  }
+
+  it("a throwing cipher on lift (under-13 refusal) leaves Auth disabled and limits unchanged", async () => {
+    const cipher = new ThrowingCipher();
+    const s = setup(cipher);
+    await s.call("PUT", "/v1/me/personal", { ...details, birthDate: "2018-01-01" }, "pat"); // refused, Auth disabled
+    const lift = await suspended(s);
+    const before = { ...s.store.doc("limits/pat") };
+    cipher.broken = true;
+    const res = await lift();
+    expect(res.statusCode).toBeGreaterThanOrEqual(500);
+    expect(s.users.disabled.has("pat")).toBe(true);
+    expect(s.store.doc("limits/pat")).toEqual(before);
+    expect(s.store.doc("limits/pat")).toMatchObject({ suspended: true });
+  });
+
+  it("with no cipher, any refusal record keeps the account disabled on lift", async () => {
+    const s = setup();
+    s.store.put("ageRefusals/pat", { ciphertext: "x", key: "k", format: 1, refusedAt: new Date(now) });
+    const lift = await suspended(s);
+    expect((await lift()).statusCode).toBe(204);
+    expect(s.users.disabled.has("pat")).toBe(true);
+  });
+
+  it("an under-18-only refusal is re-enabled on lift", async () => {
+    const s = setup(new FakeCipher());
+    await s.call("PUT", "/v1/me/personal", { ...details, birthDate: "2010-01-01" }, "pat");
+    const lift = await suspended(s);
+    expect((await lift()).statusCode).toBe(204);
+    expect(s.users.disabled.has("pat")).toBe(false);
+    expect(s.store.doc("limits/pat")).toMatchObject({ suspended: false });
+  });
+
+  it("an under-13 refusal whose refusedAt isn't a Date keeps the account disabled", async () => {
+    const s = setup(new FakeCipher());
+    await s.call("PUT", "/v1/me/personal", { ...details, birthDate: "2018-01-01" }, "pat");
+    s.store.put("ageRefusals/pat", { ...s.store.doc("ageRefusals/pat")!, refusedAt: "not-a-date" });
+    const lift = await suspended(s);
+    expect((await lift()).statusCode).toBe(204);
+    expect(s.users.disabled.has("pat")).toBe(true);
+  });
+});
+
+describe("review 3.1: no emulator variable on Cloud Run", () => {
+  const cloud = { K_SERVICE: "api", FIREBASE_PROJECT_ID: DEV_PROJECT_ID, PERSONAL_DETAILS_KMS_KEY: "projects/p/locations/l/keyRings/r/cryptoKeys/k", ACCOUNT_GATE_MODE: "report" };
+  it("boots with none", () => expect(assertStartupEnvironment(cloud)).toBe(DEV_PROJECT_ID));
+  it.each(["FIRESTORE_EMULATOR_HOST", "FIREBASE_AUTH_EMULATOR_HOST", "FIREBASE_STORAGE_EMULATOR_HOST"])("K_SERVICE with %s throws, naming the variable but not its value", (name) => {
+    const env = { ...cloud, [name]: "secret-host:1234" };
+    expect(() => assertStartupEnvironment(env)).toThrow(StartupConfigError);
+    expect(() => assertStartupEnvironment(env)).toThrow(new RegExp(name));
+    expect(() => assertStartupEnvironment(env)).not.toThrow(/secret-host/);
+    expect(() => accountGateModeFromEnv(env)).toThrow(StartupConfigError);
+  });
+  it("K_SERVICE with no ACCOUNT_GATE_MODE throws", () => {
+    const { ACCOUNT_GATE_MODE: _omit, ...env } = cloud;
+    expect(() => assertStartupEnvironment(env)).toThrow(/ACCOUNT_GATE_MODE must be set/);
   });
 });

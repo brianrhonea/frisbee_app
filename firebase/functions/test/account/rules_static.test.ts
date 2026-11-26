@@ -13,13 +13,16 @@ import { describe, expect, it } from "vitest";
 // `stall10Checked` mark.
 
 const root = join(__dirname, "../../..");
-const firestoreRules = readFileSync(join(root, "firestore.rules"), "utf8");
-const storageRules = readFileSync(join(root, "storage.rules"), "utf8");
+// A Windows checkout may give the rules CRLF line endings; parse LF only.
+const readRules = (file: string) => readFileSync(join(root, file), "utf8").replace(/\r\n?/g, "\n");
+const firestoreRules = readRules("firestore.rules");
+const storageRules = readRules("storage.rules");
 const sharedTerms = Number(/export const termsVersion = (\d+);/.exec(readFileSync(join(root, "../packages/shared/src/agreements.ts"), "utf8"))?.[1]);
 
 /** Removes // comments that are not inside a quoted string. */
 function stripComments(src: string): string {
   return src
+    .replace(/\r\n?/g, "\n")
     .split("\n")
     .map((line) => {
       let quote = "";
@@ -108,10 +111,64 @@ function allows(src: string): Allow[] {
   return out;
 }
 
+/**
+ * True when [condition] has an `||` outside every pair of brackets and quotes.
+ * `a && b || c` parses as `(a && b) || c`, so a leading accountOk() would not
+ * gate the whole rule.
+ */
+function hasTopLevelOr(condition: string): boolean {
+  let depth = 0;
+  let quote = "";
+  for (let i = 0; i < condition.length; i++) {
+    const c = condition[i]!;
+    if (quote) {
+      if (c === "\\") i++;
+      else if (c === quote) quote = "";
+    } else if (c === "'" || c === '"') quote = c;
+    else if (c === "(" || c === "[" || c === "{") depth++;
+    else if (c === ")" || c === "]" || c === "}") depth--;
+    else if (depth === 0 && c === "|" && condition[i + 1] === "|") return true;
+  }
+  return false;
+}
+
 const writeMethods = new Set(["create", "update", "delete", "write"]);
 const writesOf = (src: string) => allows(src).filter((a) => a.methods.some((m) => writeMethods.has(m)));
 const gated = /^(accountOk|readOrAccountOk|ageOk)\(\)\s*(&&|$)/;
 const keyOf = (a: Allow) => `${a.path.replace("/databases/{database}/documents", "").replace("/b/{bucket}/o", "")} ${a.methods.join(",")}`;
+
+/** One exempt top-level `||`: the exact condition, how many rules may carry it, and why. */
+interface OrExemption {
+  condition: string;
+  count: number;
+  reason: string;
+}
+
+/**
+ * Write rules (by keyOf) whose condition has a top-level `||` and that are
+ * deliberately left as they are. Matching is on the exact condition text and
+ * a count, so a second `allow` under the same key, or an edited condition,
+ * fails until someone decides here that it is meant. The rules files had
+ * none when this was written (every `||` sits inside parentheses).
+ */
+const orExemptFirestore: Record<string, OrExemption[]> = {};
+const orExemptStorage: Record<string, OrExemption[]> = {};
+
+/** The keys and conditions of write rules with a top-level `||` that no exemption covers. */
+function unexemptedTopLevelOrs(writes: Allow[], exempt: Record<string, OrExemption[]>): string[] {
+  const left = new Map<string, number>();
+  for (const [key, list] of Object.entries(exempt)) for (const e of list) left.set(`${key} @@ ${e.condition}`, (left.get(`${key} @@ ${e.condition}`) ?? 0) + e.count);
+  const bad: string[] = [];
+  for (const a of writes) {
+    if (!hasTopLevelOr(a.condition)) continue;
+    const id = `${keyOf(a)} @@ ${a.condition}`;
+    const n = left.get(id) ?? 0;
+    if (n > 0) left.set(id, n - 1);
+    else bad.push(`${keyOf(a)}: ${a.condition}`);
+  }
+  return bad;
+}
+
 
 /**
  * Write rules that are deliberately not led by the account check, each with
@@ -167,11 +224,67 @@ describe("the rules parser", () => {
   });
 });
 
-function check(name: string, src: string, open: Record<string, string>, ageOnly: Record<string, string>) {
+describe("the parser self-tests", () => {
+  const wrap = (rule: string) => `service x { match /a/{x} { ${rule} } }`;
+  it("normalises CRLF and lone CR line endings", () => {
+    const lf = ["service x {", " match /a/{x} {", " // allow write: if true;", " allow create: if accountOk()", " && ok();", " }", "}", ""].join("\n");
+    const expected = [{ path: "/a/{x}", methods: ["create"], condition: "accountOk() && ok()" }];
+    expect(allows(lf.replace(/\n/g, "\r\n"))).toEqual(expected);
+    expect(allows(lf.replace(/\n/g, "\r"))).toEqual(expected);
+  });
+  it("hasTopLevelOr: flags a bare || and one after a leading gate", () => {
+    expect(hasTopLevelOr("accountOk() && a() || b()")).toBe(true);
+    expect(hasTopLevelOr("a() ||\n b()")).toBe(true);
+  });
+  it("hasTopLevelOr: ignores || inside parentheses, brackets, braces and quotes", () => {
+    expect(hasTopLevelOr("accountOk() && (a() || b())")).toBe(false);
+    expect(hasTopLevelOr("accountOk() && x in [a || b]")).toBe(false);
+    expect(hasTopLevelOr("accountOk() && f({'k': a || b})")).toBe(false);
+    expect(hasTopLevelOr("accountOk() && x == 'a || b'")).toBe(false);
+    expect(hasTopLevelOr('accountOk() && x == "a || b"')).toBe(false);
+  });
+  it("hasTopLevelOr: a bracket closed early puts a later || back at the top", () => {
+    expect(hasTopLevelOr("accountOk() && (a()) || b()")).toBe(true);
+  });
+  it("a gated write with a top-level || is reported", () => {
+    const writes = writesOf(wrap("allow create: if accountOk() && a() || b();"));
+    expect(unexemptedTopLevelOrs(writes, {})).toEqual(["/a/{x} create: accountOk() && a() || b()"]);
+  });
+  it("an exemption matches one exact condition", () => {
+    const writes = writesOf(wrap("allow create: if accountOk() && a() || b();"));
+    const key = keyOf(writes[0]!);
+    expect(unexemptedTopLevelOrs(writes, { [key]: [{ condition: "accountOk() && a() || b()", count: 1, reason: "test" }] })).toEqual([]);
+    expect(unexemptedTopLevelOrs(writes, { [key]: [{ condition: "accountOk() && a() || c()", count: 1, reason: "test" }] })).toHaveLength(1);
+  });
+  it("a second unguarded allow under an exempt key fails", () => {
+    const writes = writesOf(wrap("allow create: if accountOk() && a() || b(); allow create: if accountOk() && a() || b();"));
+    const key = keyOf(writes[0]!);
+    const one = { [key]: [{ condition: "accountOk() && a() || b()", count: 1, reason: "test" }] };
+    expect(unexemptedTopLevelOrs(writes, one)).toHaveLength(1);
+    expect(unexemptedTopLevelOrs(writes, { [key]: [{ ...one[key]![0]!, count: 2 }] })).toEqual([]);
+    const other = writesOf(wrap("allow create: if accountOk() && a() || b(); allow create: if c() || d();"));
+    expect(unexemptedTopLevelOrs(other, one)).toEqual(["/a/{x} create: c() || d()"]);
+  });
+  it("writesOf counts every write method and no read", () => {
+    const writes = writesOf(wrap("allow read: if true; allow get, list: if true; allow create: if false; allow update: if false; allow delete: if false; allow write: if false;"));
+    expect(writes).toHaveLength(4);
+  });
+});
+
+function check(name: string, src: string, open: Record<string, string>, ageOnly: Record<string, string>, orExempt: Record<string, OrExemption[]>, expectedWrites: number) {
   describe(`${name}: every write is gated`, () => {
     const writes = writesOf(src);
-    it("finds the write rules", () => {
-      expect(writes.length).toBeGreaterThan(5);
+    it("finds exactly the expected number of write rules", () => {
+      // A new or removed write rule changes this count. Check that the new rule is gated, then update the number.
+      expect(writes.length, `${name} now has ${writes.length} write rules, not ${expectedWrites}: review the change against the account gate, then update expectedWrites in rules_static.test.ts`).toBe(expectedWrites);
+    });
+    it("no write condition has a top-level || (it would escape the leading gate)", () => {
+      expect(unexemptedTopLevelOrs(writes, orExempt)).toEqual([]);
+    });
+    it("the || exemptions have no stale entries", () => {
+      const seen = writes.filter((a) => hasTopLevelOr(a.condition)).map((a) => `${keyOf(a)} @@ ${a.condition}`);
+      const stale = Object.entries(orExempt).flatMap(([k, l]) => l.filter((e) => seen.filter((x) => x === `${k} @@ ${e.condition}`).length < e.count).map((e) => `${k}: ${e.condition}`));
+      expect(stale).toEqual([]);
     });
     it("each is accountOk()/readOrAccountOk()/ageOk()-led, `if false`, or on the open list", () => {
       const bad = writes
@@ -197,8 +310,8 @@ function check(name: string, src: string, open: Record<string, string>, ageOnly:
     });
   });
 }
-check("firestore.rules", firestoreRules, openFirestore, ageOnlyFirestore);
-check("storage.rules", storageRules, openStorage, ageOnlyStorage);
+check("firestore.rules", firestoreRules, openFirestore, ageOnlyFirestore, orExemptFirestore, 139);
+check("storage.rules", storageRules, openStorage, ageOnlyStorage, orExemptStorage, 12);
 
 describe("the current Terms version", () => {
   const literal = (src: string) => Number(/token\.get\('terms', 0\) >= (\d+)/.exec(src)?.[1]);

@@ -137,7 +137,7 @@ export class ModerationService {
     private readonly remover: ContentRemover,
     private readonly accounts: AccountSwitch | undefined,
     /** Whether an under-13 refusal disabled the account: lifting a suspension then leaves it disabled (N4). */
-    private readonly disabledForAge: (uid: string) => Promise<boolean> = async () => false,
+    private readonly disabledForAge: (uid: string) => Promise<boolean>,
   ) {}
 
   // Reports -----------------------------------------------------------------
@@ -390,11 +390,13 @@ export class ModerationService {
    */
   private async suspend(uid: string, on: boolean, by: string) {
     if (!uid) return;
+    // Lifting must not re-enable an account an under-13 refusal disabled (no staff override).
+    // Checked first: if it throws, nothing has changed and the lift can be retried (review 4.1a).
+    const keepDisabled = !on && (await this.disabledForAge(uid));
     await this.store.transact(async (tx) =>
       tx.merge(p.limits(uid), on ? { suspended: true, suspendedAt: serverTime, suspendedBy: by } : { suspended: false }),
     );
-    // Lifting must not re-enable an account an under-13 refusal disabled (no staff override).
-    if (!on && (await this.disabledForAge(uid))) return;
+    if (keepDisabled) return;
     await this.accounts?.setDisabled(uid, on);
   }
 
