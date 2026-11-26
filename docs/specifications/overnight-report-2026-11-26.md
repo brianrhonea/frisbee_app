@@ -238,3 +238,18 @@ The owner approved the defaults for D1–D13.
   - neutral status tags in the app.
 
   The #3a contract will be written to `docs/specifications/contracts/account-gate.md`. It covers the claim name and the error code, and needs owner approval before the clients use it in Sprint 2.
+
+## 14. Merged after your morning answers
+
+- `623125e` **D9:** the app's status and team-kind tags are grey; red is for live and green for registration open.
+  - Selected filter chips are indigo, and the status shows as a dot.
+  - App 1,627 passed / 72 skipped / 0 failed. The count fell because the contrast checks for the 3 removed colours went with them.
+- `f771e6b` **D11:** `fidOwners/{fid}` map, the `deviceOwnership` trigger, a check in push delivery, and a dev-only backfill script. **Not deployed.**
+  - Functions 318 passed, server tests 26 passed, rules 381 passed.
+  - `cceffc3` adds `deviceOwnership` to the default deploy groups. If you set the `FUNCTION_GROUPS` variable, add it there too.
+
+**D11 rollout order (owner's session, dev first; each step needs your go-ahead):**
+1. `firebase deploy --only functions:deviceOwnership --project frisbee-app-brianrhonea-dev`
+2. Dry-run the backfill: `cd firebase/functions && npx tsx scripts/backfill-fid-owners.ts --project frisbee-app-brianrhonea-dev`. Then run it again with `--apply`.
+3. Deploy the `notifications` group, which carries the delivery check.
+4. Phone check: sign out of account A while offline, sign in as B, message A, and confirm B's phone gets nothing.
