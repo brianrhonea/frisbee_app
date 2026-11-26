@@ -15,7 +15,9 @@ The order is the one the owner chose on 2026-11-26: API report-only, then backfi
    - `lh3.googleusercontent.com`.
 
    The new rules re-validate the whole doc when the notify toggle changes, so a legacy URL there would make that update fail. QA found no current app or web write that breaks.
-2. **Check dev `profiles`** for `photoUrl` or `headerUrl` values that fail the new strict pattern. A Storage URL with `/o/<name>?alt=media&token=…` passes. Those players' later direct profile writes would be refused.
+2. **Check dev `profiles`** for `photoUrl` or `headerUrl` values that fail the new strict pattern. A Storage URL with `/o/<name>?alt=media&token=…` passes. Two effects:
+   - From step 1, API 0.52.1 drops a non-conforming profile photo from new posts, comments, follows, follow requests, block cards and meeting tokens. Those players appear without a picture until they upload a new one.
+   - From step 5, their direct profile writes are also refused.
 3. **Confirm the `ageRefusals/{uid}` collection** (owner decision, see the completion report).
 
 ## 1. API in report-only on dev
@@ -44,8 +46,7 @@ pnpm --filter @stall10/api exec tsx src/scripts/backfill_claims.ts --project fri
 - Watch the dev API logs for `account_incomplete` with `mode: "report"` until it is near zero.
 - **Device check:**
   1. New sign-up, then verify email, then post.
-  2. An unverified account joins a meeting or voice room. It should go to the verify-email screen, not show a bare error.
-  3. Set `meta/flags.minBuild` above 58. The "Update required" screen should show. Lift the value again.
+  2. Set `meta/flags.minBuild` above 58. The "Update required" screen should show. Lift the value again.
 
 ## 4. Enforcement on
 
@@ -60,6 +61,9 @@ firebase deploy --only functions:meetings,functions:tournaments --project frisbe
 ```
 
 - Test a 13–17 account: it should stay read-only and unable to publish a profile.
+- **Device check for callables.** This only works now, because the gated callables are live from this step. An unverified account joins a meeting or voice room, or starts a draft. It should go to the verify-email screen, not show a bare error.
+  - The app's parsing of the callable error (`details.code`) has only been unit-tested against the documented shape, never against a real callable, so this is the first real check.
+  - Also test a migrated account whose old token predates its claims. It should succeed after the automatic status check, refresh and retry.
 
 ## Rollback
 
