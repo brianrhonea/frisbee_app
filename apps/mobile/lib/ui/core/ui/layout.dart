@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../themes/theme.dart';
+import 'app_button.dart';
 import 'balanced_text.dart';
 import 'scroll_to_top.dart';
 import 'status_pill.dart';
@@ -354,7 +355,8 @@ class FeatureCard extends StatelessWidget {
   }
 }
 
-/// A lime, full-width call to action on a [FeatureCard].
+/// A full-width call to action on a [FeatureCard]: an [AppButton.primary]
+/// that fills the width.
 class HighlightButton extends StatelessWidget {
   const HighlightButton({
     super.key,
@@ -368,25 +370,8 @@ class HighlightButton extends StatelessWidget {
   final IconData? icon;
 
   @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    final style = FilledButton.styleFrom(
-      backgroundColor: c.highlight,
-      foregroundColor: c.onHighlight,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    );
-    return SizedBox(
-      width: double.infinity,
-      child: icon == null
-          ? FilledButton(style: style, onPressed: onPressed, child: Text(label))
-          : FilledButton.icon(
-              style: style,
-              onPressed: onPressed,
-              icon: Icon(icon, size: 18),
-              label: Text(label),
-            ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      AppButton.primary(label, onPressed: onPressed, icon: icon, expand: true);
 }
 
 /// A small tag, e.g. "Mixed club" or "PINNED": a [StatusPill].

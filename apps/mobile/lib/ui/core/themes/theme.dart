@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'button_styles.dart';
+
+export 'button_styles.dart';
+
 /// The app's typeface, for body text and headings alike.
 const appFont = 'Inter';
 
@@ -197,16 +201,6 @@ abstract final class AppTheme {
       double spacing = -0.3,
     }) => s?.copyWith(fontWeight: w, letterSpacing: spacing, color: c.ink);
     final text = _withTabularFigures(base.textTheme);
-    final controlShape = RoundedSuperellipseBorder(
-      borderRadius: BorderRadius.circular(controlRadius),
-    );
-    const buttonText = TextStyle(
-      fontFamily: appFont,
-      fontFeatures: tabularFigures,
-      fontWeight: FontWeight.w600,
-      fontSize: 14,
-    );
-    const buttonPadding = EdgeInsets.symmetric(horizontal: 18, vertical: 14);
     return base.copyWith(
       scaffoldBackgroundColor: c.background,
       extensions: [c],
@@ -250,28 +244,18 @@ abstract final class AppTheme {
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          shape: controlShape,
-          textStyle: buttonText,
-          padding: buttonPadding,
+        style: AppButtonStyles.of(
+          c,
+          AppButtonVariant.primary,
+          AppButtonSize.medium,
+          false,
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          shape: controlShape,
-          textStyle: buttonText,
-          padding: buttonPadding,
-          foregroundColor: c.ink,
-          backgroundColor: c.card,
-          side: BorderSide(color: c.border2),
-        ),
+        style: AppButtonStyles.of(c, AppButtonVariant.secondary),
       ),
       textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          shape: controlShape,
-          textStyle: buttonText,
-          foregroundColor: c.ink,
-        ),
+        style: AppButtonStyles.of(c, AppButtonVariant.ghost),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: c.accent,
