@@ -2670,7 +2670,10 @@ describe("direct messages", () => {
 
   it("profiles may carry a header photo URL", async () => {
     const ref = doc(db(PLAYER), "profiles", PLAYER);
-    await assertSucceeds(setDoc(ref, { ...profile(), headerUrl: "https://example.test/h.jpg" }));
+    const own = `https://firebasestorage.googleapis.com/v0/b/frisbee-app-brianrhonea-dev.firebasestorage.app/o/users%2F${PLAYER}%2Fprofile%2Fh.jpg?alt=media&token=t`;
+    await assertSucceeds(setDoc(ref, { ...profile(), headerUrl: own }));
+    // Only this app's own Storage (F5); the full matrix is in account_gate.rules.test.ts.
+    await assertFails(setDoc(ref, { ...profile(), headerUrl: "https://example.test/h.jpg" }));
     await assertSucceeds(setDoc(ref, { ...profile(), headerUrl: null }));
     await assertFails(setDoc(ref, { ...profile(), headerUrl: 42 }));
     await assertFails(setDoc(ref, { ...profile(), headerUrl: "x".repeat(2001) }));

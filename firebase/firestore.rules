@@ -15,12 +15,24 @@ service cloud.firestore {
     // neither do the paths a new account uses to finish onboarding: its own
     // users doc, profile (and username claim), devices, notification
     // settings and read markers. The API enforces the same gate on its writes.
+    //
+    // The `terms` check below is the CURRENT Terms version as a literal
+    // (termsVersion in packages/shared/src/agreements.ts). Bump both rules
+    // files together with it; firebase/functions/test/account/rules_static
+    // fails until they agree.
     function accountOk() {
       return signedIn()
         && request.auth.token.email_verified == true
         && request.auth.token.get('ageOk', false) == true
         && request.auth.token.get('terms', 0) is number
         && request.auth.token.get('terms', 0) >= 1;
+    }
+    // The adult check alone, for what a new account may do while its email
+    // or Terms are still pending: build its profile and claim a username.
+    // Never without it: an under-18 account must not become searchable or
+    // messageable (account gate, F1).
+    function ageOk() {
+      return signedIn() && request.auth.token.get('ageOk', false) == true;
     }
     // For a rule that covers reads and deletes together: reads need only a
     // signed-in user.
@@ -2658,6 +2670,20 @@ service cloud.firestore {
     // teams and games are published by the player's app, already without
     // the parts they hide.
     match /profiles/{userId} {
+      // A picture on a profile (photoUrl, headerUrl) is shown to everyone
+      // who opens the profile, so a client can't point it at a server it
+      // controls (a tracking pixel, F5): empty, this app's own Storage
+      // download URL for the player's own users/{uid}/profile/ folder (the
+      // dev and production buckets; rules can't read the project id), or
+      // the Google account photo that sign-in copies.
+      function ownImageUrl(v) {
+        return v is string
+          && v.size() <= 2000
+          && (v == ''
+              || v.matches('https://firebasestorage[.]googleapis[.]com/v0/b/frisbee-app-brianrhonea(-dev)?[.](firebasestorage[.]app|appspot[.]com)/o/users%2F'
+                           + userId + '%2Fprofile%2F[^/?]+([?].*)?')
+              || v.matches('https://lh3[.]googleusercontent[.]com/[^ ]*'));
+      }
       function validProfile(p) {
         return p.keys().hasOnly([
             'name', 'keywords', 'photoUrl', 'updatedAt', 'tags',
@@ -2671,9 +2697,9 @@ service cloud.firestore {
           && p.name.size() <= 80
           && p.keywords is list
           && p.keywords.size() <= 100
-          && (p.photoUrl == null || validString(p.photoUrl, 2000))
+          && (p.photoUrl == null || ownImageUrl(p.photoUrl))
           && (p.get('headerUrl', null) == null
-              || validString(p.headerUrl, 2000))
+              || ownImageUrl(p.headerUrl))
           && p.get('tags', []) is list
           && p.get('tags', []).size() <= 100
           && validString(p.get('bio', ''), 280)
@@ -2718,11 +2744,11 @@ service cloud.firestore {
       // Searches by keyword or tag, 40 at a time.
       allow list: if signedIn() && capped(50);
       allow delete: if signedIn() && uid() == userId;
-      allow create: if signedIn() && uid() == userId
+      allow create: if ageOk() && uid() == userId
         && validProfile(request.resource.data)
         && (!('username' in request.resource.data)
             || usernameClaimed(request.resource.data.username));
-      allow update: if signedIn() && uid() == userId
+      allow update: if ageOk() && uid() == userId
         && validProfile(request.resource.data)
         && (request.resource.data.get('username', null)
               == resource.data.get('username', null)
@@ -2735,7 +2761,7 @@ service cloud.firestore {
         allow read: if signedIn()
           && (uid() == userId || (followsUser(userId) && !blockedWith(userId)));
         allow delete: if signedIn() && uid() == userId;
-        allow create, update: if signedIn() && uid() == userId
+        allow create, update: if ageOk() && uid() == userId
           && doc == 'details'
           && request.resource.data.keys().hasOnly([
                'bio', 'pronouns', 'hometown', 'school', 'throwingHand',
@@ -2791,6 +2817,13 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // A refused under-18 birth date, kept encrypted by the API so a
+    // different date can't be tried afterwards (account gate, F3). Same
+    // closure as personalDetails; deleted with the account.
+    match /ageRefusals/{userId} {
+      allow read, write: if false;
+    }
+
     // ---- Calendars --------------------------------------------------------
 
     // Calendars as in Outlook or Apple Calendar (CalendarService in the API,
@@ -2822,7 +2855,7 @@ service cloud.firestore {
     // account-deleteAccount function).
     match /usernames/{name} {
       allow get: if signedIn() || resource == null;
-      allow create: if signedIn()
+      allow create: if ageOk()
         && name.matches('^[a-z0-9_.]{3,20}$')
         && !name.matches('^[.].*|.*[.]$|.*[.][.].*')
         && request.resource.data.keys().hasOnly(['uid', 'createdAt'])
