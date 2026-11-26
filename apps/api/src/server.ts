@@ -34,7 +34,7 @@ import { jobVerifierFromEnv } from "./payments/jobs.js";
 import { payoutHoldDaysFromEnv, platformFeeFromEnv } from "./payments/service.js";
 import { stripeFromEnv } from "./payments/stripe.js";
 import { setMergedClaims } from "./account/claims.js";
-import { trustedPhotoUrl } from "./media/photo_url.js";
+import { configurePhotoTrust, trustedPhotoUrl } from "./media/photo_url.js";
 import { accountGateModeFromEnv, assertStartupEnvironment, StartupConfigError } from "./startup_env.js";
 
 // Fails fast (INF-6) when deployed without FIREBASE_PROJECT_ID or with a
@@ -67,12 +67,13 @@ let credentialChecked = false;
 const webServerKey = process.env.WEB_SERVER_KEY?.trim() || undefined;
 /** The Storage buckets whose pictures profiles may show (this project's, either domain). */
 const profilePhotoBuckets = [...new Set([process.env.STORAGE_BUCKET?.trim(), `${projectId}.firebasestorage.app`, `${projectId}.appspot.com`].filter((b): b is string => Boolean(b)))];
+configurePhotoTrust(profilePhotoBuckets, process.env.FIREBASE_STORAGE_EMULATOR_HOST);
 const imageUrl = storageUrl(process.env.STORAGE_BUCKET || `${projectId}.firebasestorage.app`);
 
 const app = buildApp({
   logger: cloudLoggingOptions(),
   enforceAppCheck: process.env.ENFORCE_APP_CHECK === "true",
-  // The account gate: enforce (default) or report-only (ACCOUNT_GATE_MODE, startup_env.ts).
+  // The account gate: ACCOUNT_GATE_MODE enforce or report. Required when deployed; unset locally means report (startup_env.ts).
   accountGateMode: accountGateModeFromEnv(),
   // Cloud Scheduler's payment jobs (JOBS_AUDIENCE, JOBS_INVOKER).
   jobs: jobVerifierFromEnv(),

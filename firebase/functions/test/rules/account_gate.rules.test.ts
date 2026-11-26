@@ -327,6 +327,73 @@ describe("profile pictures can only point at this app's own Storage (F5)", () =>
     await assertFails(write({ photoUrl: url }));
     await assertFails(write({ photoUrl: null, headerUrl: url }));
   });
+
+  // N1: the file name is a strict charset; the query too.
+  it("accepts the exact URL shape the API writes (<uploadId>.<ext>?alt=media&token=<uuid>)", async () => {
+    const real = own(PLAYER, "0f8fad5b-d9cb-469f-a165-70867728950e.jpg").replace("token=abc-123", "token=3f2c9a1e-7b4d-4c58-9e0a-1d2b3c4d5e6f");
+    await assertSucceeds(write({ photoUrl: real, headerUrl: real }));
+  });
+
+  it.each([
+    ["a percent-encoded backslash then dots", "..%5Cx.jpg"],
+    ["a literal backslash", "a\\b.jpg"],
+    ["a dot-dot name", ".."],
+    ["a leading dot-dot", "..x.jpg"],
+    ["a percent-encoded slash", "a%2Fb.jpg"],
+    ["a percent-encoded backslash", "a%5Cb.jpg"],
+    ["a literal slash", "a/b.jpg"],
+  ])("refuses a file name with %s (N1)", async (_, file) => {
+    await assertFails(write({ photoUrl: own(PLAYER, file) }));
+    await assertFails(write({ photoUrl: null, headerUrl: own(PLAYER, file) }));
+  });
+
+  it("refuses a query with characters outside the strict set (N1)", async () => {
+    await assertFails(write({ photoUrl: own(PLAYER).replace("?alt=media", "?alt=media/../x") }));
+    await assertFails(write({ photoUrl: own(PLAYER) + "#frag" }));
+    await assertFails(write({ photoUrl: own(PLAYER) + "\\x" }));
+  });
+
+  // N2: every other place a photo URL is stored for others to see.
+  const postDoc = (uid: string, authorPhotoUrl: unknown) => ({
+    kind: "text", body: "Hi", links: [], images: [], workout: null, tournamentKey: null, tournamentName: null,
+    authorId: uid, authorName: "Pat", authorPhotoUrl, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+  });
+  const followData = (target: string, photoUrl: unknown) => ({
+    key: `user_${target}`, type: "user", targetId: target, name: "Olive", photoUrl, notify: false, createdAt: serverTimestamp(),
+  });
+
+  it("posts: authorPhotoUrl must be the author's own picture, a Google photo, empty or null (N2)", async () => {
+    await assertSucceeds(setDoc(doc(fs(PLAYER), "posts", "p1"), postDoc(PLAYER, own(PLAYER))));
+    await assertSucceeds(setDoc(doc(fs(PLAYER), "posts", "p2"), postDoc(PLAYER, "https://lh3.googleusercontent.com/a/x=s96-c")));
+    await assertSucceeds(setDoc(doc(fs(PLAYER), "posts", "p3"), postDoc(PLAYER, null)));
+    await assertFails(setDoc(doc(fs(PLAYER), "posts", "p4"), postDoc(PLAYER, "https://evil.example/pixel.gif")));
+    await assertFails(setDoc(doc(fs(PLAYER), "posts", "p5"), postDoc(PLAYER, own(OWNER))));
+  });
+
+  it("follows: photoUrl must be an app Storage object or a Google photo (N2)", async () => {
+    let n = 0; // a fresh target each time: a second write to one follow is an update, judged by other rules
+    const f = (p: unknown) => {
+      const target = `u${n++}`;
+      return setDoc(doc(fs(PLAYER), "users", PLAYER, "follows", `user_${target}`), followData(target, p));
+    };
+    await assertSucceeds(f(null));
+    await assertSucceeds(f(own(OWNER)));
+    await assertSucceeds(f(own(OWNER).replace(`users%2F${OWNER}%2Fprofile`, "teams%2Ft1%2Flogo")));
+    await assertFails(f("https://evil.example/pixel.gif"));
+    await assertFails(f(own(OWNER).replace(bucket, "someone-elses-project.firebasestorage.app")));
+    await assertFails(f(own(OWNER, "..\\x.jpg")));
+  });
+
+  it("follow requests: photoUrl must be the requester's own picture (N2)", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "profiles", OWNER), { name: "Olive", private: true });
+    });
+    const r = (p: unknown) =>
+      setDoc(doc(fs(PLAYER), "profiles", OWNER, "followRequests", PLAYER), { name: "Pat", username: "pat", photoUrl: p, createdAt: serverTimestamp() });
+    await assertFails(r("https://evil.example/pixel.gif"));
+    await assertFails(r(own(OWNER)));
+    await assertSucceeds(r(own(PLAYER)));
+  });
 });
 
 describe("Storage", () => {

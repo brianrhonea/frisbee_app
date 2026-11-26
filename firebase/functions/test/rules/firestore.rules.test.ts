@@ -3448,7 +3448,13 @@ describe("follows", () => {
   });
 
   it("lets people follow users, teams and tournaments", async () => {
-    await assertSucceeds(setDoc(ref(PLAYER, "user_u2"), follow("user", "u2", { photoUrl: "https://x.org/a.png" })));
+    // A picture must be one of this app's own Storage objects (N2); a foreign host is refused.
+    await assertSucceeds(
+      setDoc(ref(PLAYER, "user_u2"), follow("user", "u2", {
+        photoUrl: "https://firebasestorage.googleapis.com/v0/b/frisbee-app-brianrhonea-dev.firebasestorage.app/o/users%2Fu2%2Fprofile%2Fa.png?alt=media&token=t",
+      })),
+    );
+    await assertFails(setDoc(ref(PLAYER, "user_u3"), follow("user", "u3", { photoUrl: "https://x.org/a.png" })));
     await assertSucceeds(setDoc(ref(PLAYER, `team_${TEAM}`), follow("team", TEAM, { notify: true })));
     await assertSucceeds(
       setDoc(ref(PLAYER, "tournament_g1_t1"), follow("tournament", "g1_t1", { groupId: "g1" })),

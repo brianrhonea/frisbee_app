@@ -81,8 +81,8 @@ export function assertStartupEnvironment(env: Env = process.env): string {
 
 /**
  * How the API treats a write by an incomplete account (ACCOUNT_GATE_MODE,
- * docs/specifications/contracts/account-gate.md): `report` (the default,
- * also when unset) logs account_incomplete and lets it through, so the first
+ * docs/specifications/contracts/account-gate.md): `report` (the local/emulator default,
+ * when unset; deployed, an unset value is a startup error) logs account_incomplete and lets it through, so the first
  * rollout can't lock anyone out while the claims and clients catch up;
  * `enforce` refuses it with 403 account_incomplete. Anything else is a
  * startup error, so a typo can't quietly turn the gate off. The claims are
@@ -90,7 +90,13 @@ export function assertStartupEnvironment(env: Env = process.env): string {
  */
 export function accountGateModeFromEnv(env: Env = process.env): AccountGateMode {
   const v = env.ACCOUNT_GATE_MODE?.trim().toLowerCase();
-  if (!v) return "report";
+  if (!v) {
+    // Deployed (and not emulated, as for the KMS key): an explicit value, so a missing variable can't quietly leave the gate report-only (N3).
+    if (isDeployed(env) && !(env.FIRESTORE_EMULATOR_HOST?.trim() || env.FIREBASE_AUTH_EMULATOR_HOST?.trim())) {
+      throw new StartupConfigError("ACCOUNT_GATE_MODE must be set to enforce or report when deployed.");
+    }
+    return "report";
+  }
   if (v === "enforce" || v === "report") return v;
   throw new StartupConfigError("ACCOUNT_GATE_MODE must be enforce or report.");
 }

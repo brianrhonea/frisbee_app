@@ -70,7 +70,7 @@ import { postEditorRoutes, postRoutes } from "./posts/routes.js";
 import { PostService } from "./posts/service.js";
 import type { PersonalCipher } from "./personal/cipher.js";
 import { personalRoutes } from "./personal/routes.js";
-import { PersonalService } from "./personal/service.js";
+import { PersonalService, refusalPath } from "./personal/service.js";
 import { profileRoutes } from "./profiles/routes.js";
 import { ProfileService } from "./profiles/service.js";
 import type { DocStore } from "./store.js";
@@ -125,7 +125,7 @@ export interface AppDeps {
   /** SafeSearch on uploaded photos (Cloud Vision); none in tests and with the emulators. */
   images?: ImageChecker;
   enforceAppCheck?: boolean;
-  /** "report": the account gate logs account_incomplete and lets writes through (ACCOUNT_GATE_MODE); default "enforce". */
+  /** "report": the account gate logs account_incomplete and lets writes through. buildApp itself defaults to "enforce"; server.ts passes ACCOUNT_GATE_MODE (startup_env.ts: report only locally when unset, required when deployed). */
   accountGateMode?: AccountGateMode;
   /** true for Fastify's default logger, or pino options (cloudLoggingOptions). */
   logger?: boolean | LoggerOptions;
@@ -263,6 +263,8 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         queries,
         new ServiceRemover(deps.store, editor, hub, teamPosts, conversations),
         setDisabled ? { setDisabled } : undefined,
+        // Without a cipher the refusal can't be opened: any record counts (the safe side).
+        personal ? (uid) => personal.disabledForAge(uid) : async (uid) => Boolean(await deps.store!.get(refusalPath(uid))),
       ),
       reads,
       revalidate,

@@ -7,7 +7,29 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
-## 0.52.0 � 2026-11-26
+## 0.52.1 — 2026-11-26
+
+Account gate re-check fixes (#3a, docs/specifications/contracts/account-gate.md section 9).
+
+- N1: the Firestore rules' own-picture URL check takes a strict file-name charset
+  (letters, digits, dot, underscore, hyphen; no slash, backslash, percent-encoded
+  slash or leading dot) and a strict query, so a URL can't resolve to another bucket.
+  The API's own check (`trustedPhotoUrl`) is as strict.
+- N2: a picture read from `profiles/{uid}` goes through the same trust check as the Auth
+  photoURL before it lands on a post, comment, follow, follow request, block card or
+  meeting token (`trustedProfilePhoto`). An untrusted URL is dropped (null), not
+  migrated. Rules: `authorPhotoUrl` on posts and comments and the photo on a follow
+  request must be the writer's own picture; a follow's photo must be an object in this
+  app's buckets.
+- N3: deployed (the KMS-key condition), `ACCOUNT_GATE_MODE` must be set to `enforce` or
+  `report`; unset stops startup. Local and emulator runs still default to `report`.
+- N4: lifting a suspension no longer re-enables an Auth account that an under-13 refusal
+  disabled (`ageRefusals/{uid}`); no staff override.
+- N7: this file's 0.52.0 heading is valid UTF-8.
+- Not changed: revoked-token checks (`checkRevoked`) stay off (latency and cost decision);
+  N5 (restricting Google photo URL paths) is left as is.
+
+## 0.52.0 — 2026-11-26
 
 Account gate fixes from the #3a security review (docs/specifications/contracts/account-gate.md).
 

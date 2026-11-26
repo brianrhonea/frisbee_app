@@ -26,7 +26,7 @@ beforeEach(() => {
   s = setup();
   s.users.records.set("me", { name: "Mia Member", photoUrl: "https://img/m.jpg" });
   s.store.put("profiles/me", { name: "Mia Member", username: "mia" });
-  s.store.put("profiles/pat", { name: "Pat Public", photoUrl: "https://img/p.jpg" });
+  s.store.put("profiles/pat", { name: "Pat Public", photoUrl: "https://lh3.googleusercontent.com/a/p.jpg" });
   s.store.put("profiles/quinn", { name: "Quinn Quiet", private: true });
   s.store.put("teams/t1", { name: "Northside Flyers" });
 });
@@ -40,7 +40,7 @@ describe("follows", () => {
       type: "user",
       targetId: "pat",
       name: "Pat Public",
-      photoUrl: "https://img/p.jpg",
+      photoUrl: "https://lh3.googleusercontent.com/a/p.jpg",
       notify: false,
       createdAt: new Date(now),
     });

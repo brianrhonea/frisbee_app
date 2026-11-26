@@ -179,6 +179,34 @@ service cloud.firestore {
 
     function validString(v, max) { return v is string && v.size() <= max; }
 
+    // A picture URL shown to other people (N1/N2, account gate re-check):
+    // empty, this app's own Storage download URL, or the Google account photo
+    // that sign-in copies. The file name is a strict charset (no slash,
+    // backslash, percent-encoded slash or leading dot, so no ".." and no way
+    // to resolve to another bucket under WHATWG URL parsing) and the query
+    // a strict one. Rules can't read the project id, so both buckets
+    // (dev and production) are listed. ownPhotoUrl is limited to the owner's
+    // users/{owner}/profile/ folder; storagePhotoUrl takes any one object in
+    // the app's buckets (a followed team's logo, say).
+    function googlePhotoOk(v) {
+      return v.matches('https://lh3[.]googleusercontent[.]com/[^ ]*');
+    }
+    function ownPhotoUrl(v, owner) {
+      return v is string
+        && v.size() <= 2000
+        && (v == ''
+            || v.matches('https://firebasestorage[.]googleapis[.]com/v0/b/frisbee-app-brianrhonea(-dev)?[.](firebasestorage[.]app|appspot[.]com)/o/users%2F'
+                         + owner + '%2Fprofile%2F[A-Za-z0-9][A-Za-z0-9._-]*([?][A-Za-z0-9=&%._-]*)?')
+            || googlePhotoOk(v));
+    }
+    function storagePhotoUrl(v) {
+      return v is string
+        && v.size() <= 2000
+        && (v == ''
+            || v.matches('https://firebasestorage[.]googleapis[.]com/v0/b/frisbee-app-brianrhonea(-dev)?[.](firebasestorage[.]app|appspot[.]com)/o/[A-Za-z0-9][A-Za-z0-9%._-]*([?][A-Za-z0-9=&%._-]*)?')
+            || googlePhotoOk(v));
+    }
+
     function validTeamFields(t) {
       return t.name is string && t.name.size() > 0 && t.name.size() <= 80
         // Teams have a division and level; groups have none (hasDivision
@@ -505,7 +533,7 @@ service cloud.firestore {
                     && d.targetId.matches(d.groupId + '_.+')))
             && validString(d.name, 100)
             && (d.get('photoUrl', null) == null
-                || validString(d.photoUrl, 2000))
+                || storagePhotoUrl(d.photoUrl))
             && d.notify is bool;
         }
 
@@ -2550,7 +2578,7 @@ service cloud.firestore {
             || request.resource.data.private == isPrivateProfile(uid()))
         && validString(request.resource.data.authorName, 80)
         && (request.resource.data.get('authorPhotoUrl', null) == null
-            || validString(request.resource.data.authorPhotoUrl, 2000))
+            || ownPhotoUrl(request.resource.data.authorPhotoUrl, uid()))
         && request.resource.data.createdAt == request.time
         && validUserPost(request.resource.data)
         && (isRepost(request.resource.data)
@@ -2617,7 +2645,7 @@ service cloud.firestore {
           && request.resource.data.authorId == uid()
           && validString(request.resource.data.authorName, 80)
           && (request.resource.data.get('authorPhotoUrl', null) == null
-              || validString(request.resource.data.authorPhotoUrl, 2000))
+              || ownPhotoUrl(request.resource.data.authorPhotoUrl, uid()))
           && validString(request.resource.data.body, 1000)
           && request.resource.data.body.size() > 0
           && request.resource.data.createdAt == request.time
@@ -2676,14 +2704,7 @@ service cloud.firestore {
       // download URL for the player's own users/{uid}/profile/ folder (the
       // dev and production buckets; rules can't read the project id), or
       // the Google account photo that sign-in copies.
-      function ownImageUrl(v) {
-        return v is string
-          && v.size() <= 2000
-          && (v == ''
-              || v.matches('https://firebasestorage[.]googleapis[.]com/v0/b/frisbee-app-brianrhonea(-dev)?[.](firebasestorage[.]app|appspot[.]com)/o/users%2F'
-                           + userId + '%2Fprofile%2F[^/?]+([?].*)?')
-              || v.matches('https://lh3[.]googleusercontent[.]com/[^ ]*'));
-      }
+      function ownImageUrl(v) { return ownPhotoUrl(v, userId); }
       function validProfile(p) {
         return p.keys().hasOnly([
             'name', 'keywords', 'photoUrl', 'updatedAt', 'tags',
@@ -2803,7 +2824,7 @@ service cloud.firestore {
           && (request.resource.data.get('username', null) == null
               || validString(request.resource.data.username, 20))
           && (request.resource.data.get('photoUrl', null) == null
-              || validString(request.resource.data.photoUrl, 2000))
+              || ownPhotoUrl(request.resource.data.photoUrl, uid()))
           && request.resource.data.createdAt == request.time;
       }
     }
