@@ -6,13 +6,12 @@ import 'package:flutter/material.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/brand.dart';
 
-/// The "Turf & Disc" palette: a scoreboard-navy night sky over a turf
-/// field, and a red disc (the logo's).
+/// The hero's colours: a night sky ([AppColors.media], read from the theme)
+/// over a turf field (the sport surface, [FieldColors]), chalk lines and
+/// text in [AppColors.onMedia], and a red disc (the logo's).
 abstract final class _Palette {
-  static const skyTop = Color(0xFF0B121D);
-  static const field = Color(0xFF12805C);
-  static const fieldDeep = Color(0xFF0B5E43);
-  static const chalk = Color(0xFFF5F6F1);
+  static const field = FieldColors.grass;
+  static const fieldDeep = FieldColors.endzone;
   static const disc = Color(0xFFE5484D);
   static const discRim = Color(0xFF8F1D23);
   static const discLine = Color(0xFFC0333A);
@@ -20,7 +19,7 @@ abstract final class _Palette {
 
 /// The background colour at the bottom of the hero, for whatever sits
 /// against it.
-const discHeroBottomColor = _Palette.fieldDeep;
+const discHeroBottomColor = FieldColors.endzone;
 
 /// Where each part of the animation happens, as fractions of its length.
 abstract final class DiscThrowTimeline {
@@ -67,7 +66,13 @@ class DiscThrowHero extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             RepaintBoundary(
-              child: CustomPaint(painter: DiscThrowPainter(animation)),
+              child: CustomPaint(
+                painter: DiscThrowPainter(
+                  animation,
+                  sky: AppColors.of(context).media,
+                  chalk: AppColors.of(context).onMedia,
+                ),
+              ),
             ),
             LayoutBuilder(
               builder: (context, box) {
@@ -81,7 +86,10 @@ class DiscThrowHero extends StatelessWidget {
                       top: math.min(g.belowDisc + 26, box.maxHeight - 76),
                       child: AnimatedBuilder(
                         animation: animation,
-                        builder: (context, _) => _Wordmark(t: animation.value),
+                        builder: (context, _) => _Wordmark(
+                          t: animation.value,
+                          chalk: AppColors.of(context).onMedia,
+                        ),
                       ),
                     ),
                   ],
@@ -96,9 +104,10 @@ class DiscThrowHero extends StatelessWidget {
 }
 
 class _Wordmark extends StatelessWidget {
-  const _Wordmark({required this.t});
+  const _Wordmark({required this.t, required this.chalk});
 
   final double t;
+  final Color chalk;
 
   @override
   Widget build(BuildContext context) {
@@ -125,7 +134,7 @@ class _Wordmark extends StatelessWidget {
               fontSize: caught ? 30 : 26,
               letterSpacing: -0.8,
               height: 1.1,
-              color: _Palette.chalk.withValues(alpha: caught ? 1 : 0.75),
+              color: chalk.withValues(alpha: caught ? 1 : 0.75),
               fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
@@ -141,7 +150,7 @@ class _Wordmark extends StatelessWidget {
                   fontFamily: appFont,
                   fontSize: 13.5,
                   fontWeight: FontWeight.w500,
-                  color: _Palette.chalk.withValues(alpha: 0.7),
+                  color: chalk.withValues(alpha: 0.7),
                 ),
               ),
             ),
@@ -155,9 +164,16 @@ class _Wordmark extends StatelessWidget {
 /// Paints the field, the disc's flight with its shadow and streaks, and the
 /// "10" it becomes.
 class DiscThrowPainter extends CustomPainter {
-  DiscThrowPainter(this.animation) : super(repaint: animation);
+  DiscThrowPainter(this.animation, {required this.sky, required this.chalk})
+    : super(repaint: animation);
 
   final Animation<double> animation;
+
+  /// The night sky, fading into the field at the horizon.
+  final Color sky;
+
+  /// Field lines and the "1".
+  final Color chalk;
 
   static Offset _bezier(Offset a, Offset b, Offset c, Offset d, double s) {
     final m = 1 - s;
@@ -290,7 +306,7 @@ class DiscThrowPainter extends CustomPainter {
         // The cap height (0.727 em in Inter) matches the disc's height.
         fontSize: ry * 2 / 0.727,
         height: 1,
-        color: _Palette.chalk,
+        color: chalk,
       ),
     ),
     textDirection: TextDirection.ltr,
@@ -301,10 +317,10 @@ class DiscThrowPainter extends CustomPainter {
     canvas.drawRect(
       rect,
       Paint()
-        ..shader = const LinearGradient(
+        ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [_Palette.skyTop, _Palette.field, _Palette.fieldDeep],
+          colors: [sky, _Palette.field, _Palette.fieldDeep],
           stops: [0, 0.55, 1],
         ).createShader(rect),
     );
@@ -341,27 +357,27 @@ class DiscThrowPainter extends CustomPainter {
       );
     }
 
-    final chalk = Paint()
-      ..color = _Palette.chalk.withValues(alpha: 0.13)
+    final lines = Paint()
+      ..color = chalk.withValues(alpha: 0.13)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
     // Sidelines and the far back line.
     for (final u in [0.0, 1.0]) {
-      canvas.drawLine(project(u, 0), project(u, 1), chalk);
+      canvas.drawLine(project(u, 0), project(u, 1), lines);
     }
-    canvas.drawLine(project(0, 1), project(1, 1), chalk);
+    canvas.drawLine(project(0, 1), project(1, 1), lines);
     // The goal line.
-    canvas.drawLine(project(0, 0.55), project(1, 0.55), chalk);
+    canvas.drawLine(project(0, 0.55), project(1, 0.55), lines);
 
     // Fade the field into the dark at the horizon.
     final fadeRect = Rect.fromLTWH(0, 0, w, project(0, 1).dy + h * 0.08);
     canvas.drawRect(
       fadeRect,
       Paint()
-        ..shader = const LinearGradient(
+        ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [_Palette.skyTop, Color(0x000B121D)],
+          colors: [sky, sky.withValues(alpha: 0)],
         ).createShader(fadeRect),
     );
   }
@@ -496,5 +512,7 @@ class DiscThrowPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(DiscThrowPainter oldDelegate) =>
-      oldDelegate.animation != animation;
+      oldDelegate.animation != animation ||
+      oldDelegate.sky != sky ||
+      oldDelegate.chalk != chalk;
 }

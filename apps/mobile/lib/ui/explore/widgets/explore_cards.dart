@@ -16,6 +16,7 @@ import '../../tournaments/widgets/spots_left.dart';
 import '../../tournaments/widgets/hosted_tournament_screen.dart'
     show hostedDates;
 import '../view_models/explore_viewmodel.dart';
+import '../../core/ui/app_segmented_button.dart';
 
 /// The next few published tournaments, with a link to all of them.
 class UpcomingTournamentsCard extends StatelessWidget {
@@ -304,7 +305,7 @@ class RankingKindToggle extends StatelessWidget {
   final ValueChanged<RankingKind>? onPick;
 
   @override
-  Widget build(BuildContext context) => SegmentedButton<RankingKind>(
+  Widget build(BuildContext context) => AppSegmentedButton<RankingKind>(
     showSelectedIcon: false,
     style: const ButtonStyle(visualDensity: VisualDensity.compact),
     segments: const [

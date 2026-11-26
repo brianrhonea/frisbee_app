@@ -135,7 +135,7 @@ class Pill extends StatelessWidget {
     final c = AppColors.of(context);
     final (bg, fg) = switch (tone) {
       PillTone.neutral => (c.field, c.ink2),
-      PillTone.turf => (c.accentSoft, c.accentInk),
+      PillTone.turf => (c.positiveSoft, c.positive),
       PillTone.needsYou => (c.highlightSoft, c.highlightInk),
     };
     return Container(

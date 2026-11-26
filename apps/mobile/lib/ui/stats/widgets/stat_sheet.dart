@@ -234,7 +234,7 @@ class _StatSheetTableState extends State<StatSheetTable> {
                     style: i == 0
                         ? cellText.copyWith(
                             fontWeight: FontWeight.w800,
-                            color: p.plusMinus < 0 ? c.ink : c.accent,
+                            color: p.plusMinus < 0 ? c.ink : c.positive,
                           )
                         : null,
                   ),

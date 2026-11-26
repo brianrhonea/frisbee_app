@@ -177,7 +177,7 @@ class PlayerSignupCard extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     // Paying is the player's to do; paid is settled.
-                    color: paid ? c.accentSoft : c.highlightSoft,
+                    color: paid ? c.positiveSoft : c.highlightSoft,
                     borderRadius: BorderRadius.circular(controlRadius),
                   ),
                   child: Text(
@@ -191,7 +191,7 @@ class PlayerSignupCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: paid ? c.accentInk : c.highlightInk,
+                      color: paid ? c.positive : c.highlightInk,
                     ),
                   ),
                 ),

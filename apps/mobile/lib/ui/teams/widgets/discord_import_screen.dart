@@ -180,7 +180,7 @@ class _DiscordImportScreenState extends State<DiscordImportScreen> {
                       if (vm.done)
                         Row(
                           children: [
-                            Icon(Icons.check_circle, color: c.accent),
+                            Icon(Icons.check_circle, color: c.positive),
                             const SizedBox(width: 8),
                             const Expanded(child: Text('Imported.')),
                             TextButton(

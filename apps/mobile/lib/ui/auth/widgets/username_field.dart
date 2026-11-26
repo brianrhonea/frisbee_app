@@ -72,7 +72,7 @@ class UsernameField extends StatelessWidget {
               ),
               UsernameStatus.available => Icon(
                 Icons.check_circle,
-                color: c.accent,
+                color: c.positive,
               ),
               UsernameStatus.taken || UsernameStatus.invalid => Icon(
                 Icons.error_outline,

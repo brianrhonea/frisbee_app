@@ -359,7 +359,7 @@ class _LiveDraftScreenState extends State<LiveDraftScreen> {
                   : draft.status == DraftStatus.paused
                   ? Icons.pause_circle_outline
                   : Icons.flag_outlined,
-              color: finished ? c.accent : fg,
+              color: finished ? c.positive : fg,
               size: 28,
             ),
             const SizedBox(width: 12),

@@ -387,9 +387,12 @@ class HighlightButton extends StatelessWidget {
 
 /// A small rounded tag, e.g. "Mixed club" or "PINNED".
 class Tag extends StatelessWidget {
-  const Tag(this.text, {super.key, this.strong = false});
+  const Tag(this.text, {super.key, this.strong = false, this.success = false});
 
   final String text;
+
+  /// In the success colours, for a confirmed state such as "You're on it".
+  final bool success;
 
   /// For use on navy: the secondary navy fill with white text.
   final bool strong;
@@ -400,7 +403,9 @@ class Tag extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: strong ? c.featureHighlight : c.accentSoft,
+        color: strong
+            ? c.featureHighlight
+            : (success ? c.positiveSoft : c.accentSoft),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
@@ -409,7 +414,7 @@ class Tag extends StatelessWidget {
           fontSize: 10.5,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.2,
-          color: strong ? c.onFeature : c.accentInk,
+          color: strong ? c.onFeature : (success ? c.positive : c.accentInk),
         ),
       ),
     );

@@ -434,7 +434,7 @@ class RespondScreen extends StatelessWidget {
                   'Paid.',
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
-                    color: c.accentInk,
+                    color: c.positive,
                   ),
                 ),
               )
@@ -494,7 +494,7 @@ class RespondScreen extends StatelessWidget {
             children: [
               Icon(
                 done ? Icons.check_circle : Icons.radio_button_unchecked,
-                color: done ? c.accent : c.highlightInk,
+                color: done ? c.positive : c.highlightInk,
                 size: 20,
               ),
               const SizedBox(width: 10),
@@ -517,8 +517,8 @@ class RespondScreen extends StatelessWidget {
         Center(
           child: CircleAvatar(
             radius: 30,
-            backgroundColor: c.accentSoft,
-            child: Icon(Icons.check, size: 34, color: c.accentInk),
+            backgroundColor: c.positiveSoft,
+            child: Icon(Icons.check, size: 34, color: c.positive),
           ),
         ),
         const SizedBox(height: 12),

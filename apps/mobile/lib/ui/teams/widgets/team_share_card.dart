@@ -159,6 +159,7 @@ class _TeamShareCardState extends State<TeamShareCard> {
                   avatar: Icon(
                     mine ? Icons.check_circle : Icons.schedule,
                     size: 18,
+                    color: mine ? AppColors.of(context).positive : null,
                   ),
                   label: Text(mine ? "You've paid" : 'Not paid yet'),
                   visualDensity: VisualDensity.compact,

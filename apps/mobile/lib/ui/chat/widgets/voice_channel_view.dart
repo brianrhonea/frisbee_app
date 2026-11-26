@@ -257,6 +257,7 @@ class _CallControls extends StatelessWidget {
               fixedSize: const Size(56, 56),
               backgroundColor: vm.micOn ? c.accentSoft : c.field,
               foregroundColor: vm.micOn ? c.accentInk : c.ink,
+              side: vm.micOn ? BorderSide(color: c.accent, width: 1.5) : null,
             ),
             icon: Icon(vm.micOn ? Icons.mic : Icons.mic_off),
             onPressed: vm.canSpeak && !vm.toggleMic.running

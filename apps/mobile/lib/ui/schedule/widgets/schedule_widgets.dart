@@ -243,7 +243,14 @@ class WeekDayCell extends StatelessWidget {
       button: true,
       child: Material(
         color: fill ?? Colors.transparent,
-        borderRadius: BorderRadius.circular(controlRadius),
+        // The soft fill alone is about 1.1:1: the selected day also gets
+        // an indigo outline.
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(controlRadius),
+          side: selected && !isToday
+              ? BorderSide(color: c.accent, width: 1.5)
+              : BorderSide.none,
+        ),
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(controlRadius),

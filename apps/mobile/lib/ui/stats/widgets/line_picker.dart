@@ -4,6 +4,7 @@ import '../../../domain/models/roster_player.dart';
 import '../../../domain/models/stats.dart';
 import '../../core/themes/theme.dart';
 import 'player_chooser.dart';
+import '../../core/ui/app_segmented_button.dart';
 
 typedef LineChoice = ({List<String> players, String? saveAs, Side? side});
 
@@ -173,7 +174,7 @@ class _LinePickerState extends State<_LinePicker> {
                       '${_picked.length}/${StatLine.size}',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontFamily: scoreFont,
-                        color: full ? c.accent : c.muted,
+                        color: full ? c.positive : c.muted,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -193,7 +194,7 @@ class _LinePickerState extends State<_LinePicker> {
                 ),
                 if (widget.canSave || widget.requireName) ...[
                   const SizedBox(height: 16),
-                  SegmentedButton<Side?>(
+                  AppSegmentedButton<Side?>(
                     segments: const [
                       ButtonSegment(value: Side.offense, label: Text('O line')),
                       ButtonSegment(value: Side.defense, label: Text('D line')),

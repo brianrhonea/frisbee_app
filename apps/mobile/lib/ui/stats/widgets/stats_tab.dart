@@ -18,6 +18,7 @@ import 'game_to_field.dart';
 import 'stat_sheet.dart';
 import 'stats_glossary.dart';
 import '../../core/ui/time_picker.dart';
+import '../../core/ui/app_segmented_button.dart';
 
 class StatsTab extends StatelessWidget {
   const StatsTab({super.key, required this.viewModel});
@@ -300,7 +301,7 @@ class _SeasonCard extends StatelessWidget {
                         style: TextStyle(fontSize: 12, color: c.muted),
                       ),
                       const SizedBox(width: 12),
-                      ScoreText('+${p.plusMinus}', size: 20, color: c.accent),
+                      ScoreText('+${p.plusMinus}', size: 20, color: c.positive),
                     ],
                   ),
                 ),
@@ -447,7 +448,7 @@ class GameRow extends StatelessWidget {
     final live = g.won == null && !g.finished;
     // A win is turf, a loss or tie plain; red only for a game still live.
     final (badge, bg, fg) = switch (g.won) {
-      true => ('W', c.accentSoft, c.accentInk),
+      true => ('W', c.positiveSoft, c.positive),
       false => ('L', c.field, c.ink2),
       null when g.finished => ('T', c.field, c.ink2),
       null => ('LIVE', c.liveSoft, c.liveInk),
@@ -770,7 +771,7 @@ class _NewEventDialogState extends State<_NewEventDialog> {
             ),
             const SizedBox(height: 12),
             if (!widget.tournament)
-              SegmentedButton<EventType>(
+              AppSegmentedButton<EventType>(
                 segments: [
                   for (final t in const [
                     EventType.practice,

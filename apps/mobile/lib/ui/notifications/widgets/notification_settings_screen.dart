@@ -184,7 +184,7 @@ class _PushTile extends StatelessWidget {
       PushStatus.enabled => Container(
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
         decoration: BoxDecoration(
-          color: c.accentSoft,
+          color: vm.deviceRegistered ? c.positiveSoft : c.accentSoft,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
@@ -196,7 +196,7 @@ class _PushTile extends StatelessWidget {
               child: Icon(
                 Icons.notifications_active_outlined,
                 size: 20,
-                color: c.accent,
+                color: vm.deviceRegistered ? c.positive : c.accent,
               ),
             ),
             const SizedBox(width: 12),
@@ -211,7 +211,7 @@ class _PushTile extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: c.accentInk,
+                      color: vm.deviceRegistered ? c.positive : c.accentInk,
                     ),
                   ),
                   Text(
@@ -220,7 +220,7 @@ class _PushTile extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.35,
-                      color: c.accentInk,
+                      color: vm.deviceRegistered ? c.positive : c.accentInk,
                     ),
                   ),
                 ],

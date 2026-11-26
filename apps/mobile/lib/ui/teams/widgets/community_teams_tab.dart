@@ -273,7 +273,7 @@ class _TeamTile extends StatelessWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (on || joining) Tag(on ? "You're on it" : 'Joining…'),
+          if (on || joining) Tag(on ? "You're on it" : 'Joining…', success: on),
           if (onInvite != null || onEditAccess != null)
             PopupMenuButton<String>(
               tooltip: 'Team options',

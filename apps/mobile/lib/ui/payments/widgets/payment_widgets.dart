@@ -252,7 +252,9 @@ class PayoutsCard extends StatelessWidget {
                   a.status == PayoutStatus.ready
                       ? Icons.check_circle_outline
                       : Icons.payments_outlined,
-                  color: theme.colorScheme.primary,
+                  color: a.status == PayoutStatus.ready
+                      ? AppColors.of(context).positive
+                      : theme.colorScheme.primary,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -684,7 +686,7 @@ class PayoutsStatusChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: on ? c.accentSoft : c.highlightSoft,
+        color: on ? c.positiveSoft : c.highlightSoft,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
@@ -692,7 +694,7 @@ class PayoutsStatusChip extends StatelessWidget {
         style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w700,
-          color: on ? c.accentInk : c.highlightInk,
+          color: on ? c.positive : c.highlightInk,
         ),
       ),
     );

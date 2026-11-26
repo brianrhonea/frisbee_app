@@ -117,8 +117,8 @@ class _SignupNextStepsState extends State<SignupNextSteps> {
                     Center(
                       child: CircleAvatar(
                         radius: 30,
-                        backgroundColor: c.accentSoft,
-                        child: Icon(Icons.check, size: 34, color: c.accentInk),
+                        backgroundColor: c.positiveSoft,
+                        child: Icon(Icons.check, size: 34, color: c.positive),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -187,7 +187,7 @@ class _SignupNextStepsState extends State<SignupNextSteps> {
           children: [
             Icon(
               done ? Icons.check_circle : Icons.radio_button_unchecked,
-              color: done ? c.accent : c.highlightInk,
+              color: done ? c.positive : c.highlightInk,
               size: 20,
             ),
             const SizedBox(width: 10),

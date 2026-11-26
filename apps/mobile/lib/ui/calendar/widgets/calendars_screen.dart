@@ -12,6 +12,7 @@ import '../../core/ui/error_message.dart';
 import '../../core/ui/layout.dart' show CountPill, PersonAvatar;
 import '../../settings/widgets/settings_widgets.dart';
 import '../view_models/calendars_viewmodel.dart';
+import '../../core/ui/app_segmented_button.dart';
 
 /// Settings → Calendars: invites, the user's calendars, ones shared with
 /// them, and the subscription link for Outlook, Apple and Google Calendar.
@@ -775,7 +776,7 @@ class _CalendarDetailScreenState extends State<CalendarDetailScreen> {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-                  child: SegmentedButton<CalendarRole>(
+                  child: AppSegmentedButton<CalendarRole>(
                     segments: [
                       for (final r in CalendarRole.shareable)
                         ButtonSegment(value: r, label: Text(r.label)),
