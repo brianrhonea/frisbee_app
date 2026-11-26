@@ -4,6 +4,22 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.60.1 — 2026-11-26
+
+Video uploads behind the server flag (item #13, website part; docs/specifications/contracts/meta-flags.md).
+
+- The site reads `meta/flags` from Firestore (readable signed out). Native
+  video upload is offered only while `videoUploads` is literally `true`;
+  loading, unreadable, missing or mistyped means closed.
+- Team and direct chat: while closed, the attach button and menu say "Photo
+  or file", and a video (picked or pasted, by type or by name: .mp4 .mov
+  .m4v .webm .3gp) is refused with "Video uploads aren't available right
+  now." before any request. Photos and documents are unchanged.
+- If the flag is turned off after the page loads, the API's 412 message is
+  shown on that file.
+- The site has no other native video upload: team videos are YouTube links.
+  No web version gate (the contract explains why).
+
 ## 0.60.0 — 2026-11-26
 
 Account gate (SEC-2, item #3a; docs/specifications/contracts/account-gate.md):

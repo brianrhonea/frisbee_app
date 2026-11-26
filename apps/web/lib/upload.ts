@@ -44,6 +44,19 @@ function chatFileType(file: File): string {
   return chatDocumentTypes.includes(byName) ? byName : "application/octet-stream";
 }
 
+/** The words for a video refused while `meta/flags.videoUploads` is off (the API's 412 says the same). */
+export const videoUploadsClosed = "Video uploads aren't available right now.";
+
+const videoExtensions = ["mp4", "mov", "m4v", "webm", "3gp"];
+
+/** Whether [file] is a video: by its type, or by its name (the storage rules' test too). */
+export function isVideoFile(file: File): boolean {
+  const type = fileType(file);
+  if (type && isVideoType(type)) return true;
+  const dot = file.name.lastIndexOf(".");
+  return dot >= 0 && videoExtensions.includes(file.name.slice(dot + 1).toLowerCase());
+}
+
 /** Why [file] can't go in a message, or null when it can (10 MB; 100 MB for a video). */
 export function chatFileProblem(file: File): string | null {
   const max = uploadMax("chat", chatFileType(file), file.name) ?? uploadLimits.chat.image;
