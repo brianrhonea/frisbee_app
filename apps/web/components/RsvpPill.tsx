@@ -1,3 +1,6 @@
+import type { ReactNode } from "react";
+import { StatusPill } from "./ui/StatusPill";
+
 /**
  * The member's answer on a schedule row (the app's RsvpStatusPill): Going
  * in turf, Maybe and Can't go neutral, and "Needs RSVP" in amber when
@@ -17,18 +20,22 @@ export function needsRsvp(answer: string | undefined, startsAt?: string, endsAt?
 }
 
 export function RsvpPill({ answer, type, needs = false }: { answer?: string; type?: string; needs?: boolean }) {
-  if (!answer) return needs ? <span className="rsvp-pill needs">Needs RSVP</span> : null;
+  if (!answer) return needs ? <NeedsPill>Needs RSVP</NeedsPill> : null;
   const going = answer === "going";
   // Tournaments ask who's attending; the rows keep the short answers otherwise.
   const label = going && type === "tournament" ? "Attending" : (labels[answer] ?? answer);
   return (
-    <span className={`rsvp-pill${going ? " going" : ""}`}>
-      {going && (
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M5 12l5 5L20 7" />
-        </svg>
-      )}
+    <StatusPill tone={going ? "success" : "neutral"} icon={going ? "check" : undefined} className={`rsvp-pill${going ? " going" : ""}${answer === "notGoing" ? " notGoing" : ""}`}>
       {label}
-    </span>
+    </StatusPill>
+  );
+}
+
+/** "Needs RSVP", "Vote": theirs to do (the app's NeedsYouPill). */
+export function NeedsPill({ children }: { children: ReactNode }) {
+  return (
+    <StatusPill tone="attention" className="rsvp-pill needs">
+      {children}
+    </StatusPill>
   );
 }

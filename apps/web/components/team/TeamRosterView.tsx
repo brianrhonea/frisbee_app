@@ -23,6 +23,7 @@ import { LocalTime } from "../LocalTime";
 import { ErrorNote, Loading } from "../StatusViews";
 import { InviteButton } from "./InviteDialog";
 import { useTeamHub } from "./TeamContext";
+import { StatusPill } from "../ui/StatusPill";
 
 /** In place of a youth team's roster for anyone who isn't on it (the app says the same). */
 export const youthRosterNote = "Rosters of youth teams are private: only members see them.";
@@ -318,9 +319,7 @@ function PlayersCard({
                     <span className="roster-role">
                       {leads.has(m.tier) && <span className="role-pill lead">{roleLabel(m.tier, kind)}</span>}
                       {m.roles.map((r) => (
-                        <span key={r} className="pill pill-soft">
-                          {r}
-                        </span>
+                        <StatusPill key={r}>{r}</StatusPill>
                       ))}
                     </span>
                   ) : (
@@ -479,9 +478,7 @@ function MemberCard({ member, kind, me }: { member: RosterMember; kind: string; 
         <span className="member-roles">
           <span className={`role-pill${leads.has(member.tier) ? " lead" : ""}`}>{tier}</span>
           {member.roles.map((r) => (
-            <span key={r} className="pill pill-soft">
-              {r}
-            </span>
+            <StatusPill key={r}>{r}</StatusPill>
           ))}
         </span>
       </Link>

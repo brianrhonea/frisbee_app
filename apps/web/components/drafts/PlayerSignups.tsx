@@ -17,6 +17,7 @@ import { type FormEvent, useState } from "react";
 import type { Doc } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
 import { HostPaymentControls, isPaidOnline, PayOnline } from "../payments/Payments";
+import { StatusPill as Pill } from "../ui/StatusPill";
 import {
   attempt,
   dateLabel,
@@ -264,7 +265,11 @@ export function GenderSplit({ mmp, wmp, unknown }: { mmp: number; wmp: number; u
 }
 
 function StatusPill({ status }: { status: SignupStatus }) {
-  return <span className={`pill pill-soft draft-status draft-status-${status}`}>{signupStatusLabels[status]}</span>;
+  return (
+    <Pill tone={status === "accepted" ? "success" : "neutral"} className={`draft-status draft-status-${status}`}>
+      {signupStatusLabels[status]}
+    </Pill>
+  );
 }
 
 /** Division, skill and gender match (the app's signup dialog). */

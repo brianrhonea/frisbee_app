@@ -13,6 +13,7 @@ import { InviteButton } from "./InviteDialog";
 import { TeamBadge } from "./TeamBadge";
 import { type TeamDoc, type TeamViewer, useTeamHub } from "./TeamContext";
 import { JoinButton } from "./TeamNav";
+import { StatusPill } from "../ui/StatusPill";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
@@ -102,7 +103,7 @@ export function TeamMeta({ subtitle }: { subtitle?: string }) {
         </Link>
       )}
       {founded && <span>Est. {founded}</span>}
-      {member && <span className="pill">{roleLabel(member.tier, kind)}</span>}
+      {member && <StatusPill tone="accent">{roleLabel(member.tier, kind)}</StatusPill>}
     </p>
   );
 }

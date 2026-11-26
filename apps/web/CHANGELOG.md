@@ -4,6 +4,20 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.59.9 — 2026-11-26
+
+C1: StatusPill (Sprint 2).
+
+- New `StatusPill` (components/ui): one soft-fill pill for every status, with
+  a label and an optional icon, in six tones (neutral, accent, success,
+  attention, live, error). Parity with the app's StatusPill.
+- `RsvpPill` and the loose "Needs RSVP" / "RSVP needed" / "Vote" spans now use
+  it (`NeedsPill`). Plain status spans on tournaments, entries, rosters, team
+  share, profile, explore, drafts and payments moved from `.pill` to it, with
+  tones chosen by meaning (accepted success, declined error, live live, ...).
+  Pills that are buttons or links, and counts, keep `.pill` / `.count-badge`.
+- A components gallery at /dev/ui (404 in production) and browser checks on it.
+
 ## 0.59.8 — 2026-11-26
 
 Video uploads behind the server flag (item #13, website part; docs/specifications/contracts/meta-flags.md).

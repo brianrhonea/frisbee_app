@@ -29,6 +29,8 @@ import "./tournaments.css";
 import { useTournamentSpots } from "./useTournamentSpots";
 import { formatDate, startOfToday } from "@/lib/dates";
 import { dayKey, localeFor, useRenderZone } from "@/lib/renderZone";
+import { StatusPill } from "../ui/StatusPill";
+import { entryTone, hostedTone } from "./tones";
 
 export const tournamentHref = (id: string) => `/tournaments/${encodeURIComponent(id)}`;
 
@@ -78,7 +80,11 @@ export function SpotsLeft({ spots }: { spots: TournamentSpots }) {
 }
 
 export function StatusBadge({ status }: { status: HostedStatus }) {
-  return <span className={`pill hosted-status hosted-${status}`}>{hostedStatusLabels[status] ?? status}</span>;
+  return (
+    <StatusPill tone={hostedTone(status)} icon={status === "live" ? "dot" : undefined}>
+      {hostedStatusLabels[status] ?? status}
+    </StatusPill>
+  );
 }
 
 /** The first day as a date tile (month over the day number), in [zone]. */
@@ -266,7 +272,7 @@ export function HostedTournamentsSection({ teamId, kind, manager, member }: { te
                 <b>{e.name || "Tournament"}</b>
                 <small>{[datesLabel(e.startsOn, e.endsOn), e.location, e.hostName ? `Hosted by ${e.hostName}` : ""].filter(Boolean).join(" · ")}</small>
               </span>
-              <span className={`pill${e.status === "accepted" ? " hosted-live" : ""}`}>{entryStatusLabels[e.status]}</span>
+              <StatusPill tone={entryTone(e.status)}>{entryStatusLabels[e.status]}</StatusPill>
             </Link>
           ))}
           {(list.length > 0 || manager) && <h3 className="hosted-heading">Hosted here</h3>}

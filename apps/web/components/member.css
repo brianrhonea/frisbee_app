@@ -6,15 +6,10 @@
 
 /* --- Shared bits ---------------------------------------------------------- */
 
-/* The member's answer on a schedule row (RsvpPill): Going in turf, other
-   answers neutral, "Needs RSVP" in amber (theirs to do). */
-.rsvp-pill {
-  display: inline-flex; align-items: center; gap: 4px; flex: none; max-width: 140px;
-  padding: 3px 10px; border-radius: 999px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  background: var(--field); color: var(--ink-soft); font-size: 12px; font-weight: 700; line-height: 1.4;
-}
-.rsvp-pill.going { background: var(--success-soft); color: var(--success); }
-.rsvp-pill.needs { background: var(--disc-soft); color: var(--disc-ink); }
+/* The member's answer on a schedule row (RsvpPill, a StatusPill in ui/): this
+   only keeps it from outgrowing a row. The solid "needs" fill below is the
+   row's own emphasis. */
+.rsvp-pill { max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
 .sched-row.needs .rsvp-pill.needs, .needs-you .rsvp-pill.needs { background: var(--disc); color: var(--on-disc); }
 
 /* A team's dot on meta lines (the app's TeamDot). */

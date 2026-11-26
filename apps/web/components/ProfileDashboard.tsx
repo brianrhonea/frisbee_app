@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Avatar } from "./Avatar";
 import { NavIcon, type NavIconName } from "./NavIcons";
 import "./member.css";
+import { StatusPill } from "./ui/StatusPill";
 
 /**
  * The profile dashboard: the person on the left (card, season stats,
@@ -53,7 +54,7 @@ export function ProfileCard({
               <span aria-hidden="true">✓</span> Stall 10 staff
             </span>
           )}
-          {profile.private && <span className="pill">Private profile</span>}
+          {profile.private && <StatusPill tone="accent">Private profile</StatusPill>}
         </div>
       )}
       {(profile.bio || facts.length > 0) && (

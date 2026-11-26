@@ -1,0 +1,19 @@
+/* Shared components (Sprint 2 C1-C4): StatusPill, Button, SegmentedTabs,
+   FilterChips, Avatar, TeamLogo, AvatarStack. Semantic tokens only, so light,
+   dark and system follow site.css. Parity with the app's StatusPill, AppButton,
+   SegmentedTabs, FilterChip, Avatar, TeamLogo, AvatarStack. */
+
+/* --- StatusPill ----------------------------------------------------------- */
+.ui-pill {
+  display: inline-flex; align-items: center; gap: var(--space-xs); flex: none; max-width: 100%;
+  padding: 3px 10px; border-radius: var(--radius-pill); white-space: nowrap;
+  background: var(--field); color: var(--ink-soft);
+  font-size: var(--text-caption-size); font-weight: 700; line-height: 16px;
+}
+.ui-pill-icon { display: inline-grid; place-items: center; flex: none; }
+.ui-pill-neutral { background: var(--field); color: var(--ink-soft); }
+.ui-pill-accent { background: var(--accent-soft); color: var(--accent-ink); }
+.ui-pill-success { background: var(--success-soft); color: var(--success); }
+.ui-pill-attention { background: var(--disc-soft); color: var(--disc-ink); }
+.ui-pill-live { background: var(--live-soft); color: var(--live-ink); }
+.ui-pill-error { background: var(--error-soft); color: var(--error); }

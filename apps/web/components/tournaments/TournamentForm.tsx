@@ -58,6 +58,7 @@ import { tournamentHref } from "./TournamentLists";
 import { canOn, tournamentPath, useAction } from "./useTournament";
 import "./tournaments.css";
 import { formatDate } from "@/lib/dates";
+import { StatusPill } from "../ui/StatusPill";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const dayValue = (d: Date | null) => (d ? `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` : "");
@@ -405,7 +406,7 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
             </div>
           ) : (
             <p>
-              <span className="pill">{league ? "League" : "Tournament"}</span> <span className="pill">{entryChoiceLabels[choice]}</span>
+              <StatusPill tone="accent">{league ? "League" : "Tournament"}</StatusPill> <StatusPill tone="accent">{entryChoiceLabels[choice]}</StatusPill>
             </p>
           )}
           <label>

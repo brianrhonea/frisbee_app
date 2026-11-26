@@ -26,7 +26,7 @@ import { fromLocalInput } from "@/lib/dates";
 import { useAuth } from "../AuthProvider";
 import { Dialog } from "../Dialog";
 import { LocalTime } from "../LocalTime";
-import { needsRsvp, RsvpPill } from "../RsvpPill";
+import { needsRsvp, NeedsPill, RsvpPill } from "../RsvpPill";
 import { EmptyState, Loading } from "../StatusViews";
 import { DateTile } from "./DateTile";
 import type { TeamViewer } from "./TeamContext";
@@ -272,7 +272,7 @@ export function ChatEventCard({ teamId, eventId, uid }: { teamId: string; eventI
       </Link>
       {!over && (
         <div className="chat-event-actions">
-          {needs && <span className="rsvp-pill needs">RSVP needed</span>}
+          {needs && <NeedsPill>RSVP needed</NeedsPill>}
           {answers.map(([status, label]) => (
             <button
               key={status}
@@ -445,7 +445,7 @@ export function ChatPollCard({
     <div className="chat-event-card chat-poll-card">
       <p className="chat-poll-head">
         <b>📊 Poll · {poll.multiple ? "pick any" : "pick one"}</b>
-        {needs && <span className="rsvp-pill needs">Vote</span>}
+        {needs && <NeedsPill>Vote</NeedsPill>}
       </p>
       <p className="chat-poll-question">{poll.question || "Poll"}</p>
       <div className="chat-poll-options">

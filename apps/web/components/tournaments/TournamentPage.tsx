@@ -40,6 +40,8 @@ import { JoinToTakePart, PublicNews } from "./VisitorParts";
 import { datesLabel, StatusBadge } from "./TournamentLists";
 import { type TournamentState, divisionPath, tournamentPath, useAction, useTournament } from "./useTournament";
 import "./tournaments.css";
+import { StatusPill } from "../ui/StatusPill";
+import { entryTone } from "./tones";
 
 type Tab = "overview" | "players" | "teams" | "schedule" | "results" | "news";
 
@@ -388,7 +390,7 @@ function RunEvent({ s, onTab }: { s: TournamentState; onTab: (tab: Tab) => void 
                 {divisionLabel(d)} · {d.seeds.length} {d.seeds.length === 1 ? "team" : "teams"}
               </span>
               {d.seedsConfirmedAt ? (
-                <span className="pill pill-soft">✓ Confirmed</span>
+                <StatusPill tone="success" icon="check">Confirmed</StatusPill>
               ) : (
                 <span className="home-actions">
                   {teams && (
@@ -612,7 +614,7 @@ export function InviteAnswer({ entry, href }: { entry: { status: string; replyBy
   if (inviteExpired(entry, new Date())) {
     return (
       <div className="stack">
-        <span className="pill">Expired</span>
+        <StatusPill>Expired</StatusPill>
         <small className="muted">{inviteExpiredMessage}</small>
       </div>
     );
@@ -653,7 +655,7 @@ function YourTeams({ s }: { s: TournamentState }) {
             return (
               <div key={e.id} className="row-card hosted-entry">
                 <div>
-                  <b>{e.teamName}</b> <span className="pill">{entryStatusLabels[e.status]}</span>
+                  <b>{e.teamName}</b> <StatusPill tone={entryTone(e.status)}>{entryStatusLabels[e.status]}</StatusPill>
                   <br />
                   <small className="muted">
                     {d ? divisionLabel(d) : ""} · captains: {e.captainIds.map((c) => team?.memberNames?.[c] ?? "a member").join(", ")}
@@ -828,7 +830,7 @@ function TeamsTab({ s }: { s: TournamentState }) {
             {waiting.map((e) => (
               <div key={e.id} className={`row-card${e.status === "applied" ? " hosted-row-due" : ""}`}>
                 <span>
-                  <b>{e.teamName}</b> <span className={`pill ${e.status === "applied" ? "hosted-pill-due" : "pill-soft"}`}>{entryStatusLabels[e.status]}</span>
+                  <b>{e.teamName}</b> <StatusPill tone={e.status === "applied" ? "attention" : entryTone(e.status)}>{entryStatusLabels[e.status]}</StatusPill>
                 </span>
                 <span className="home-actions">
                   <button type="button" className="btn btn-primary btn-small" disabled={busy || d.seeds.length >= d.maxTeams} onClick={() => decide(e.id, "accepted")}>
@@ -864,8 +866,8 @@ function TeamsTab({ s }: { s: TournamentState }) {
                   {s.teamName(id)}
                   {s.manager && (rosterMissing(id) || (owes(id) && paymentById.get(id)?.paid !== true)) && (
                     <span className="entry-flags">
-                      {rosterMissing(id) && <span className={`pill ${deadline && Date.now() > deadline.getTime() ? "hosted-pill-due" : "pill-soft"}`}>Roster missing</span>}
-                      {owes(id) && paymentById.get(id)?.paid !== true && <span className={`pill ${overdue(id) ? "hosted-pill-due" : "pill-soft"}`}>Unpaid</span>}
+                      {rosterMissing(id) && <StatusPill tone={deadline && Date.now() > deadline.getTime() ? "attention" : "neutral"}>Roster missing</StatusPill>}
+                      {owes(id) && paymentById.get(id)?.paid !== true && <StatusPill tone={overdue(id) ? "attention" : "neutral"}>Unpaid</StatusPill>}
                     </span>
                   )}
                   {s.manager && fee && fee.amountCents > 0 && id === s.t?.hostId && <small className="muted"> Host · no fee</small>}
@@ -909,7 +911,7 @@ function TeamsTab({ s }: { s: TournamentState }) {
                   Confirm seeds
                 </button>
               )}
-              {d.seedsConfirmedAt && !changed && <span className="pill pill-soft">✓ Seeds confirmed</span>}
+              {d.seedsConfirmedAt && !changed && <StatusPill tone="success" icon="check">Seeds confirmed</StatusPill>}
             </div>
           </div>
         )}
@@ -934,7 +936,7 @@ function TeamsTab({ s }: { s: TournamentState }) {
                   )}
                 </span>
                 <span className="home-actions">
-                  <span className="pill">{expired ? "Expired" : entryStatusLabels[e.status]}</span>
+                  <StatusPill tone={expired ? "neutral" : entryTone(e.status)}>{expired ? "Expired" : entryStatusLabels[e.status]}</StatusPill>
                   {expired && ["draft", "registration", "seeding"].includes(s.t!.status) && (
                     <button type="button" className="btn btn-small" disabled={busy} onClick={() => void run(`${tournamentPath(s.id)}/entries/${encodeURIComponent(e.id)}/invite`, "POST", { divisionId: e.divisionId })}>
                       Invite again
@@ -990,7 +992,7 @@ function InviteTeams({ s, divisionId }: { s: TournamentState; divisionId: string
                 {x.city ? <small className="muted"> · {x.city}</small> : null}
               </span>
               {taken ? (
-                <span className="pill">{entryStatusLabels[e.status]}</span>
+                <StatusPill tone={entryTone(e.status)}>{entryStatusLabels[e.status]}</StatusPill>
               ) : (
                 <button type="button" className="btn btn-small" disabled={busy} onClick={() => void run(`${tournamentPath(s.id)}/entries/${encodeURIComponent(x.id)}/invite`, "POST", { divisionId })}>
                   Invite

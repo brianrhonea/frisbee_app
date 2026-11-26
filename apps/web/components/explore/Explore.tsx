@@ -43,6 +43,7 @@ import { usePublicEvents } from "../usePublicEvents";
 import { type ExploreFilter, eventsFor, exploreHref, hostedFor, listingsFor, matchText, matchTournaments, minQueryLength } from "./filters";
 import "./explore.css";
 import { useMyTeams } from "../useMyTeams";
+import { StatusPill } from "../ui/StatusPill";
 
 const chips: Array<[string, ExploreFilter | null]> = [
   ["All", null],
@@ -257,7 +258,7 @@ function SearchCard({
               <b>{t.name || "Team"}</b>
               <small>{group ? [sub, t.requiresApproval ? "Approval required" : "Open to join"].filter(Boolean).join(" · ") : sub}</small>
             </span>
-            {myIds.has(t.id) && <span className="pill pill-soft explore-mine">{group ? "Your group" : "Your team"}</span>}
+            {myIds.has(t.id) && <StatusPill className="explore-mine">{group ? "Your group" : "Your team"}</StatusPill>}
           </Link>
         );
       })}

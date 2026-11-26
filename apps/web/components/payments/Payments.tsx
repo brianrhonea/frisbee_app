@@ -36,6 +36,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { PaymentDoc } from "@/components/drafts/data";
 import { callApi, problem } from "@/lib/client";
 import { ConfirmSignIn } from "./ConfirmSignIn";
+import { StatusPill } from "../ui/StatusPill";
 
 /** One fee's state on the host's payouts card (EarningsStatus.label in the app). */
 const earningsStatusLabels: Record<EarningsView["items"][number]["status"], string> = {
@@ -279,7 +280,7 @@ export function PayoutsCard({ user, teamId, amountCents }: { user: User; teamId:
     <section className="card payouts-card">
       <div className="card-head">
         <h2 className="card-title">{copy.title}</h2>
-        <span className={`pill payouts-status payouts-${account.status}`}>Payments: {payoutStatusLabels[account.status].label}</span>
+        <StatusPill tone={account.status === "ready" ? "success" : "attention"}>Payments: {payoutStatusLabels[account.status].label}</StatusPill>
       </div>
       <p>{copy.body}</p>
       <FeeBreakdownNote user={user} amountCents={amountCents ?? 10_000} currency="USD" compact />
