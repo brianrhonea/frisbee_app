@@ -67,3 +67,27 @@
 }
 
 @media (prefers-reduced-motion: reduce) { .ui-face { transition: none; } }
+
+/* --- Avatar, TeamLogo, AvatarStack -------------------------------------------
+   .avatar (person) is in app.css with its hooks; this is the team logo, the
+   stack's "+N" and the image fit. One tone per kind, from tokens. */
+.ui-logo {
+  display: inline-grid; place-items: center; flex: none; line-height: 1; overflow: hidden; object-fit: cover;
+  font-family: var(--font-score); font-weight: 800; letter-spacing: 0.01em; box-sizing: border-box;
+}
+.ui-logo-team, .ui-logo-community, .ui-logo-organization { border-radius: 27%; }
+.ui-logo-team { background: var(--team); color: var(--on-media); }
+.ui-logo-community { border-radius: 50%; background: var(--accent); color: var(--on-accent); }
+.ui-logo-organization { border-radius: 50%; background: var(--accent-soft); color: var(--accent-ink); }
+img.ui-logo { background: var(--field); }
+/* The light team blue is for dark text; the logo's light initials need a deeper blue in dark mode. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ui-logo-team { background: color-mix(in srgb, var(--team) 50%, var(--board)); }
+}
+:root[data-theme="dark"] .ui-logo-team { background: color-mix(in srgb, var(--team) 50%, var(--board)); }
+
+.avatar-stack-more {
+  display: inline-grid; place-items: center; flex: none; box-sizing: content-box; border-radius: 50%;
+  border: 2px solid var(--card); background: var(--field); color: var(--ink-soft); font-weight: 800; line-height: 1; white-space: nowrap;
+}
+.avatar svg { display: block; }

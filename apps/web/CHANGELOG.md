@@ -4,6 +4,24 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.59.12 — 2026-11-26
+
+C4: Avatar, TeamLogo, AvatarStack (Sprint 2).
+
+- New `Avatar`, `TeamLogo` and `AvatarStack` (components/ui/Avatar.tsx): the
+  image, else the initials, else a neutral glyph; a picture that fails to
+  load falls back the same way. `AvatarStack` overlaps avatars with a "+N".
+  Decorative unless given a `label`. Parity with the app's Avatar, TeamLogo
+  and AvatarStack. `components/Avatar.tsx` and `TeamBadge` stay as thin
+  re-exports so no caller changed.
+- The sidebar's "Your spaces" and Home's team strip no longer colour each team
+  from a hash of its id: a logo is drawn by kind (team, pickup community,
+  school or club) from tokens. The team page's member stack uses
+  `AvatarStack`. In dark mode the team logo blue is a little deeper (50% team
+  over the board, from 55%) so its initials pass 4.5:1.
+- The K5-D check on the hashed tints is replaced by a check on the logo tones
+  in light and dark and that no per-team colour is left.
+
 ## 0.59.11 — 2026-11-26
 
 C3: SegmentedTabs and FilterChips (Sprint 2).

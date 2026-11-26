@@ -1,27 +1,18 @@
 "use client";
 import Link from "next/link";
-import type { CSSProperties } from "react";
 import { type Doc } from "@/lib/live";
 import { useAuth } from "./AuthProvider";
 import { NavIcon } from "./NavIcons";
-import { initials } from "@/lib/text";
+import { TeamLogo } from "./ui/Avatar";
 import { useMyTeams } from "./useMyTeams";
 import { StartOrJoinButton } from "./home/StartOrJoin";
 
 /** Teams listed before "See all". */
 const shown = 5;
 
-/**
- * Tile colours, picked by the team's id so a team keeps its colour. A decorative per-team
- * palette (not status colours). The initials are 75% tint over ink and the fill 15% tint over
- * the card; tests/unit/sideTeamTints.test.ts holds all six to 4.5:1 in both themes. --team
- * and --personal are the theme-aware design tokens, so they stay readable in dark.
- */
-const tints = ["#665cc8", "#b7791f", "var(--team)", "#0e7490", "var(--personal)", "#c2622d"];
-export function tint(id: string) {
-  let h = 0;
-  for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return tints[h % tints.length]!;
+/** A space's kind as the logo draws it (anything unknown is a team). */
+export function logoKind(kind: string | undefined): "team" | "community" | "organization" {
+  return kind === "community" || kind === "organization" ? kind : "team";
 }
 
 /** Kinds, short enough to sit beside the member count in the sidebar. */
@@ -76,15 +67,8 @@ export function SideTeams() {
           const count = Object.keys(t.members ?? {}).length;
 
           return (
-            <Link
-              key={t.id}
-              href={`/teams/${encodeURIComponent(t.id)}`}
-              className="side-team"
-              style={{ "--tint": tint(t.id) } as CSSProperties}
-            >
-              <span className="team-tile" aria-hidden="true">
-                {initials(t.name || "Team")}
-              </span>
+            <Link key={t.id} href={`/teams/${encodeURIComponent(t.id)}`} className="side-team">
+              <TeamLogo name={t.name || "Team"} kind={logoKind(t.kind)} size={34} />
               <span>
                 <b>{t.name || "Team"}</b>
                 <small className="space-meta">

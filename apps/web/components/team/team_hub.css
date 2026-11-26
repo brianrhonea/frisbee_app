@@ -37,21 +37,6 @@
 }
 .team-hub .team-gear.on { background: var(--accent-soft); border-color: transparent; color: var(--accent-ink); box-shadow: inset 0 0 0 2px var(--accent); }
 
-/* The initials badge (TeamBadge.tsx): team blue rounded square, turf
-   circle for a community, navy circle for a school or club. */
-.team-hub .team-badge, .team-badge {
-  display: inline-grid; place-items: center; flex: none; line-height: 1;
-  border-radius: 27%; background: var(--team); color: #FFFFFF;
-  font-family: var(--font-score); font-weight: 800; letter-spacing: 0.01em;
-}
-.team-badge.community { border-radius: 50%; background: var(--accent); color: var(--on-accent); }
-.team-badge.organization { border-radius: 50%; background: var(--accent-soft); color: var(--accent-ink); }
-/* White initials need a deeper blue than dark mode's light --team. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .team-badge.team { background: color-mix(in srgb, var(--team) 55%, var(--board)); }
-}
-:root[data-theme="dark"] .team-badge.team { background: color-mix(in srgb, var(--team) 55%, var(--board)); }
-
 /* Back to the Teams list. */
 .team-hub .team-back { margin: 0 0 8px; font-size: 0.86rem; }
 .team-hub .team-back a { color: var(--accent); }
@@ -75,7 +60,7 @@
   .team-hub .team-banner-actions { grid-column: 1 / -1; justify-content: flex-start; padding-top: 0; }
 }
 @media (max-width: 560px) {
-  .team-hub .team-head .team-badge { width: 48px !important; height: 48px !important; font-size: 22px !important; }
+  .team-hub .team-head .ui-logo { width: 48px !important; height: 48px !important; font-size: 22px !important; }
   .team-hub .team-tabs a, .team-hub .team-more-button { padding: 11px 10px 10px; }
 }
 

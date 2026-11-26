@@ -1,6 +1,7 @@
 "use client";
 import { type CSSProperties, useState } from "react";
 import { NeedsPill, RsvpPill } from "../RsvpPill";
+import { Avatar, AvatarStack, TeamLogo } from "./Avatar";
 import { Button, buttonClass, IconButton } from "./Button";
 import { FilterChips } from "./FilterChips";
 import { SegmentedTabs } from "./SegmentedTabs";
@@ -150,6 +151,30 @@ export function Showcase() {
           value={many}
           onChange={setMany}
         />
+      </section>
+
+      <section className="card" data-showcase="avatar" aria-labelledby="sc-avatar">
+        <h2 id="sc-avatar">Avatar, team logo, stack</h2>
+        <div style={row}>
+          <Avatar name="Sam Rivera" />
+          <Avatar name="Sam Rivera" url="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect width='80' height='80' fill='%23a1a1aa'/%3E%3Ccircle cx='40' cy='32' r='14' fill='%23f4f4f5'/%3E%3Crect x='14' y='52' width='52' height='40' rx='20' fill='%23f4f4f5'/%3E%3C/svg%3E" />
+          <Avatar name="Sam Rivera" url="data:image/png;base64,AAAA" />
+          <Avatar />
+          <Avatar name="Sam Rivera" size={28} />
+          <Avatar name="Sam Rivera" size={64} />
+        </div>
+        <div style={{ ...row, marginTop: 12 }}>
+          <TeamLogo name="Seattle Ultimate" kind="team" size={48} />
+          <TeamLogo name="Sunday Pickup" kind="community" size={48} />
+          <TeamLogo name="Lakeside School" kind="organization" size={48} />
+          <TeamLogo name="Seattle Ultimate" kind="team" url="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect width='80' height='80' fill='%23a1a1aa'/%3E%3Ccircle cx='40' cy='32' r='14' fill='%23f4f4f5'/%3E%3Crect x='14' y='52' width='52' height='40' rx='20' fill='%23f4f4f5'/%3E%3C/svg%3E" size={48} />
+          <TeamLogo name="Seattle Ultimate" kind="team" size={34} />
+        </div>
+        <div style={{ ...row, marginTop: 12 }}>
+          <AvatarStack people={["Ann Lee", "Bo Chen", "Cy Diaz", "Di Evans", "Ed Fox", "Fay Gu"].map((name, i) => ({ id: String(i), name }))} max={4} size={32} label="6 members" />
+          <AvatarStack people={["Ann Lee", "Bo Chen"].map((name, i) => ({ id: String(i), name }))} size={32} label="2 members" />
+          <AvatarStack people={["Ann Lee", "Bo Chen", "Cy Diaz", "Di Evans", "Ed Fox", "Fay Gu"].map((name, i) => ({ id: String(i), name }))} max={3} size={20} label="6 members" />
+        </div>
       </section>
     </div>
   );

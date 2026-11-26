@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useLayoutEffect, useRef, useState } from "react";
-import { Avatar } from "../Avatar";
+import { AvatarStack } from "../ui/Avatar";
 import { FollowButton } from "../FollowButton";
 import { roleLabel } from "../ProfileDashboard";
 import { JoinWithCode } from "../CreateTeam";
@@ -94,11 +94,7 @@ export function TeamMeta({ subtitle }: { subtitle?: string }) {
       {subtitle && <span>{subtitle}</span>}
       {member && (
         <Link className="member-count" href={`/teams/${teamId}/roster`}>
-          <span className="avatar-stack" aria-hidden="true">
-            {people.slice(0, 4).map((p) => (
-              <Avatar key={p.uid} name={p.name} size={20} />
-            ))}
-          </span>
+          <AvatarStack people={people.map((p) => ({ id: p.uid, name: p.name }))} max={4} size={20} />
           {n} {n === 1 ? "member" : "members"}
         </Link>
       )}
