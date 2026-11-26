@@ -5,6 +5,7 @@ import { ApiError } from "../errors.js";
 import type { Data, DocStore } from "../store.js";
 import { tooFastMessage } from "../teams/service.js";
 import { clip } from "../teams/access.js";
+import { trustedProfilePhoto } from "../media/photo_url.js";
 
 /** Longest author name on a post or comment (validString(authorName, 80)). */
 export const nameMax = 80;
@@ -30,7 +31,7 @@ export async function authorOf(store: DocStore, users: UserLookup, caller: Calle
   const [user, profile] = await Promise.all([users.lookup(caller.uid), store.get(`profiles/${caller.uid}`)]);
   const username = text(profile?.username);
   const name = text(user?.name) || text(profile?.name) || (username ? `@${username}` : "") || "Player";
-  const photo = user?.photoUrl ?? (typeof profile?.photoUrl === "string" ? profile.photoUrl : null);
+  const photo = user?.photoUrl ?? trustedProfilePhoto(profile?.photoUrl, caller.uid);
   return {
     name: clip(name, nameMax),
     photoUrl: photo && photo.length <= photoMax ? photo : null,

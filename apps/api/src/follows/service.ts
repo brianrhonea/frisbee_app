@@ -12,6 +12,7 @@ import { checkNotBlocked } from "../moderation/service.js";
 import { authorOf, checkNotMuted, photoMax, text } from "../posts/author.js";
 import { type Data, type DocStore, serverTime } from "../store.js";
 import { clip } from "../teams/access.js";
+import { trustedProfilePhoto } from "../media/photo_url.js";
 
 const p = {
   follow: (uid: string, key: string) => `users/${uid}/follows/${key}`,
@@ -70,7 +71,7 @@ export class FollowService {
         type,
         targetId: id,
         name: clip(name, followNameMax),
-        photoUrl: photo(profile?.photoUrl) ?? photo(user?.photoUrl),
+        photoUrl: photo(trustedProfilePhoto(profile?.photoUrl, id)) ?? photo(user?.photoUrl),
         isPrivate: profile?.private === true,
       };
     }
@@ -181,7 +182,7 @@ export class FollowService {
       type: "user",
       targetId: caller.uid,
       name: clip(text(profile?.name) || me.name, followNameMax),
-      photoUrl: photo(profile?.photoUrl) ?? me.photoUrl,
+      photoUrl: photo(trustedProfilePhoto(profile?.photoUrl, caller.uid)) ?? me.photoUrl,
       isPrivate: true,
     };
     const key = followKey("user", caller.uid);

@@ -199,4 +199,18 @@ export class PersonalService {
   private today(): Date {
     return new Date(this.now() + 14 * 3600_000);
   }
+
+  /**
+   * Whether [uid]'s Auth account was disabled by an under-13 refusal (N4):
+   * the remembered birth date made them under 13 when it was refused. A
+   * suspension being lifted must not re-enable it (no staff override).
+   */
+  async disabledForAge(uid: string): Promise<boolean> {
+    const refusal = await this.store.get(refusalPath(uid));
+    if (!refusal) return false;
+    const date = await this.openDate(refusal, refusalPath(uid));
+    if (date === null) return false;
+    const at = refusal.refusedAt instanceof Date ? refusal.refusedAt : new Date(this.now());
+    return birthDateProblem(date, at) === tooYoungMessage;
+  }
 }

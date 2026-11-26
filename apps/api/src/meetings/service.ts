@@ -47,6 +47,7 @@ import type { Limit } from "../limits/model.js";
 import { authorOf, checkNotMuted } from "../posts/author.js";
 import { type Data, type DocStore, serverTime } from "../store.js";
 import { can, clip, isMember, mapOf, strings } from "../teams/access.js";
+import { trustedProfilePhoto } from "../media/photo_url.js";
 import type { TeamRepository } from "../teams/repository.js";
 import type { LiveKitSigner } from "./signer.js";
 
@@ -412,11 +413,11 @@ export class MeetingService {
       const code = decision === "notStarted" || decision === "needsApproval" ? "failed_precondition" : "permission_denied";
       throw new ApiError(code, meetingJoinMessages[decision]);
     }
-    const photoUrl = profile?.photoUrl;
+    const photoUrl = trustedProfilePhoto(profile?.photoUrl, uid);
     const token = await livekit.sign({
       identity: uid,
       name: meetingDisplayName(teamData!, uid, profile?.name),
-      metadata: JSON.stringify(typeof photoUrl === "string" ? { photoUrl } : {}),
+      metadata: JSON.stringify(photoUrl ? { photoUrl } : {}),
       ttl: "6h",
       room: meetingRoomName(teamId, meetingId),
       canPublish: true,
@@ -446,11 +447,11 @@ export class MeetingService {
       const code = ({ "permission-denied": "permission_denied", "not-found": "not_found", "failed-precondition": "failed_precondition" } as const)[decision.code];
       throw new ApiError(code, decision.message);
     }
-    const photoUrl = profile?.photoUrl;
+    const photoUrl = trustedProfilePhoto(profile?.photoUrl, uid);
     const token = await livekit.sign({
       identity: uid,
       name: meetingDisplayName(teamData!, uid, profile?.name),
-      metadata: JSON.stringify(typeof photoUrl === "string" ? { photoUrl } : {}),
+      metadata: JSON.stringify(photoUrl ? { photoUrl } : {}),
       ttl: "6h",
       room: voiceRoomName(teamId, roomId),
       canPublish: decision.canSpeak,

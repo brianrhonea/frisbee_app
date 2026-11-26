@@ -522,7 +522,7 @@ describe("join token (meetings-joinToken)", () => {
   const T = `${M}/m1/token`;
   beforeEach(() => {
     putMeeting("m1", { status: "live", inviteRoles: [], inviteUsers: ["player"] });
-    s.store.put("profiles/player", { name: "Patricia", photoUrl: "https://img.test/p.jpg" });
+    s.store.put("profiles/player", { name: "Patricia", photoUrl: "https://lh3.googleusercontent.com/a/p.jpg" });
     s.store.put("profiles/coach", { name: "Casey" });
   });
 
@@ -532,7 +532,7 @@ describe("join token (meetings-joinToken)", () => {
     expect(res.json()).toEqual({ url: "wss://livekit.test", token: "jwt:t1_m1:player" });
     expect(res.headers["cache-control"]).toBe("no-store");
     expect((s.signer as FakeSigner).signed).toEqual([
-      { identity: "player", name: "Pat", metadata: JSON.stringify({ photoUrl: "https://img.test/p.jpg" }), ttl: "6h", room: "t1_m1", canPublish: true },
+      { identity: "player", name: "Pat", metadata: JSON.stringify({ photoUrl: "https://lh3.googleusercontent.com/a/p.jpg" }), ttl: "6h", room: "t1_m1", canPublish: true },
     ]);
     await s.call("POST", T, undefined, "coach");
     expect((s.signer as FakeSigner).signed[1]).toMatchObject({ identity: "coach", name: "Casey", metadata: "{}" });

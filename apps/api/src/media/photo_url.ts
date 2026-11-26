@@ -8,7 +8,7 @@
 // that sign-in copies, is trusted; anything else is treated as no picture.
 
 /** A file name that smuggles in a folder or a traversal. */
-const unsafeName = /[/\\]|%2f|%5c|%2e%2e/i;
+const unsafeName = /[/\\]|%2f|%5c|%2e%2e|^\.|[^A-Za-z0-9._%-]/i;
 
 /** Google account photos, as Firebase copies them at sign-in. */
 const googlePhotoHost = "https://lh3.googleusercontent.com/";
@@ -34,4 +34,25 @@ export function trustedPhotoUrl(url: string | null | undefined, uid: string, buc
     }
   }
   return null;
+}
+
+// The deployment's trusted buckets, set once at startup (server.ts) so every
+// service that copies a picture out of `profiles/{uid}` (account gate
+// re-check, N2) judges it the same way as the Auth photoURL. Until it is
+// set, only Google account photos are trusted.
+let configuredBuckets: readonly string[] = [];
+let configuredEmulatorHost: string | undefined;
+
+export function configurePhotoTrust(buckets: readonly string[], emulatorHost?: string): void {
+  configuredBuckets = buckets;
+  configuredEmulatorHost = emulatorHost;
+}
+
+/**
+ * A picture read from `profiles/{uid}` (a document a client can write, in
+ * old data or past a rules gap), passed on only when trusted for [uid];
+ * anything else is null. Never migrated, just not shown.
+ */
+export function trustedProfilePhoto(url: unknown, uid: string): string | null {
+  return typeof url === "string" ? trustedPhotoUrl(url, uid, configuredBuckets, configuredEmulatorHost) : null;
 }
