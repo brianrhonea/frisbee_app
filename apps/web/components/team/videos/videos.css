@@ -11,7 +11,7 @@
 .video-folder-form { max-width: 420px; }
 .video-editor { max-width: 640px; }
 .video-editor .home-actions, .video-folder-form .home-actions, .video-move .home-actions { margin-top: 0; }
-.video-status.ok { color: var(--accent); }
+.video-status.ok { color: var(--success); }
 .video-status.bad { color: var(--danger); }
 .video-file-row { margin: 0; overflow-wrap: anywhere; }
 
@@ -105,7 +105,7 @@
   font: inherit; font-size: 0.85rem; font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer;
 }
 .video-mark:hover { border-color: var(--accent); }
-.video-mark.on { background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; }
+.video-mark.on { background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; box-shadow: inset 0 0 0 2px var(--accent); }
 .event-videos h3 { font-size: 0.95rem; margin: 12px 0 4px; }
 .event-videos ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .event-videos a { color: var(--accent); font-weight: 600; text-decoration: none; }

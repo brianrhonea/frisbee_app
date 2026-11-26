@@ -12,7 +12,7 @@
 .card > .draft-head { margin-bottom: 12px; }
 
 .draft-status { margin-left: 8px; font-size: 0.8rem; vertical-align: middle; }
-.draft-status-accepted { background: var(--accent-soft); color: var(--accent-ink); }
+.draft-status-accepted { background: var(--success-soft); color: var(--success); }
 .draft-status-waitlisted { background: var(--field); color: var(--ink-soft); }
 .draft-status-declined, .draft-status-withdrawn { background: var(--field); color: var(--muted); }
 
