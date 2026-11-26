@@ -1,0 +1,65 @@
+# Conflicting requirements
+
+Register of disagreements found while reading the 25 specifications
+(2026-11-25), compared with each other, with the owner's standing decisions,
+and with the `development` branch at `39c8a53`.
+
+**Resolution key:** *Resolved* means a recorded decision or the precedence
+rule in [`README.md`](README.md) settles it. *Proposed* means a recommended
+resolution that still needs owner approval; these are listed in
+[`development-plan.md`](development-plan.md) §8. *Gap* means the spec is
+clear and the code doesn't meet it yet; the readiness assessment covers these.
+
+## A. Specification against specification
+
+| # | Topic | Says one thing | Says another | Resolution |
+|---|---|---|---|---|
+| C-01 | **Launch dates** | Doc 19: target February 2027; beta (M3) in sprint 4, Jan 11–24; public launch (M5) in sprint 6, Feb 8–21; 240 hours from Nov 30 | Owner decision D-1: beta **Jan 4**, public **Jan 18** | **Resolved** by D-1. Doc 19 §06–§07 and Doc 18 §15 phases need rewriting to the new dates (plan §7). |
+| C-02 | **Colour palette** | Doc 17 §01, §04 (approved): replace grass green with graphite and white surfaces and a *proposed* electric-indigo accent (#4338CA / #A5B4FC); "green remains semantic success only"; Doc 19 §04: "Doc 17 supersedes" the turf-green brand | UI-updated appendices (00, 02, 03, 04, 09): navy header band, **green accent** for key figures and links. Each appendix calls itself "concepts for discussion" | **Resolved by D-2 (UI-updated wins for design):** navy + green. This is close to the current Turf & Disc palette (ink/feature navy `#0F1A2A`, accent green `#12805C`), so the indigo re-colour is **not** done. Doc 17's non-colour requirements still apply: themes, accessibility, states, breakpoints, motion. Confirm as plan decision **Q1**. |
+| C-03 | **Tab order and label** | Doc 17 §02, §05: Home · Discover · **Schedule · Teams** · **Chats** (the current app's order and label) | Master Blueprint §01 and all five UI-updated images: Home · Discover · **Teams · Schedule** · **Chat** | **Proposed** under D-2: switch to Home · Discover · Teams · Schedule · Chats, keeping the plural label "Chats" (Doc 17 and current code) because the images are concepts. Confirm as **Q2**. |
+| C-04 | **Platform fee** | Master §05: 4.5–6% combined fee; Marketplace §06: 5% combined fee ($25 on $500) | Docs 11 §02, 14 §05, 19 §13: standard **3%** of host principal, processing paid by the payer; Doc 17 checkout mock: $15 platform fee on $500 | **Resolved** (newer docs, owner decision 2026-11-23, code `packages/shared/src/payments.ts` default 300 bps): 3%. |
+| C-05 | **New-host collection cap** | Marketplace §02: pilot cap **$5,000** first-event gross | Doc 10 PF06, Doc 13 §09, Doc 14 §05, Doc 19 §10: first three events enhanced review, proposed **$1,500** cap | **Resolved**: $1,500 (Doc 10 is the newer, dedicated spec). The code has a $2,000 payout-review threshold instead (C-29). |
+| C-06 | **Payout release policy** | Marketplace §07: release only after verified completion **and manual approval**; consider a 90/10 split with 10% held for 30 days | Doc 10 PF07–PF08: automated release after a **3-day** (established) or **14-day** (provisional) hold following verified completion; risk-based reserves of 10–20% for up to 90 days. Doc 14: automate routine eligible settlements, human review for high risk | **Resolved**: Doc 10. Only matters if paid hosting is enabled (Q4). |
+| C-07 | **Host deposits** | Marketplace §02: avoid mandatory deposits ("a $200 deposit cannot protect a $16,000 event") | Doc 10 PF05: optional, risk-based refundable deposit, initially consider $200 | **Compatible**: optional and risk-based, never universal. Post-launch. |
+| C-08 | **Subscription plans** | Master §05: three plans (Individual $4.99, Team $19.99, Organization $49.99) | Docs 11, 15, 16, 19: five plans, adding **Community Pro $9.99**, plus annual prices | **Resolved**: Doc 11. Subscriptions are post-launch either way. |
+| C-09 | **Budget alert thresholds** | Doc 01 §07: alerts at 50%, **80%**, 100% | Docs 14, 18, 19: 50%, **75%, 90%**, 100% | **Resolved**: 50/75/90/100 (three later docs agree). |
+| C-10 | **Environments** | Marketplace §03: separate dev, **staging** and production for Firebase and Stripe | Doc 18 §02 (approved): two persistent environments plus local emulators and previews; staging later if justified | **Resolved**: Doc 18 (dev + prod). |
+| C-11 | **Stripe Connect status** | Marketplace: "proposed, not yet approved for this business" | Doc 10: "retain the existing Stripe Connect separate charges and transfers architecture" | **Resolved**: Doc 10 (newer). Stripe's live-mode approval of the account is still an external dependency. |
+| C-12 | **Client parity** | Docs 01, 05–08: "practical feature parity"; Doc 01 §06 allows justified device differences | `CLAUDE.md`: web and mobile must have **exactly** the same features | **Resolved**: exact parity per `CLAUDE.md`. The device exceptions already accepted stay (GPS recording, push permission, native calendar). |
+| C-13 | **Youth at launch** | Doc 02, Doc 13 SP-02/03: 13+ with verified guardian consent; 13–17 private by default | Doc 19 §05, §07 M1, §10: **adult-only launch**; youth disabled until its own gate passes | **Resolved**: Doc 19 governs launch scope. The 13+ design is the later target. Code is 13+ today (C-24). |
+| C-14 | **Launch scope of communities** | Doc 05 §08 launch list: recurrence, capacity/waitlists, attendance | Doc 19 §05: defer "complex recurrence" and advanced automation | **Resolved**: Doc 19 scope cut. Keep existing recurrence (daily/weekly/biweekly/monthly); waitlists are not a launch blocker. |
+| C-15 | **Launch scope of messaging** | Doc 06 §09 launch list: editing, replies, templates, basic search | Doc 19 §05: ship existing chats; P1-04 "Discord-inspired channels" | **Proposed**: ship what exists (rooms, DMs, mentions, pins, polls, Discord import). Message editing and search move after launch. |
+| C-16 | **Document numbering** | Master §06 library: 00–15, with 09 = marketplace and 15 = deployment | Delivered set: 15 = Statistics, 16 = Playbooks, 17 = UI/UX, 18 = Deployment, 19 = Roadmap; no 09 file | **Resolved** in the README register: the Marketplace Blueprint is 09 and the Master Blueprint is 00. |
+| C-17 | **Reminder defaults** | Doc 07 §06 and Doc 12 §05: practice 24h/1h, game 24h/2h, tournament 7d/24h/2h, meeting 15m | (Consistent between specs) | No conflict; see C-31 against code. |
+| C-18 | **Design tokens** | Doc 17 §13: shared JSON design tokens generated into Dart and CSS | `CLAUDE.md` / owner (2026-11-14): each platform keeps its own design | **Proposed**: share token *values* (colour, type scale, spacing) from one source and keep platform-native components. That satisfies both. Post-launch; not needed for Jan 18. Confirm as **Q8**. |
+
+## B. Specification against the owner's standing decisions
+
+| # | Topic | Specification | Standing decision | Resolution |
+|---|---|---|---|---|
+| C-19 | **Email** | Doc 12 NR-01: "essential transactional email at launch" (receipts, refunds, security notices) | Redesign decision 2026-11-19: "no email notifications for now" | **Proposed**: no notification email for a free-only launch. Firebase Auth's own verification and reset emails are enough. Transactional email becomes a gate for paid hosting (receipts). Confirm as **Q5**. |
+| C-20 | **Payout hold on dev** | Doc 10 PF07: 3-day / 14-day holds | Dev runs `PAYOUT_HOLD_DAYS=0` for testing (2026-11-24) | Dev-only setting. Prod must use ≥ 3 if paid hosting is ever enabled. |
+| C-21 | **Palette history** | Doc 17: drop turf green | Turf & Disc redesign approved 2026-11-19 | Settled by C-02 / D-2. |
+| C-22 | **Competition data** | Doc 08 DS10: rankings, results; Marketplace: sanctioned events | USA Ultimate data removed (no rights) | Rankings stay first-party only. Never imply USAU sanctioning or import USAU data. |
+
+## C. Specification against the current code (`development`, 39c8a53)
+
+| # | Area | Specification | Code today (evidence) | Effect |
+|---|---|---|---|---|
+| C-23 | **API-only writes** (P0-02) | Docs 01 §4, 13 §04, 19 P0-02: every application write through the API; deny direct client writes; no insecure fallback | The website writes through the API. The **app still writes Firestore directly** for posts, comments, follows, DMs, team chat, events/RSVPs, playbook, videos, stats, drafts, group and hosted tournaments, meetings (`ARCHITECTURE.md` §10 rows 4–16 "app not switched"; about 300 direct `set/update/add/delete` call sites in `apps/mobile/lib/data/repositories`). `use_api_*` flags keep a direct-write fallback for teams, membership, profiles, tournaments, search | **Gap**: the largest. Plan Q3 decides how much closes before Jan 18. |
+| C-24 | **Age policy** | Doc 19 P0-04: adult-only launch, enforced on the server | `packages/shared/src/personal.ts`: `minimumAge = 13`; guardian *contact* collected, no consent workflow; pentest P4: the age gate is only in the sign-up form | **Gap**: needs a server-enforced 18+ gate for launch (Q6). |
+| C-25 | **Onboarding data** | Doc 02 §2: collect basic details and birth date first; legal name, address and so on only when a capability needs them | New accounts since 2026-11-14 must give full personal details (legal name, phone, gender, address) | **Gap**: friction for beta sign-ups. Proposed: birth date only at sign-up (Q7). |
+| C-26 | **Email verification** | Doc 13 SP-01: verified email before posting, messaging or organizing | No `emailVerified` check in the API, app or website | **Gap**. |
+| C-27 | **Staff MFA and scoped staff** | Docs 13 SP-12, 14, 19 P0-11: mandatory staff MFA, granular staff roles, audit log | One broad `staff` ID-token claim (`apps/api/src/auth.ts`); no MFA anywhere; no staff audit log | **Gap**: P0 for launch. |
+| C-28 | **Refunds** | Doc 10 PF12: full refund **including** platform and processing fees for host cancellation, fraud and platform errors | Refunds cover principal only; "Stall 10's service and Stripe's processing fees aren't refunded" (`apps/api/src/payments/service.ts`, release 0.0.51) | **Gap**: blocks paid hosting only. |
+| C-29 | **Host caps and holds** | Doc 10 PF06–PF07: $1,500 provisional cap per event; 14-day provisional hold; 72-hour freeze after bank change | Payout review over $2,000 (`payoutReviewOverCents = 200_000`), 3-day default hold, first-payout review; bank change doesn't reset approval (`docs/payments-security.md`) | **Gap**: blocks paid hosting only. |
+| C-30 | **Backups and restore** | Docs 18 §14, 19 P0-07: daily backups, 30-day retention, restore drill before launch | No backup schedule or restore script in the repository | **Gap**. |
+| C-31 | **Reminders** | Docs 07, 12: per-type offsets, durable outbox, retries; no truncation at 200 entries | One reminder 23–24 h before; hourly query; marker written before delivery; competition fan-out capped at 200 (`firebase/functions/src/notifications`) | **Gap**: works for a small beta; P1 after launch. |
+| C-32 | **Monitoring** | Doc 18 §12: crash reporting, alerts, synthetic probes on Cloud Run and Vercel | No Crashlytics or other crash reporting in the app or website; monitoring scripts target legacy Firebase Hosting and Functions | **Gap**. |
+| C-33 | **CI coverage** | Doc 18 §03, §05: required PR checks including Flutter, Firebase rules and web tests | `ci-node.yml` runs shared/API typecheck, tests and builds, plus the API emulator suite. No Flutter, functions or rules jobs; the website has no test script; no E2E or load tests | **Gap**. |
+| C-34 | **Android release** | Docs 18 §06, 19: iOS, Android and web together | `codemagic.yaml` builds iOS only. No Play Console track configured in the repository | **Gap**: it's on the Jan 18 critical path (plan §5). |
+| C-35 | **Palette implementation** | Doc 17 §13: semantic tokens only; audit hardcoded colours | `theme.dart` has semantic tokens, but about 619 `Color(0x…)` / `Colors.*` uses outside the theme folder (upper bound: includes `Colors.transparent` / `white`) | **Gap** for UI consistency and dark mode. |
+| C-36 | **Rate limits** | Docs 01, 13: distributed limits | Per-instance memory limiter (`apps/api/src/limits/memory.ts`) | Acceptable at beta scale (max 3 dev / 10 prod instances). Post-launch. |
+| C-37 | **App Check** | Docs 01, 18: enforce where supported | `ENFORCE_APP_CHECK` defaults to false; pentest P4 open | **Gap**: enable for the app on prod after testing; the web uses reCAPTCHA Enterprise. |
+| C-38 | **Statistics sync** | Doc 15 §05: ordered event batches, durable offline queue, recorder lease | Whole-game document saves with an in-memory dirty state (web `useTracker.ts`); concurrent overwrites and restart loss are possible | Doc 19 P1-09. Proposed: single recorder per game for beta; event batches after launch. |
+| C-39 | **Self-written stats** | Doc 15: provenance; Docs 08, 15: verified leaderboards | Pentest P7: players write their own stats, which feed player rankings | **Gap**: hide public player rankings or limit them to team-recorded stats for launch. |

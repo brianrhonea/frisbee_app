@@ -1,211 +1,318 @@
-# Stall 10 — project instructions
+# Stall10 — Engineering Instructions
 
-Monorepo (see `ARCHITECTURE.md`):
+## 1. Product Overview
 
-```
-apps/mobile    Flutter app (iOS first, Android); Dart package `frisbee_app`
-apps/api       Node.js API (TypeScript, Fastify, firebase-admin, zod)
-apps/web       Next.js website (phase 3; placeholder today)
-packages/      Shared TypeScript (@stall10/shared: types, zod schemas)
-firebase/      firebase.json, rules, indexes, functions, hosting, scripts, docs
-docs/          Current-state architecture, user guide, changelog, iOS release
-```
+Stall10 is an ultimate frisbee ecosystem combining:
 
-## Secrets: never commit them
+- Athlete social networking
+- Team and organization management
+- Community and pickup management
+- Messaging and communication
+- Scheduling and event management
+- Statistics and performance tracking
+- Playbooks and video analysis
+- Tournament and league management
+- Registration and payments
 
-All secrets (API keys, tokens, credentials, service-account files) live in
-gitignored local files and must never be committed or pushed to GitHub.
+Stall10 will remain focused on ultimate frisbee for the initial release. Multi-sport expansion and rebranding are deferred.
 
-- Firebase API keys live in `apps/mobile/secrets.local.json` (dev) and
-  `apps/mobile/secrets.prod.local.json` (prod), both gitignored. The app
-  reads them at build time via `--dart-define-from-file=secrets.local.json`
-  (run from `apps/mobile`); `lib/firebase_options.dart` only references
-  `String.fromEnvironment(...)`.
-- `apps/mobile/secrets.example.json` is the committed template — keys only,
-  empty values. When adding a new secret, add the key to both files and read
-  it with `String.fromEnvironment` (Dart), `defineSecret` (Cloud Functions)
-  or an environment variable (API; template `apps/api/.env.example`, real
-  values in the gitignored `apps/api/.env`).
-- The API uses Application Default Credentials (Cloud Run's identity, or
-  `gcloud auth application-default login` / the emulators locally). Never
-  create or commit a service-account key for it.
-- Native Firebase config files are gitignored local files:
-  `apps/mobile/android/app/google-services.json`,
-  `apps/mobile/ios/Runner/GoogleService-Info.plist`. Get them from the
-  Firebase console or `flutterfire configure`.
-- iOS Google Sign-In IDs live in `apps/mobile/ios/Flutter/Secrets.xcconfig`
-  (gitignored; template `Secrets.example.xcconfig`), filled from
-  `GoogleService-Info.plist`'s `REVERSED_CLIENT_ID` and `CLIENT_ID`.
-- Codemagic (`codemagic.yaml`) gets every secret from its `frisbee_secrets`
-  environment groups and App Store Connect API key integration. Never put
-  secrets, `.p8` keys, certificates or provisioning profiles in the repo.
-- Never hardcode a secret in source, tests, docs, or commit messages. Never
-  paste one into a published artifact or external service.
-- `flutterfire configure` (run in `apps/mobile`) rewrites
-  `lib/firebase_options.dart` with hardcoded keys. Re-run it with
-  `--out=lib/firebase_options.generated.dart` (gitignored), copy any
-  new/changed keys into `secrets.local.json`, then delete the generated
-  file. It also writes `apps/mobile/firebase.json` (gitignored); the real
-  config is `firebase/firebase.json`.
-- Before every commit, check that no secret is staged:
-  `git diff --cached | grep -E "AIza[0-9A-Za-z_-]{20,}|BEGIN (RSA )?PRIVATE KEY|\"private_key\"|sk_live_[0-9A-Za-z]{8,}|sk_test_[0-9A-Za-z]{8,}|rk_live_[0-9A-Za-z]{8,}|whsec_[0-9A-Za-z]{8,}"`
-  must print nothing, and `git status` must not list any of the files above.
-- If a secret is ever committed, stop and tell the user. Rotate the key; don't
-  just delete it in a follow-up commit.
+## 2. Current Release Objective
 
-## Environments
+- Founding-team beta: January 4, 2027
+- Public release target: January 18, 2027
 
-Two Firebase projects:
+Current priorities, in order:
 
-- `frisbee-app-brianrhonea-dev` (dev): local runs, and TestFlight builds from
-  the `development` branch. `secrets.local.json` (`"FIREBASE_ENV": "dev"`).
-- `frisbee-app-brianrhonea` (prod): App Store builds from `main`.
-  `secrets.prod.local.json` (`"FIREBASE_ENV": "prod"`).
+1. Security and data integrity
+2. UI/UX modernization
+3. Reliability of existing functionality
+4. Automated testing and regression prevention
+5. Application performance
+6. Production and release readiness
+7. User onboarding and retention
 
-Local native config files (`apps/mobile/android/app/google-services.json`)
-are the dev project's; prod copies are
-`apps/mobile/android/app/google-services.prod.json` and the root
-`GoogleService-Info.plist` (dev: `GoogleService-Info.dev.plist`), all
-gitignored. Run the Firebase CLI from `firebase/` (it finds
-`firebase.json` there); it defaults to dev. Deploy to production only with
-`--project prod`, and only when the user asks.
+Major new features are frozen unless explicitly approved by the product owner.
 
-## Running and building
+## 3. Technology Stack
 
-The app (always pass the secrets file; run from `apps/mobile`):
+- Mobile: Flutter and Dart
+- Web: Next.js and TypeScript
+- Backend: Fastify and TypeScript
+- Authentication: Firebase Authentication
+- Database: Cloud Firestore
+- File storage: Firebase Storage
+- Notifications: Firebase Cloud Messaging
+- Infrastructure: Google Cloud Run
+- Payments: Stripe Connect
+- Real-time audio/video: LiveKit
+- Source control: GitHub monorepo
 
-```
-cd apps/mobile
-flutter run -d <android-emulator-or-device> --dart-define-from-file=secrets.local.json
-flutter build apk --dart-define-from-file=secrets.local.json
-flutter build ipa --dart-define-from-file=secrets.local.json   # Codemagic does this
-```
+Verify the actual repository structure and installed dependencies before implementation.
 
-VS Code launch configs in `.vscode/launch.json` already do this.
+Do not introduce major architectural changes, database migrations or replacement frameworks without approval.
 
-`API_BASE_URL` in the secrets file points the app at the API; without it
-the app writes Firestore directly as before. The `use_api_*` flags in
-`meta/flags` switch API paths off without a build.
+## 4. Documentation
 
-The API and shared packages (pnpm workspace, from the repo root):
+Product specifications are located in `docs/specifications/`.
 
-```
-pnpm install
-pnpm dev:api                         # builds @stall10/shared, then tsx watch on :8787
-cd firebase && firebase emulators:start   # optional; set the emulator hosts in apps/api/.env
-```
+These documents define the intended long-term product behavior. They do not establish that a feature is currently implemented or approved for January.
 
-The API deploys to Cloud Run (service `api`, one per Firebase project) from
-GitHub: Actions → **Deploy API** (`.github/workflows/deploy-api.yml`, dev or
-prod; prod needs the `prod` environment's approval), rolled back with
-**Roll back API**. It builds `apps/api/Dockerfile` from the repo root and
-applies `apps/api/deploy/service.yaml`; one-time setup per project (APIs,
-Artifact Registry, service accounts, Workload Identity Federation) is in
-`apps/api/DEPLOY.md`. Deploy only when the user asks.
+Before implementing a task:
 
-iOS App Store builds run on Codemagic (no Mac needed) from `apps/mobile`;
-see `docs/ios-release.md`. Pushes that don't touch `apps/mobile/` or
-`packages/` skip the iOS build.
+1. Identify the relevant product specifications.
+2. Review the current implementation.
+3. Review approved release scope.
+4. Identify discrepancies and dependencies.
+5. Confirm acceptance criteria.
 
-## Website
+Prefer approved UI-updated specifications for visual design decisions.
 
-The website is `apps/web` (Next.js on Vercel; see `apps/web/README.md`).
-Signed-out visitors read the public pages through the API's
-`/v1/public/*`; members use the member area. Its env lives in the
-gitignored `apps/web/.env.local` (template `.env.example`). The old
-Flutter web site (`lib/main_web.dart`, `lib/ui/web`, `lib/ui/browse`) was
-removed from the app.
+Do not silently resolve conflicting requirements.
 
-Firebase Hosting now serves only static pages: `firebase/build/site`
-(gitignored), copied from `firebase/hosting/` by
-`firebase/scripts/build_site.sh` (firebase.json predeploy): `/about`,
-`/help`, `/terms`, `/privacy`, `/cookies`, `/delete-account`, the invite
-fallbacks (`/join/…`, `/g/…`, `/p/…`) and `.well-known/`. Nothing is
-compiled, so hosting deploys need no API key. The legal pages are drafts:
-fill in the [bracketed] details and get them reviewed before launch.
+Documentation is not authorization to implement a feature.
 
-```
-bash firebase/scripts/build_site.sh && cd firebase && firebase emulators:start --only hosting
-```
+## 5. Planning and Task Management
 
-Store URLs are placeholders in `apps/web/lib/site.ts` and
-`firebase/hosting/about.html` / `join.html` (and
-`apps/web/content/about.html`); keep them in step. Never commit `build/`.
+GitHub Projects and GitHub Issues are the source of truth for implementation progress.
 
-## Platform parity: web and mobile are the same product
+Every implementation task should include:
 
-The website (`apps/web`) and the app (`apps/mobile`) must have exactly the
-same features and behaviour; only the design differs. Someone who only
-ever uses one of them must be able to do everything.
+- Feature or epic
+- Objective
+- Scope
+- Acceptance criteria
+- Priority
+- Dependencies
+- Estimated effort
+- Target sprint
+- Testing requirements
 
-- Any feature change on one platform (new feature, changed behaviour,
-  rule, limit, validation, wording of what happens) is made on the other
-  platform in the same piece of work. Don't finish a change on only one.
-- Keep each platform's own design: the app follows its Flutter design
-  decisions, the website its web design (`apps/web/app/app.css` tokens and
-  components). Don't copy one platform's look onto the other.
-- Shared behaviour lives in one place where possible: API endpoints and
-  `packages/shared` schemas and limits both platforms use.
-- Checks cover both: when a feature has tests on one platform, add the
-  matching tests on the other, and keep `docs/product-spec.md` §8.1's
-  parity checklist up to date.
-- Bump both platforms' versions and changelogs when both change.
+Priority definitions:
 
-## Architecture
+- P0: Release blocker, critical security issue or data integrity issue
+- P1: Important January improvement
+- P2: Non-blocking improvement
+- P3: Future development
 
-- **App:** the official Flutter MVVM architecture guide: `data/services` →
-  `data/repositories` (abstract + implementation) → `ui/<feature>/view_models`
-  (ChangeNotifier + `Command`s) → `ui/<feature>/widgets` (no logic). DI via
-  `provider`; no Riverpod. Repositories call the API through
-  `data/services/api_client.dart`.
-- **API:** `routes.ts` (HTTP) → `service.ts` (rules, validation, no
-  Firebase imports) → `repository.ts` (interface + Firestore). The caller
-  comes from the ID token, never the body. The Admin SDK bypasses
-  `firestore.rules`, so a migrated operation must re-check everything its
-  rule checked. Request types and zod schemas go in `packages/shared`.
-- **Migrating a feature to the API:** follow the playbook and checklist in
-  `ARCHITECTURE.md` §10, and update its status there.
-- Team membership writes not yet migrated are validated only by
-  `firebase/firestore.rules`, so update the rules (and
-  `firebase/functions/test/rules`) with any membership change.
-- New client-facing endpoints go in the API, not new callables.
+Do not expand an issue's scope without approval.
 
-## USA Ultimate data
+## 6. Subagent Organization
 
-USA Ultimate events, rankings, team pages and roster sync were removed
-(November 2026): we don't have rights to that data. Don't add USA Ultimate
-data back without the user confirming they have permission. The old code is
-in git history. play.usaultimate.org's robots.txt also disallows
-Claude/Anthropic agents, so never fetch it.
+Use specialized subagents when appropriate:
 
-## Versions
+- Planning agent
+- Flutter development agent
+- Web development agent
+- Backend development agent
+- QA and testing agent
+- Security review agent
+- UI/UX review agent
+- Release and infrastructure agent
 
-Every app/API change bumps its version and adds a changelog entry:
-`apps/api/package.json` + `apps/api/CHANGELOG.md`, `apps/web/package.json`
-+ `apps/web/CHANGELOG.md`, `apps/mobile/pubspec.yaml` + `docs/CHANGELOG.md`.
-`pnpm test` (`pnpm check:versions`) fails when the current version has no
-entry. The API reports its version in `GET /health` and the
-`x-stall10-api-version` header; the website shows its version in the footer.
+Parallelize independent work using isolated Git worktrees.
 
-## Checks
+Before delegating parallel tasks:
 
-```
-cd apps/mobile && flutter analyze && flutter test
-pnpm typecheck && pnpm test                    # shared + API (fakes)
-pnpm test:api:emulator                         # API against Firestore/Auth emulators
-cd firebase/functions && npm run build && npm test
-cd firebase/functions && npm run test:rules    # Firestore/Storage rules (emulator)
-cd firebase/functions && npm run test:server   # callables against the emulator
-```
+- Identify shared dependencies.
+- Establish API and component contracts.
+- Define file ownership.
+- Prevent conflicting modifications.
+- Confirm the starting Git commit.
 
-After changing what a new team starts with or the team-name rules, refresh
-the shared fixtures (`flutter test test/data/shared_fixtures_test.dart
---dart-define=UPDATE_FIXTURES=true` in `apps/mobile`) and rerun `pnpm test`.
+Initially limit concurrent implementation agents to three.
 
-The app also writes cross-language test vectors to
-`packages/shared/fixtures/<area>/` (tournament engine, stats, playbook,
-drafts, Discord, calendar files), which the TypeScript ports are tested
-against. After changing any of that logic on either side, refresh them
-(`flutter test test/shared_fixtures --dart-define=UPDATE_FIXTURES=true` in
-`apps/mobile`), review the diff, and rerun `pnpm test` and the functions
-tests.
+QA and security reviews should be independent of implementation whenever practical.
+
+## 7. UI/UX Standards
+
+Follow the approved Stall10 UI specifications.
+
+The application should feel modern, athletic, social-first and consistent across platforms.
+
+Prioritize:
+
+- Shared design tokens
+- Reusable components
+- Light, dark and system themes
+- Consistent typography and spacing
+- Predictable navigation
+- Responsive desktop and mobile layouts
+- Accessible controls
+- Loading, empty, error and success states
+
+Avoid unnecessary screen-specific components and duplicated styling.
+
+Do not change existing business logic solely to accomplish a visual redesign.
+
+## 8. Backend and Security Standards
+
+- Validate sensitive operations on the server.
+- Never trust client-provided authorization or ownership claims.
+- Verify authentication and resource-level permissions.
+- Prevent unauthorized cross-team and cross-community access.
+- Protect private messages, media and personal information.
+- Validate all external inputs.
+- Use idempotency where duplicate requests could cause harm.
+- Handle concurrency and transactional operations safely.
+- Never expose credentials or secrets.
+- Never bypass security controls to resolve functionality problems.
+
+Review both API authorization and Firebase security rules independently.
+
+Financial functionality requires explicit approval and additional security validation before public activation.
+
+## 9. Testing Requirements
+
+Every implementation task must include appropriate testing.
+
+Testing layers:
+
+- Flutter unit and widget tests
+- Flutter golden tests
+- Mobile integration and end-to-end tests
+- Web component tests
+- Playwright browser tests
+- Backend unit and API integration tests
+- Firebase security rules tests
+- Performance and load tests
+- Physical-device acceptance testing
+
+Use existing test frameworks where appropriate. Do not introduce redundant frameworks.
+
+### Mandatory rules
+
+- Run relevant existing tests before modifying code.
+- Add regression tests for bug fixes where feasible.
+- Test authorized and unauthorized behavior.
+- Test invalid inputs and failure scenarios.
+- Never remove, weaken or skip tests to make builds pass.
+- Never claim a test passed without executing it.
+- Report pre-existing failures separately.
+- Identify tests requiring physical-device validation.
+
+Automated tests must use isolated test environments and synthetic data.
+
+Never run destructive tests against production.
+
+## 10. Mobile Device Testing
+
+The product owner currently has a physical iPhone and uses TestFlight.
+
+Use the following testing environments as appropriate:
+
+- iOS Simulator
+- Android Emulator
+- Flutter integration tests
+- Maestro mobile workflows
+- Firebase Test Lab
+- TestFlight
+- Google Play testing tracks
+
+Physical-device validation remains necessary for notifications, camera, microphone, media playback, background behavior, network transitions and native permissions.
+
+Do not claim physical-device compatibility based solely on simulator results.
+
+## 11. Git and Pull Request Workflow
+
+- Production branch: `main`
+- Integration branch: `development`
+- Implementation: isolated feature or fix branches
+
+Confirm the current branch strategy before making changes.
+
+Branch naming examples:
+
+- `feature/123-home-redesign`
+- `fix/124-team-authorization`
+- `test/125-rsvp-regression`
+
+Every pull request should include:
+
+- Associated GitHub issue
+- Summary of changes
+- Acceptance criteria
+- Tests executed
+- Security implications
+- Screenshots for visual changes
+- Known limitations
+
+Do not merge, deploy or modify production resources without explicit approval.
+
+## 12. Definition of Done
+
+An issue is complete only when:
+
+- Acceptance criteria are satisfied.
+- Relevant automated tests pass.
+- Security implications are reviewed.
+- Existing functionality is preserved.
+- Relevant platforms are validated.
+- Documentation is updated where necessary.
+- Remaining manual testing is identified.
+- The product owner approves the change.
+
+Compilation alone does not establish completion.
+
+## 13. Agent Completion Report
+
+At the end of every implementation task, report:
+
+1. Objective
+2. Implementation summary
+3. Files modified
+4. Tests added
+5. Tests executed
+6. Passed, failed, skipped and unexecuted tests
+7. Security considerations
+8. Known limitations
+9. Remaining manual validation
+10. Recommended next steps
+
+Clearly distinguish verified results from assumptions.
+
+## 14. Restrictions
+
+Do not perform the following without explicit approval:
+
+- Add major new features
+- Change product requirements
+- Change payment processing behavior
+- Modify database schemas
+- Introduce major dependencies
+- Replace architectural patterns
+- Delete existing functionality
+- Modify production data
+- Deploy infrastructure
+- Merge production releases
+- Expand into additional sports
+
+When uncertain, document the concern and request clarification.
+
+## 15. Engineering Philosophy
+
+Prefer simple, maintainable and testable implementations.
+
+Prioritize correctness over development speed.
+
+Reuse existing functionality before creating replacements.
+
+The January objective is a polished, secure and reliable Stall10 release, not completion of the entire long-term product vision.
+
+## UI/UX Implementation Authority
+
+Reference `docs/design-system/Stall10_UI_Implementation_Guide.md` for all UI modernization tasks.
+
+Consult Document 17 and the UI-updated product specifications for original visual concepts and mockups.
+
+Requirements:
+
+- Use shared semantic design tokens rather than hardcoded colors.
+- Maintain visual consistency across Flutter and Next.js.
+- Support light, dark and system themes.
+- Implement reusable components before redesigning individual screens.
+- Preserve existing functionality, permissions and navigation.
+- Follow the documented responsive layout conventions.
+- Include loading, empty, error, offline and success states.
+- Add widget, golden or browser screenshot tests where appropriate.
+- Do not introduce new functionality solely because it appears in a design concept.
+- Obtain product owner approval for deviations from the design system.
