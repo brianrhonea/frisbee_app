@@ -43,10 +43,11 @@
 | Team / personal events | `team` / `personal` | `--team` / `--personal` | `#1D4ED8` / `#A21CAF` | `#93C5FD` / `#F0ABFC` | |
 | Team badge (white initials) | `badge` | — | `#4338CA` | `#4338CA` | `#2C6FB7` |
 | Retired dark card | `feature`, `onFeature`, `onFeatureMuted`, `featureHighlight` | `--board…` | surface / text / muted / raised | same | navy |
+| Video and call surfaces, device mock-up **(new, added during K2/K3 review)** | `media`, `media2`, `onMedia`, `onMediaMuted` | `--media`, `--media-2`, `--on-media`, `--on-media-muted` | `#18181B` / `#27272A` / `#FAFAFA` / `#A1A1AA` | same | was the navy card |
 
 **Website aliases.** These keep pointing where they did: `--amber`, `--brand` and `--glow`. `--danger` moves to the new `--error`. The duplicated dark block in `site.css` becomes one block (K3).
 
-**Not changed:** the playbook field colours (`FieldColors`). They are the sport surface, not app chrome.
+**Not changed:** the playbook field colours (`FieldColors`). They are the sport surface, not app chrome. On the website the playbook pieces now use literals matching the app: defense `#14213A` on both platforms (previously navy `#0F1A2A`/`#1A2940` on the website), and offense, disc edge and cones keep their earlier colours.
 
 ## Text (K6)
 
