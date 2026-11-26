@@ -1,6 +1,6 @@
 "use client";
-import { type KeyboardEvent, type ReactNode } from "react";
-import { nextInGroup } from "./roving";
+import { type KeyboardEvent, type ReactNode, useRef } from "react";
+import { nextInGroup, useEdgeFade } from "./roving";
 import "./ui.css";
 
 /**
@@ -30,12 +30,14 @@ export type FilterChipsProps =
 
 export function FilterChips(props: FilterChipsProps) {
   const { items, label, className } = props;
+  const bar = useRef<HTMLDivElement>(null);
+  useEdgeFade(bar);
   const cls = `ui-tabs ui-chips${className ? ` ${className}` : ""}`;
 
   if (props.multiple) {
     const { value, onChange } = props;
     return (
-      <div role="group" aria-label={label} className={cls}>
+      <div ref={bar} role="group" aria-label={label} className={cls}>
         {items.map((c) => {
           const on = value.includes(c.id);
           return (
@@ -59,7 +61,7 @@ export function FilterChips(props: FilterChipsProps) {
     if (id !== null && id !== value) onChange(id);
   }
   return (
-    <div role="radiogroup" aria-label={label} className={cls} onKeyDown={onKeyDown}>
+    <div ref={bar} role="radiogroup" aria-label={label} className={cls} onKeyDown={onKeyDown}>
       {items.map((c) => {
         const on = c.id === value;
         const stop = on || (!hasValue && c === items.find((x) => !x.disabled));

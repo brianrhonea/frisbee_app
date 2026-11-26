@@ -269,7 +269,7 @@ h1, h2, h3 { line-height: 1.1; letter-spacing: -0.03em; margin: 0; }
   transition: transform var(--dur-fast) var(--ease), filter var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
 }
 /* :where keeps the hover as weak as .btn, so variants keep their colours. */
-.btn:where(:hover) { background: var(--field); }
+.btn:where(:hover:not(:disabled):not([aria-disabled="true"])) { background: var(--field); }
 .btn-amber { background: var(--disc); color: var(--on-disc); border-color: transparent; }
 .btn-primary { background: var(--accent); color: var(--on-accent); border-color: transparent; }
 .btn-small { min-height: 36px; padding: 7px 14px; font-size: var(--text-secondary-size); border-radius: 10px; }
@@ -290,7 +290,7 @@ h1, h2, h3 { line-height: 1.1; letter-spacing: -0.03em; margin: 0; }
 .btn-primary:active:not(:disabled) { background: color-mix(in srgb, var(--accent) 76%, var(--ink)); }
 .btn-ghost:active:not(:disabled) { background: color-mix(in srgb, var(--accent-soft) 80%, var(--accent)); }
 .btn-destructive:active:not(:disabled) { background: color-mix(in srgb, var(--error) 76%, var(--ink)); }
-.btn:disabled, .btn[aria-disabled="true"] { opacity: 0.6; cursor: default; }
+.btn:disabled, .btn[aria-disabled="true"]:not([aria-busy="true"]) { opacity: 0.6; cursor: default; }
 /* Loading: the button keeps its size and focus, shows a spinner and ignores clicks. */
 .btn[aria-busy="true"] { cursor: progress; }
 .btn[aria-busy="true"]::before {

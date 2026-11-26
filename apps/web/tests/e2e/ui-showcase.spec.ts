@@ -125,3 +125,32 @@ test("pages that use the new bars do not scroll sideways at phone width", async 
     expect(overflow, path).toBeLessThanOrEqual(0);
   }
 });
+
+test("a loading button keeps its colour and a disabled one does not hover", async ({ page }) => {
+  await open(page, "/dev/ui");
+  const opacity = (name: string) => page.getByRole("button", { name, exact: true }).first().evaluate((el) => getComputedStyle(el).opacity);
+  expect(await opacity("Saving")).toBe("1");
+  expect(await opacity("Disabled")).toBe("0.6");
+  const off = page.getByRole("button", { name: "Disabled", exact: true }).first();
+  const before = await off.evaluate((el) => getComputedStyle(el).backgroundColor);
+  await off.hover({ force: true });
+  expect(await off.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(before);
+});
+
+test("the long tab bar fades at the end it scrolls to", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 700 });
+  await open(page, "/dev/ui");
+  const bar = page.getByRole("tablist", { name: "Many tabs, scrolling" });
+  await bar.evaluate((el) => (el.scrollLeft = 0));
+  await expect(bar).toHaveAttribute("data-edges", "end");
+  await bar.evaluate((el) => (el.scrollLeft = el.scrollWidth));
+  await expect(bar).toHaveAttribute("data-edges", "start");
+});
+
+test("the visitor home's community tab is drawn as a tab", async ({ page }) => {
+  await open(page, "/");
+  const tab = page.locator(".feed-tabs > a");
+  if ((await tab.count()) === 0) return; // signed in
+  const s = await tab.evaluate((el) => ({ w: getComputedStyle(el).borderBottomWidth, c: getComputedStyle(el).fontWeight }));
+  expect(s).toEqual({ w: "2px", c: "700" });
+});

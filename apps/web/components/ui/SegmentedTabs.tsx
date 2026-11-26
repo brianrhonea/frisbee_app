@@ -1,6 +1,6 @@
 "use client";
 import { type KeyboardEvent, type ReactNode, useEffect, useRef } from "react";
-import { nextInGroup } from "./roving";
+import { nextInGroup, useEdgeFade } from "./roving";
 import "./ui.css";
 
 /**
@@ -39,6 +39,7 @@ export interface SegmentedTabsProps {
 export function SegmentedTabs({ items, value, onChange, label, variant = "segmented", className, tabId, panelId }: SegmentedTabsProps) {
   const first = useRef(true);
   const bar = useRef<HTMLDivElement>(null);
+  useEdgeFade(bar);
   const hasValue = items.some((t) => t.id === value);
 
   // A long bar scrolls the selected tab into view (not on the first paint).
