@@ -17,6 +17,7 @@ import '../../../utils/on_screen.dart';
 import '../../../utils/pending_removals.dart';
 import '../../../utils/result.dart';
 import '../../../domain/models/mentions.dart';
+import '../../../domain/models/meta_flags.dart';
 
 /// How a thread lays out its messages.
 enum ThreadStyle {
@@ -53,7 +54,11 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
     send = Command1<void, String>(_send);
     pickFiles = Command1<void, bool>(_pickFiles);
     takePhoto = Command0<void>(() => _capture(_picker.takePhoto));
-    recordVideo = Command0<void>(() => _capture(_picker.recordVideo));
+    recordVideo = Command0<void>(
+      () => _picker.videoUploads
+          ? _capture(_picker.recordVideo)
+          : Future.value(const Result.error(videoUploadsClosed)),
+    );
     deleteMessage = Command1<void, ChatMessage>(_delete);
     saveAttachment = Command1<bool, ChatAttachment>(_saveAttachment);
     react = Command1<void, (ChatMessage, String)>((a) => _react(a.$1, a.$2));
@@ -739,6 +744,12 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
       picked = await _picker.pick(imagesOnly: imagesOnly);
     } on Exception catch (e) {
       return Result.error(e);
+    }
+    // A video file is refused while video upload is closed (the server would
+    // refuse it too); photos and other files go through.
+    if (!_picker.videoUploads &&
+        picked.any((f) => contentTypeFor(f.name).startsWith('video/'))) {
+      return const Result.error(videoUploadsClosed);
     }
     final tooLarge = <String>[];
     for (final f in picked) {

@@ -6,6 +6,17 @@
 /// (same test vectors in test/domain/meta_flags_test.dart).
 library;
 
+/// What people are told when video upload is closed (`videoUploads` is not
+/// true): the same words as the server's refusal.
+class VideoUploadsClosedException implements Exception {
+  const VideoUploadsClosedException();
+
+  @override
+  String toString() => "Video uploads aren't available right now.";
+}
+
+const videoUploadsClosed = VideoUploadsClosedException();
+
 /// The platforms that have a build number gate. (The website has none.)
 enum AppPlatform { ios, android }
 

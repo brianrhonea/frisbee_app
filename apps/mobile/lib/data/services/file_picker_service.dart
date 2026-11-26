@@ -53,6 +53,11 @@ class FilePickerService {
   /// a phone's full-quality recording under maxVideoBytes.
   static const maxVideoLength = Duration(seconds: 30);
 
+  /// Whether native video upload is open (`meta/flags.videoUploads`, #13).
+  /// Fails closed: false without flags or until they're read. The server
+  /// enforces it too; this keeps people from picking what would be refused.
+  bool get videoUploads => _flags?.videoUploads ?? false;
+
   /// Whether this device can take photos and videos here (phones).
   bool get canUseCamera =>
       defaultTargetPlatform == TargetPlatform.iOS ||

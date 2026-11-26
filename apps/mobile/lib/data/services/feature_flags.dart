@@ -38,6 +38,9 @@ class FeatureFlags extends ChangeNotifier {
     // build has one (answering invites, rosters, confirming seeds and
     // publishing every division always do). Off writes Firestore directly.
     'use_api_tournaments': true,
+    // Native video upload (meta/flags.videoUploads, #13). Off until the
+    // owner turns it on; fails closed.
+    'videoUploads': false,
   };
 
   /// Flags fixed in code, for tests.
@@ -57,6 +60,11 @@ class FeatureFlags extends ChangeNotifier {
   bool get useApiMembership => _flag('use_api_membership');
   bool get useApiProfiles => _flag('use_api_profiles');
   bool get useApiTournaments => _flag('use_api_tournaments');
+
+  /// Whether native video upload is open (only a literal `true` opens it).
+  /// The server enforces this too (storage rules and the API); this hides
+  /// the entry points.
+  bool get videoUploads => _flag('videoUploads');
 
   bool _flag(String key) => _values[key] ?? defaults[key] ?? false;
 

@@ -2035,6 +2035,11 @@ class FakeFilePickerService implements FilePickerService {
   @override
   bool canUseCamera = false;
 
+  /// Whether video upload is open (meta/flags.videoUploads); open by default
+  /// here so the video flows can be tested, closed in the #13 tests.
+  @override
+  bool videoUploads = true;
+
   /// Returned by the next [takePhoto] / [recordVideo].
   PickedFile? nextPhoto;
   PickedFile? nextRecording;

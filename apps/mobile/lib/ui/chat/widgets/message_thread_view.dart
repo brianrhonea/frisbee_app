@@ -26,6 +26,7 @@ import '../../core/ui/skeleton.dart';
 import '../../../domain/models/moderation.dart';
 import '../../moderation/widgets/report_sheet.dart';
 import '../../../domain/models/mentions.dart';
+import '../../core/ui/video_uploads.dart';
 
 /// Messages with a composer below, for a team room or a direct message.
 /// Shows [readOnlyNotice] in place of the composer when the user can't post.
@@ -2311,7 +2312,13 @@ class _Composer extends StatelessWidget {
                   shape: BoxShape.circle,
                   border: Border.all(color: c.border2),
                 ),
-                child: _attachMenu(context, c, vm, sending),
+                child: _attachMenu(
+                  context,
+                  c,
+                  vm,
+                  sending,
+                  videoOpen: videoUploadsOpen(context),
+                ),
               )
             : const SizedBox.shrink();
         return Container(
@@ -2444,8 +2451,9 @@ class _Composer extends StatelessWidget {
     BuildContext context,
     AppColors c,
     MessageThreadViewModel vm,
-    bool sending,
-  ) => PopupMenuButton<_AttachKind>(
+    bool sending, {
+    required bool videoOpen,
+  }) => PopupMenuButton<_AttachKind>(
     tooltip: 'Upload a photo, video or file',
     enabled: !sending && !vm.pickFiles.running && !vm.recordVideo.running,
     padding: EdgeInsets.zero,
@@ -2467,7 +2475,8 @@ class _Composer extends StatelessWidget {
             title: Text('Take photo'),
           ),
         ),
-      if (vm.canUseCamera)
+      // Recording is a native video upload: only while the flag is open.
+      if (vm.canUseCamera && videoOpen)
         const PopupMenuItem(
           value: _AttachKind.video,
           child: ListTile(
