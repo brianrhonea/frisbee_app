@@ -17,6 +17,7 @@ import { defaultSettings, loadSettings, type MeetingSettings, updateSettings, wi
 import { WatchTogether } from "./WatchTogether";
 import "./meetings.css";
 import "./devices.css";
+import { SegmentedTabs } from "../../ui/SegmentedTabs";
 
 /** What the lobby offers right now (LobbyState). */
 type Lobby = "loading" | "unavailable" | "ended" | "canStart" | "waitingToStart" | "canAsk" | "waitingForApproval" | "canJoin";
@@ -296,20 +297,17 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
             <CallStage people={state.people} />
           </div>
           <aside className="card call-side">
-            <div className="segmented" role="tablist" aria-label="Panel">
-              {(
-                [
-                  ["people", `People (${state.people.length})`],
-                  ["chat", "Chat"],
-                  ["watch", "Watch together"],
-                  ["settings", "Settings"],
-                ] as const
-              ).map(([k, label]) => (
-                <button key={k} type="button" role="tab" className={panel === k ? "on" : ""} aria-selected={panel === k} onClick={() => setPanel(k)}>
-                  {label}
-                </button>
-              ))}
-            </div>
+            <SegmentedTabs
+              label="Panel"
+              items={[
+                { id: "people", label: `People (${state.people.length})` },
+                { id: "chat", label: "Chat" },
+                { id: "watch", label: "Watch together" },
+                { id: "settings", label: "Settings" },
+              ]}
+              value={panel}
+              onChange={(k) => setPanel(k as typeof panel)}
+            />
             {panel === "people" && <PeopleList people={state.people} volumes={settings.participantVolumes} onVolume={setPersonVolume} />}
             {panel === "chat" && <MeetingChat teamId={teamId} meetingId={meetingId} canModerate={admin} />}
             {panel === "watch" && <WatchTogether teamId={teamId} meetingId={meetingId} canControl={admin} stage={false} volume={watchVolume} />}

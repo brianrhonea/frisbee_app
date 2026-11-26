@@ -7,10 +7,6 @@
 .hosted-toolbar input[type="search"] { flex: 1 1 220px; min-width: 0; }
 .hosted-filters, .hosted-divisions { flex-wrap: wrap; }
 .hosted-official { color: var(--accent); font-weight: 600; font-size: 0.85em; }
-.hosted-status.hosted-registration, .pill.hosted-live:not(.hosted-status) { background: var(--success-soft); color: var(--success); }
-.hosted-status.hosted-live { background: var(--live-soft); color: var(--live-ink); }
-.hosted-status.hosted-draft { border: 1px dashed var(--line-2); background: var(--field); color: var(--ink-soft); }
-.hosted-status.hosted-seeding, .hosted-status.hosted-scheduled, .hosted-status.hosted-finished { background: var(--field); color: var(--ink-soft); }
 .hosted-actions { margin-top: 10px; }
 .hosted-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 
@@ -102,7 +98,6 @@
 .hosted-slot-links { margin: 12px 0 0; padding-left: 20px; display: grid; gap: 4px; }
 
 /* Amber: what's the viewer's to do. */
-.hosted-pill-due { background: var(--disc); color: var(--on-disc); margin: 0; }
 .hosted-page .pill.pill-soft { margin: 0; }
 .hosted-due-note { color: var(--disc-ink); font-weight: 700; font-size: 0.82rem; }
 .hosted-page .row-card.hosted-row-due { background: var(--disc-soft); border-color: var(--disc); }

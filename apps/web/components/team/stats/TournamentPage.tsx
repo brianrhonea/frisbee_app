@@ -25,6 +25,7 @@ import { StatSheetTable } from "./StatSheetTable";
 import { confirmAndDelete, deleteGameMessage, GameRow } from "./StatsHome";
 import "./stats.css";
 import { formatDate } from "@/lib/dates";
+import { SegmentedTabs } from "../../ui/SegmentedTabs";
 
 const newId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`);
 
@@ -150,19 +151,17 @@ function Tournament({ tournamentId }: { tournamentId: string }) {
         </div>
       </section>
       {error && <p className="form-error">{error}</p>}
-      <div className="segmented st-tabs" role="tablist" aria-label="Tournament">
-        {(
-          [
-            ["games", "Games"],
-            ["roster", "Roster & lines"],
-            ["stats", "Stats"],
-          ] as const
-        ).map(([k, label]) => (
-          <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>
-            {label}
-          </button>
-        ))}
-      </div>
+      <SegmentedTabs
+        variant="underline"
+        label="Tournament"
+        items={[
+          { id: "games", label: "Games" },
+          { id: "roster", label: "Roster & lines" },
+          { id: "stats", label: "Stats" },
+        ]}
+        value={tab}
+        onChange={(k) => setTab(k as typeof tab)}
+      />
       {tab === "games" &&
         (its.length === 0 ? (
           <p className="empty">No games yet. Add a game to start tracking stats.</p>

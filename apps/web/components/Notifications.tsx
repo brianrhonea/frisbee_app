@@ -11,6 +11,8 @@ import { Avatar } from "./Avatar";
 import { FollowButton } from "./FollowButton";
 import { LocalTime } from "./LocalTime";
 import "./member.css";
+import { Button } from "./ui/Button";
+import { FilterChips } from "./ui/FilterChips";
 
 /** A notification as the functions write it (AppNotification in the app). */
 interface Notice {
@@ -132,34 +134,20 @@ export function Notifications() {
   return (
     <div className="notifications">
       <div className="toolbar">
-        <div className="segmented" role="tablist" aria-label="Show">
-          {filters.map(([f, label]) => (
-            <button
-              key={f}
-              type="button"
-              role="tab"
-              aria-selected={filter === f}
-              className={filter === f ? "on" : ""}
-              onClick={() => setFilter(f)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <FilterChips label="Show" items={filters.map(([id, label]) => ({ id, label }))} value={filter} onChange={(f) => setFilter(f as typeof filter)} />
         <span className="composer-spacer" />
         <button type="button" className="text-btn notice-mark" disabled={unread.length === 0} onClick={() => void mark(unread.map((n) => n.id))}>
           Mark all read
         </button>
-        <button
-          type="button"
-          className="btn btn-small"
+        <Button
+          size="small"
           disabled={list.length === 0}
           onClick={() => {
             if (confirm("Clear these notifications?")) void clear(list.map((n) => n.id));
           }}
         >
           Clear
-        </button>
+        </Button>
       </div>
 
       {/* Follow requests waiting are the member's to do: their own group, in amber. */}

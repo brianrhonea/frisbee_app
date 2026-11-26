@@ -11,6 +11,8 @@ import { ErrorNote, Loading } from "../StatusViews";
 import { InvitePeople } from "./InvitePeople";
 import { type JoinRequestDoc, JoinRequests } from "./JoinRequests";
 import { useTeamHub } from "./TeamContext";
+import { IconButton } from "../ui/Button";
+import { SegmentedTabs } from "../ui/SegmentedTabs";
 
 const site = process.env.NEXT_PUBLIC_SITE_URL || "";
 
@@ -126,26 +128,18 @@ function InviteDialog({ pane, setPane, link, onClose }: { pane: Pane; setPane: (
     <Dialog label={`Invite to ${name}`} onClose={onClose} className="card invite-dialog" dismissOnBackdrop>
       <div className="invite-head">
         <h2 className="card-title">Invite to {name}</h2>
-        <button type="button" className="icon-btn" aria-label="Close" onClick={onClose}>
+        <IconButton label="Close" onClick={onClose}>
           ×
-        </button>
+        </IconButton>
       </div>
-      <div className="segmented" role="tablist" aria-label="How to invite">
-        {panes.map(([p, label]) => (
-          <button
-            key={p}
-            type="button"
-            role="tab"
-            id={`invite-tab-${p}`}
-            aria-controls={`invite-pane-${p}`}
-            aria-selected={pane === p}
-            className={pane === p ? "on" : ""}
-            onClick={() => setPane(p)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <SegmentedTabs
+        label="How to invite"
+        items={panes.map(([id, label]) => ({ id, label }))}
+        value={pane}
+        onChange={(p) => setPane(p as typeof pane)}
+        tabId={(p) => `invite-tab-${p}`}
+        panelId={(p) => `invite-pane-${p}`}
+      />
       {/* Every pane stays mounted, so switching keeps a search and who was invited. */}
       <div role="tabpanel" id="invite-pane-link" aria-labelledby="invite-tab-link" hidden={pane !== "link"}>
         <ShareLink link={link} />

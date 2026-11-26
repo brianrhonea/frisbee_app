@@ -7,6 +7,7 @@ import { useLiveQuery } from "@/lib/live";
 import { useTeamHub } from "../TeamContext";
 import { tournamentView, tournamentWhen } from "./format";
 import "./group_tournaments.css";
+import { StatusPill } from "../../ui/StatusPill";
 
 /**
  * A group's own (hat) tournaments, in its Tournaments section
@@ -62,7 +63,7 @@ export function GroupTournamentsList() {
               {tournamentWhen(t.settings.startsAt)} · {groupTournamentFormatInfo[t.settings.format].label} · {t.teams.length} teams
             </small>
           </span>
-          <span className={`pill${t.status === "scheduled" ? "" : " pill-soft"}`}>{groupTournamentStatusLabels[t.status]}</span>
+          <StatusPill tone={t.status === "scheduled" ? "accent" : "neutral"}>{groupTournamentStatusLabels[t.status]}</StatusPill>
         </Link>
       ))}
     </section>

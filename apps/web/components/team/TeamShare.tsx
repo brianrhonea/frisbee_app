@@ -17,6 +17,7 @@ import { callApi } from "@/lib/client";
 import { useAuth } from "../AuthProvider";
 import { Dialog } from "../Dialog";
 import { useTeamHub } from "./TeamContext";
+import { StatusPill } from "../ui/StatusPill";
 
 const money = (cents: number) => `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}`;
 /** Cents from what someone typed ("40", "$40.50"), or null. */
@@ -133,7 +134,7 @@ export function TeamShare() {
         </b>
       </p>
       {share.note && <p className="muted small team-share-note">{share.note}</p>}
-      {view.mine !== null && <span className={`pill${view.mine.paid ? "" : " pill-soft"}`}>{view.mine.paid ? "You've paid" : "Not paid yet"}</span>}
+      {view.mine !== null && <StatusPill tone={view.mine.paid ? "success" : "attention"} icon={view.mine.paid ? "check" : undefined}>{view.mine.paid ? "You've paid" : "Not paid yet"}</StatusPill>}
       {view.manages && (
         <>
           <p className="muted small">

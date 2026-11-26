@@ -2,7 +2,7 @@
 import type { MeHome, MyEvent, PostPage, PublicPost } from "@stall10/shared";
 import type { User } from "firebase/auth";
 import Link from "next/link";
-import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { newPostBox, onHomeRefresh } from "@/lib/homeRefresh";
 import { callApi, problem } from "@/lib/client";
 import { type Audience, Composer } from "./Composer";
@@ -22,6 +22,7 @@ import { useTournamentDays } from "./tournaments/useTournamentDays";
 import { useMyTeams } from "./useMyTeams";
 import { needsRsvp, RsvpPill } from "./RsvpPill";
 import "./member.css";
+import { SegmentedTabs } from "./ui/SegmentedTabs";
 
 const rsvpLabels: Record<string, string> = { going: "Going", maybe: "Maybe", notGoing: "Can't go" };
 
@@ -92,7 +93,6 @@ export function Dashboard({ user }: { user: User }) {
   const [community, setCommunity] = useState<Feed | null>(null);
   const audiences = useAudiences(user.uid);
   const tournamentDays = useTournamentDays(user.uid);
-  const tabRefs = useRef<Partial<Record<Tab, HTMLButtonElement | null>>>({});
 
   const load = useCallback(async () => {
     setError("");
@@ -168,17 +168,6 @@ export function Dashboard({ user }: { user: User }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on load.
   }, []);
 
-  /** Arrow keys, Home and End move along the tabs (the ARIA tabs pattern). */
-  function onTabKey(e: KeyboardEvent<HTMLButtonElement>) {
-    const i = tabs.findIndex(([t]) => t === tab);
-    const to = ({ ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 } as Record<string, number>)[e.key];
-    if (to === undefined) return;
-    e.preventDefault();
-    const [next] = tabs[(to + tabs.length) % tabs.length]!;
-    pickTab(next);
-    tabRefs.current[next]?.focus();
-  }
-
   async function loadOlder() {
     if (older.next === null || older.busy) return;
     setOlder((o) => ({ ...o, busy: true, error: false }));
@@ -235,27 +224,16 @@ export function Dashboard({ user }: { user: User }) {
         {/* What's the member's to do: join requests on groups they approve for. */}
         <NeedsYou uid={user.uid} />
 
-        <div className="feed-tabs" role="tablist" aria-label="Feed">
-          {tabs.map(([t, label]) => (
-            <button
-              key={t}
-              ref={(el) => {
-                tabRefs.current[t] = el;
-              }}
-              id={`feed-tab-${t}`}
-              type="button"
-              role="tab"
-              aria-selected={tab === t}
-              aria-controls={tab === t ? `feed-panel-${t}` : undefined}
-              tabIndex={tab === t ? 0 : -1}
-              className={tab === t ? "on" : undefined}
-              onClick={() => pickTab(t)}
-              onKeyDown={onTabKey}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <SegmentedTabs
+          variant="underline"
+          className="feed-tabs"
+          label="Feed"
+          items={tabs.map(([id, label]) => ({ id, label }))}
+          value={tab}
+          onChange={(t) => pickTab(t as Tab)}
+          tabId={(t) => `feed-tab-${t}`}
+          panelId={(t) => `feed-panel-${t}`}
+        />
 
         {/* As in the app: post from Your teams and Following, not Everyone. */}
         {tab !== "everyone" && (

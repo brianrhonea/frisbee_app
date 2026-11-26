@@ -4,11 +4,10 @@
 // sidebar (SideTeams), a team one of their communities lists is reached
 // through the community.
 import Link from "next/link";
-import type { CSSProperties } from "react";
 import { NavIcon } from "../NavIcons";
-import { spacesOf, tint } from "../SideTeams";
+import { logoKind, spacesOf } from "../SideTeams";
 import { useMyTeams } from "../useMyTeams";
-import { initials } from "@/lib/text";
+import { TeamLogo } from "../ui/Avatar";
 import { StartOrJoinButton } from "./StartOrJoin";
 
 export function TeamStrip({ uid }: { uid: string }) {
@@ -20,10 +19,8 @@ export function TeamStrip({ uid }: { uid: string }) {
       <ul>
         {spaces.map((t) => (
           <li key={t.id}>
-            <Link className="team-strip-item" href={`/teams/${encodeURIComponent(t.id)}`} style={{ "--tint": tint(t.id) } as CSSProperties}>
-              <span className="team-tile" aria-hidden="true">
-                {initials(t.name || "Team")}
-              </span>
+            <Link className="team-strip-item" href={`/teams/${encodeURIComponent(t.id)}`}>
+              <TeamLogo name={t.name || "Team"} kind={logoKind((t as { kind?: string }).kind)} size={42} />
               <span className="team-strip-name">{t.name || "Team"}</span>
             </Link>
           </li>

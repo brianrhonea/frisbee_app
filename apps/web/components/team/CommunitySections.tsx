@@ -11,6 +11,7 @@ import { openConversation } from "../MessageButton";
 import { DateTile } from "./DateTile";
 import { useTeamHub } from "./TeamContext";
 import { JoinButton } from "./TeamNav";
+import { NeedsPill } from "../RsvpPill";
 import type { Room } from "./TeamStatTiles";
 
 // The community page's own sections (redesign F27), on a pickup
@@ -90,7 +91,7 @@ export function NextPickupCard({ event }: { event?: PickupEvent }) {
     <div className="card pickup-card">
       <div className="card-head">
         <h2 className="card-title">{text.title}</h2>
-        {needs && <span className="rsvp-pill needs">RSVP needed</span>}
+        {needs && <NeedsPill>RSVP needed</NeedsPill>}
       </div>
       <Link className="pickup-event" href={`${base}/schedule?event=${encodeURIComponent(event.id)}`}>
         <DateTile startsAt={event.startsAt} />

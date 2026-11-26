@@ -8,6 +8,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { JoinWithCode } from "../CreateTeam";
 import { Dialog } from "../Dialog";
+import { IconButton } from "../ui/Button";
 
 /** Create links and the join-with-code form; [join] opens straight on the form. */
 export function StartOrJoinDialog({ onClose, join = false }: { onClose: () => void; join?: boolean }) {
@@ -15,9 +16,9 @@ export function StartOrJoinDialog({ onClose, join = false }: { onClose: () => vo
     <Dialog label={join ? "Join with a code" : "Create or join"} onClose={onClose} className="card start-join" dismissOnBackdrop>
       <div className="card-head">
         <h2 className="card-title">{join ? "Join with a code" : "Create or join"}</h2>
-        <button type="button" className="icon-btn" aria-label="Close" onClick={onClose}>
+        <IconButton label="Close" onClick={onClose}>
           ×
-        </button>
+        </IconButton>
       </div>
       {!join && (
         <ul className="start-join-list">

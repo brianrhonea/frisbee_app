@@ -2,7 +2,6 @@
    The web playbook's design: cards on the site tokens, turf (--accent)
    for what's selected, destructive actions neutral. */
 .team-hub .playbook-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-.team-hub .playbook-switch button.on { background: var(--accent); color: var(--on-accent); box-shadow: none; }
 
 /* The blank whiteboard card and the saved ones. */
 .team-hub .wb-blank { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 18px; align-items: center; }

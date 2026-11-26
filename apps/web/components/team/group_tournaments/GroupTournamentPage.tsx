@@ -40,6 +40,7 @@ import {
 import { ScoreStepper } from "../../tournaments/TournamentGames";
 import "../../tournaments/tournaments.css";
 import "./group_tournaments.css";
+import { SegmentedTabs } from "../../ui/SegmentedTabs";
 
 type Tab = "schedule" | "standings" | "bracket" | "teams";
 /** What a captain can do with a game (GameAction in the app). */
@@ -229,13 +230,7 @@ export function GroupTournamentPage({ tournamentId, publicListing }: { tournamen
           </div>
         </div>
       )}
-      <div className="segmented gt-tabs" role="tablist" aria-label="Tournament">
-        {tabs.map(([k, label]) => (
-          <button key={k} type="button" role="tab" aria-selected={k === shown} className={k === shown ? "on" : ""} onClick={() => setTab(k)}>
-            {label}
-          </button>
-        ))}
-      </div>
+      <SegmentedTabs variant="underline" label="Tournament" items={tabs.map(([id, label]) => ({ id, label }))} value={shown} onChange={(k) => setTab(k as typeof shown)} />
 
       {shown === "schedule" && (
         <div className="stack">

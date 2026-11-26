@@ -7,6 +7,7 @@ import { type Doc, useLivePaged } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
 import { Avatar } from "../Avatar";
 import { LoadMore } from "../LoadMore";
+import { SegmentedTabs } from "../ui/SegmentedTabs";
 
 /** A follow as stored (Follow in the app). */
 interface Follow {
@@ -61,13 +62,12 @@ export function FollowingSettings() {
   return (
     <div className="card">
       <div className="toolbar">
-        <div className="segmented" role="tablist">
-          {tabs.map(([t, label]) => (
-            <button key={t} type="button" role="tab" aria-selected={tab === t} className={tab === t ? "on" : ""} onClick={() => setTab(t)}>
-              {label} <span className="muted">{count(t)}</span>
-            </button>
-          ))}
-        </div>
+        <SegmentedTabs
+          label="Following"
+          items={tabs.map(([id, label]) => ({ id, label: `${label} ${count(id)}` }))}
+          value={tab}
+          onChange={(t) => setTab(t as Follow["type"])}
+        />
         <span className="composer-spacer" />
         <input className="search-input" type="search" placeholder="Find" value={find} onChange={(e) => setFind(e.target.value)} />
       </div>

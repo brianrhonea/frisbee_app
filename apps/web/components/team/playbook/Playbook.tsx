@@ -10,6 +10,7 @@ import { Dialog } from "../../Dialog";
 import { ErrorNote, LiveList, Loading } from "../../StatusViews";
 import { PlayField } from "./PlayField";
 import "./whiteboard.css";
+import { SegmentedTabs } from "../../ui/SegmentedTabs";
 
 const isWhiteboard = (p: PlayDoc) => p.kind === "whiteboard";
 
@@ -34,13 +35,15 @@ export function Playbook({ teamId, editor }: { teamId: string; editor: boolean }
   return (
     <>
       <div className="playbook-bar">
-        <div className="segmented playbook-switch" role="tablist" aria-label="Playbook">
-          {(["plays", "whiteboard"] as const).map((v) => (
-            <button key={v} type="button" role="tab" aria-selected={view === v} className={view === v ? "on" : undefined} onClick={() => show(v)}>
-              {v === "plays" ? "Plays" : "Whiteboard"}
-            </button>
-          ))}
-        </div>
+        <SegmentedTabs
+          label="Playbook"
+          items={[
+            { id: "plays", label: "Plays" },
+            { id: "whiteboard", label: "Whiteboard" },
+          ]}
+          value={view}
+          onChange={(v) => show(v as typeof view)}
+        />
         {editor && view === "plays" && (
           <Link href={`/teams/${encodeURIComponent(teamId)}/plays/new`} className="btn btn-primary btn-small">
             New play

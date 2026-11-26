@@ -272,8 +272,42 @@ h1, h2, h3 { line-height: 1.1; letter-spacing: -0.03em; margin: 0; }
 .btn:where(:hover) { background: var(--field); }
 .btn-amber { background: var(--disc); color: var(--on-disc); border-color: transparent; }
 .btn-primary { background: var(--accent); color: var(--on-accent); border-color: transparent; }
-.btn-amber:hover, .btn-primary:hover { filter: brightness(1.08); }
 .btn-small { min-height: 36px; padding: 7px 14px; font-size: var(--text-secondary-size); border-radius: 10px; }
+.btn-large { min-height: 52px; padding: 12px 28px; font-size: var(--text-body-size); }
+
+/* The Button component's variants (components/ui/Button.tsx; the app's
+   AppButton). Ghost: text only. Destructive: the error fill (the existing
+   .btn-danger, solid ink, is unchanged: app.css). */
+.btn-ghost { background: transparent; color: var(--accent); border-color: transparent; }
+.btn-destructive { background: var(--error); color: var(--on-accent); border-color: transparent; }
+
+/* States. Hover and pressed shift the fill with tokens, not filters. */
+.btn-amber:hover:not(:disabled), .btn-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, var(--ink)); }
+.btn-amber:hover:not(:disabled) { background: color-mix(in srgb, var(--disc) 88%, var(--ink)); }
+.btn-ghost:hover:not(:disabled) { background: var(--accent-soft); }
+.btn-destructive:hover:not(:disabled) { background: color-mix(in srgb, var(--error) 88%, var(--ink)); }
+.btn:active:not(:disabled):not([aria-disabled="true"]) { transform: scale(0.98); }
+.btn-primary:active:not(:disabled) { background: color-mix(in srgb, var(--accent) 76%, var(--ink)); }
+.btn-ghost:active:not(:disabled) { background: color-mix(in srgb, var(--accent-soft) 80%, var(--accent)); }
+.btn-destructive:active:not(:disabled) { background: color-mix(in srgb, var(--error) 76%, var(--ink)); }
+.btn:disabled, .btn[aria-disabled="true"] { opacity: 0.6; cursor: default; }
+/* Loading: the button keeps its size and focus, shows a spinner and ignores clicks. */
+.btn[aria-busy="true"] { cursor: progress; }
+.btn[aria-busy="true"]::before {
+  content: ""; width: 1em; height: 1em; flex: none; box-sizing: border-box;
+  border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
+  animation: btn-spin 700ms linear infinite;
+}
+@keyframes btn-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .btn[aria-busy="true"]::before { animation: none; } }
+
+/* A 48 px target for every size without moving the layout: the control keeps
+   its look, an invisible band around it takes the touch (measured from the
+   padding box, inside the 1 px border). */
+:where(.btn, .icon-btn) { position: relative; }
+.btn::after { content: ""; position: absolute; inset: -3px 0; }
+.btn-small::after { inset: -7px 0; }
+.btn-large::after { inset: 0; }
 
 .link { text-decoration: none; color: var(--ink-soft); font-weight: 600; }
 .link:hover { color: var(--ink); }

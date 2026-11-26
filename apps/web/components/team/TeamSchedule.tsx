@@ -17,7 +17,7 @@ import { type TeamViewer, useTeamHub, viewerSectionOn } from "./TeamContext";
 import { TeamEventEditor } from "./TeamEventEditor";
 import { EventVideos } from "./videos/EventVideos";
 import { DateTile, isToday } from "./DateTile";
-import { needsRsvp, RsvpPill } from "../RsvpPill";
+import { needsRsvp, NeedsPill, RsvpPill } from "../RsvpPill";
 import { NoteQuote, RsvpNoteField } from "../RsvpNote";
 import "./team_schedule_meetings.css";
 import { startOfToday } from "@/lib/dates";
@@ -464,7 +464,7 @@ function EventDetail({ event, onEdit }: { event: Doc<TeamEventDoc>; onEdit?: () 
           <div className={`rsvp-ask${unanswered ? " needs" : ""}`}>
             <p className="rsvp-ask-title">
               Are you in?
-              {unanswered && <span className="rsvp-pill needs">Needs RSVP</span>}
+              {unanswered && <NeedsPill>Needs RSVP</NeedsPill>}
             </p>
           <div className="segmented rsvp-buttons" role="group" aria-label="Your answer">
             {rsvpLabels.map(([status, label, tLabel]) => (

@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useLayoutEffect, useRef, useState } from "react";
-import { Avatar } from "../Avatar";
+import { AvatarStack } from "../ui/Avatar";
 import { FollowButton } from "../FollowButton";
 import { roleLabel } from "../ProfileDashboard";
 import { JoinWithCode } from "../CreateTeam";
@@ -13,6 +13,7 @@ import { InviteButton } from "./InviteDialog";
 import { TeamBadge } from "./TeamBadge";
 import { type TeamDoc, type TeamViewer, useTeamHub } from "./TeamContext";
 import { JoinButton } from "./TeamNav";
+import { StatusPill } from "../ui/StatusPill";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
@@ -93,16 +94,12 @@ export function TeamMeta({ subtitle }: { subtitle?: string }) {
       {subtitle && <span>{subtitle}</span>}
       {member && (
         <Link className="member-count" href={`/teams/${teamId}/roster`}>
-          <span className="avatar-stack" aria-hidden="true">
-            {people.slice(0, 4).map((p) => (
-              <Avatar key={p.uid} name={p.name} size={20} />
-            ))}
-          </span>
+          <AvatarStack people={people.map((p) => ({ id: p.uid, name: p.name }))} max={4} size={20} />
           {n} {n === 1 ? "member" : "members"}
         </Link>
       )}
       {founded && <span>Est. {founded}</span>}
-      {member && <span className="pill">{roleLabel(member.tier, kind)}</span>}
+      {member && <StatusPill tone="accent">{roleLabel(member.tier, kind)}</StatusPill>}
     </p>
   );
 }

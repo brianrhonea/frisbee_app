@@ -17,6 +17,8 @@ import { type FormEvent, useState } from "react";
 import type { Doc } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
 import { HostPaymentControls, isPaidOnline, PayOnline } from "../payments/Payments";
+import { StatusPill as Pill } from "../ui/StatusPill";
+import { SegmentedTabs } from "../ui/SegmentedTabs";
 import {
   attempt,
   dateLabel,
@@ -68,13 +70,7 @@ export function PlayerSignups({ tournamentId, divisionId: initial }: { tournamen
   return (
     <div className="drafts">
       {list.length > 1 && (
-        <div className="segmented" role="tablist" aria-label="Division">
-          {list.map((x) => (
-            <button key={x.id} type="button" role="tab" aria-selected={x.id === d?.id} className={x.id === d?.id ? "on" : ""} onClick={() => setPicked(x.id)}>
-              {divisionLabel(x)}
-            </button>
-          ))}
-        </div>
+        <SegmentedTabs label="Division" items={list.map((x) => ({ id: x.id, label: divisionLabel(x) }))} value={d?.id ?? ""} onChange={setPicked} />
       )}
       {list.length === 0 && (
         <p className="muted">{manager ? "Add a division so players can sign up." : "The host is still setting up divisions."}</p>
@@ -264,7 +260,11 @@ export function GenderSplit({ mmp, wmp, unknown }: { mmp: number; wmp: number; u
 }
 
 function StatusPill({ status }: { status: SignupStatus }) {
-  return <span className={`pill pill-soft draft-status draft-status-${status}`}>{signupStatusLabels[status]}</span>;
+  return (
+    <Pill tone={status === "accepted" ? "success" : "neutral"} className={`draft-status draft-status-${status}`}>
+      {signupStatusLabels[status]}
+    </Pill>
+  );
 }
 
 /** Division, skill and gender match (the app's signup dialog). */

@@ -4,6 +4,86 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.59.13 — 2026-11-26
+
+Review fixes for C1-C4 (Sprint 2).
+
+- Fixes found in review of C1-C4: migrated pills keep their row layout
+  (`.row-card > .ui-pill`, member roles, team share, team banner and roster
+  sizes); `Button` and `IconButton` are client components and `buttonClass`
+  moved to its own plain module so server components can use it; the existing
+  `.btn-danger` stays solid ink (only the Button's destructive variant is the
+  error fill); the gallery's browser checks are skipped against a deployed
+  site, and a check that Explore, Learn and Sign in do not scroll sideways at
+  320 px was added.
+
+## 0.59.12 — 2026-11-26
+
+C4: Avatar, TeamLogo, AvatarStack (Sprint 2).
+
+- New `Avatar`, `TeamLogo` and `AvatarStack` (components/ui/Avatar.tsx): the
+  image, else the initials, else a neutral glyph; a picture that fails to
+  load falls back the same way. `AvatarStack` overlaps avatars with a "+N".
+  Decorative unless given a `label`. Parity with the app's Avatar, TeamLogo
+  and AvatarStack. `components/Avatar.tsx` and `TeamBadge` stay as thin
+  re-exports so no caller changed.
+- The sidebar's "Your spaces" and Home's team strip no longer colour each team
+  from a hash of its id: a logo is drawn by kind (team, pickup community,
+  school or club) from tokens. The team page's member stack uses
+  `AvatarStack`. In dark mode the team logo blue is a little deeper (50% team
+  over the board, from 55%) so its initials pass 4.5:1.
+- The K5-D check on the hashed tints is replaced by a check on the logo tones
+  in light and dark and that no per-team colour is left.
+
+## 0.59.11 — 2026-11-26
+
+C3: SegmentedTabs and FilterChips (Sprint 2).
+
+- New `SegmentedTabs` and `FilterChips` (components/ui): the selected tab or
+  chip is filled indigo with heavier text; the bar scrolls sideways instead of
+  wrapping (holds up at 320 px and large text); each is a 48 px target.
+  `SegmentedTabs` is a proper ARIA tablist (one Tab stop, Left/Right with wrap,
+  Home/End, `aria-selected`, optional `aria-controls`); `variant="underline"`
+  draws the line style. `FilterChips` is a radio group (one choice) or toggle
+  buttons with `aria-pressed` (`multiple`). Parity with the app's
+  SegmentedTabs and FilterChip.
+- Moved onto them: the Home feed tabs (their own key code is gone), schedule
+  view and filter, notifications filter, Explore chips, following settings,
+  draft divisions, invite dialog, meeting panel and list, playbook, game and
+  tournament stats tabs, group tournament tabs. Tabs that are links (Messages,
+  team schedule) and the play editor's steps are left as they are.
+- Their old per-page button styling is removed from the stylesheets.
+
+## 0.59.10 — 2026-11-26
+
+C2: Button and IconButton (Sprint 2).
+
+- New `Button` and `IconButton` (components/ui): primary, secondary, ghost,
+  destructive; small, medium, large; loading keeps focus, shows a spinner,
+  ignores clicks and sets `aria-busy`. `buttonClass()` styles links the same.
+  Parity with the app's AppButton.
+- `.btn*` and `.icon-btn` gain hover, pressed and loading states from tokens
+  (no brightness filters) and a 48 px hit area in every size without moving
+  the layout (an invisible band around the control). The Button's destructive
+  variant is the error fill; the existing `.btn-danger` (solid ink) is
+  unchanged, pending the owner's choice between them.
+- Messages, Notifications, Schedule, the invite and create/join dialogs use
+  the components; the other buttons get the new states through the classes.
+
+## 0.59.9 — 2026-11-26
+
+C1: StatusPill (Sprint 2).
+
+- New `StatusPill` (components/ui): one soft-fill pill for every status, with
+  a label and an optional icon, in six tones (neutral, accent, success,
+  attention, live, error). Parity with the app's StatusPill.
+- `RsvpPill` and the loose "Needs RSVP" / "RSVP needed" / "Vote" spans now use
+  it (`NeedsPill`). Plain status spans on tournaments, entries, rosters, team
+  share, profile, explore, drafts and payments moved from `.pill` to it, with
+  tones chosen by meaning (accepted success, declined error, live live, ...).
+  Pills that are buttons or links, and counts, keep `.pill` / `.count-badge`.
+- A components gallery at /dev/ui (404 in production) and browser checks on it.
+
 ## 0.59.8 — 2026-11-26
 
 Video uploads behind the server flag (item #13, website part; docs/specifications/contracts/meta-flags.md).

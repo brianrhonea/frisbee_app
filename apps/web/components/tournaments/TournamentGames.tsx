@@ -41,6 +41,7 @@ import Link from "next/link";
 import { Dialog } from "@/components/Dialog";
 import { dayKey, useRenderZone } from "@/lib/renderZone";
 import { type TournamentState, divisionPath, useAction } from "./useTournament";
+import { StatusPill } from "../ui/StatusPill";
 
 // In [zone] (useRenderZone: UTC while a server-rendered page hydrates), else the viewer's.
 const dayLabel = (d: Date, zone?: string) => d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: zone });
@@ -230,7 +231,7 @@ export function GameCard({ s, g, focus = false }: { s: TournamentState; g: Engin
         </small>
         <span className="hosted-game-pills">
           {live && <LivePill />}
-          {action ? <span className={`pill ${due ? "hosted-pill-due" : "pill-soft"}`}>{badge[action]}</span> : isDone(g) && <span className="pill pill-soft">Final</span>}
+          {action ? <StatusPill tone={due ? "attention" : "neutral"}>{badge[action]}</StatusPill> : isDone(g) && <StatusPill>Final</StatusPill>}
         </span>
       </div>
       <div className="hosted-game-teams">

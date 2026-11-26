@@ -74,11 +74,11 @@
 /* A date tile leading a row (tournament lists). */
 .row-card > .event-date { flex: none; width: 54px; }
 .row-card > .event-date b { overflow: visible; }
-.row-card > .pill { flex: none; margin: 0 0 0 auto; white-space: nowrap; }
+.row-card > .pill, .row-card > .ui-pill { flex: none; margin: 0 0 0 auto; white-space: nowrap; }
 /* Phones: a dated row's status goes under its text. */
 @media (max-width: 560px) {
   .row-card:has(> .event-date) { display: grid; grid-template-columns: 54px minmax(0, 1fr); align-items: start; }
-  .row-card:has(> .event-date) > .pill { grid-column: 2; justify-self: start; margin: 0; }
+  .row-card:has(> .event-date) > .pill, .row-card:has(> .event-date) > .ui-pill { grid-column: 2; justify-self: start; margin: 0; }
 }
 /* The Teams tab's finder (TeamFinder): search box, then listings as row cards. */
 .team-finder { display: grid; gap: 10px; }
@@ -223,7 +223,6 @@
   cursor: pointer; text-decoration: underline;
 }
 button.btn { cursor: pointer; }
-button.btn:disabled { opacity: 0.6; cursor: default; }
 
 /* Cards and the profile dashboard (components/ProfileDashboard.tsx) */
 .card {
@@ -526,11 +525,10 @@ dialog.dialog > * { max-height: calc(100vh - 32px); overflow-y: auto; }
 .space-count svg { stroke-width: 2.2; }
 .side-team b { font-size: 13.5px; font-weight: 700; }
 .side-team small { font-size: var(--text-caption-size); color: var(--muted); }
+/* The "+" tile in the strip and sidebar; teams there are TeamLogo (components/ui). */
 .team-tile {
   display: inline-grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 9px;
-  font-size: 11px; font-weight: 800; letter-spacing: 0.02em;
-  background: color-mix(in srgb, var(--tint, var(--accent)) 15%, var(--card));
-  color: color-mix(in srgb, var(--tint, var(--accent)) 75%, var(--ink));
+  font-size: 11px; font-weight: 800; letter-spacing: 0.02em; background: var(--accent-soft); color: var(--accent-ink);
 }
 .side-more { padding: 2px 10px; font-size: 13px; font-weight: 700; color: var(--accent); text-decoration: none; }
 .side-more:hover { text-decoration: underline; }
@@ -626,6 +624,10 @@ dialog.dialog > * { max-height: calc(100vh - 32px); overflow-y: auto; }
 }
 .icon-btn:hover:not(:disabled) { background: var(--field); color: var(--ink); }
 .icon-btn:disabled { opacity: 0.4; cursor: default; }
+.icon-btn:active:not(:disabled) { background: var(--line); color: var(--ink); }
+.icon-btn[aria-busy="true"] { cursor: progress; opacity: 0.6; }
+/* 36 px to look at, 48 px to hit (see .btn in site.css). */
+.icon-btn::after { content: ""; position: absolute; inset: -6px; }
 .icon-wrap { position: relative; display: inline-grid; place-items: center; }
 .count-badge {
   position: absolute; top: -6px; right: -9px; min-width: 18px; height: 18px; padding: 0 5px;
@@ -973,7 +975,7 @@ a.person:hover span { text-decoration: underline; }
 .member-card > span { display: grid; min-width: 0; }
 .member-card b, .member-card small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .member-roles { display: flex; gap: var(--space-xs); flex-wrap: wrap; }
-.member-roles .pill { margin: var(--space-xs) 0 0; }
+.member-roles .pill, .member-roles .ui-pill { margin: var(--space-xs) 0 0; }
 .pill-soft { background: var(--field); color: var(--ink-soft); }
 
 .chat-rooms { position: sticky; top: 64px; }
@@ -1203,13 +1205,8 @@ button.person-row:hover { background: var(--field); }
 .huddle-main { display: grid; gap: var(--space-lg); min-width: 0; max-width: 760px; width: 100%; justify-self: center; }
 .huddle-side { display: grid; gap: var(--space-lg); position: sticky; top: 88px; }
 .huddle-side .card { padding: var(--space-lg) 18px; }
-.feed-tabs { display: flex; gap: var(--space-xs); border-bottom: 1px solid var(--line); margin-top: var(--space-xs); }
-.feed-tabs button, .feed-tabs a {
-  border: 0; background: none; font: inherit; font-weight: 700; color: var(--muted); cursor: pointer;
-  padding: 10px 14px; margin-bottom: -1px; border-bottom: 2px solid transparent; text-decoration: none;
-}
-.feed-tabs button:hover, .feed-tabs a:hover { color: var(--ink); }
-.feed-tabs .on { color: var(--accent); border-bottom-color: var(--accent); }
+/* The tabs themselves are SegmentedTabs (components/ui); this is their place on the page. */
+.feed-tabs { margin-top: var(--space-xs); }
 .see-all { font-size: 0.85rem; font-weight: 700; color: var(--accent); text-decoration: none; }
 .see-all:hover { text-decoration: underline; }
 .date-list { display: grid; }
@@ -1478,14 +1475,14 @@ button.poll-option.on { border-color: var(--accent); }
 .member-count:hover { color: var(--ink); text-decoration: underline; }
 .avatar-stack { display: inline-flex; }
 .avatar-stack .avatar { border: 2px solid var(--card); box-sizing: content-box; }
-.avatar-stack .avatar + .avatar { margin-left: -8px; }
+.avatar-stack .avatar + .avatar, .avatar-stack .avatar-stack-more { margin-left: -8px; }
 .invite-btn { position: relative; }
 .invite-btn .count-badge { top: -7px; right: -7px; }
 .invite-only { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 10px; color: var(--ink-soft); font-size: 0.9rem; }
 dialog.dialog:has(.invite-dialog) { width: min(100% - 32px, 560px); }
 .invite-dialog { display: grid; gap: 14px; }
 .invite-dialog > * { margin: 0; }
-.invite-dialog .segmented { justify-self: start; }
+.invite-dialog .ui-tabs { justify-self: start; }
 .invite-dialog [role="tabpanel"][hidden] { display: none; }
 .invite-dialog .form-actions { justify-content: flex-end; }
 .invite-share p { margin: 0; }
@@ -1576,6 +1573,7 @@ dialog.dialog:has(.invite-dialog) { width: min(100% - 32px, 560px); }
 }
 .team-strip-item:hover { border-color: var(--accent); }
 .team-strip-item .team-tile { width: 42px; height: 42px; border-radius: var(--radius-control); font-size: 13px; }
+.team-strip-item .ui-logo { border-radius: var(--radius-control); }
 .team-strip-name {
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-size: var(--text-caption-size); font-weight: 700; text-align: center;
@@ -1600,7 +1598,6 @@ dialog.dialog:has(.invite-dialog) { width: min(100% - 32px, 560px); }
 .feed-pager { flex-direction: column; align-items: center; gap: var(--space-sm); margin-top: 10px; }
 .feed-pager > p:empty { display: none; }
 .feed-sentinel { display: block; width: 100%; height: 1px; }
-.feed-tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 8px; }
 
 /* The new-member checklist and the no-team card. */
 .get-started .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-sm); margin-bottom: var(--space-xs); }
@@ -1772,7 +1769,7 @@ small.fee-note {
 .team-share > * { margin: 0; }
 .team-share-actions { display: inline-flex; gap: var(--space-md); }
 .team-share-amount { font-size: 1.02rem; }
-.team-share .pill { justify-self: start; }
+.team-share .pill, .team-share .ui-pill { justify-self: start; }
 .team-share-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .team-share-list label { display: flex; align-items: center; gap: var(--space-sm); padding: var(--space-xs) 0; cursor: pointer; }
 

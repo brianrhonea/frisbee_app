@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ApiError, callApi, problem } from "@/lib/client";
 import { useAuth } from "../AuthProvider";
 import { Avatar } from "../Avatar";
+import { StatusPill } from "../ui/StatusPill";
 
 /**
  * Find people by name and invite them to [teamId] (`POST
@@ -97,7 +98,7 @@ export function InvitePeople({
                 </span>
               </span>
               {invited[p.id] ? (
-                <span className="pill">{invited[p.id]}</span>
+                <StatusPill tone="accent">{invited[p.id]}</StatusPill>
               ) : (
                 <button type="button" className="btn btn-small btn-primary" disabled={busy !== null} onClick={() => void invite(p.id, p.name ?? "Player")}>
                   Invite
@@ -123,7 +124,7 @@ export function InvitePeople({
                     <Avatar name={p.name} size={28} />
                     <span>{p.name}</span>
                   </span>
-                  <span className="pill pill-soft">Pending</span>
+                  <StatusPill>Pending</StatusPill>
                 </li>
               ))}
             </ul>

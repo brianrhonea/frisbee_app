@@ -6,6 +6,7 @@ import { callApi } from "@/lib/client";
 import { useAuth } from "../AuthProvider";
 import { LocalTime } from "../LocalTime";
 import { DateTile } from "./DateTile";
+import { StatusPill } from "../ui/StatusPill";
 
 const respondPath = (tournamentId: string, teamId: string, step?: string) =>
   `/tournaments/${encodeURIComponent(tournamentId)}/enter?team=${encodeURIComponent(teamId)}${step ? `&step=${step}` : ""}`;
@@ -52,7 +53,7 @@ export function TournamentInvites({ teamId }: { teamId: string }) {
                   <small className="muted">{[i.hostName && `From ${i.hostName}`, i.divisionLabel, i.location].filter(Boolean).join(" · ")}</small>
                   {i.expired ? (
                     <small className="muted">
-                      <span className="pill">Expired</span> {inviteExpiredMessage}
+                      <StatusPill>Expired</StatusPill> {inviteExpiredMessage}
                     </small>
                   ) : (
                     <>

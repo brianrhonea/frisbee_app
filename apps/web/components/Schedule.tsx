@@ -44,6 +44,9 @@ import { type PickedPerson, PersonPicker } from "./PersonPicker";
 import { ColorPicker } from "./settings/CalendarSettings";
 import { meetingAnswer, needsRsvp, RsvpPill } from "./RsvpPill";
 import "./member.css";
+import { Button } from "./ui/Button";
+import { SegmentedTabs } from "./ui/SegmentedTabs";
+import { FilterChips } from "./ui/FilterChips";
 
 const dayMs = 86_400_000;
 const canEdit = (c: CalendarInfo | undefined) => c?.role === "owner" || c?.role === "edit";
@@ -398,33 +401,14 @@ export function Schedule() {
       <div className="card sched-card">
         <div className="card-head">
           <h2 className="card-title">{monthView ? "Month" : "Upcoming"}</h2>
-          <div className="segmented schedule-view" role="tablist" aria-label="View">
-            {scheduleViews.map(([v, label]) => (
-              <button key={v} type="button" role="tab" aria-selected={view === v} className={view === v ? "on" : ""} onClick={() => chooseView(v)}>
-                {label}
-              </button>
-            ))}
-          </div>
+          <SegmentedTabs className="schedule-view" label="View" items={scheduleViews.map(([id, label]) => ({ id, label }))} value={view} onChange={(v) => chooseView(v as typeof view)} />
           {!editing && writable.length > 0 && (
-            <button type="button" className="btn btn-primary btn-small" onClick={() => setEditing({})}>
+            <Button variant="primary" size="small" onClick={() => setEditing({})}>
               Add event
-            </button>
+            </Button>
           )}
         </div>
-        <div className="segmented schedule-filter" role="tablist" aria-label="Show">
-          {scheduleFilters.map(([f, label]) => (
-            <button
-              key={f}
-              type="button"
-              role="tab"
-              aria-selected={filter === f}
-              className={filter === f ? "on" : ""}
-              onClick={() => setFilter(f)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <FilterChips className="schedule-filter" label="Show" items={scheduleFilters.map(([id, label]) => ({ id, label }))} value={filter} onChange={(f) => setFilter(f as typeof filter)} />
         {editing && data && (
           <EventEditor
             key={editing.id ?? "new"}

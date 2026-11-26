@@ -37,7 +37,7 @@ describe("board-filled cards keep an edge", () => {
   });
 
   it("organization badges use the soft accent, not the card colour", () => {
-    for (const sel of [".team-badge.organization", ".host-mark-organization"]) {
+    for (const sel of [".ui-logo-organization", ".host-mark-organization"]) {
       const r = rules.find((x) => x.sel === sel)!;
       expect(r.body, sel).toContain("var(--accent-soft)");
       expect(r.body, sel).not.toContain("var(--board)");

@@ -8,9 +8,6 @@
 .gt-day-title { margin: 12px 0 0; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 
 /* Tabs: underlined, turf on the open one (the event page's tabs). */
-.segmented.gt-tabs { display: flex; padding: 0; gap: 4px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; flex-wrap: nowrap; overflow-x: auto; }
-.segmented.gt-tabs button { flex: none; border-radius: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; padding: 10px 14px; font-size: 0.95rem; }
-.segmented.gt-tabs button.on { background: none; box-shadow: none; color: var(--accent); border-bottom-color: var(--accent); font-weight: 700; }
 
 .gt-game {
   display: grid; gap: 4px; width: 100%; text-align: left; font: inherit; color: inherit;

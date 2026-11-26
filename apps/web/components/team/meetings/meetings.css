@@ -47,7 +47,6 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .call-side { display: grid; gap: 10px; }
-.call-side .segmented { flex-wrap: wrap; }
 .call-controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 /* Muted or off: outlined and neutral, never red. */
 .call-controls .btn.off { background: transparent; border: 1px solid var(--on-media-muted); color: var(--on-media-muted); }
