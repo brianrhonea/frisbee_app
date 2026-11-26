@@ -7,6 +7,7 @@ import {
   createCommunityTeamRequestSchema,
   createInviteCodeRequestSchema,
   editTeamRequestSchema,
+  isClubTeam,
   type InviteCodeResponse,
   inviteToTeamRequestSchema,
   joinByCodeRequestSchema,
@@ -17,6 +18,7 @@ import {
   type PendingInvites,
   pendingInvitesMax,
   roleLimits,
+  rosterMax,
   rolesData,
   saveRolesRequestSchema,
   setAllowJoinRequestsRequestSchema,
@@ -448,12 +450,30 @@ export class MembershipService {
     if (!listed || teamNameKey(String(listed.name ?? "")) !== teamNameKey(input.name)) {
       await this.ensureNameFree(input.name, kind, division, teamId);
     }
+    // SEC-4: `level` only changes here (firestore.rules refuses a client
+    // write). Moving a team to the club level re-checks everyone on it,
+    // members and the accounts linked to roster spots, as a join would.
+    const toClub = !isGroup(current) && input.level === "club" && !isClubTeam(current);
+    const checked = toClub ? await this.checkClubSwitch(teamId, current) : null;
     await this.store.transact(async (tx) => {
       const team = await this.team(tx, teamId);
+      // Someone joined since the check: ask again rather than skip them.
+      if (checked && strings(team.memberIds).some((u) => !checked.has(u))) {
+        throw new ApiError("failed_precondition", "The team's members changed. Try again.");
+      }
       const update = editDetails(team, caller.uid, input);
       tx.update(p.team(teamId), update);
       tx.set(p.listing(teamId), listingFor({ ...team, ...update }));
     });
+  }
+
+  /** Everyone who'd be on the club team: members, and accounts linked to roster spots. Throws if any is under 16 or has no date of birth. */
+  private async checkClubSwitch(teamId: string, team: Data): Promise<Set<string>> {
+    const spots = await this.store.list(`teams/${teamId}/roster`, rosterMax + 1);
+    const linked = spots.map((s) => s.data.userId).filter((u): u is string => typeof u === "string" && u !== "");
+    const everyone = new Set([...strings(team.memberIds), ...linked]);
+    await this.clubAges.checkEveryone([...everyone]);
+    return everyone;
   }
 
   /** setSections(): the owner switches the team's optional sections. */

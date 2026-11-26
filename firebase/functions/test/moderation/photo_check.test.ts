@@ -2,7 +2,12 @@
 // SafeSearch policy matches packages/shared's.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// Declaring the Storage trigger needs a default bucket; give it a synthetic one.
+vi.hoisted(() => {
+  process.env.FIREBASE_CONFIG ??= JSON.stringify({ storageBucket: "demo-frisbee.appspot.com" });
+});
 
 import { needsCheck, thumbOf } from "../../src/moderation/photo_check";
 
