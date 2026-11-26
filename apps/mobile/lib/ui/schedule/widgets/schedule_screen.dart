@@ -120,9 +120,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             listenable: vm,
             builder: (context, _) => vm.showsToday
                 ? const SizedBox.shrink()
-                : TextButton(
+                : IconButton(
+                    tooltip: 'Today',
+                    constraints: const BoxConstraints.tightFor(
+                      width: 48,
+                      height: 48,
+                    ),
+                    icon: const Icon(Icons.today_outlined),
                     onPressed: vm.goToToday,
-                    child: const Text('Today'),
                   ),
           ),
           // Sharing, new shared calendars and subscription links, one

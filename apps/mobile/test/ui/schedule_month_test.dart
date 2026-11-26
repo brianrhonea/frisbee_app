@@ -185,7 +185,7 @@ void main() {
     expect(find.text('MONDAY, NOV 23'), findsOneWidget);
     expect(find.text('Needs RSVP'), findsOneWidget);
     // Another day picked: Today brings it back.
-    await tester.tap(find.text('Today'));
+    await tester.tap(find.byTooltip('Today'));
     await tester.pumpAndSettle();
     expect(find.text('Thursday practice'), findsOneWidget);
 
