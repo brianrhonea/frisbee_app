@@ -33,8 +33,21 @@ import { livekitFromEnv } from "./meetings/livekit.js";
 import { jobVerifierFromEnv } from "./payments/jobs.js";
 import { payoutHoldDaysFromEnv, platformFeeFromEnv } from "./payments/service.js";
 import { stripeFromEnv } from "./payments/stripe.js";
+import { assertStartupEnvironment, StartupConfigError } from "./startup_env.js";
 
-const projectId = process.env.FIREBASE_PROJECT_ID ?? "frisbee-app-brianrhonea-dev";
+// Fails fast (INF-6) when deployed without FIREBASE_PROJECT_ID or with a
+// Stripe key whose mode doesn't match the project; see startup_env.ts.
+const projectId = (() => {
+  try {
+    return assertStartupEnvironment();
+  } catch (e) {
+    if (e instanceof StartupConfigError) {
+      console.error(`Startup configuration error: ${e.message}`);
+      process.exit(1);
+    }
+    throw e;
+  }
+})();
 const firebase = initializeApp({ projectId });
 const db = getFirestore(firebase);
 const auth = getAuth(firebase);
