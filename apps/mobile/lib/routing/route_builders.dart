@@ -3,7 +3,9 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../data/repositories/hosted_tournament/hosted_tournament_repository.dart';
+import '../ui/auth/view_models/account_check_viewmodel.dart';
 import '../ui/auth/view_models/agree_terms_viewmodel.dart';
+import '../ui/auth/widgets/account_check_screen.dart';
 import '../ui/auth/widgets/agree_terms_screen.dart';
 import '../data/repositories/calendar/calendar_repository.dart';
 import '../data/repositories/chat/chat_repository.dart';
@@ -72,6 +74,15 @@ Widget personalDetailsPage({bool finishing = false}) => ViewModelHost(
     finishing: finishing,
   ),
   builder: (_, vm) => PersonalDetailsScreen(viewModel: vm),
+);
+
+Widget accountCheckPage() => ViewModelHost(
+  create: (c) => AccountCheckViewModel(
+    agreementRepository: c.read(),
+    personalRepository: c.read(),
+    authRepository: c.read(),
+  ),
+  builder: (_, vm) => AccountCheckScreen(viewModel: vm),
 );
 
 Widget agreeTermsPage() => ViewModelHost(

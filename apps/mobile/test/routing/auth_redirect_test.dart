@@ -111,6 +111,25 @@ void main() {
       expect(go(FakePersonalDetailsRepository(), '/teams/t1'), isNull);
     });
 
+    test('a failed status check blocks, and recovers on a retry', () {
+      final p = FakePersonalDetailsRepository()..checkFailed = true;
+      expect(go(p, '/teams/t1'), '${Routes.accountCheck}?from=%2Fteams%2Ft1');
+      expect(go(p, Routes.accountCheck), isNull);
+      p
+        ..checkFailed = false
+        ..status = const PersonalDetailsStatus(complete: true, required: true);
+      expect(go(p, Routes.accountCheck), Routes.home);
+      expect(go(p, '/teams/t1'), isNull);
+    });
+
+    test('signed-out users are not sent to the check screen', () {
+      final p = FakePersonalDetailsRepository()..checkFailed = true;
+      expect(
+        authRedirect(FakeAuthRepository(), Uri.parse('/teams/t1'), personal: p),
+        '/sign-in?from=%2Fteams%2Ft1',
+      );
+    });
+
     test('the username comes first', () {
       final auth = FakeAuthRepository(user: testUser)..usernameMissing = true;
       final p = FakePersonalDetailsRepository(status: missing);
@@ -147,6 +166,19 @@ void main() {
 
     test('an unknown answer holds nobody up', () {
       expect(go(FakeAgreementRepository(agreed: null), '/teams/t1'), isNull);
+    });
+
+    test('a failed check is not an unknown one: it blocks', () {
+      final a = FakeAgreementRepository(agreed: null)..checkFailed = true;
+      expect(go(a, '/teams/t1'), '${Routes.accountCheck}?from=%2Fteams%2Ft1');
+      expect(go(a, Routes.home), Routes.accountCheck);
+      expect(go(a, Routes.accountCheck), isNull);
+      // Back to normal once a retry gets an answer.
+      a
+        ..checkFailed = false
+        ..agreed = true;
+      expect(go(a, '${Routes.accountCheck}?from=/teams/t1'), '/teams/t1');
+      expect(go(a, Routes.accountCheck), Routes.home);
     });
 
     test('after the username, before personal details', () {

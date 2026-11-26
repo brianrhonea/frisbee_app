@@ -12,9 +12,16 @@ final _log = Logger('AgreementRepository');
 /// Guidelines and Terms (`/v1/me/agreement`). Notifies when that changes,
 /// so the router can ask before anything else.
 abstract class AgreementRepository extends ChangeNotifier {
-  /// Null while unknown or unreadable (no API in this build, offline):
-  /// then nobody is held up.
+  /// Null until the first answer arrives, or in a build with no API: then
+  /// nobody is held up. An error or an unreadable answer is not "unknown":
+  /// see [checkFailed].
   bool? get agreed;
+
+  /// The last check for the signed-in account failed (offline, an API
+  /// error, or an answer that isn't a plain true or false). The router holds
+  /// the app on a "Couldn't check your account" screen until [refresh]
+  /// succeeds, so a bad answer never lets someone past the terms.
+  bool get checkFailed => false;
 
   /// A definite "not yet": the app asks first.
   bool get mustAgree => agreed == false;
@@ -40,15 +47,25 @@ class AgreementRepositoryApi extends AgreementRepository {
   final AuthRepository _auth;
   String? _uid;
   bool? _agreed;
+  bool _failed = false;
+
+  /// Bumped per request and per account change, so only the latest answer
+  /// for the current account is kept.
+  int _generation = 0;
 
   @override
   bool? get agreed => _agreed;
+
+  @override
+  bool get checkFailed => _failed;
 
   void _onAuth() {
     final uid = _auth.currentUser?.uid;
     if (uid == _uid) return;
     _uid = uid;
+    _generation++;
     _agreed = null;
+    _failed = false;
     notifyListeners();
     if (uid != null) refresh();
   }
@@ -58,15 +75,21 @@ class AgreementRepositoryApi extends AgreementRepository {
     final api = _api;
     final uid = _uid;
     if (api == null || uid == null) return;
+    final generation = ++_generation;
     try {
       final json = await api.send('GET', '/v1/me/agreement');
-      if (_uid != uid) return;
-      _agreed = json['agreed'] == true;
+      final agreed = json['agreed'];
+      if (agreed is! bool) {
+        throw const FormatException('The agreement answer is not true/false');
+      }
+      if (_uid != uid || _generation != generation) return;
+      _agreed = agreed;
+      _failed = false;
     } on Exception catch (e) {
-      // Unknown: let them in rather than lock them out.
-      _log.info('Agreement status unavailable', e);
-      if (_uid != uid) return;
+      _log.warning('Agreement status unavailable', e);
+      if (_uid != uid || _generation != generation) return;
       _agreed = null;
+      _failed = true;
     }
     notifyListeners();
   }

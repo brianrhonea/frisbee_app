@@ -14,9 +14,14 @@ typedef PersonalDetailsLoad = ({
 });
 
 abstract class PersonalDetailsRepository extends ChangeNotifier {
-  /// Null while unknown, or when it can't be read (no API in this build,
-  /// offline): then nobody is held up.
+  /// Null until the first answer arrives, or in a build with no API: then
+  /// nobody is held up. A failed check is not "unknown": see [checkFailed].
   PersonalDetailsStatus? get status;
+
+  /// The last status check for the signed-in account failed (offline, an
+  /// API error, or an unreadable answer). The router holds the app on a
+  /// "Couldn't check your account" screen until [refreshStatus] succeeds.
+  bool get checkFailed => false;
 
   /// A new account that hasn't given them: the app asks first.
   bool get mustComplete {

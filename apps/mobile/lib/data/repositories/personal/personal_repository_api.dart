@@ -25,15 +25,25 @@ class PersonalDetailsRepositoryApi extends PersonalDetailsRepository {
   String? _uid;
   PersonalDetailsStatus? _status;
   DateTime? _signUpBirthDate;
+  bool _failed = false;
+
+  /// Bumped per request and per account change, so only the latest answer
+  /// for the current account is kept.
+  int _generation = 0;
 
   @override
   PersonalDetailsStatus? get status => _status;
+
+  @override
+  bool get checkFailed => _failed;
 
   void _onAuth() {
     final uid = _auth.currentUser?.uid;
     if (uid == _uid) return;
     _uid = uid;
+    _generation++;
     _status = null;
+    _failed = false;
     notifyListeners();
     if (uid != null) refreshStatus();
   }
@@ -43,17 +53,19 @@ class PersonalDetailsRepositoryApi extends PersonalDetailsRepository {
     final api = _api;
     final uid = _uid;
     if (api == null || uid == null) return;
+    final generation = ++_generation;
     try {
       final s = PersonalDetailsStatus.fromMap(
         await api.send('GET', '/v1/me/personal/status'),
       );
-      if (_uid != uid) return;
+      if (_uid != uid || _generation != generation) return;
       _status = s;
+      _failed = false;
     } on Exception catch (e) {
-      // Unknown: let them in rather than lock them out.
-      _log.info('Personal details status unavailable', e);
-      if (_uid != uid) return;
+      _log.warning('Personal details status unavailable', e);
+      if (_uid != uid || _generation != generation) return;
       _status = null;
+      _failed = true;
     }
     notifyListeners();
   }

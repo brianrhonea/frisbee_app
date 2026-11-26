@@ -3189,13 +3189,29 @@ class FakeAgreementRepository extends AgreementRepository {
   int agreeCalls = 0;
   bool failAgree = false;
 
+  /// The last check failed (see [AgreementRepository.checkFailed]).
+  @override
+  bool checkFailed = false;
+
+  /// What the next [refresh] finds: true makes it fail again.
+  bool refreshFails = false;
+  int refreshCalls = 0;
+
   void setAgreed(bool? value) {
     agreed = value;
     notifyListeners();
   }
 
   @override
-  Future<void> refresh() async {}
+  Future<void> refresh() async {
+    refreshCalls++;
+    if (refreshFails) {
+      checkFailed = true;
+    } else {
+      checkFailed = false;
+    }
+    notifyListeners();
+  }
 
   @override
   Future<Result<void>> agree() async {
@@ -3212,6 +3228,14 @@ class FakePersonalDetailsRepository extends PersonalDetailsRepository {
   @override
   PersonalDetailsStatus? status;
 
+  /// The last check failed (see [PersonalDetailsRepository.checkFailed]).
+  @override
+  bool checkFailed = false;
+
+  /// What the next [refreshStatus] finds: true makes it fail again.
+  bool refreshFails = false;
+  int refreshCalls = 0;
+
   PersonalDetails? details;
   String? email = 'pat@example.com';
   final saved = <PersonalDetails>[];
@@ -3226,7 +3250,15 @@ class FakePersonalDetailsRepository extends PersonalDetailsRepository {
   }
 
   @override
-  Future<void> refreshStatus() async {}
+  Future<void> refreshStatus() async {
+    refreshCalls++;
+    if (refreshFails) {
+      checkFailed = true;
+    } else {
+      checkFailed = false;
+    }
+    notifyListeners();
+  }
 
   @override
   Future<Result<PersonalDetailsLoad>> load() async {
