@@ -70,3 +70,12 @@
 - **F6:** the rules will check the current Terms version as a literal, with a test that keeps it in step with `termsVersion`.
 - **F8 and F9:** the API refuses to start without the cipher when a store is configured. A decrypt failure during backfill grants nothing but no longer breaks status.
 - **Test gaps:** the "someone else's records" test, an incomplete-token decryption test, `oldterms` at the current version minus 1, and a static test that every rules write is gated or on the exempt list.
+
+**Owner, 2026-11-26:**
+- **Disable on under-13:** yes. An under-13 refusal also disables the Firebase Auth account.
+- **Safer rollout:** yes, in this order:
+  1. API with enforcement **report-only**, controlled by an environment flag;
+  2. a one-off Admin SDK claim backfill on dev;
+  3. the app and website updates;
+  4. enforcement on;
+  5. rules and the callable fixes last.
