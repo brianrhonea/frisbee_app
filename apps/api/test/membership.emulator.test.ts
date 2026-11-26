@@ -28,7 +28,7 @@ const app = buildApp({
   verifier: {
     async verifyIdToken(token) {
       const t = await auth.verifyIdToken(token);
-      return { uid: t.uid, name: t.name as string | undefined, email: t.email };
+      return { uid: t.uid, name: t.name as string | undefined, email: t.email, emailVerified: t.email_verified === true, ...(t.ageOk === true && { ageOk: true }), ...(typeof t.terms === "number" && { terms: t.terms }) };
     },
     async verifyAppCheck() {},
   },
@@ -51,8 +51,8 @@ async function seedBirthDate(uid: string, birthDate: string) {
 }
 
 async function idTokenFor(uid: string, displayName: string): Promise<string> {
-  await auth.createUser({ uid, displayName, email: `${uid}@x.test` }).catch(() => undefined);
-  const custom = await auth.createCustomToken(uid);
+  await auth.createUser({ uid, displayName, email: `${uid}@x.test`, emailVerified: true }).catch(() => undefined);
+  const custom = await auth.createCustomToken(uid, { ageOk: true, terms: 1 });
   const res = await fetch(
     `http://${authHost}/identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=fake`,
     { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: custom, returnSecureToken: true }) },

@@ -7,6 +7,58 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.52.1 — 2026-11-26
+
+Account gate re-check fixes (#3a, docs/specifications/contracts/account-gate.md section 9).
+
+- N1: the Firestore rules' own-picture URL check takes a strict file-name charset
+  (letters, digits, dot, underscore, hyphen; no slash, backslash, percent-encoded
+  slash or leading dot) and a strict query, so a URL can't resolve to another bucket.
+  The API's own check (`trustedPhotoUrl`) is as strict.
+- N2: a picture read from `profiles/{uid}` goes through the same trust check as the Auth
+  photoURL before it lands on a post, comment, follow, follow request, block card or
+  meeting token (`trustedProfilePhoto`). An untrusted URL is dropped (null), not
+  migrated. Rules: `authorPhotoUrl` on posts and comments and the photo on a follow
+  request must be the writer's own picture; a follow's photo must be an object in this
+  app's buckets.
+- N3: deployed (the KMS-key condition), `ACCOUNT_GATE_MODE` must be set to `enforce` or
+  `report`; unset stops startup. Local and emulator runs still default to `report`.
+- N4: lifting a suspension no longer re-enables an Auth account that an under-13 refusal
+  disabled (`ageRefusals/{uid}`); no staff override.
+- N7: this file's 0.52.0 heading is valid UTF-8.
+- Not changed: revoked-token checks (`checkRevoked`) stay off (latency and cost decision);
+  N5 (restricting Google photo URL paths) is left as is.
+
+## 0.52.0 — 2026-11-26
+
+Account gate fixes from the #3a security review (docs/specifications/contracts/account-gate.md).
+
+- **Rollout switch.** `ACCOUNT_GATE_MODE` is `report` (the default when unset) or
+  `enforce`. In `report` the API logs `account_incomplete` (event, uid, what is
+  missing, route; never the body) and lets the write through; the claims are
+  still set and the age rules below still apply. Any other value stops startup.
+  With `enforce` the API refuses to start without a personal-details cipher
+  (`PERSONAL_DETAILS_KMS_KEY`, or the local key with the emulators) (F8).
+- F1: `PUT /v1/me/identity`, `POST /v1/me/username`, `PUT /v1/me/profile/details`,
+  `/profile/privacy` and `/profile/visibility` need the `ageOk` claim (route
+  `accountGate: "age"`); a pending email or Terms no longer blocks them, a
+  missing adult check does.
+- F3: an under-18 birth date is remembered in `ageRefusals/{uid}` (sealed like
+  personal details, closed to clients, deleted with the account). A different
+  date afterwards, on either route, is refused 412 with the birth-date-locked
+  message. An under-13 refusal also disables the Firebase Auth account and
+  revokes its sessions. No staff override. `PUT /v1/me/personal` is limited to
+  5 a minute and 20 a day per account.
+- F4: `GET /v1/me/personal/status` is limited to 10 a minute and 200 a day per
+  account. Setting claims skips the Auth write when nothing changes.
+- F5: a client can set its own Firebase Auth `photoURL`, which was copied into
+  `profiles/{uid}` and onto posts past the rules. The API now trusts an Auth
+  photo only when it is this project's Storage URL for the person's own
+  `users/{uid}/profile/` folder, or a Google account photo; otherwise no picture.
+- `deploy/service.yaml` sets `ACCOUNT_GATE_MODE: "report"`; flip it there.
+- F9: a decrypt failure while looking for the age claim is logged
+  (`account_gate_decrypt_failed`, no detail) and grants no age claim; status
+  still answers.
 ## 0.51.0 — 2026-11-26
 
 - Client errors (Sprint 2 #7): `POST /v1/client-errors` takes the

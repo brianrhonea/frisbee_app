@@ -3,6 +3,12 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../data/repositories/hosted_tournament/hosted_tournament_repository.dart';
+import '../data/repositories/account_gate/account_gate.dart';
+import '../data/repositories/personal/personal_repository.dart';
+import '../ui/auth/view_models/adults_only_viewmodel.dart';
+import '../ui/auth/view_models/verify_email_viewmodel.dart';
+import '../ui/auth/widgets/adults_only_screen.dart';
+import '../ui/auth/widgets/verify_email_screen.dart';
 import '../ui/auth/view_models/account_check_viewmodel.dart';
 import '../ui/auth/view_models/agree_terms_viewmodel.dart';
 import '../ui/auth/widgets/account_check_screen.dart';
@@ -72,8 +78,25 @@ Widget personalDetailsPage({bool finishing = false}) => ViewModelHost(
     personalRepository: c.read(),
     authRepository: c.read(),
     finishing: finishing,
+    accountGate: readOptional<AccountGate>(c),
   ),
   builder: (_, vm) => PersonalDetailsScreen(viewModel: vm),
+);
+
+/// "Verify your email": the account can't write until it is.
+Widget verifyEmailPage() => ViewModelHost(
+  create: (c) => VerifyEmailViewModel(
+    authRepository: c.read(),
+    accountGate: c.read(),
+    personalRepository: readOptional<PersonalDetailsRepository>(c),
+  ),
+  builder: (_, vm) => VerifyEmailScreen(viewModel: vm),
+);
+
+/// The dead end for someone under 18.
+Widget adultsOnlyPage() => ViewModelHost(
+  create: (c) => AdultsOnlyViewModel(authRepository: c.read()),
+  builder: (_, vm) => AdultsOnlyScreen(viewModel: vm),
 );
 
 Widget accountCheckPage() => ViewModelHost(

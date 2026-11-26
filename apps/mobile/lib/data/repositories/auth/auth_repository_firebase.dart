@@ -74,11 +74,44 @@ class AuthRepositoryFirebase extends AuthRepository {
   /// A username is being claimed; don't ask for one meanwhile.
   bool _claiming = false;
 
+  /// The ID token's `ageOk` claim, and whether it has been read for this
+  /// user. The directory profile and the username are written only after
+  /// it is true (the server refuses them before).
+  bool _ageOk = false;
+  bool _claimsKnown = false;
+
+  /// The uid whose directory profile has been written this session.
+  String? _profileWrittenFor;
+
   @override
   AppUser? get currentUser => _currentUser;
 
   @override
-  bool get isReady => _isReady && (_currentUser == null || _profileKnown);
+  bool get ageOk => _ageOk;
+
+  @override
+  bool get emailVerified => _authService.emailVerified;
+
+  @override
+  bool get isReady =>
+      _isReady && (_currentUser == null || (_profileKnown && _claimsKnown));
+
+  /// Reads the claim from the (cached) ID token. Runs on every user
+  /// change, which includes a refreshed token; once it turns true the
+  /// profile that was held back is written.
+  Future<void> _refreshClaims() async {
+    final uid = _currentUser?.uid;
+    final ok = uid != null && await _authService.ageOk();
+    if (_currentUser?.uid != uid) return;
+    final changed = ok != _ageOk || !_claimsKnown;
+    _ageOk = ok;
+    _claimsKnown = true;
+    final user = _currentUser;
+    if (ok && user != null && _profileWrittenFor != user.uid) {
+      unawaited(_upsertProfile(user));
+    }
+    if (changed) notifyListeners();
+  }
 
   @override
   bool get needsUsername =>
@@ -160,13 +193,25 @@ class AuthRepositoryFirebase extends AuthRepository {
             photoUrl: user.photoURL,
             username: _username,
           );
-    if (next == _currentUser && _isReady) return;
+    if (next == _currentUser && _isReady) {
+      // A refreshed token (or a reload) may carry new claims.
+      if (next != null) unawaited(_refreshClaims());
+      return;
+    }
     // Shared listeners belong to the old user; drop them so the next
     // user's screens open their own.
-    if (next?.uid != _currentUser?.uid) SharedStreams.instance.clear();
+    if (next?.uid != _currentUser?.uid) {
+      SharedStreams.instance.clear();
+      _ageOk = false;
+      _claimsKnown = false;
+      _profileWrittenFor = null;
+    }
     _currentUser = next;
     _isReady = true;
-    if (next != null) unawaited(_upsertProfile(next));
+    if (next != null) {
+      unawaited(_upsertProfile(next));
+      unawaited(_refreshClaims());
+    }
     notifyListeners();
   }
 
@@ -180,8 +225,10 @@ class AuthRepositoryFirebase extends AuthRepository {
       }, SetOptions(merge: true));
       // The public directory listing for direct messages: name and photo,
       // never the email. Users without a display name aren't listed.
+      // Not before the birth date is saved (the server refuses it); the
+      // claim check in [_refreshClaims] brings it back afterwards.
       final name = user.displayName?.trim() ?? '';
-      if (name.isNotEmpty) {
+      if (name.isNotEmpty && _ageOk) {
         await _firestore.collection('profiles').doc(user.uid).set({
           ...UserProfile(
             uid: user.uid,
@@ -192,6 +239,7 @@ class AuthRepositoryFirebase extends AuthRepository {
           'updatedAt': FieldValue.serverTimestamp(),
           // Merge: the player's profile details and stats live here too.
         }, SetOptions(merge: true));
+        _profileWrittenFor = user.uid;
       }
     } on Exception catch (e) {
       _log.warning('Failed to save user profile', e);
@@ -219,6 +267,7 @@ class AuthRepositoryFirebase extends AuthRepository {
     required String firstName,
     required String lastName,
     required String username,
+    Future<bool> Function()? afterCreate,
   }) => guard(() async {
     final handle = Username.normalize(username);
     if (Username.problem(handle) case final problem?) {
@@ -240,6 +289,21 @@ class AuthRepositoryFirebase extends AuthRepository {
         'firstName': first,
         'lastName': last,
       }, SetOptions(merge: true));
+      // Firebase's verification email (the account can read, not write,
+      // until it is verified). Best effort: the verify screen resends.
+      try {
+        await _authService.sendEmailVerification();
+      } on Exception catch (e) {
+        _log.info('Verification email after sign-up failed', e);
+      }
+      // The birth date first: until it is saved the server refuses the
+      // username and the directory profile.
+      if (!(await afterCreate?.call() ?? true)) return;
+      await _refreshClaims();
+      if (!_ageOk) {
+        _log.info('Username left for after the birth date is saved');
+        return;
+      }
       // If it was taken meanwhile, the app asks for another.
       final claimed = await claimUsername(handle);
       if (claimed case Error(:final error)) {
@@ -278,6 +342,10 @@ class AuthRepositoryFirebase extends AuthRepository {
     if (Username.problem(handle) case final problem?) {
       throw ArgumentError(problem);
     }
+    // The server refuses a username before the birth date is saved: don't
+    // try (the token may only be stale, so look once more).
+    if (!_ageOk) await _refreshClaims();
+    if (!_ageOk) throw const AgeNotConfirmedException();
     if ((_flags?.useApiProfiles ?? true) ? _api : null case final api?) {
       try {
         await api.post('/v1/me/username', {'username': handle});
@@ -317,6 +385,19 @@ class AuthRepositoryFirebase extends AuthRepository {
     _username = handle;
     _currentUser = user.withUsername(handle);
     notifyListeners();
+  });
+
+  @override
+  Future<Result<void>> sendEmailVerification() =>
+      guard(_authService.sendEmailVerification);
+
+  @override
+  Future<Result<bool>> checkEmailVerified() => guard(() async {
+    final verified = await _authService.reloadVerified();
+    // The new token may carry new claims; the router re-reads.
+    await _refreshClaims();
+    notifyListeners();
+    return verified;
   });
 
   @override

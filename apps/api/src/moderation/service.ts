@@ -20,6 +20,7 @@ import { docIdParam } from "../ids.js";
 import type { DocQueries } from "../queries.js";
 import { type Data, type DocStore, serverTime } from "../store.js";
 import { can, clip, isMember, roleIn, strings } from "../teams/access.js";
+import { trustedProfilePhoto } from "../media/photo_url.js";
 
 const p = {
   report: (id: string) => `reports/${id}`,
@@ -135,6 +136,8 @@ export class ModerationService {
     private readonly queries: DocQueries,
     private readonly remover: ContentRemover,
     private readonly accounts: AccountSwitch | undefined,
+    /** Whether an under-13 refusal disabled the account: lifting a suspension then leaves it disabled (N4). */
+    private readonly disabledForAge: (uid: string) => Promise<boolean> = async () => false,
   ) {}
 
   // Reports -----------------------------------------------------------------
@@ -390,6 +393,8 @@ export class ModerationService {
     await this.store.transact(async (tx) =>
       tx.merge(p.limits(uid), on ? { suspended: true, suspendedAt: serverTime, suspendedBy: by } : { suspended: false }),
     );
+    // Lifting must not re-enable an account an under-13 refusal disabled (no staff override).
+    if (!on && (await this.disabledForAge(uid))) return;
     await this.accounts?.setDisabled(uid, on);
   }
 
@@ -404,7 +409,7 @@ export class ModerationService {
     if (!profile && !user) throw new ApiError("not_found", "That player doesn't exist.");
     const username = str(profile?.username);
     const name = clip(str(profile?.name) || str(user?.name) || (username ? `@${username}` : "Player"), 80);
-    const photo = str(profile?.photoUrl) || str(user?.photoUrl);
+    const photo = trustedProfilePhoto(profile?.photoUrl, other) || str(user?.photoUrl);
     await this.store.transact(async (tx) => {
       const theirs = await tx.get(p.block(other, me));
       tx.set(p.block(me, other), {

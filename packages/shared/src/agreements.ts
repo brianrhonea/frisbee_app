@@ -20,6 +20,8 @@ export interface AgreementStatus {
   agreed: boolean;
   /** What they must agree to: [termsVersion]. */
   version: number;
+  /** After `PUT`: the API changed this account's claims; call `getIdToken(true)` before the next write. */
+  refreshToken?: true;
 }
 
 /** Whether a stored agreement (users/{uid}.agreedTerms) covers the current version. */

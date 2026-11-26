@@ -14,6 +14,7 @@ import { FieldValue, getFirestore, type Transaction } from "firebase-admin/fires
 import { logger } from "firebase-functions";
 import { HttpsError, onCall, type CallableRequest } from "firebase-functions/v2/https";
 
+import { requireCompleteAccount } from "../account/gate";
 import { enforceAppCheck } from "../options";
 import {
   autoPick,
@@ -45,6 +46,7 @@ interface Ctx {
 async function context(req: CallableRequest): Promise<Ctx> {
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in to use the draft.");
+  requireCompleteAccount(req.auth!);
   const data = (req.data ?? {}) as Data;
   const { tournamentId, divisionId } = data;
   if (typeof tournamentId !== "string" || !idPattern.test(tournamentId)) {

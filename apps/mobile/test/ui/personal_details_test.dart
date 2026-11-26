@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frisbee_app/data/repositories/account_gate/account_gate.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/personal_details.dart';
 import 'package:frisbee_app/ui/auth/view_models/sign_up_viewmodel.dart';
@@ -18,6 +19,7 @@ void main() {
     DateTime? birth,
     DateTime? savedBirth,
     bool offline = false,
+    AccountGate? gate,
   }) async {
     tester.view.physicalSize = const Size(500, 3000);
     tester.view.devicePixelRatio = 1;
@@ -44,6 +46,7 @@ void main() {
       personalRepository: personal,
       authRepository: auth,
       finishing: finishing,
+      accountGate: gate,
     );
     addTearDown(vm.dispose);
     await tester.pumpWidget(
@@ -83,83 +86,84 @@ void main() {
     expect(saved.legalFirstName, 'Pat');
     expect(saved.birthDate, DateTime(1995, 4, 2));
     expect(saved.address.country, 'US');
-    expect(saved.guardian, isNull);
     expect(personal.mustComplete, isFalse);
   });
 
-  testWidgets('a minor adds a parent or guardian', (tester) async {
+  testWidgets('there is no guardian step: under 18 is the dead end', (
+    tester,
+  ) async {
     final now = DateTime.now();
-    await pump(tester, birth: DateTime(now.year - 15, 1, 1));
-    expect(find.text('Parent or guardian'), findsOneWidget);
+    final gate = AccountGate();
+    await pump(tester, birth: DateTime(now.year - 15, 1, 1), gate: gate);
+    expect(find.text('Parent or guardian'), findsNothing);
     await fillAdultFields(tester);
     await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
     await tester.pumpAndSettle();
+    // Nothing is sent or removed; the router shows the adults-only screen.
+    expect(gate.underAge, isTrue);
     expect(personal.saved, isEmpty);
-    expect(find.text("Enter your parent or guardian's name."), findsOneWidget);
-  });
-
-  testWidgets('an under-13 birthday when finishing removes the account', (
-    tester,
-  ) async {
-    final now = DateTime.now();
-    // As after Google sign-in: no birthday was asked before.
-    await pump(tester, birth: DateTime(now.year - 10, 1, 1));
-    auth.reauthenticated = true; // Just signed up.
-    await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
-    await tester.pumpAndSettle();
-    expect(find.textContaining(tooYoungMessage), findsOneWidget);
-    expect(auth.deleted, isTrue);
-    expect(personal.saved, isEmpty);
-  });
-
-  testWidgets('if removing needs a fresh sign-in, they are signed out', (
-    tester,
-  ) async {
-    final now = DateTime.now();
-    await pump(tester, birth: DateTime(now.year - 10, 1, 1));
-    await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
-    await tester.pumpAndSettle();
-    expect(auth.deleted, isFalse);
-    expect(auth.currentUser, isNull);
-  });
-
-  testWidgets('refused by the API as under 13: the new account is removed', (
-    tester,
-  ) async {
-    await pump(tester, birth: DateTime(1995, 4, 2));
-    personal.refuseTooYoung = true;
-    auth.reauthenticated = true; // Just signed up.
-    await fillAdultFields(tester);
-    await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
-    await tester.pumpAndSettle();
-    expect(find.textContaining(tooYoungMessage), findsOneWidget);
-    expect(auth.deleted, isTrue);
-  });
-
-  testWidgets('from Settings, an under-13 date is refused and nothing else', (
-    tester,
-  ) async {
-    await pump(tester, finishing: false);
-    expect(find.text('Personal details'), findsOneWidget);
-    expect(find.text('Sign out'), findsNothing);
-    personal.refuseTooYoung = true;
-    await fillAdultFields(tester);
-    await tester.tap(find.text('Date of birth'));
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.descendant(
-        of: find.byType(Dialog),
-        matching: find.byType(TextField),
-      ),
-      '04/02/1995',
-    );
-    await tester.tap(find.text('OK'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
-    await tester.pumpAndSettle();
-    expect(find.text(tooYoungMessage), findsOneWidget); // The snack bar.
     expect(auth.deleted, isFalse);
     expect(auth.currentUser, isNotNull);
+  });
+
+  testWidgets('refused by the API as under 18: the dead end, no delete', (
+    tester,
+  ) async {
+    final gate = AccountGate();
+    await pump(tester, birth: DateTime(1995, 4, 2), gate: gate);
+    personal.refuseTooYoung = true;
+    await fillAdultFields(tester);
+    await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
+    await tester.pumpAndSettle();
+    expect(gate.underAge, isTrue);
+    expect(auth.deleted, isFalse);
+    expect(auth.currentUser, isNotNull);
+  });
+
+  testWidgets('from Settings, an under-18 date is refused with the message', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    await pump(tester, finishing: false, birth: DateTime(now.year - 15, 1, 1));
+    expect(find.text('Personal details'), findsOneWidget);
+    expect(find.text('Sign out'), findsNothing);
+    await fillAdultFields(tester);
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+    expect(find.text(adultOnlyMessage), findsOneWidget);
+    expect(personal.saved, isEmpty);
+  });
+
+  group('the birth date once saved', () {
+    testWidgets('is shown read-only, with where to write', (tester) async {
+      await pump(tester, savedBirth: DateTime(1995, 4, 2));
+      expect(find.text(birthDateLockedHint), findsOneWidget);
+      await tester.tap(find.text('Date of birth'));
+      await tester.pumpAndSettle();
+      expect(find.byType(Dialog), findsNothing);
+    });
+
+    testWidgets('a date only typed at sign-up (not saved) is editable', (
+      tester,
+    ) async {
+      await pump(tester, birth: DateTime(1996, 5, 6), offline: true);
+      expect(find.text(birthDateLockedHint), findsNothing);
+      await tester.tap(find.text('Date of birth'));
+      await tester.pumpAndSettle();
+      expect(find.byType(Dialog), findsOneWidget);
+    });
+
+    testWidgets('a refused change shows the message and support hint', (
+      tester,
+    ) async {
+      await pump(tester, birth: DateTime(1995, 4, 2), offline: true);
+      personal.refuseLocked = true;
+      await fillAdultFields(tester);
+      await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
+      await tester.pumpAndSettle();
+      expect(find.text(birthDateLockedHint), findsOneWidget);
+      expect(personal.saved, isEmpty);
+    });
   });
 
   group('the sign-up birthday', () {
@@ -188,9 +192,23 @@ void main() {
       expect(personal.mustComplete, isTrue);
     });
 
-    test('a failed save never holds up sign-up', () async {
+    test('the birth date is saved before the username is claimed', () async {
       final auth = FakeAuthRepository();
-      final personal = FakePersonalDetailsRepository()..refuseTooYoung = true;
+      final personal = FakePersonalDetailsRepository();
+      final vm = SignUpViewModel(
+        authRepository: auth,
+        personalRepository: personal,
+      );
+      addTearDown(vm.dispose);
+      await vm.signUp.execute(form(DateTime(1995, 4, 2)));
+      expect(personal.savedSignUpBirthDate, DateTime(1995, 4, 2));
+      expect(auth.events, ['account-created', 'claim-username']);
+    });
+
+    test('a save that cannot be reached never holds up sign-up', () async {
+      final auth = FakeAuthRepository();
+      final personal = FakePersonalDetailsRepository()
+        ..saveBirthDateError = Exception('offline');
       final vm = SignUpViewModel(
         authRepository: auth,
         personalRepository: personal,
@@ -200,6 +218,42 @@ void main() {
       expect(vm.signUp.completed, isTrue);
       expect(auth.currentUser, isNotNull);
       expect(personal.savedSignUpBirthDate, isNull);
+    });
+
+    test(
+      'refused by the server as under 18: nothing else is written',
+      () async {
+        final auth = FakeAuthRepository();
+        final personal = FakePersonalDetailsRepository()..refuseTooYoung = true;
+        final vm = SignUpViewModel(
+          authRepository: auth,
+          personalRepository: personal,
+        );
+        addTearDown(vm.dispose);
+        await vm.signUp.execute(form(DateTime(1995, 4, 2)));
+        expect(auth.events, ['account-created']);
+        expect(personal.savedSignUpBirthDate, isNull);
+      },
+    );
+
+    test('18 and over only: under 18 makes no account', () async {
+      final auth = FakeAuthRepository();
+      final vm = SignUpViewModel(
+        authRepository: auth,
+        personalRepository: FakePersonalDetailsRepository(),
+      );
+      addTearDown(vm.dispose);
+      final now = DateTime.now();
+      // 17 years and 11 months old: still refused.
+      expect(
+        vm.birthDateProblemOn(DateTime(now.year - 18, now.month + 1, 1)),
+        adultOnlyMessage,
+      );
+      expect(vm.birthDateProblemOn(DateTime(now.year - 18, 1, 1)), isNull);
+      await vm.signUp.execute(form(DateTime(now.year - 15, 1, 1)));
+      expect(vm.signUp.error, isTrue);
+      expect(auth.currentUser, isNull);
+      expect(auth.events, isEmpty);
     });
 
     test('nothing is saved when no account was made', () async {

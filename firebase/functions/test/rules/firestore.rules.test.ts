@@ -39,7 +39,10 @@ const STATS = "stats";
 const PLAYER = "player";
 const OUTSIDER = "outsider";
 
-const db = (uid: string) => env.authenticatedContext(uid).firestore();
+// A complete account (the account gate: verified email, ageOk, terms): the API sets the
+// claims; account_gate.rules.test.ts covers the incomplete ones.
+const COMPLETE = { email_verified: true, ageOk: true, terms: 1 };
+const db = (uid: string) => env.authenticatedContext(uid, COMPLETE).firestore();
 
 // An inviteCodes doc as the app mints it (InviteCode in
 // lib/domain/models/invite_code.dart): a 6-character code that works for
@@ -2667,7 +2670,10 @@ describe("direct messages", () => {
 
   it("profiles may carry a header photo URL", async () => {
     const ref = doc(db(PLAYER), "profiles", PLAYER);
-    await assertSucceeds(setDoc(ref, { ...profile(), headerUrl: "https://example.test/h.jpg" }));
+    const own = `https://firebasestorage.googleapis.com/v0/b/frisbee-app-brianrhonea-dev.firebasestorage.app/o/users%2F${PLAYER}%2Fprofile%2Fh.jpg?alt=media&token=t`;
+    await assertSucceeds(setDoc(ref, { ...profile(), headerUrl: own }));
+    // Only this app's own Storage (F5); the full matrix is in account_gate.rules.test.ts.
+    await assertFails(setDoc(ref, { ...profile(), headerUrl: "https://example.test/h.jpg" }));
     await assertSucceeds(setDoc(ref, { ...profile(), headerUrl: null }));
     await assertFails(setDoc(ref, { ...profile(), headerUrl: 42 }));
     await assertFails(setDoc(ref, { ...profile(), headerUrl: "x".repeat(2001) }));
@@ -3442,7 +3448,13 @@ describe("follows", () => {
   });
 
   it("lets people follow users, teams and tournaments", async () => {
-    await assertSucceeds(setDoc(ref(PLAYER, "user_u2"), follow("user", "u2", { photoUrl: "https://x.org/a.png" })));
+    // A picture must be one of this app's own Storage objects (N2); a foreign host is refused.
+    await assertSucceeds(
+      setDoc(ref(PLAYER, "user_u2"), follow("user", "u2", {
+        photoUrl: "https://firebasestorage.googleapis.com/v0/b/frisbee-app-brianrhonea-dev.firebasestorage.app/o/users%2Fu2%2Fprofile%2Fa.png?alt=media&token=t",
+      })),
+    );
+    await assertFails(setDoc(ref(PLAYER, "user_u3"), follow("user", "u3", { photoUrl: "https://x.org/a.png" })));
     await assertSucceeds(setDoc(ref(PLAYER, `team_${TEAM}`), follow("team", TEAM, { notify: true })));
     await assertSucceeds(
       setDoc(ref(PLAYER, "tournament_g1_t1"), follow("tournament", "g1_t1", { groupId: "g1" })),

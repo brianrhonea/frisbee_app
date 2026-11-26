@@ -1,19 +1,21 @@
 "use client";
-import { type AgreementStatus, agreementPath, minimumAge, nameMissing, type PersonalDetailsResponse, type PersonalDetailsStatus } from "@stall10/shared";
+import { type AccountGateField, type AgreementStatus, agreementPath, nameMissing, type PersonalDetailsResponse, type PersonalDetailsStatus } from "@stall10/shared";
 import type { User } from "firebase/auth";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { callApi } from "@/lib/client";
-import { deleteOwnAccount } from "@/lib/firebase";
+import { clearIncomplete, isUnderAge, localToday, subscribeIncomplete } from "@/lib/accountGate";
 import { useLiveDoc } from "@/lib/live";
 import { signupDraft } from "@/lib/signupDraft";
 import { useAuth } from "./AuthProvider";
 import { AgreeTerms } from "./AgreeTerms";
+import { AdultOnly } from "./AdultOnly";
 import { PersonalDetailsForm } from "./PersonalDetailsForm";
 import "./member.css";
 import { SignUpSteps } from "./SignUpSteps";
 import { ErrorNote } from "./StatusViews";
+import { VerifyEmail } from "./VerifyEmail";
 import { stepAsksName, UsernameStep, usernameStepCopy } from "./UsernameStep";
 
 /** Readable without finishing sign-up: the legal pages and help. */
@@ -62,8 +64,12 @@ export function PersonalGate({ children }: { children: ReactNode }) {
   // A check failed: the member is held at a retry, never let through.
   const [statusFailed, setStatusFailed] = useState(false);
   const [agreeFailed, setAgreeFailed] = useState(false);
-  // Under 13: the account is removed and signed out, and this stays up.
-  const [tooYoung, setTooYoung] = useState<"removing" | "removed" | null>(null);
+  // Under 18 (adult-only launch): a dead end with sign out / delete account.
+  const [adultOnly, setAdultOnly] = useState(false);
+  // A write stayed refused as account_incomplete (lib/client.ts): the first missing step shows.
+  const [incomplete, setIncomplete] = useState<AccountGateField[] | null>(null);
+  // Bumped when the email is verified (the user object is changed in place).
+  const [, setVerified] = useState(0);
   // Bumped when the name step saves: reloading the user changes its
   // displayName in place, which on its own doesn't re-render.
   const [, setNamed] = useState(0);
@@ -120,6 +126,8 @@ export function PersonalGate({ children }: { children: ReactNode }) {
     setAgreed(null);
     setStatusFailed(false);
     setAgreeFailed(false);
+    setAdultOnly(false);
+    clearIncomplete();
     if (!user) return;
     setHidePrompt(dismissed(user.uid));
     load(user);
@@ -130,6 +138,8 @@ export function PersonalGate({ children }: { children: ReactNode }) {
       agreeLatest.current += 1;
     };
   }, [user, load, loadAgreement]);
+
+  useEffect(() => subscribeIncomplete(setIncomplete), []);
 
   const refresh = useCallback(() => {
     if (user) load(user);
@@ -154,41 +164,47 @@ export function PersonalGate({ children }: { children: ReactNode }) {
   const missing = !!user && status !== null && !status.complete;
   const blocked = missing && status.required && !openPath;
   const checkFailed = !!user && (statusFailed || agreeFailed) && !openPath;
+  const firstMissing = incomplete?.[0];
+  const needsAge = (blocked || firstMissing === "age") && !openPath;
+  const needsVerify = (newAccount || firstMissing === "email_unverified") && user?.emailVerified === false && !openPath;
+  const needsTerms = (agreed === false || firstMissing === "terms") && !openPath;
   const prompt = missing && !status.required && !hidePrompt && path !== "/settings/personal";
 
   return (
     <Ctx.Provider value={{ status, refresh }}>
-      {tooYoung ? (
-        <div className="auth-card" role="alert">
-          <h1>Sorry, you&apos;re too young</h1>
-          <p>
-            You must be {minimumAge} or older to use Stall 10.{" "}
-            {tooYoung === "removing"
-              ? "Removing the account…"
-              : "We didn't keep your details, and the account has been removed."}
-          </p>
-          {tooYoung === "removed" && (
-            <Link className="btn" href="/">
-              Back to Stall 10
-            </Link>
-          )}
-        </div>
+      {adultOnly ? (
+        <AdultOnly />
       ) : checkFailed ? (
         <div className="auth-card">
           <h1>Couldn&apos;t check your account</h1>
           <ErrorNote onRetry={retry}>We couldn&apos;t confirm your account details. Check your connection and retry.</ErrorNote>
         </div>
-      ) : (needsUsername || needsName) && !openPath && user ? (
-        <NameStep user={user} needsUsername={needsUsername} onDone={() => setNamed((n) => n + 1)} />
-      ) : agreed === false && !openPath && user ? (
-        <AgreeTerms user={user} onDone={() => setAgreed(true)} />
-      ) : blocked && user ? (
+      ) : needsAge && user ? (
+        // First: the birth date sets the ageOk claim, which the username and profile writes need.
         <FinishSignUp
           user={user}
-          onDone={refresh}
-          onTooYoung={() => {
-            setTooYoung("removing");
-            void deleteOwnAccount().finally(() => setTooYoung("removed"));
+          onDone={() => {
+            clearIncomplete();
+            refresh();
+          }}
+          onUnderAge={() => setAdultOnly(true)}
+        />
+      ) : (needsUsername || needsName) && !openPath && user ? (
+        <NameStep user={user} needsUsername={needsUsername} onDone={() => setNamed((n) => n + 1)} />
+      ) : needsVerify && user ? (
+        <VerifyEmail
+          user={user}
+          onVerified={() => {
+            clearIncomplete();
+            setVerified((n) => n + 1);
+          }}
+        />
+      ) : needsTerms && user ? (
+        <AgreeTerms
+          user={user}
+          onDone={() => {
+            setAgreed(true);
+            clearIncomplete();
           }}
         />
       ) : (
@@ -248,7 +264,7 @@ function NameStep({ user, needsUsername, onDone }: { user: User; needsUsername: 
 }
 
 /** The sign-up form's last step, until it's done. */
-function FinishSignUp({ user, onDone, onTooYoung }: { user: User; onDone: () => void; onTooYoung: () => void }) {
+function FinishSignUp({ user, onDone, onUnderAge }: { user: User; onDone: () => void; onUnderAge: () => void }) {
   const [draftBirthDate] = useState(() => signupDraft.takeBirthDate());
   // The first and last name just typed (sign-up or the name step), else
   // the account's name split.
@@ -256,11 +272,11 @@ function FinishSignUp({ user, onDone, onTooYoung }: { user: User; onDone: () => 
   // The birthday saved at sign-up (PUT /v1/me/personal/birth-date), so it
   // isn't asked again after a reload or on another device; else the one
   // still in memory. The form starts once this has answered (or failed).
-  const [saved, setSaved] = useState<{ birthDate?: string } | null>(null);
+  const [saved, setSaved] = useState<{ birthDate?: string; details?: PersonalDetailsResponse["details"] } | null>(null);
   useEffect(() => {
     let live = true;
     callApi<PersonalDetailsResponse>(user, "/v1/me/personal").then(
-      (r) => live && setSaved({ birthDate: r.signUpBirthDate ?? r.details?.birthDate }),
+      (r) => live && setSaved({ birthDate: r.signUpBirthDate ?? r.details?.birthDate, details: r.details }),
       () => live && setSaved({}),
     );
     return () => {
@@ -268,6 +284,11 @@ function FinishSignUp({ user, onDone, onTooYoung }: { user: User; onDone: () => 
     };
   }, [user]);
   const birthDate = saved?.birthDate ?? draftBirthDate;
+  // A birth date the server already holds can't change (and is checked at once).
+  const underAge = isUnderAge(saved?.birthDate, localToday());
+  useEffect(() => {
+    if (underAge) onUnderAge();
+  }, [underAge, onUnderAge]);
   return (
     <div className="page">
       <div className="card personal-finish">
@@ -280,11 +301,12 @@ function FinishSignUp({ user, onDone, onTooYoung }: { user: User; onDone: () => 
           <PersonalDetailsForm
             user={user}
             email={user.email}
-            initial={null}
+            initial={saved.details ?? null}
+            birthDateLocked={!!saved.birthDate}
             prefill={{ name: user.displayName, first: name?.first, last: name?.last, birthDate }}
             submitLabel="Continue"
             onSaved={onDone}
-            onTooYoung={onTooYoung}
+            onUnderAge={onUnderAge}
           />
         ) : (
           <p className="muted">Loading…</p>

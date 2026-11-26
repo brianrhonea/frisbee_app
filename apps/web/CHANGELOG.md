@@ -4,6 +4,35 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.61.0 — 2026-11-26
+
+Release-branch merge of #3a (account gate, web 0.60.0/0.60.1 on hold/3a-account-gate) with C1-C4 (0.59.9-0.59.14).
+
+- 0.60.1 on the #3a branch was the same video-upload flag change as 0.59.8 below; it is listed once.
+
+## 0.60.0 — 2026-11-26
+
+Account gate (SEC-2, item #3a; docs/specifications/contracts/account-gate.md):
+the website explains the gate, the API and rules enforce it.
+
+- A write refused with 403 `account_incomplete` asks the status route once,
+  refreshes the token if told (`refreshToken: true`) and retries once; if
+  still refused it shows the first missing step: verify your email, About
+  you (birth date) or the Terms. No loops. Every answer carrying
+  `refreshToken: true` refreshes the token.
+- New "Verify your email" step (resend, "I've verified" reloads the user
+  and refreshes the token). Email sign-up now sends Firebase's verification
+  email.
+- Adults only (18+): the sign-up and About you birth date are refused under
+  18 with the server's message; the guardian fields are gone; under 18 ends
+  at a "Stall 10 is for players 18 and older" page with Sign out and Delete
+  account (the account is no longer removed automatically).
+- The birth date is read-only once saved; a refused change shows the
+  server's message and support@stall10.app.
+- Onboarding order: the birth date is saved (and the token refreshed with
+  `ageOk`) before the username is claimed; accounts that skipped it are
+  asked About you before "Your name and username".
+
 ## 0.59.14 — 2026-11-26
 
 Review fixes 2 for C1-C4 (Sprint 2).

@@ -5,6 +5,38 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
+    // A complete account (see accountOk() in firestore.rules and
+    // docs/specifications/contracts/account-gate.md): verified email, an
+    // adult, Terms agreed. Every upload and delete needs it, except
+    // profile pictures (onboarding). Downloads (get) don't.
+    //
+    // The `terms` check is the CURRENT Terms version as a literal
+    // (termsVersion in packages/shared/src/agreements.ts); keep it equal to
+    // the one in firestore.rules (firebase/functions/test/account/
+    // rules_static fails until they agree).
+    function accountOk() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.get('ageOk', false) == true
+        && request.auth.token.get('terms', 0) is number
+        && request.auth.token.get('terms', 0) >= 1;
+    }
+    // The adult check alone: a profile picture while the email or Terms are
+    // still pending, never for an account without `ageOk` (F1).
+    function ageOk() {
+      return request.auth != null
+        && request.auth.token.get('ageOk', false) == true;
+    }
+
+    // `stall10Checked` is the API's own mark that it already screened a photo
+    // (functions/src/moderation/photo_check.ts skips marked ones). The API
+    // writes with admin credentials; a client upload that carries the mark is
+    // refused, on every path, so the screening can't be bypassed (F5).
+    function unmarked() {
+      return request.resource.metadata == null
+        || !('stall10Checked' in request.resource.metadata);
+    }
+
     function team(teamId) {
       return firestore.get(/databases/(default)/documents/teams/$(teamId)).data;
     }
@@ -111,13 +143,14 @@ service firebase.storage {
     // chat managers who can read the room, delete any.
     match /teams/{teamId}/chats/{roomId}/{userId}/{messageId}/{fileName} {
       allow get: if request.auth != null && canRead(teamId, roomId);
-      allow create, update: if request.auth != null
+      allow create, update: if accountOk()
+        && unmarked()
         && request.auth.uid == userId
         && attachmentSizeOk(fileName)
         && request.resource.contentType != null && attachmentType()
         && videoAllowed(fileName)
         && canWrite(teamId, roomId);
-      allow delete: if request.auth != null
+      allow delete: if accountOk()
         && (request.auth.uid == userId
             || role(team(teamId)) == 'owner'
             || ((can(team(teamId), 'moderate')
@@ -150,11 +183,12 @@ service firebase.storage {
       allow get: if (request.auth != null
           && (publicPost() || isMember(team(teamId))))
         || (publicPost() && !privateGroup(team(teamId)));
-      allow create, update: if request.auth != null
+      allow create, update: if accountOk()
+        && unmarked()
         && can(team(teamId), 'manageTeam')
         && request.resource.size <= 10 * 1024 * 1024
         && photoType();
-      allow delete: if request.auth != null && can(team(teamId), 'manageTeam');
+      allow delete: if accountOk() && can(team(teamId), 'manageTeam');
     }
 
     // Uploaded team videos (TeamVideo.file in firestore.rules): video
@@ -163,12 +197,13 @@ service firebase.storage {
     match /teams/{teamId}/videos/{videoId}/{fileName} {
 
       allow get: if request.auth != null && isMember(team(teamId));
-      allow create, update: if request.auth != null
+      allow create, update: if accountOk()
+        && unmarked()
         && can(team(teamId), 'manageTeam')
         && request.resource.size <= 500 * 1024 * 1024
         && videoType()
         && videoUploadsOn();
-      allow delete: if request.auth != null && can(team(teamId), 'manageTeam');
+      allow delete: if accountOk() && can(team(teamId), 'manageTeam');
     }
 
     // Photos on people's own posts (posts in firestore.rules), uploaded
@@ -197,11 +232,12 @@ service firebase.storage {
       // in firestore.rules), or a private one's own photos and followers.
       allow get: if publicAuthor()
         || (request.auth != null && (!privateAuthor() || ownerOrFollower()));
-      allow create, update: if request.auth != null
+      allow create, update: if accountOk()
+        && unmarked()
         && request.auth.uid == userId
         && request.resource.size <= 10 * 1024 * 1024
         && photoType();
-      allow delete: if request.auth != null && request.auth.uid == userId;
+      allow delete: if accountOk() && request.auth.uid == userId;
     }
 
     // Profile pictures and header photos (photoUrl and headerUrl in
@@ -209,7 +245,8 @@ service firebase.storage {
     // Shown by download URL, to anyone signed in.
     match /users/{userId}/profile/{fileName} {
       allow get: if request.auth != null;
-      allow create, update: if request.auth != null
+      allow create, update: if ageOk()
+        && unmarked()
         && request.auth.uid == userId
         && request.resource.size <= 10 * 1024 * 1024
         && photoType();
@@ -248,13 +285,14 @@ service firebase.storage {
                    /databases/(default)/documents/users/$(request.auth.uid)/blocks/$(other)));
       }
       allow get: if inConversation();
-      allow create, update: if inConversation()
+      allow create, update: if accountOk()
+        && unmarked() && inConversation()
         && mayUpload()
         && request.auth.uid == userId
         && attachmentSizeOk(fileName)
         && request.resource.contentType != null && attachmentType()
         && videoAllowed(fileName);
-      allow delete: if inConversation() && request.auth.uid == userId;
+      allow delete: if accountOk() && inConversation() && request.auth.uid == userId;
     }
   }
 }

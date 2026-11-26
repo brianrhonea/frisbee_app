@@ -22,7 +22,10 @@ const PLAYER = "player";
 const GUEST = "guest";
 const OUTSIDER = "outsider";
 
-const storage = (uid: string) => env.authenticatedContext(uid).storage();
+// A complete account (the account gate: verified email, ageOk, terms): the API sets the
+// claims; account_gate.rules.test.ts covers the incomplete ones.
+const COMPLETE = { email_verified: true, ageOk: true, terms: 1 };
+const storage = (uid: string) => env.authenticatedContext(uid, COMPLETE).storage();
 const file = (uid: string, author: string, room = "r1") =>
   storage(uid).ref(`teams/${TEAM}/chats/${room}/${author}/m1/0-photo.png`);
 const bytes = (n: number) => new Uint8Array(n);

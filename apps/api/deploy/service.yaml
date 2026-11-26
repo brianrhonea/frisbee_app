@@ -45,6 +45,14 @@ spec:
               value: "1"
             - name: LOG_LEVEL
               value: info
+            # The account gate (docs/specifications/contracts/account-gate.md):
+            # "report" logs account_incomplete and lets the write through;
+            # "enforce" refuses it. Flip to "enforce" here (every deploy
+            # replaces the whole service from this file, so a console change
+            # would be undone) once the claim backfill and the client updates
+            # are out. "enforce" needs PERSONAL_DETAILS_KMS_KEY.
+            - name: ACCOUNT_GATE_MODE
+              value: "report"
             # Photo uploads (/v1/uploads) are only served when this names the
             # bucket. Browsers PUT to it directly, so it needs CORS for the
             # website (storage-cors.<env>.json, DEPLOY.md).

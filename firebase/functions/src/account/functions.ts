@@ -130,6 +130,8 @@ async function deleteUserData(db: Firestore, uid: string): Promise<void> {
   await db.recursiveDelete(db.doc(`profiles/${uid}`));
   // Encrypted personal details (apps/api/src/personal).
   await db.doc(`personalDetails/${uid}`).delete();
+  // A refused under-18 birth date, kept sealed so a different one can't be tried (account gate F3).
+  await db.doc(`ageRefusals/${uid}`).delete();
   // Their profile and header photos, and any post photos left behind.
   await deleteFolder(userFolder(uid));
 }

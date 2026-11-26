@@ -36,6 +36,40 @@ class AuthService {
     return _auth.currentUser ?? user;
   }
 
+  /// Whether the current ID token carries the `ageOk` claim (the API sets
+  /// it once a saved birth date makes the person 18 or over; see
+  /// docs/specifications/contracts/account-gate.md). From the cached
+  /// token, no refresh. False when signed out or the token can't be read.
+  Future<bool> ageOk() async {
+    try {
+      final result = await _auth.currentUser?.getIdTokenResult();
+      return result?.claims?['ageOk'] == true;
+    } on Exception {
+      return false;
+    }
+  }
+
+  /// Firebase's own verification email (the only email besides password
+  /// reset that Stall 10 causes).
+  Future<void> sendEmailVerification() async {
+    await _auth.currentUser?.sendEmailVerification();
+  }
+
+  /// Whether the signed-in user's email is verified, as of the last reload.
+  bool get emailVerified => _auth.currentUser?.emailVerified ?? false;
+
+  /// Asks Firebase again whether the email is verified, then takes a new
+  /// ID token so the `email_verified` claim reaches the API and the rules.
+  /// Returns the answer.
+  Future<bool> reloadVerified() async {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+    await user.reload();
+    final fresh = _auth.currentUser ?? user;
+    if (fresh.emailVerified) await fresh.getIdToken(true);
+    return fresh.emailVerified;
+  }
+
   Future<void> sendPasswordReset(String email) =>
       _auth.sendPasswordResetEmail(email: email);
 

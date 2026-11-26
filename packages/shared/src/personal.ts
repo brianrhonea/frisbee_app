@@ -4,10 +4,11 @@
 // keeps them encrypted (Cloud KMS) in personalDetails/{uid}, which
 // firestore.rules closes to every client. Their email is the account's.
 import { z } from "zod";
+import { adultOnlyMessage } from "./account_gate.js";
 
 /** Too young to have an account (COPPA): sign-up stops. */
 export const minimumAge = 13;
-/** Under this, a parent or guardian's details are asked too. */
+/** Launch is adults only: this age and over (account_gate.ts). There is no guardian path. */
 export const adultAge = 18;
 
 /**
@@ -85,13 +86,17 @@ export function ageOn(birthDate: string, today: string | Date): number {
   return age;
 }
 
-/** What's wrong with [birthDate] on [today], or null; under 13 gives [tooYoungMessage]. */
+/**
+ * What's wrong with [birthDate] on [today], or null. Launch is adults only:
+ * under 13 gives [tooYoungMessage], 13 to 17 gives [adultOnlyMessage].
+ */
 export function birthDateProblem(birthDate: string, today: string | Date): string | null {
   if (!isCalendarDate(birthDate)) return "Enter your date of birth.";
   const age = ageOn(birthDate, today);
   if (age < 0) return "That date is in the future.";
   if (age > 120) return "Check the year of your date of birth.";
   if (age < minimumAge) return tooYoungMessage;
+  if (age < adultAge) return adultOnlyMessage;
   return null;
 }
 
@@ -171,7 +176,7 @@ export const personalDetailsSchema = z.strictObject({
   phone,
   gender: z.enum(genders, { message: "Choose an option." }),
   address: addressSchema,
-  /** Required under 18; dropped at 18 and over. */
+  /** Legacy and never asked or kept (adults only); still accepted so an older client's body parses. */
   guardian: guardianSchema.optional(),
 });
 export type PersonalDetails = z.output<typeof personalDetailsSchema>;
@@ -179,18 +184,16 @@ export type PersonalDetailsInput = z.input<typeof personalDetailsSchema>;
 
 /**
  * The age rules on [today]: the field and message of the first problem,
- * or null. Clients show it before sending; the API enforces it.
+ * or null. Adults only (18 and over), so there is no guardian step: under 18
+ * is a birthDate problem ([adultOnlyMessage], or [tooYoungMessage] under 13).
+ * Clients show it before sending; the API enforces it.
  */
 export function personalDetailsProblem(
-  d: Pick<PersonalDetails, "birthDate" | "guardian">,
+  d: Pick<PersonalDetails, "birthDate">,
   today: string | Date,
 ): { field: string; message: string } | null {
   const birth = birthDateProblem(d.birthDate, today);
-  if (birth) return { field: "birthDate", message: birth };
-  if (ageOn(d.birthDate, today) < adultAge && !d.guardian) {
-    return { field: "guardian", message: "Players under 18 need a parent or guardian's details." };
-  }
-  return null;
+  return birth ? { field: "birthDate", message: birth } : null;
 }
 
 /**
@@ -211,6 +214,11 @@ export interface PersonalDetailsStatus {
   complete: boolean;
   /** Their account is new enough that the apps ask before anything else. */
   required: boolean;
+  /**
+   * The API changed this account's claims (account_gate.ts): call
+   * `getIdToken(true)` before the next write.
+   */
+  refreshToken?: true;
 }
 
 /** `GET /v1/me/personal`: their own details, for editing. */

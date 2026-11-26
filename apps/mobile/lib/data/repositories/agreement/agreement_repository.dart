@@ -4,6 +4,7 @@ import 'package:logging/logging.dart';
 import '../../../domain/models/agreement.dart';
 import '../../../utils/result.dart';
 import '../../services/api_client.dart';
+import '../account_gate/account_gate.dart';
 import '../auth/auth_repository.dart';
 
 final _log = Logger('AgreementRepository');
@@ -37,14 +38,17 @@ class AgreementRepositoryApi extends AgreementRepository {
   AgreementRepositoryApi({
     required ApiClient? api,
     required AuthRepository auth,
+    AccountGate? gate,
   }) : _api = api,
-       _auth = auth {
+       _auth = auth,
+       _gate = gate {
     _auth.addListener(_onAuth);
     _onAuth();
   }
 
   final ApiClient? _api;
   final AuthRepository _auth;
+  final AccountGate? _gate;
   String? _uid;
   bool? _agreed;
   bool _failed = false;
@@ -105,6 +109,7 @@ class AgreementRepositoryApi extends AgreementRepository {
     }
     await api.put('/v1/me/agreement', {'version': termsVersion});
     _agreed = true;
+    _gate?.clear(AccountGate.terms);
     notifyListeners();
   });
 

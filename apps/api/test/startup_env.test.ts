@@ -6,7 +6,7 @@ import { stripeFromEnv } from "../src/payments/stripe.js";
 import { assertStartupEnvironment, DEV_PROJECT_ID, isDeployed, PROD_PROJECT_ID, StartupConfigError, stripeKeyMode } from "../src/startup_env.js";
 import { FakeStore, FakeTeamRepository, FakeUsers, FakeVerifier } from "./fakes.js";
 
-const kms = { PERSONAL_DETAILS_KMS_KEY: "projects/p/locations/l/keyRings/r/cryptoKeys/k" };
+const kms = { PERSONAL_DETAILS_KMS_KEY: "projects/p/locations/l/keyRings/r/cryptoKeys/k", ACCOUNT_GATE_MODE: "enforce" };
 const fails = (env: Record<string, string>, re: RegExp) => expect(() => assertStartupEnvironment(env)).toThrow(re);
 
 describe("startup environment", () => {

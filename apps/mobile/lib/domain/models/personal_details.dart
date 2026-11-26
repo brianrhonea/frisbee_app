@@ -1,16 +1,29 @@
-/// A player's personal details: legal name, birthday, phone, gender,
-/// address and, under 18, a parent or guardian. Only the player sees them;
+/// A player's personal details: legal name, birthday, phone, gender and
+/// address. Launch is adults only (18+). Only the player sees them;
 /// the API keeps them encrypted (`/v1/me/personal`). Mirrors
 /// packages/shared/src/personal.ts: keep the rules and limits in step.
 library;
 
-/// Too young to have an account (COPPA): sign-up stops.
-const minimumAge = 13;
-
-/// Under this, a parent or guardian's details are asked too.
+/// Launch is adults only: under this, sign-up stops (account gate, Q6).
 const adultAge = 18;
 
-const tooYoungMessage = 'You must be $minimumAge or older to use Stall 10.';
+/// The server's own text (`adultOnlyMessage` in
+/// packages/shared/src/account_gate.ts); the website shows the same.
+const adultOnlyMessage = 'You must be $adultAge or older to use Stall 10.';
+
+/// Kept for callers that still name it: the same message.
+const tooYoungMessage = adultOnlyMessage;
+
+/// The birth date is saved once (`birthDateLockedMessage` in
+/// packages/shared/src/account_gate.ts).
+const birthDateLockedMessage =
+    "Your date of birth can't be changed. Contact support if it's wrong.";
+
+/// Where to write when a saved birth date is wrong.
+const supportEmail = 'support@stall10.app';
+
+/// [birthDateLockedMessage] with where to go, for showing.
+const birthDateLockedHint = '$birthDateLockedMessage Email $supportEmail.';
 
 enum Gender {
   woman('Woman'),
@@ -33,7 +46,6 @@ abstract final class PersonalLimits {
   static const city = 60;
   static const region = 60;
   static const postalCode = 20;
-  static const relationship = 40;
 }
 
 /// [date] as YYYY-MM-DD.
@@ -61,14 +73,14 @@ int ageOn(DateTime birth, DateTime today) {
   return age;
 }
 
-/// What's wrong with [birth] on [today], or null; under 13 gives
-/// [tooYoungMessage].
+/// What's wrong with [birth] on [today], or null; under 18 gives
+/// [adultOnlyMessage].
 String? birthDateProblem(DateTime? birth, DateTime today) {
   if (birth == null) return 'Enter your date of birth.';
   final age = ageOn(birth, today);
   if (age < 0) return 'That date is in the future.';
   if (age > 120) return 'Check the year of your date of birth.';
-  if (age < minimumAge) return tooYoungMessage;
+  if (age < adultAge) return adultOnlyMessage;
   return null;
 }
 
@@ -163,34 +175,6 @@ class Address {
   };
 }
 
-class Guardian {
-  const Guardian({
-    required this.name,
-    this.relationship = '',
-    required this.email,
-    required this.phone,
-  });
-
-  final String name;
-  final String relationship;
-  final String email;
-  final String phone;
-
-  factory Guardian.fromMap(Map<String, Object?> m) => Guardian(
-    name: '${m['name'] ?? ''}',
-    relationship: '${m['relationship'] ?? ''}',
-    email: '${m['email'] ?? ''}',
-    phone: '${m['phone'] ?? ''}',
-  );
-
-  Map<String, Object?> toMap() => {
-    'name': name.trim(),
-    'relationship': relationship.trim(),
-    'email': email.trim(),
-    'phone': phone.trim(),
-  };
-}
-
 class PersonalDetails {
   const PersonalDetails({
     required this.legalFirstName,
@@ -199,7 +183,6 @@ class PersonalDetails {
     required this.phone,
     required this.gender,
     required this.address,
-    this.guardian,
   });
 
   final String legalFirstName;
@@ -209,16 +192,12 @@ class PersonalDetails {
   final Gender gender;
   final Address address;
 
-  /// Required under 18; not kept at 18 and over.
-  final Guardian? guardian;
-
   static PersonalDetails? fromMap(Map<String, Object?>? m) {
     if (m == null) return null;
     final birth = parseIsoDate('${m['birthDate']}');
     final gender = Gender.fromName(m['gender']);
     final address = m['address'];
     if (birth == null || gender == null || address is! Map) return null;
-    final guardian = m['guardian'];
     return PersonalDetails(
       legalFirstName: '${m['legalFirstName'] ?? ''}',
       legalLastName: '${m['legalLastName'] ?? ''}',
@@ -226,9 +205,6 @@ class PersonalDetails {
       phone: '${m['phone'] ?? ''}',
       gender: gender,
       address: Address.fromMap(address.cast<String, Object?>()),
-      guardian: guardian is Map
-          ? Guardian.fromMap(guardian.cast<String, Object?>())
-          : null,
     );
   }
 
@@ -240,7 +216,6 @@ class PersonalDetails {
     'phone': phone.trim(),
     'gender': gender.name,
     'address': address.toMap(),
-    'guardian': ?guardian?.toMap(),
   };
 }
 
@@ -264,10 +239,37 @@ class PersonalDetailsStatus {
   }
 }
 
-/// Thrown when the API refuses details for being under [minimumAge].
+/// Thrown when the API refuses a birth date for being under [adultAge]
+/// (412, [adultOnlyMessage]). The app then shows the adults-only screen.
 class TooYoungException implements Exception {
-  const TooYoungException();
+  const TooYoungException([this.message = adultOnlyMessage]);
+
+  final String message;
 
   @override
-  String toString() => tooYoungMessage;
+  String toString() => message;
+}
+
+/// Thrown when the API refuses a different birth date than the saved one
+/// (412, [birthDateLockedMessage]).
+class BirthDateLockedException implements Exception {
+  const BirthDateLockedException();
+
+  @override
+  String toString() => birthDateLockedHint;
+}
+
+/// The exception for a 412 on a birth date, or null if [message] and
+/// [fields] aren't one. [message] is the API's own text.
+Exception? birthDateRefusal(
+  String code,
+  Map<String, String> fields,
+  String message,
+) {
+  if (code != 'failed_precondition' || !fields.containsKey('birthDate')) {
+    return null;
+  }
+  return message == birthDateLockedMessage
+      ? const BirthDateLockedException()
+      : TooYoungException(message);
 }

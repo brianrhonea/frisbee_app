@@ -21,6 +21,9 @@ export const routeWriteLimits: Record<string, Limit[]> = {
   "POST /v1/teams/:teamId/join-requests": [{ max: 10, windowMs: minute }],
   "POST /v1/uploads": [{ max: 30, windowMs: minute }],
   "PUT /v1/me/identity": [{ max: 10, windowMs: minute }],
+  // Each full save is a KMS encrypt and decrypt (the locked-birth-date check), and a
+  // refused under-18 date writes a refusal record (F3).
+  "PUT /v1/me/personal": [{ max: 5, windowMs: minute }, { max: 20, windowMs: day }],
   // Once per sign-up; each one is a KMS encrypt.
   "PUT /v1/me/personal/birth-date": [{ max: 5, windowMs: minute }, { max: 20, windowMs: day }],
   "DELETE /v1/teams/:teamId": [{ max: 3, windowMs: minute }],

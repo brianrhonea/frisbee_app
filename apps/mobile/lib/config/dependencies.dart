@@ -1,6 +1,7 @@
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
+import '../data/repositories/account_gate/account_gate.dart';
 import '../data/repositories/calendar/calendar_repository.dart';
 import '../data/repositories/calendar/calendar_repository_api.dart';
 import '../data/repositories/discord/discord_import_repository.dart';
@@ -158,16 +159,30 @@ List<SingleChildWidget> get firebaseProviders => [
     create: (context) =>
         TeamShareRepositoryApi(api: context.read<ApiClient?>()),
   ),
+  // What the account gate says is missing (verify email, birth date,
+  // Terms) and the under-18 dead end. Made at start so a refused write
+  // anywhere reaches it: the API client reports into it.
+  ChangeNotifierProvider<AccountGate>(
+    lazy: false,
+    create: (context) {
+      final gate = AccountGate(auth: context.read<AuthRepository>());
+      context.read<ApiClient?>()?.onAccountIncomplete = (fields) =>
+          gate.report(fields.keys);
+      return gate;
+    },
+  ),
   ChangeNotifierProvider<AgreementRepository>(
     create: (context) => AgreementRepositoryApi(
       api: context.read<ApiClient?>(),
       auth: context.read<AuthRepository>(),
+      gate: context.read<AccountGate>(),
     ),
   ),
   ChangeNotifierProvider<PersonalDetailsRepository>(
     create: (context) => PersonalDetailsRepositoryApi(
       api: context.read<ApiClient?>(),
       auth: context.read<AuthRepository>(),
+      gate: context.read<AccountGate>(),
     ),
   ),
   Provider(create: (_) => AttachmentStorage()),
