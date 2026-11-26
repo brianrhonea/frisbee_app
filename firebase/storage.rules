@@ -39,6 +39,20 @@ service firebase.storage {
           + '|text/(plain|csv)');
     }
 
+    // Native video upload is off until the owner sets videoUploads true in
+    // meta/flags (docs/specifications/contracts/meta-flags.md). A missing
+    // document or field is closed. A file counts as a video by its content
+    // type or by a video file name (as attachmentSizeOk does).
+    function videoUploadsOn() {
+      return firestore.exists(/databases/(default)/documents/meta/flags)
+        && firestore.get(/databases/(default)/documents/meta/flags)
+             .data.get('videoUploads', false) == true;
+    }
+    function videoAllowed(fileName) {
+      return !(videoType() || fileName.lower().matches('.*[.](mp4|mov|m4v|webm|3gp)'))
+        || videoUploadsOn();
+    }
+
     // Message attachments: 10 MB, or 100 MB for videos (maxAttachmentBytes
     // and maxVideoBytes in lib/domain/models/chat.dart); videos are known
     // by name, and sent as a video type or octet-stream.
@@ -101,6 +115,7 @@ service firebase.storage {
         && request.auth.uid == userId
         && attachmentSizeOk(fileName)
         && request.resource.contentType != null && attachmentType()
+        && videoAllowed(fileName)
         && canWrite(teamId, roomId);
       allow delete: if request.auth != null
         && (request.auth.uid == userId
@@ -151,7 +166,8 @@ service firebase.storage {
       allow create, update: if request.auth != null
         && can(team(teamId), 'manageTeam')
         && request.resource.size <= 500 * 1024 * 1024
-        && videoType();
+        && videoType()
+        && videoUploadsOn();
       allow delete: if request.auth != null && can(team(teamId), 'manageTeam');
     }
 
@@ -215,7 +231,8 @@ service firebase.storage {
       allow create, update: if inConversation()
         && request.auth.uid == userId
         && attachmentSizeOk(fileName)
-        && request.resource.contentType != null && attachmentType();
+        && request.resource.contentType != null && attachmentType()
+        && videoAllowed(fileName);
       allow delete: if inConversation() && request.auth.uid == userId;
     }
   }

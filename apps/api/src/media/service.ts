@@ -3,6 +3,7 @@ import {
   chatDocumentTypes,
   chatFileMax,
   chatUploadQuota,
+  chatVideoName,
   type CompleteUploadResponse,
   type CreateUploadResponse,
   createUploadRequestSchema,
@@ -15,6 +16,7 @@ import {
   uploadMax,
   videoFileName,
   isUnsafeImage,
+  parseMetaFlags,
   unsafeImageMessage,
 } from "@stall10/shared";
 import type { Caller } from "../auth.js";
@@ -144,6 +146,20 @@ export class UploadService {
     if (!conv || !strings(conv.participants).includes(uid)) throw denied("You're not in this conversation.");
   }
 
+  /**
+   * Whether native video upload is open: `meta/flags.videoUploads` is true
+   * (docs/specifications/contracts/meta-flags.md). Fails CLOSED: a missing
+   * document, a bad value or a read error all mean no videos. storage.rules
+   * enforces the same for direct uploads.
+   */
+  private async videosOpen(): Promise<boolean> {
+    try {
+      return parseMetaFlags(await this.store.get("meta/flags")).videoUploads;
+    } catch {
+      return false;
+    }
+  }
+
   /** Today (UTC), the day uploadQuotas/{uid} counts. */
   private quotaDay() {
     return new Date(this.now()).toISOString().slice(0, 10);
@@ -173,6 +189,8 @@ export class UploadService {
     if (!parsed.success) throw fromZod(parsed.error);
     const { purpose, contentType, size, targetId, itemId, name } = parsed.data;
     await this.checkTarget(caller.uid, purpose, targetId);
+    const videoByName = purpose === "chat" && name != null && chatVideoName.test(name);
+    if ((isVideoType(contentType) || videoByName) && !(await this.videosOpen())) throw new ApiError("failed_precondition", videosOff);
     if (purpose !== "chat" && isVideoType(contentType) && !this.opts.queue) throw new ApiError("failed_precondition", videosNotYet);
     // The URL takes up to the limit for the declared kind (and, in chat, name).
     const maxBytes = uploadMax(purpose, contentType, name) ?? uploadLimits[purpose].image;
@@ -232,6 +250,11 @@ export class UploadService {
       purpose === "chat"
         ? sniffChatMediaType(head, String(upload.contentType ?? ""), typeof upload.name === "string" ? upload.name : undefined)
         : sniffMediaType(head);
+    // The flag may have been turned off since the URL was signed: what the bytes show decides.
+    if (type != null && isVideoType(type) && !(await this.videosOpen())) {
+      await this.reject(id, rawPath, videosOff);
+      throw new ApiError("failed_precondition", videosOff);
+    }
     if (purpose === "chat" && (type == null || isVideoType(type))) return this.keepAsSent(id, upload, type, size, generation);
     const limits = uploadLimits[purpose];
     const max = type == null ? null : isImageType(type) ? limits.image : limits.video;
@@ -447,6 +470,7 @@ export class UploadService {
  * Videos outside chat wait on the transcode job (ARCHITECTURE.md §10 item
  * 4): until a queue is wired, they're refused rather than left processing.
  */
+const videosOff = "Video uploads aren't available right now.";
 const videosNotYet = "Video uploads aren't available here yet.";
 
 const quotaPath = (uid: string) => `uploadQuotas/${uid}`;

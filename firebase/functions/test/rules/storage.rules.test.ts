@@ -6,7 +6,7 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { doc, setDoc, updateDoc } from "firebase/firestore";
+import { deleteDoc, doc, setDoc, updateDoc } from "firebase/firestore";
 import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 
 // Run with `npm run test:rules` (starts the Firestore and Storage
@@ -26,6 +26,9 @@ const storage = (uid: string) => env.authenticatedContext(uid).storage();
 const file = (uid: string, author: string, room = "r1") =>
   storage(uid).ref(`teams/${TEAM}/chats/${room}/${author}/m1/0-photo.png`);
 const bytes = (n: number) => new Uint8Array(n);
+// meta/flags.videoUploads (docs/specifications/contracts/meta-flags.md).
+const setVideoUploads = (on: boolean) =>
+  env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), "meta", "flags"), { videoUploads: on }));
 
 beforeAll(async () => {
   env = await initializeTestEnvironment({
@@ -108,6 +111,7 @@ describe("chat attachments", () => {
   });
 
   it("lets videos be up to 100 MB", async () => {
+    await setVideoUploads(true);
     const at = (name: string) => storage(CAPTAIN).ref(`teams/${TEAM}/chats/r1/${CAPTAIN}/m3/${name}`);
     await assertSucceeds(at("0-clip.MP4").put(bytes(10 * 1024 * 1024 + 1), { contentType: "video/mp4" }).then());
     // Before the desktop SDK sets the type.
@@ -265,6 +269,7 @@ describe("direct message attachments", () => {
   });
 
   it("videos may be up to 100 MB", async () => {
+    await setVideoUploads(true);
     const at = (name: string) => storage(PLAYER).ref(`conversations/${CONV}/${PLAYER}/m3/${name}`);
     await assertSucceeds(at("0-clip.mp4").put(bytes(10 * 1024 * 1024 + 1), { contentType: "video/mp4" }).then());
     await assertFails(at("1-clip.mp4").put(bytes(100 * 1024 * 1024 + 1), { contentType: "video/mp4" }).then());
@@ -352,5 +357,48 @@ describe("user post photos", () => {
     await assertSucceeds(photo(OWNER).getMetadata());
     await assertSucceeds(photo(COACH, OWNER).getMetadata());
     await assertFails(photo(OUTSIDER, OWNER).getMetadata());
+  });
+});
+
+describe("native video upload flag (meta/flags.videoUploads)", () => {
+  const DMCONV = `${OWNER}_${PLAYER}`;
+  const attempts = (uid: string) => [
+    // team chat: by type, by name, small and large
+    () => storage(CAPTAIN).ref(`teams/${TEAM}/chats/r1/${CAPTAIN}/v1/0-a.mp4`).put(bytes(10), { contentType: "video/mp4" }).then(),
+    () => storage(CAPTAIN).ref(`teams/${TEAM}/chats/r1/${CAPTAIN}/v2/0-a.mov`).put(bytes(10), { contentType: "application/octet-stream" }).then(),
+    () => storage(CAPTAIN).ref(`teams/${TEAM}/chats/r1/${CAPTAIN}/v3/0-a.bin`).put(bytes(10), { contentType: "video/webm" }).then(),
+    // direct messages
+    () => storage(uid).ref(`conversations/${DMCONV}/${uid}/v4/0-a.mp4`).put(bytes(10), { contentType: "video/mp4" }).then(),
+    // team film
+    () => storage(OWNER).ref(`teams/${TEAM}/videos/vid1/a.mp4`).put(bytes(10), { contentType: "video/mp4" }).then(),
+  ];
+
+  it("refuses every kind of video while the flag is off, missing or not true", async () => {
+    for (const state of ["missing", "false", "string"] as const) {
+      await env.withSecurityRulesDisabled((ctx) => deleteDoc(doc(ctx.firestore(), "meta", "flags")));
+      if (state === "false") await setVideoUploads(false);
+      if (state === "string")
+        await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), "meta", "flags"), { videoUploads: "true" }));
+      for (const go of attempts(PLAYER)) await assertFails(go());
+    }
+  });
+
+  it("allows them once the owner turns it on", async () => {
+    await setVideoUploads(true);
+    for (const go of attempts(PLAYER)) await assertSucceeds(go());
+  });
+
+  it("never blocks photos or documents", async () => {
+    await setVideoUploads(false);
+    await assertSucceeds(
+      storage(CAPTAIN).ref(`teams/${TEAM}/chats/r1/${CAPTAIN}/p1/0-a.png`).put(bytes(10), { contentType: "image/png" }).then(),
+    );
+    await assertSucceeds(
+      storage(CAPTAIN).ref(`teams/${TEAM}/chats/r1/${CAPTAIN}/p2/0-a.pdf`).put(bytes(10), { contentType: "application/pdf" }).then(),
+    );
+  });
+
+  it("can't be turned on from a client", async () => {
+    await assertFails(setDoc(doc(env.authenticatedContext(OWNER).firestore(), "meta", "flags"), { videoUploads: true }));
   });
 });
