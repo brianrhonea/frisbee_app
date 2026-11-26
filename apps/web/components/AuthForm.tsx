@@ -4,6 +4,7 @@ import {
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
   OAuthProvider,
+  sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
@@ -15,13 +16,12 @@ import {
   passwordMinLength,
   passwordProblem,
   personNameLimits,
-  type SignUpBirthDateInput,
 } from "@stall10/shared";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
 import { authConfigured, emailForUsername, firebaseAuth } from "@/lib/firebase";
-import { ApiError, callApi } from "@/lib/client";
+import { saveSignUpDetails } from "@/lib/signupAccount";
 import { signupDraft } from "@/lib/signupDraft";
 import { useAuth } from "./AuthProvider";
 import { isSignInCancelled, popupBlockedMessage } from "@/lib/auth_errors";
@@ -82,7 +82,7 @@ function safeNext(next: string | null): string {
 /**
  * Log in, or sign up's first step (account details, as in the app's
  * SignUpScreen): name, a username they can change (suggested from the name
- * until they edit it), birthday, email and password. Under 13 is refused
+ * until they edit it), birthday, email and password. Under 18 is refused
  * before any account exists. Google and Apple skip the form; PersonalGate
  * then asks their name and username ("Your name and username") and, like
  * everyone, the details ("About you").
@@ -162,18 +162,13 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     void run(async () => {
       const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
       await updateProfile(cred.user, { displayName: joinPersonName(first, last) });
-      try {
-        await callApi(cred.user, "/v1/me/username", { method: "POST", body: { username: check.handle } });
-      } catch (err) {
-        // Taken in the meantime, or the API is down: the next step asks again.
-        if (!(err instanceof ApiError)) throw err;
-      }
-      // Kept (encrypted) so "About you" has it after a reload or on another
-      // device. Never holds up sign-up: if it fails (offline, an API without
-      // an encryption key, or under 13 by the server's date), the in-memory
-      // copy still fills the form, and its full save checks the age again.
-      const body: SignUpBirthDateInput = { birthDate };
-      await callApi(cred.user, "/v1/me/personal/birth-date", { method: "PUT", body }).catch(() => {});
+      // Email verification (Firebase's own email): writes need it (account gate).
+      await sendEmailVerification(cred.user).catch(() => {});
+      // Birth date first (sets ageOk, token refreshed), then the username:
+      // the API refuses the username without ageOk. Never holds up sign-up:
+      // if the birth date isn't saved, the in-memory copy still fills "About
+      // you", and the gate asks for the username after it.
+      await saveSignUpDetails(cred.user, birthDate, check.handle!);
     });
   }
 

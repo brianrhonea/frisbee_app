@@ -31,6 +31,7 @@ export function PersonalSettings() {
         email={data.email}
         initial={data.details}
         prefill={{ name: user.displayName, birthDate: data.signUpBirthDate }}
+        birthDateLocked={!!(data.details?.birthDate || data.signUpBirthDate)}
         onSaved={refresh}
       />
     </div>
