@@ -29,6 +29,11 @@ Account gate fixes from the #3a security review (docs/specifications/contracts/a
   5 a minute and 20 a day per account.
 - F4: `GET /v1/me/personal/status` is limited to 10 a minute and 200 a day per
   account. Setting claims skips the Auth write when nothing changes.
+- F5: a client can set its own Firebase Auth `photoURL`, which was copied into
+  `profiles/{uid}` and onto posts past the rules. The API now trusts an Auth
+  photo only when it is this project's Storage URL for the person's own
+  `users/{uid}/profile/` folder, or a Google account photo; otherwise no picture.
+- `deploy/service.yaml` sets `ACCOUNT_GATE_MODE: "report"`; flip it there.
 - F9: a decrypt failure while looking for the age claim is logged
   (`account_gate_decrypt_failed`, no detail) and grants no age claim; status
   still answers.

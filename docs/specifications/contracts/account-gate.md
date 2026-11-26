@@ -226,8 +226,12 @@ Changes to the sections above, from the #3a security review (F1 to F9):
   `draftPick`, `draftControl` and `finishDraft` need the same three things in the
   token (`firebase/functions/src/account/gate.ts`). They throw `permission-denied`
   with `details: { code: "account_incomplete", fields }`.
-- **Photo URLs (F5), Terms literal (F6).** Rules only; see section 4. API pictures
-  are built server side from an upload id, never from a client URL.
+- **Photo URLs (F5), Terms literal (F6).** Rules: see section 4. API: pictures it
+  writes are built server side from an upload id, but a client can set its own Auth
+  `photoURL`, which the API copies into `profiles/{uid}` and posts with Admin
+  access. The API now passes on an Auth photo only if it is this project's Storage
+  URL for the person's own `users/{uid}/profile/` folder or a Google account photo
+  (`apps/api/src/media/photo_url.ts`); anything else reads as no picture.
 - **Startup (F8, F9).** `ACCOUNT_GATE_MODE=enforce` refuses to start without a cipher.
   A decrypt failure while looking for the age claim logs
   `account_gate_decrypt_failed` (uid only), grants no age claim, and status still answers.
