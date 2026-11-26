@@ -127,7 +127,7 @@ class _Tag extends StatelessWidget {
   @override
   Widget build(BuildContext context) => DecoratedBox(
     decoration: BoxDecoration(
-      color: AppColors.of(context).feature.withValues(alpha: 0.85),
+      color: AppColors.of(context).media.withValues(alpha: 0.85),
       borderRadius: BorderRadius.circular(999),
     ),
     child: Padding(
@@ -135,14 +135,14 @@ class _Tag extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: AppColors.of(context).onFeature),
+          Icon(icon, size: 14, color: AppColors.of(context).onMedia),
           const SizedBox(width: 4),
           Flexible(
             child: Text(
               text,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: AppColors.of(context).onFeature,
+                color: AppColors.of(context).onMedia,
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),

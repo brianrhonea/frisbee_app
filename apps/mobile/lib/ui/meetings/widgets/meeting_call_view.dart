@@ -179,7 +179,7 @@ class _MeetingCallViewState extends State<MeetingCallView> {
     builder: (context, c) {
       final wide = c.maxWidth >= _wide;
       // The call is always on the dark scoreboard surface.
-      final stage = AppColors.of(context).feature;
+      final stage = AppColors.of(context).media;
       final theme = AppTheme.dark;
       return Theme(
         data: theme,
@@ -257,14 +257,14 @@ class _TopBar extends StatelessWidget {
               style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
-                color: c.onFeature,
+                color: c.onMedia,
               ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
           Text(
             '${vm.participants.length} in call',
-            style: TextStyle(fontSize: 12, color: c.onFeatureMuted),
+            style: TextStyle(fontSize: 12, color: c.onMediaMuted),
           ),
           if (vm.isAdmin && (vm.meeting?.requireApproval ?? false))
             IconButton(
@@ -355,7 +355,7 @@ class _Stage extends StatelessWidget {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: ColoredBox(
-              color: AppColors.of(context).feature,
+              color: AppColors.of(context).media,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -437,7 +437,7 @@ class ParticipantTile extends StatelessWidget {
     final camera = p.camera;
     final c = AppColors.of(context);
     return Material(
-      color: c.featureHighlight,
+      color: c.media2,
       shape: RoundedSuperellipseBorder(
         borderRadius: BorderRadius.circular(cardRadius),
         side: p.isSpeaking
@@ -492,7 +492,7 @@ class _NameTag extends StatelessWidget {
     final c = AppColors.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: c.feature.withValues(alpha: 0.85),
+        color: c.media.withValues(alpha: 0.85),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Padding(
@@ -501,7 +501,7 @@ class _NameTag extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (icon case final icon?) ...[
-              Icon(icon, size: 14, color: c.onFeature),
+              Icon(icon, size: 14, color: c.onMedia),
               const SizedBox(width: 4),
             ],
             Flexible(
@@ -509,7 +509,7 @@ class _NameTag extends StatelessWidget {
                 text,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: c.onFeature,
+                  color: c.onMedia,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
@@ -657,11 +657,11 @@ class CallToggle extends StatelessWidget {
     final Color background;
     final Color foreground;
     if (highlightOn) {
-      background = on ? c.accent : c.featureHighlight;
-      foreground = on ? c.onAccent : c.onFeature;
+      background = on ? c.accent : c.media2;
+      foreground = on ? c.onAccent : c.onMedia;
     } else {
-      background = on ? c.featureHighlight : c.onFeature;
-      foreground = on ? c.onFeature : c.feature;
+      background = on ? c.media2 : c.onMedia;
+      foreground = on ? c.onMedia : c.media;
     }
     return IconButton.filled(
       tooltip: tooltip,
