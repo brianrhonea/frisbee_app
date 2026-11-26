@@ -15,6 +15,9 @@ The running version is in `GET /health` and in every response's
   (docs/specifications/contracts/meta-flags.md). A missing document, a bad
   value or a read error all mean closed. Photos and documents are
   unaffected. Signed upload URLs still last 15 minutes.
+- Uploads (#14): photo screening fails closed. If SafeSearch errors or
+  gives no answer, `complete` returns 503 `unavailable` and saves nothing;
+  the upload stays pending, so the client can call `complete` again.
 
 ## 0.49.0 — 2026-11-26
 
