@@ -7,6 +7,22 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.51.0 — 2026-11-26
+
+- Client errors (Sprint 2 #7): `POST /v1/client-errors` takes the
+  website's error reports (`{message ≤1 KB, stack ≤8 KB, url, release,
+  digest?}`, strict, 16 KB body limit). Open to anyone (`config.public`: no
+  token, no App Check, never an account); answers 204. Limited per IP in
+  memory (30 a minute, 300 a day); over the limit it still answers 204 and
+  logs a throttled count. The server redacts again (emails, JWTs, bearer
+  tokens, 32+ character ids, URL queries and fragments) and writes one
+  Cloud Logging entry for Cloud Error Reporting: severity ERROR, `@type`
+  ReportedErrorEvent, `serviceContext {service: "web", version: release}`,
+  `message` = the stack (the message when there is none, which Error
+  Reporting may not group), `context.httpRequest.url` = the path. No user
+  id or IP. CORS needed no change (`content-type` is already allowed).
+  The Flutter app reports to Crashlytics, not here.
+
 ## 0.50.0 — 2026-11-26
 
 - Uploads (#13): `POST /v1/uploads` and `/complete` refuse every video
