@@ -49,6 +49,10 @@ abstract final class AppTheme {
           surfaceContainerHighest: c.accentSoft,
           outline: c.muted,
           outlineVariant: c.border,
+          error: c.error,
+          onError: c.card,
+          errorContainer: c.errorSoft,
+          onErrorContainer: c.error,
         );
     final base = ThemeData(
       colorScheme: scheme,
@@ -241,7 +245,7 @@ abstract final class AppTheme {
           fontSize: 13,
         ),
       ),
-      // Unread counts are the user's to clear: disc amber.
+      // Unread counts are the user's to clear: indigo.
       badgeTheme: BadgeThemeData(
         backgroundColor: c.highlight,
         textColor: c.onHighlight,
@@ -282,9 +286,9 @@ abstract final class AppTheme {
       dividerTheme: DividerThemeData(color: c.border, space: 1),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: c.feature,
-        contentTextStyle: TextStyle(fontFamily: appFont, color: c.onFeature),
-        actionTextColor: c.highlight,
+        backgroundColor: c.ink,
+        contentTextStyle: TextStyle(fontFamily: appFont, color: c.background),
+        actionTextColor: c.background,
         shape: RoundedSuperellipseBorder(
           borderRadius: BorderRadius.circular(controlRadius),
         ),
@@ -328,9 +332,9 @@ abstract final class AppTheme {
   }
 }
 
-/// Named colors of the "Turf & Disc" design, shared with the website:
-/// turf green for actions, scoreboard navy for anything live or today,
-/// disc amber only for what is yours to do, red only for live games.
+/// Named colors (zinc + indigo), shared with the website through
+/// packages/shared/fixtures/design_tokens/tokens.json: indigo for
+/// actions, amber pills for what needs you, red only for live games.
 /// Read with `AppColors.of(context)`.
 @immutable
 class AppColors extends ThemeExtension<AppColors> {
@@ -361,6 +365,8 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.onFeature,
     required this.onFeatureMuted,
     required this.featureHighlight,
+    required this.error,
+    required this.errorSoft,
     required this.positive,
     required this.positiveSoft,
     required this.chipOn,
@@ -368,6 +374,10 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.team,
     required this.personal,
     required this.badge,
+    required this.media,
+    required this.media2,
+    required this.onMedia,
+    required this.onMediaMuted,
   });
 
   /// The page behind cards.
@@ -382,7 +392,8 @@ class AppColors extends ThemeExtension<AppColors> {
   /// Card borders and dividers.
   final Color border;
 
-  /// Outline buttons and unselected chips.
+  /// Outline for inputs, outline buttons and unselected chips (3:1 on
+  /// cards and field fill).
   final Color border2;
 
   /// Primary text.
@@ -394,29 +405,29 @@ class AppColors extends ThemeExtension<AppColors> {
   /// Meta text.
   final Color muted;
 
-  /// Turf green: primary actions, links and selected state.
+  /// Indigo: primary actions, links and selected state.
   final Color accent;
 
   /// Text and icons on [accent].
   final Color onAccent;
 
-  /// Soft turf fill: selected chips, date tiles, soft badges.
+  /// Soft indigo fill: selected chips, date tiles, soft badges.
   final Color accentSoft;
 
   /// Text on [accentSoft].
   final Color accentInk;
 
-  /// Disc amber: only for what is yours to do (report a score, RSVP,
-  /// unread counts). Never decoration.
+  /// Unread / attention fill (indigo): unread dots, count badges and
+  /// what is yours to do. Never decoration.
   final Color highlight;
 
   /// Text on [highlight].
   final Color onHighlight;
 
-  /// Soft amber fill behind a "needs you" row.
+  /// Soft amber fill of a "needs you" pill or row.
   final Color highlightSoft;
 
-  /// Amber text for "needs you" labels on cards.
+  /// Amber text of "needs you" pills and labels.
   final Color highlightInk;
 
   /// Red, only for live games: the live dot.
@@ -434,8 +445,9 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color onSidebar;
   final Color onSidebarMuted;
 
-  /// Scoreboard navy: anything live or today (scoreboard cards,
-  /// live headers).
+  /// Retired dark card (UI-Q6): now holds light-card values (white card
+  /// in light, surface in dark). Pair only with [onFeature] etc. For
+  /// video and call stages use [media].
   final Color feature;
 
   final Color onFeature;
@@ -446,12 +458,18 @@ class AppColors extends ThemeExtension<AppColors> {
   /// Secondary buttons and tiles on [feature].
   final Color featureHighlight;
 
-  /// Wins and confirmations.
+  /// Error text, icons and outlines.
+  final Color error;
+
+  /// Fill of an error banner or pill.
+  final Color errorSoft;
+
+  /// Success only: wins and confirmations.
   final Color positive;
 
   final Color positiveSoft;
 
-  /// A selected filter chip.
+  /// A selected filter chip: solid indigo.
   final Color chipOn;
 
   final Color onChipOn;
@@ -461,79 +479,103 @@ class AppColors extends ThemeExtension<AppColors> {
 
   final Color personal;
 
-  /// Team badge fill (white initials), the same in both modes.
+  /// Team badge fill (white initials), indigo in both modes.
   final Color badge;
 
+  /// Video and call stages: dark in both themes.
+  final Color media;
+
+  /// Tiles and control buttons on [media].
+  final Color media2;
+
+  /// Text and icons on [media].
+  final Color onMedia;
+
+  /// Secondary text on [media].
+  final Color onMediaMuted;
+
   static const light = AppColors(
-    background: Color(0xFFF5F6F1),
+    background: Color(0xFFF4F4F5),
     card: Color(0xFFFFFFFF),
-    field: Color(0xFFEEF0EA),
-    border: Color(0xFFE1E4DC),
-    border2: Color(0xFFD5D9CF),
-    ink: Color(0xFF0F1A2A),
-    ink2: Color(0xFF3B4352),
-    muted: Color(0xFF5E6573),
-    accent: Color(0xFF12805C),
+    field: Color(0xFFE4E4E7),
+    border: Color(0xFFD4D4D8),
+    border2: Color(0xFF71717A),
+    ink: Color(0xFF18181B),
+    ink2: Color(0xFF3F3F46),
+    muted: Color(0xFF52525B),
+    accent: Color(0xFF4338CA),
     onAccent: Color(0xFFFFFFFF),
-    accentSoft: Color(0xFFE3F2EA),
-    accentInk: Color(0xFF0B5E43),
-    highlight: Color(0xFFFFB627),
-    onHighlight: Color(0xFF2A1B00),
-    highlightSoft: Color(0xFFFFF1D1),
-    highlightInk: Color(0xFF8A5A00),
-    live: Color(0xFFD93636),
-    liveSoft: Color(0xFFFDE7E7),
-    liveInk: Color(0xFFB42323),
+    accentSoft: Color(0xFFEEF2FF),
+    accentInk: Color(0xFF3730A3),
+    highlight: Color(0xFF4338CA),
+    onHighlight: Color(0xFFFFFFFF),
+    highlightSoft: Color(0xFFFEF3C7),
+    highlightInk: Color(0xFF92400E),
+    live: Color(0xFFBE123C),
+    liveSoft: Color(0xFFFFE4E6),
+    liveInk: Color(0xFFBE123C),
+    error: Color(0xFFB91C1C),
+    errorSoft: Color(0xFFFEE2E2),
+    positive: Color(0xFF166534),
+    positiveSoft: Color(0xFFDCFCE7),
     sidebar: Color(0xFFFFFFFF),
-    onSidebar: Color(0xFF0F1A2A),
-    onSidebarMuted: Color(0xFF5E6573),
-    feature: Color(0xFF0F1A2A),
-    onFeature: Color(0xFFFFFFFF),
-    onFeatureMuted: Color(0xFFB7C0CE),
-    featureHighlight: Color(0xFF22324A),
-    positive: Color(0xFF12805C),
-    positiveSoft: Color(0xFFE3F2EA),
-    chipOn: Color(0xFF0F1A2A),
+    onSidebar: Color(0xFF18181B),
+    onSidebarMuted: Color(0xFF52525B),
+    feature: Color(0xFFFFFFFF),
+    onFeature: Color(0xFF18181B),
+    onFeatureMuted: Color(0xFF52525B),
+    featureHighlight: Color(0xFFE4E4E7),
+    chipOn: Color(0xFF4338CA),
     onChipOn: Color(0xFFFFFFFF),
-    team: Color(0xFF2C6FB7),
-    personal: Color(0xFFA8407A),
-    badge: Color(0xFF2C6FB7),
+    team: Color(0xFF1D4ED8),
+    personal: Color(0xFFA21CAF),
+    badge: Color(0xFF4338CA),
+    media: Color(0xFF18181B),
+    media2: Color(0xFF27272A),
+    onMedia: Color(0xFFFAFAFA),
+    onMediaMuted: Color(0xFFA1A1AA),
   );
 
   static const dark = AppColors(
-    background: Color(0xFF0B121D),
-    card: Color(0xFF152030),
-    field: Color(0xFF1B2838),
-    border: Color(0xFF24324A),
-    border2: Color(0xFF2E3D55),
-    ink: Color(0xFFEAF0F5),
-    ink2: Color(0xFFC4CDD8),
-    muted: Color(0xFF93A0B2),
-    accent: Color(0xFF3DBE8B),
-    onAccent: Color(0xFF06281B),
-    accentSoft: Color(0xFF133528),
-    accentInk: Color(0xFF7FDDB4),
-    highlight: Color(0xFFFFC24D),
-    onHighlight: Color(0xFF2A1B00),
-    highlightSoft: Color(0xFF3A2C0E),
-    highlightInk: Color(0xFFFFC24D),
-    live: Color(0xFFFF5A5A),
-    liveSoft: Color(0xFF3A1A1E),
-    liveInk: Color(0xFFFF8A8A),
-    sidebar: Color(0xFF152030),
-    onSidebar: Color(0xFFEAF0F5),
-    onSidebarMuted: Color(0xFF93A0B2),
-    feature: Color(0xFF1A2940),
-    onFeature: Color(0xFFFFFFFF),
-    onFeatureMuted: Color(0xFFA9B6C8),
-    featureHighlight: Color(0xFF26385A),
-    positive: Color(0xFF3DBE8B),
-    positiveSoft: Color(0xFF133528),
-    chipOn: Color(0xFFEAF0F5),
-    onChipOn: Color(0xFF0B121D),
-    team: Color(0xFF7FB0EE),
-    personal: Color(0xFFE08BB8),
-    badge: Color(0xFF2C6FB7),
+    background: Color(0xFF09090B),
+    card: Color(0xFF18181B),
+    field: Color(0xFF27272A),
+    border: Color(0xFF3F3F46),
+    border2: Color(0xFF71717A),
+    ink: Color(0xFFFAFAFA),
+    ink2: Color(0xFFD4D4D8),
+    muted: Color(0xFFA1A1AA),
+    accent: Color(0xFFA5B4FC),
+    onAccent: Color(0xFF18181B),
+    accentSoft: Color(0xFF1E1B4B),
+    accentInk: Color(0xFFC7D2FE),
+    highlight: Color(0xFFA5B4FC),
+    onHighlight: Color(0xFF18181B),
+    highlightSoft: Color(0xFF451A03),
+    highlightInk: Color(0xFFFCD34D),
+    live: Color(0xFFFDA4AF),
+    liveSoft: Color(0xFF4C0519),
+    liveInk: Color(0xFFFDA4AF),
+    error: Color(0xFFFCA5A5),
+    errorSoft: Color(0xFF450A0A),
+    positive: Color(0xFF86EFAC),
+    positiveSoft: Color(0xFF052E16),
+    sidebar: Color(0xFF18181B),
+    onSidebar: Color(0xFFFAFAFA),
+    onSidebarMuted: Color(0xFFA1A1AA),
+    feature: Color(0xFF18181B),
+    onFeature: Color(0xFFFAFAFA),
+    onFeatureMuted: Color(0xFFA1A1AA),
+    featureHighlight: Color(0xFF27272A),
+    chipOn: Color(0xFFA5B4FC),
+    onChipOn: Color(0xFF18181B),
+    team: Color(0xFF93C5FD),
+    personal: Color(0xFFF0ABFC),
+    badge: Color(0xFF4338CA),
+    media: Color(0xFF18181B),
+    media2: Color(0xFF27272A),
+    onMedia: Color(0xFFFAFAFA),
+    onMediaMuted: Color(0xFFA1A1AA),
   );
 
   static AppColors of(BuildContext context) =>
@@ -573,6 +615,8 @@ class AppColors extends ThemeExtension<AppColors> {
       onFeature: l(onFeature, other.onFeature),
       onFeatureMuted: l(onFeatureMuted, other.onFeatureMuted),
       featureHighlight: l(featureHighlight, other.featureHighlight),
+      error: l(error, other.error),
+      errorSoft: l(errorSoft, other.errorSoft),
       positive: l(positive, other.positive),
       positiveSoft: l(positiveSoft, other.positiveSoft),
       chipOn: l(chipOn, other.chipOn),
@@ -580,6 +624,10 @@ class AppColors extends ThemeExtension<AppColors> {
       team: l(team, other.team),
       personal: l(personal, other.personal),
       badge: l(badge, other.badge),
+      media: l(media, other.media),
+      media2: l(media2, other.media2),
+      onMedia: l(onMedia, other.onMedia),
+      onMediaMuted: l(onMediaMuted, other.onMediaMuted),
     );
   }
 }
