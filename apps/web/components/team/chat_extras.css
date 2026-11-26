@@ -48,7 +48,7 @@
 .chat-event-info .type-dot { width: 8px; height: 8px; border-radius: 4px; background: var(--team); flex-shrink: 0; }
 .chat-event-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .chat-event-actions .rsvp-pill.needs { margin-right: auto; }
-.chat-event-actions .btn.chosen { background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; }
+.chat-event-actions .btn.chosen { background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; box-shadow: inset 0 0 0 2px var(--accent); }
 
 .share-event-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; }
 .share-event-list button {

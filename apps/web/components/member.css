@@ -13,7 +13,7 @@
   padding: 3px 10px; border-radius: 999px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   background: var(--field); color: var(--ink-soft); font-size: 12px; font-weight: 700; line-height: 1.4;
 }
-.rsvp-pill.going { background: var(--accent-soft); color: var(--accent-ink); }
+.rsvp-pill.going { background: var(--success-soft); color: var(--success); }
 .rsvp-pill.needs { background: var(--disc-soft); color: var(--disc-ink); }
 .sched-row.needs .rsvp-pill.needs, .needs-you .rsvp-pill.needs { background: var(--disc); color: var(--on-disc); }
 
@@ -194,7 +194,7 @@
 }
 /* .hub-items a would make the row a block; keep its avatar / text / time grid. */
 .messages .hub-items a.conv-row { display: grid; padding: 9px 10px; border-radius: var(--radius-control); }
-.messages .conv-row.active { background: var(--accent-soft); }
+.messages .conv-row.active { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
 .messages .conv-row .avatar { border-radius: 50%; }
 .messages .conv-time { align-self: start; padding-top: 3px; }
 /* Unread: bold, with an amber dot (unread counts are amber). */
@@ -276,7 +276,7 @@
   top: 88px;
 }
 .settings .settings-nav a { padding: 10px 12px; border-radius: var(--radius-control); font-weight: 600; font-size: 0.94rem; color: var(--ink-soft); }
-.settings .settings-nav a.active { background: var(--accent-soft); color: var(--accent-ink); font-weight: 700; }
+.settings .settings-nav a.active { background: var(--accent-soft); color: var(--accent-ink); font-weight: 700; box-shadow: inset 3px 0 0 var(--accent); }
 .settings .settings-main .card { padding: 20px; box-shadow: none; }
 .settings .settings-main .card-title { font-size: 1.05rem; font-weight: 800; letter-spacing: -0.01em; }
 /* Uppercase muted sub-headings inside a group. */

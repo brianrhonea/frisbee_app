@@ -36,7 +36,7 @@ button.gt-game:hover { border-color: var(--accent); }
 .gt-teams .card.gt-mine { background: var(--accent-soft); }
 .card.gt-game.gt-game-due { border: 2px solid var(--disc); }
 .btn.gt-btn-due { background: var(--disc); color: var(--on-disc); border-color: var(--disc); }
-.gt-champion { background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; font-weight: 800; font-size: 1.1rem; }
+.gt-champion { background: var(--success-soft); color: var(--success); border-color: transparent; font-weight: 800; font-size: 1.1rem; }
 .gt-standings td.num, .gt-standings td.narrow { font-family: var(--font-score); font-weight: 800; font-size: 1.1rem; }
 .gt-standings th { font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; }
 

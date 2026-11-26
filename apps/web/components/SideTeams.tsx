@@ -11,8 +11,13 @@ import { StartOrJoinButton } from "./home/StartOrJoin";
 /** Teams listed before "See all". */
 const shown = 5;
 
-/** Tile colours, picked by the team's id so a team keeps its colour. */
-const tints = ["#5348b2", "#b7791f", "#2c6fb7", "#2f8f6b", "#a8407a", "#c2622d"];
+/**
+ * Tile colours, picked by the team's id so a team keeps its colour. A decorative per-team
+ * palette (not status colours). The initials are 75% tint over ink and the fill 15% tint over
+ * the card; tests/unit/sideTeamTints.test.ts holds all six to 4.5:1 in both themes. --team
+ * and --personal are the theme-aware design tokens, so they stay readable in dark.
+ */
+const tints = ["#665cc8", "#b7791f", "var(--team)", "#2f8f6b", "var(--personal)", "#c2622d"];
 export function tint(id: string) {
   let h = 0;
   for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;

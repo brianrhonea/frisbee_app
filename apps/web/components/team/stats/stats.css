@@ -9,11 +9,11 @@
 .st-score { font-family: var(--font-score); font-weight: 800; font-size: 1.4rem; line-height: 1; }
 .st-score-lost { color: var(--muted); }
 .st-badge { font-size: 0.75rem; font-weight: 800; padding: 3px 8px; border-radius: 999px; }
-.st-win { color: var(--accent-ink); background: var(--accent-soft); }
+.st-win { color: var(--success); background: var(--success-soft); }
 .st-loss, .st-tie { color: var(--ink-soft); background: var(--field); }
 .st-live { color: var(--live-ink); background: var(--live-soft); }
 .st-danger { color: var(--ink-soft); }
-.st-pos { color: var(--accent); }
+.st-pos { color: var(--success); }
 .st-neg { color: var(--ink); }
 .st-rounds { counter-reset: round; }
 .st-rounds > li { counter-increment: round; }
@@ -161,4 +161,4 @@ li.st-chip { background: var(--accent-soft); color: var(--accent-ink); border-co
 .st-jersey { font-family: var(--font-score); font-weight: 800; font-size: 1.15rem; }
 tr.st-you td { background: var(--accent-soft); color: var(--accent-ink); }
 .st-paid { margin: 0; background: var(--field); color: var(--ink-soft); }
-.st-paid.on { background: var(--accent-soft); color: var(--accent-ink); }
+.st-paid.on { background: var(--success-soft); color: var(--success); box-shadow: inset 0 0 0 2px var(--success); }
