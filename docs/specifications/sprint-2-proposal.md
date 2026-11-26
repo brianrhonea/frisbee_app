@@ -99,3 +99,8 @@
 - **D17:** when Vision errors, the API now refuses the photo (503, retry) instead of letting it through. This is in #14's scope as "fails closed". Confirm?
 - **D18:** video playback uses Firebase download tokens that never expire. Moving to short-lived signed playback URLs needs a design (Sprint 3?).
 - **D19:** a photo uploaded straight to Storage is visible for a few seconds until `photoCheck` runs. Closing that window needs a "pending" marker, which is a data-shape change. Do it, or accept the window?
+
+**Owner, 2026-11-26:**
+- **D17:** yes, refuse the photo when Vision errors.
+- **D18:** short-lived playback URLs move to Sprint 3.
+- **D19:** the few-second window before `photoCheck` runs is accepted; no pending marker.
