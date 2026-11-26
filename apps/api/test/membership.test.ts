@@ -1113,14 +1113,131 @@ describe("club teams are for players 16 and over", () => {
     expect(team().memberIds).toContain("kid");
   });
 
-  it("changing a team's level to club removes no one", async () => {
-    s.store.put(T, seedTeam({ level: "youth", members: { ...seedTeam().members, kid: "player" }, memberIds: [...seedTeam().memberIds, "kid"] }));
-    await born("kid", "2012-06-01");
-    expect((await s.call("PATCH", "/v1/teams/t1", "owner", { name: "The Haze", level: "club", city: "Austin" })).statusCode).toBe(200);
-    expect(team()).toMatchObject({ level: "club" });
-    expect(team().memberIds).toContain("kid");
-    // They're still on it, so handing them the team works as before.
-    expect((await s.call("POST", "/v1/teams/t1/owner", "owner", { uid: "kid" })).statusCode).toBe(200);
+  // SEC-4: level only changes through PATCH /v1/teams/:id, and a switch to
+  // club re-checks everyone on the team (the rules no longer take the write).
+  describe("changing a team's level (SEC-4)", () => {
+    const patch = (level: unknown, uid = "owner") =>
+      s.call("PATCH", "/v1/teams/t1", uid, { name: "The Haze", level, city: "Austin" });
+    const adults = () => Promise.all(["owner", "coach", "p1", "mgr", "old"].map((u) => born(u, "1990-01-01")));
+    const withKid = (extra: Record<string, unknown> = {}) => {
+      const base = seedTeam();
+      s.store.put(T, seedTeam({ level: "youth", members: { ...base.members, kid: "player" }, memberIds: [...base.memberIds, "kid"], ...extra }));
+    };
+    const refused = (res: { statusCode: number; json(): unknown }) => {
+      expect(res.statusCode).toBe(412);
+      expect(err(res).code).toBe("failed_precondition");
+      expect(err(res).message).toMatch(/can't switch to the club level/);
+      expect(team().level).toBe("youth");
+    };
+
+    it("lets a manager switch to club when everyone is 16 or over", async () => {
+      withKid();
+      await adults();
+      await born("kid", turns16Today);
+      expect((await patch("club")).statusCode).toBe(200);
+      expect(team()).toMatchObject({ level: "club" });
+      expect(s.store.doc("teamDirectory/t1")).toMatchObject({ level: "club" });
+    });
+
+    it("refuses when a member is under 16; nothing is written", async () => {
+      withKid();
+      await adults();
+      await born("kid", "2012-06-01");
+      const res = await patch("club");
+      refused(res);
+      expect(err(res).message).toContain("1 person on it is under 16");
+      expect(s.store.doc("teamDirectory/t1")).toBeUndefined();
+    });
+
+    it("refuses the day before a member's 16th birthday", async () => {
+      withKid();
+      await adults();
+      await born("kid", turns16Tomorrow);
+      refused(await patch("club"));
+    });
+
+    it("refuses when a member has no date of birth", async () => {
+      withKid();
+      await adults();
+      refused(await patch("club"));
+    });
+
+    it("counts everyone who fails, without naming them", async () => {
+      withKid();
+      const res = await patch("club");
+      expect(res.statusCode).toBe(412);
+      expect(err(res).message).toContain("6 people on it are under 16");
+      expect(err(res).message).not.toContain("kid");
+    });
+
+    it("checks an account linked to a roster spot, even if they left the team", async () => {
+      s.store.put(T, seedTeam({ level: "youth" }));
+      await adults();
+      s.store.put("teams/t1/roster/r1", { name: "Left", position: "cutter", userId: "gone" });
+      await born("gone", "2013-01-01");
+      refused(await patch("club"));
+    });
+
+    it("ignores roster spots with no account", async () => {
+      s.store.put(T, seedTeam({ level: "youth" }));
+      await adults();
+      s.store.put("teams/t1/roster/r1", { name: "Walk-on", position: "cutter" });
+      expect((await patch("club")).statusCode).toBe(200);
+    });
+
+    it("refuses without the personal-details key (fails closed)", async () => {
+      const store = new FakeStore(() => now);
+      const app = buildApp({ verifier: new FakeVerifier(), users: new FakeUsers(), teams: new FakeTeamRepository(), store, now: () => now });
+      store.put(T, seedTeam({ level: "youth" }));
+      const res = await app.inject({
+        method: "PATCH",
+        url: "/v1/teams/t1",
+        headers: { authorization: "Bearer token:owner:Name owner" },
+        payload: { name: "The Haze", level: "club", city: "Austin" },
+      });
+      expect(res.statusCode).toBe(503);
+      expect(store.doc(T)!.level).toBe("youth");
+    });
+
+    it("refuses a non-manager, even when every age would pass", async () => {
+      s.store.put(T, seedTeam({ level: "youth" }));
+      await adults();
+      for (const by of ["mgr", "p1", "old", "stranger"]) expect((await patch("club", by)).statusCode).toBe(403);
+      expect(team().level).toBe("youth");
+    });
+
+    it("refuses a level that doesn't exist", async () => {
+      s.store.put(T, seedTeam({ level: "youth" }));
+      expect((await patch("pro")).statusCode).toBe(400);
+      expect((await patch(7)).statusCode).toBe(400);
+      expect((await patch(undefined)).statusCode).toBe(400);
+      expect(team().level).toBe("youth");
+    });
+
+    it("changing away from club needs no age check", async () => {
+      // Nobody has a date of birth on file.
+      s.store.put(T, seedTeam({ level: "club" }));
+      expect((await patch("college")).statusCode).toBe(200);
+      expect(team().level).toBe("college");
+    });
+
+    it("moving between other levels needs no age check", async () => {
+      withKid();
+      expect((await patch("college")).statusCode).toBe(200);
+      expect(team().level).toBe("college");
+    });
+
+    it("a team already at club keeps editing its other details", async () => {
+      withKid({ level: "club" });
+      expect((await patch("club")).statusCode).toBe(200);
+    });
+
+    it("a group's level is never set from the request", async () => {
+      s.store.put(T, group());
+      const res = await s.call("PATCH", "/v1/teams/t1", "owner", { name: "Austin Pickup", level: "club", city: "Austin" });
+      expect(res.statusCode).toBe(200);
+      expect(team().level).toBe("pickup");
+    });
   });
 
   describe("a new club team in a community", () => {
