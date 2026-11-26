@@ -1,40 +1,43 @@
 /* Landing page, header, footer and text pages. */
-/* Palette "Turf & Disc" (docs/redesign-plan.md): light by default, dark
-   from the system setting or the top bar's toggle (lib/theme.ts). Turf
-   green for actions, scoreboard navy for live/today, disc amber only for
-   what is the visitor's to do, red only for live games. */
+/* Palette zinc + indigo (docs/specifications/design-tokens.md; values in
+   packages/shared/fixtures/design_tokens/tokens.json): light by default, dark
+   from the system setting or the top bar's toggle (lib/theme.ts). */
 :root {
-  --bg: #F5F6F1;
-  --bg-2: #EDEFE8;
+  --bg: #F4F4F5;
+  --bg-2: #E4E4E7;
   --card: #FFFFFF;
-  --field: #EEF0EA;
-  --line: #E1E4DC;
-  --line-2: #D5D9CF;
-  --ink: #0F1A2A;
-  --ink-soft: #3B4352;
-  --muted: #5E6573;
-  /* Turf: actions, links, selected. */
-  --accent: #12805C;
+  --field: #E4E4E7;
+  --line: #D4D4D8;
+  --line-2: #71717A;
+  --ink: #18181B;
+  --ink-soft: #3F3F46;
+  --muted: #52525B;
+  /* Indigo: actions, links, selected. */
+  --accent: #4338CA;
   --on-accent: #FFFFFF;
-  --accent-soft: #E3F2EA;
-  --accent-ink: #0B5E43;
-  /* Scoreboard navy: live and today. */
-  --board: #0F1A2A;
-  --on-board: #FFFFFF;
-  --board-muted: #B7C0CE;
-  --board-2: #22324A;
-  /* Disc amber: only what is yours to do, and unread counts. */
-  --disc: #FFB627;
-  --on-disc: #2A1B00;
-  --disc-soft: #FFF1D1;
-  --disc-ink: #8A5A00;
-  /* Red: only live games. */
-  --live: #D93636;
-  --live-soft: #FDE7E7;
-  --live-ink: #B42323;
-  --team: #2C6FB7;
-  --personal: #A8407A;
-  --chip-on: #0F1A2A;
+  --accent-soft: #EEF2FF;
+  --accent-ink: #3730A3;
+  /* Retired dark card (UI-Q6): now a light card. */
+  --board: #FFFFFF;
+  --on-board: #18181B;
+  --board-muted: #52525B;
+  --board-2: #E4E4E7;
+  /* Attention: unread counts (solid indigo); "needs you" pills (amber). */
+  --disc: #4338CA;
+  --on-disc: #FFFFFF;
+  --disc-soft: #FEF3C7;
+  --disc-ink: #92400E;
+  /* Live games (rose), errors (red), success (green). */
+  --live: #BE123C;
+  --live-soft: #FFE4E6;
+  --live-ink: #BE123C;
+  --error: #B91C1C;
+  --error-soft: #FEE2E2;
+  --success: #166534;
+  --success-soft: #DCFCE7;
+  --team: #1D4ED8;
+  --personal: #A21CAF;
+  --chip-on: #4338CA;
   --on-chip-on: #FFFFFF;
   /* Older names, kept so existing rules follow the new palette. */
   --amber: var(--disc);
@@ -42,9 +45,9 @@
   --brand: var(--board);
   --on-brand: var(--on-board);
   --glow: var(--accent-soft);
-  --danger: var(--live-ink);
+  --danger: var(--error);
   --header-bg: rgba(255, 255, 255, 0.92);
-  --shadow: 0 1px 2px rgb(15 26 42 / 0.05);
+  --shadow: 0 1px 2px rgb(24 24 27 / 0.05);
   color-scheme: light;
   --radius: 16px;
   --radius-control: 12px;
@@ -54,91 +57,99 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0B121D;
-    --bg-2: #101927;
-    --card: #152030;
-    --field: #1B2838;
-    --line: #24324A;
-    --line-2: #2E3D55;
-    --ink: #EAF0F5;
-    --ink-soft: #C4CDD8;
-    --muted: #93A0B2;
-    /* Turf: actions, links, selected. */
-    --accent: #3DBE8B;
-    --on-accent: #06281B;
-    --accent-soft: #133528;
-    --accent-ink: #7FDDB4;
-    /* Scoreboard navy: live and today. */
-    --board: #1A2940;
-    --on-board: #FFFFFF;
-    --board-muted: #A9B6C8;
-    --board-2: #26385A;
-    /* Disc amber: only what is yours to do, and unread counts. */
-    --disc: #FFC24D;
-    --on-disc: #2A1B00;
-    --disc-soft: #3A2C0E;
-    --disc-ink: #FFC24D;
-    /* Red: only live games. */
-    --live: #FF5A5A;
-    --live-soft: #3A1A1E;
-    --live-ink: #FF8A8A;
-    --team: #7FB0EE;
-    --personal: #E08BB8;
-    --chip-on: #EAF0F5;
-    --on-chip-on: #0B121D;
+    --bg: #09090B;
+    --bg-2: #18181B;
+    --card: #18181B;
+    --field: #27272A;
+    --line: #3F3F46;
+    --line-2: #71717A;
+    --ink: #FAFAFA;
+    --ink-soft: #D4D4D8;
+    --muted: #A1A1AA;
+    /* Indigo: actions, links, selected. */
+    --accent: #A5B4FC;
+    --on-accent: #18181B;
+    --accent-soft: #1E1B4B;
+    --accent-ink: #C7D2FE;
+    /* Retired dark card (UI-Q6): now a light card. */
+    --board: #18181B;
+    --on-board: #FAFAFA;
+    --board-muted: #A1A1AA;
+    --board-2: #27272A;
+    /* Attention: unread counts (solid indigo); "needs you" pills (amber). */
+    --disc: #A5B4FC;
+    --on-disc: #18181B;
+    --disc-soft: #451A03;
+    --disc-ink: #FCD34D;
+    /* Live games (rose), errors (red), success (green). */
+    --live: #FDA4AF;
+    --live-soft: #4C0519;
+    --live-ink: #FDA4AF;
+    --error: #FCA5A5;
+    --error-soft: #450A0A;
+    --success: #86EFAC;
+    --success-soft: #052E16;
+    --team: #93C5FD;
+    --personal: #F0ABFC;
+    --chip-on: #A5B4FC;
+    --on-chip-on: #18181B;
     /* Older names, kept so existing rules follow the new palette. */
     --amber: var(--disc);
     --on-amber: var(--on-disc);
     --brand: var(--board);
     --on-brand: var(--on-board);
     --glow: var(--accent-soft);
-    --danger: var(--live-ink);
-    --header-bg: rgba(11, 18, 29, 0.88);
+    --danger: var(--error);
+    --header-bg: rgba(9, 9, 11, 0.88);
     --shadow: 0 1px 2px rgb(0 0 0 / 0.3);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0B121D;
-  --bg-2: #101927;
-  --card: #152030;
-  --field: #1B2838;
-  --line: #24324A;
-  --line-2: #2E3D55;
-  --ink: #EAF0F5;
-  --ink-soft: #C4CDD8;
-  --muted: #93A0B2;
-  /* Turf: actions, links, selected. */
-  --accent: #3DBE8B;
-  --on-accent: #06281B;
-  --accent-soft: #133528;
-  --accent-ink: #7FDDB4;
-  /* Scoreboard navy: live and today. */
-  --board: #1A2940;
-  --on-board: #FFFFFF;
-  --board-muted: #A9B6C8;
-  --board-2: #26385A;
-  /* Disc amber: only what is yours to do, and unread counts. */
-  --disc: #FFC24D;
-  --on-disc: #2A1B00;
-  --disc-soft: #3A2C0E;
-  --disc-ink: #FFC24D;
-  /* Red: only live games. */
-  --live: #FF5A5A;
-  --live-soft: #3A1A1E;
-  --live-ink: #FF8A8A;
-  --team: #7FB0EE;
-  --personal: #E08BB8;
-  --chip-on: #EAF0F5;
-  --on-chip-on: #0B121D;
+  --bg: #09090B;
+  --bg-2: #18181B;
+  --card: #18181B;
+  --field: #27272A;
+  --line: #3F3F46;
+  --line-2: #71717A;
+  --ink: #FAFAFA;
+  --ink-soft: #D4D4D8;
+  --muted: #A1A1AA;
+  /* Indigo: actions, links, selected. */
+  --accent: #A5B4FC;
+  --on-accent: #18181B;
+  --accent-soft: #1E1B4B;
+  --accent-ink: #C7D2FE;
+  /* Retired dark card (UI-Q6): now a light card. */
+  --board: #18181B;
+  --on-board: #FAFAFA;
+  --board-muted: #A1A1AA;
+  --board-2: #27272A;
+  /* Attention: unread counts (solid indigo); "needs you" pills (amber). */
+  --disc: #A5B4FC;
+  --on-disc: #18181B;
+  --disc-soft: #451A03;
+  --disc-ink: #FCD34D;
+  /* Live games (rose), errors (red), success (green). */
+  --live: #FDA4AF;
+  --live-soft: #4C0519;
+  --live-ink: #FDA4AF;
+  --error: #FCA5A5;
+  --error-soft: #450A0A;
+  --success: #86EFAC;
+  --success-soft: #052E16;
+  --team: #93C5FD;
+  --personal: #F0ABFC;
+  --chip-on: #A5B4FC;
+  --on-chip-on: #18181B;
   /* Older names, kept so existing rules follow the new palette. */
   --amber: var(--disc);
   --on-amber: var(--on-disc);
   --brand: var(--board);
   --on-brand: var(--on-board);
   --glow: var(--accent-soft);
-  --danger: var(--live-ink);
-  --header-bg: rgba(11, 18, 29, 0.88);
+  --danger: var(--error);
+  --header-bg: rgba(9, 9, 11, 0.88);
   --shadow: 0 1px 2px rgb(0 0 0 / 0.3);
   color-scheme: dark;
 }
