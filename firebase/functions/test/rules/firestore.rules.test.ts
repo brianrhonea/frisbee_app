@@ -3555,7 +3555,8 @@ describe("user posts", () => {
     await assertSucceeds(
       updateDoc(doc(db(COACH), "posts", "ev"), { body: "See you there", updatedAt: serverTimestamp() }),
     );
-    await assertSucceeds(setDoc(ref(PLAYER, "ev"), shared(event({ teamId: null, teamName: null }))));
+    // (A new id: "ev" now belongs to the coach, so writing it as the player would be an update.)
+    await assertSucceeds(setDoc(ref(PLAYER, "ev-personal"), shared(event({ teamId: null, teamName: null }))));
     // A personal event: no team, no end, no place.
     await assertSucceeds(
       setDoc(ref(PLAYER, "mine"), shared({ eventId: "m1", title: "Tempo run", type: "workout", startsAt: new Date() })),
@@ -3599,16 +3600,22 @@ describe("user posts", () => {
 
   it("lets people repost someone's post, once, with a note", async () => {
     await assertSucceeds(setDoc(ref(PLAYER, "orig"), post(PLAYER)));
-    const repostRef = (uid: string, id = `r_orig_${uid}`) => doc(db(uid), "posts", id);
+    // One Firestore instance per user: a batch can't mix document references from different instances.
+    const dbs = new Map<string, ReturnType<typeof db>>();
+    const as = (uid: string) => {
+      if (!dbs.has(uid)) dbs.set(uid, db(uid));
+      return dbs.get(uid)!;
+    };
+    const repostRef = (uid: string, id = `r_orig_${uid}`) => doc(as(uid), "posts", id);
     const repost = (uid: string, extra: Record<string, unknown> = {}) => ({
       ...post(uid, { kind: "repost", body: "Look!" }),
       repostOf: { postId: "orig", authorId: PLAYER, authorName: "P" },
       ...extra,
     });
     const doRepost = (uid: string, data: Record<string, unknown>, id?: string) => {
-      const batch = writeBatch(db(uid));
+      const batch = writeBatch(as(uid));
       batch.set(repostRef(uid, id), data);
-      batch.update(doc(db(uid), "posts", "orig"), { repostedBy: arrayUnion(uid) });
+      batch.update(doc(as(uid), "posts", "orig"), { repostedBy: arrayUnion(uid) });
       return batch.commit();
     };
     // The repost alone, without counting it, fails; so does the reverse.
@@ -3618,9 +3625,9 @@ describe("user posts", () => {
     await assertSucceeds(updateDoc(repostRef(OUTSIDER), { body: "Carpool?", updatedAt: serverTimestamp() }));
     await assertFails(updateDoc(repostRef(OUTSIDER), { repostOf: null }));
     // Undo: delete it and drop yourself together.
-    const undo = writeBatch(db(OUTSIDER));
+    const undo = writeBatch(as(OUTSIDER));
     undo.delete(repostRef(OUTSIDER));
-    undo.update(doc(db(OUTSIDER), "posts", "orig"), { repostedBy: arrayRemove(OUTSIDER) });
+    undo.update(doc(as(OUTSIDER), "posts", "orig"), { repostedBy: arrayRemove(OUTSIDER) });
     await assertSucceeds(undo.commit());
 
     for (const [uid, data, id] of [
