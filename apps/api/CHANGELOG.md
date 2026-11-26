@@ -7,6 +7,20 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.49.0 — 2026-11-26
+
+- Teams (SEC-4): switching a team to the club level through
+  `PATCH /v1/teams/:id` is refused with 412 `failed_precondition` while
+  anyone on the team (or any account linked to a roster spot) is under 16
+  or has no date of birth; the message gives a count, never names. The
+  check repeats inside the transaction, rosters over 500 spots are
+  refused, team edits are limited to 5 a minute and 30 a day per person,
+  and a team gets at most 3 failed club switches a day.
+- Startup checks: when deployed, the API refuses to start without
+  `FIREBASE_PROJECT_ID` or `PERSONAL_DETAILS_KMS_KEY`, or with a Stripe key
+  whose mode doesn't match the project. Payments stay off when the Stripe
+  secrets are absent.
+
 ## 0.48.0 — 2026-11-24
 
 - Hosting: `POST /v1/tournaments` takes `enterHost`. A team hosting an
