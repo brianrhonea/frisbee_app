@@ -51,6 +51,20 @@ service firebase.storage {
           + '|text/(plain|csv)');
     }
 
+    // Native video upload is off until the owner sets videoUploads true in
+    // meta/flags (docs/specifications/contracts/meta-flags.md). A missing
+    // document or field is closed. A file counts as a video by its content
+    // type or by a video file name (as attachmentSizeOk does).
+    function videoUploadsOn() {
+      return firestore.exists(/databases/(default)/documents/meta/flags)
+        && firestore.get(/databases/(default)/documents/meta/flags)
+             .data.get('videoUploads', false) == true;
+    }
+    function videoAllowed(fileName) {
+      return !(videoType() || fileName.lower().matches('.*[.](mp4|mov|m4v|webm|3gp)'))
+        || videoUploadsOn();
+    }
+
     // Message attachments: 10 MB, or 100 MB for videos (maxAttachmentBytes
     // and maxVideoBytes in lib/domain/models/chat.dart); videos are known
     // by name, and sent as a video type or octet-stream.
@@ -113,6 +127,7 @@ service firebase.storage {
         && request.auth.uid == userId
         && attachmentSizeOk(fileName)
         && request.resource.contentType != null && attachmentType()
+        && videoAllowed(fileName)
         && canWrite(teamId, roomId);
       allow delete: if accountOk()
         && (request.auth.uid == userId
@@ -163,7 +178,8 @@ service firebase.storage {
       allow create, update: if accountOk()
         && can(team(teamId), 'manageTeam')
         && request.resource.size <= 500 * 1024 * 1024
-        && videoType();
+        && videoType()
+        && videoUploadsOn();
       allow delete: if accountOk() && can(team(teamId), 'manageTeam');
     }
 
@@ -223,11 +239,33 @@ service firebase.storage {
                   /databases/(default)/documents/conversations/$(convId)).data.participants
               : request.auth.uid in convId.split('_'));
       }
+      // Uploading also needs the conversation to exist, to list the
+      // uploader, not be a message request still waiting on them, and (a
+      // direct one) not be blocked either way. The same as creating a
+      // message (conversations/{convId}/messages in firestore.rules). The
+      // API writes users/{a}/blocks/{b} for both sides, so one lookup does.
+      function convDoc() {
+        return /databases/(default)/documents/conversations/$(convId);
+      }
+      function mayUpload() {
+        let c = firestore.get(convDoc()).data;
+        let ids = convId.split('_');
+        let other = ids[0] == request.auth.uid ? ids[1] : ids[0];
+        return firestore.exists(convDoc())
+          && request.auth.uid in c.participants
+          && !(c.get('status', 'accepted') == 'request'
+               && c.get('requestedOf', null) == request.auth.uid)
+          && (convId.matches('g-[A-Za-z0-9]+')
+              || !firestore.exists(
+                   /databases/(default)/documents/users/$(request.auth.uid)/blocks/$(other)));
+      }
       allow get: if inConversation();
       allow create, update: if accountOk() && inConversation()
+        && mayUpload()
         && request.auth.uid == userId
         && attachmentSizeOk(fileName)
-        && request.resource.contentType != null && attachmentType();
+        && request.resource.contentType != null && attachmentType()
+        && videoAllowed(fileName);
       allow delete: if accountOk() && inConversation() && request.auth.uid == userId;
     }
   }

@@ -2117,6 +2117,20 @@ describe("meta", () => {
     await assertFails(setDoc(doc(db(PLAYER), "meta", "flags"), { use_api_search: true }));
   });
 
+  it("serves meta/flags to signed-out visitors too, but no other meta document", async () => {
+    await assertSucceeds(getDoc(doc(env.unauthenticatedContext().firestore(), "meta", "flags")));
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "meta", "health")));
+    await assertSucceeds(getDoc(doc(db(PLAYER), "meta", "health")));
+  });
+
+  it("no client writes the new flags, signed in or not", async () => {
+    const flags = { minBuild: { ios: 1, android: 1 }, videoUploads: true };
+    await assertFails(setDoc(doc(db(OWNER), "meta", "flags"), flags));
+    await assertFails(setDoc(doc(env.unauthenticatedContext().firestore(), "meta", "flags"), flags));
+    await assertFails(updateDoc(doc(db(PLAYER), "meta", "flags"), { videoUploads: true }));
+    await assertFails(deleteDoc(doc(db(PLAYER), "meta", "flags")));
+  });
+
   it("no longer serves the USA Ultimate cache", async () => {
     await assertFails(getDoc(doc(db(PLAYER), "usau_tournaments", "x")));
   });

@@ -67,6 +67,9 @@ beforeEach(async () => {
   await env.clearStorage();
   await env.withSecurityRulesDisabled(async (ctx) => {
     const f = ctx.firestore();
+    // Video uploads on, so the video case tests only the account gate
+    // (the flag itself: storage.rules.test.ts).
+    await setDoc(doc(f, "meta", "flags"), { videoUploads: true });
     await setDoc(doc(f, "teams", TEAM), {
       name: "Team",
       division: "mixed",

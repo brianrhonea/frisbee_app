@@ -7,6 +7,18 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.50.0 — 2026-11-26
+
+- Uploads (#13): `POST /v1/uploads` and `/complete` refuse every video
+  (declared as one, named like one in chat, or shown by its bytes) with
+  412 `failed_precondition` until `meta/flags.videoUploads` is `true`
+  (docs/specifications/contracts/meta-flags.md). A missing document, a bad
+  value or a read error all mean closed. Photos and documents are
+  unaffected. Signed upload URLs still last 15 minutes.
+- Uploads (#14): photo screening fails closed. If SafeSearch errors or
+  gives no answer, `complete` returns 503 `unavailable` and saves nothing;
+  the upload stays pending, so the client can call `complete` again.
+
 ## 0.49.0 — 2026-11-26
 
 - Teams (SEC-4): switching a team to the club level through

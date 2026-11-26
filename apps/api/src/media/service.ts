@@ -3,6 +3,7 @@ import {
   chatDocumentTypes,
   chatFileMax,
   chatUploadQuota,
+  chatVideoName,
   type CompleteUploadResponse,
   type CreateUploadResponse,
   createUploadRequestSchema,
@@ -15,6 +16,7 @@ import {
   uploadMax,
   videoFileName,
   isUnsafeImage,
+  parseMetaFlags,
   unsafeImageMessage,
 } from "@stall10/shared";
 import type { Caller } from "../auth.js";
@@ -144,6 +146,20 @@ export class UploadService {
     if (!conv || !strings(conv.participants).includes(uid)) throw denied("You're not in this conversation.");
   }
 
+  /**
+   * Whether native video upload is open: `meta/flags.videoUploads` is true
+   * (docs/specifications/contracts/meta-flags.md). Fails CLOSED: a missing
+   * document, a bad value or a read error all mean no videos. storage.rules
+   * enforces the same for direct uploads.
+   */
+  private async videosOpen(): Promise<boolean> {
+    try {
+      return parseMetaFlags(await this.store.get("meta/flags")).videoUploads;
+    } catch {
+      return false;
+    }
+  }
+
   /** Today (UTC), the day uploadQuotas/{uid} counts. */
   private quotaDay() {
     return new Date(this.now()).toISOString().slice(0, 10);
@@ -173,6 +189,8 @@ export class UploadService {
     if (!parsed.success) throw fromZod(parsed.error);
     const { purpose, contentType, size, targetId, itemId, name } = parsed.data;
     await this.checkTarget(caller.uid, purpose, targetId);
+    const videoByName = purpose === "chat" && name != null && chatVideoName.test(name);
+    if ((isVideoType(contentType) || videoByName) && !(await this.videosOpen())) throw new ApiError("failed_precondition", videosOff);
     if (purpose !== "chat" && isVideoType(contentType) && !this.opts.queue) throw new ApiError("failed_precondition", videosNotYet);
     // The URL takes up to the limit for the declared kind (and, in chat, name).
     const maxBytes = uploadMax(purpose, contentType, name) ?? uploadLimits[purpose].image;
@@ -232,6 +250,11 @@ export class UploadService {
       purpose === "chat"
         ? sniffChatMediaType(head, String(upload.contentType ?? ""), typeof upload.name === "string" ? upload.name : undefined)
         : sniffMediaType(head);
+    // The flag may have been turned off since the URL was signed: what the bytes show decides.
+    if (type != null && isVideoType(type) && !(await this.videosOpen())) {
+      await this.reject(id, rawPath, videosOff);
+      throw new ApiError("failed_precondition", videosOff);
+    }
     if (purpose === "chat" && (type == null || isVideoType(type))) return this.keepAsSent(id, upload, type, size, generation);
     const limits = uploadLimits[purpose];
     const max = type == null ? null : isImageType(type) ? limits.image : limits.video;
@@ -414,22 +437,26 @@ export class UploadService {
 
   /** Marks a still-pending upload failed with [error] (a removed one stays removed), and deletes its raw file. */
   /**
-   * Whether SafeSearch refuses the photo. If Vision can't be reached the
-   * photo is let through (and logged), so an outage doesn't stop uploads.
+   * Whether SafeSearch refuses the photo. Fails CLOSED (#14): if Vision
+   * can't be reached or gives no answer, the photo isn't saved and the
+   * caller gets 503 `unavailable`; the upload stays pending, so the client
+   * can call complete again. (No checker configured: not screened; the
+   * deployment sets one, see server.ts.)
    */
   private async unsafe(id: string, image: Buffer): Promise<boolean> {
     const checker = this.opts.images;
     if (!checker) return false;
     try {
       const s = await checker.safeSearch(image);
+      if (s == null) throw new Error("SafeSearch gave no answer");
       if (isUnsafeImage(s)) {
         console.warn(JSON.stringify({ severity: "WARNING", message: "Photo refused by SafeSearch", uploadId: id, safeSearch: s }));
         return true;
       }
       return false;
     } catch (e) {
-      console.error(JSON.stringify({ severity: "ERROR", message: "SafeSearch failed; photo let through", uploadId: id, error: String(e) }));
-      return false;
+      console.error(JSON.stringify({ severity: "ERROR", message: "SafeSearch failed; photo not saved", uploadId: id, error: String(e) }));
+      throw new ApiError("unavailable", "We couldn't check that photo right now. Try again in a minute.");
     }
   }
 
@@ -442,6 +469,8 @@ export class UploadService {
     await this.storage.delete(rawPath).catch(() => undefined);
   }
 }
+
+const videosOff = "Video uploads aren't available right now.";
 
 /**
  * Videos outside chat wait on the transcode job (ARCHITECTURE.md §10 item
