@@ -7,7 +7,8 @@ import type { OutboxKind } from "@stall10/shared";
 import { callApi } from "@/lib/client";
 import { queuedNotice, submitOutbox } from "@/lib/outbox";
 import { loadDraft, saveDraft } from "@/lib/drafts";
-import { chatFileProblem, newId, removeUpload, uploadPhoto } from "@/lib/upload";
+import { useVideoUploads } from "@/lib/metaFlags";
+import { chatFileProblem, isVideoFile, newId, removeUpload, uploadPhoto, videoUploadsClosed } from "@/lib/upload";
 import { useAuth } from "./AuthProvider";
 
 type Pending = { key: string; name: string; size: number; uploadId?: string; error?: string };
@@ -51,6 +52,8 @@ export function ChatComposer({
   mentions?: MentionContext;
 }) {
   const { user } = useAuth();
+  // Video is offered only while meta/flags.videoUploads is true (closed when unread).
+  const videoOpen = useVideoUploads();
   const [text, setText] = useState("");
   const [messageId, setMessageId] = useState(() => newId());
   const [files, setFiles] = useState<Pending[]>([]);
@@ -100,7 +103,7 @@ export function ChatComposer({
     if (!user) return;
     const room = chatAttachmentsMax - files.length;
     for (const file of list.slice(0, Math.max(0, room))) {
-      const problem = chatFileProblem(file);
+      const problem = !videoOpen && isVideoFile(file) ? videoUploadsClosed : chatFileProblem(file);
       if (problem) {
         setError(problem);
         continue;
@@ -223,7 +226,7 @@ export function ChatComposer({
                     input.current?.click();
                   }}
                 >
-                  Photo, video or file
+                  {videoOpen ? "Photo, video or file" : "Photo or file"}
                 </button>
                 {onShareEvent && (
                   <button
@@ -253,7 +256,7 @@ export function ChatComposer({
             )}
           </span>
         ) : (
-          <button type="button" className="icon-btn" aria-label="Attach files" title="Attach photos, videos or files" onClick={() => input.current?.click()}>
+          <button type="button" className="icon-btn" aria-label="Attach files" title={videoOpen ? "Attach photos, videos or files" : "Attach photos or files"} onClick={() => input.current?.click()}>
             📎
           </button>
         )}
