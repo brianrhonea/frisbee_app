@@ -201,3 +201,38 @@ Both platforms (app and website, exact parity, mirrored tests):
 - App Check (the other half of SEC-2 in the audit) is separate and not part of this change.
 - The Firebase Auth emulator integration tests (`pnpm test:emulator`) mint tokens
   with `ageOk` and `terms` custom claims and verified emails for the same reason.
+
+## 9. Security review fixes (3a-S, 2026-11-26)
+
+Changes to the sections above, from the #3a security review (F1 to F9):
+
+- **Age-only routes (F1).** `PUT /v1/me/identity`, `POST /v1/me/username`,
+  `PUT /v1/me/profile/details`, `/profile/privacy` and `/profile/visibility` are
+  no longer "open": they need the `ageOk` claim and nothing else (route config
+  `accountGate: "age"`), so a refused minor never gets a searchable profile, while a
+  pending email or Terms doesn't block building one. The rules match
+  (`ageOk()` on `profiles/{uid}`, its `private/details`, and `usernames` create).
+- **Refusals are remembered (F3).** A refused under-18 birth date is stored sealed
+  (same cipher, own path as context) in **`ageRefusals/{uid}`**: a **new collection**,
+  closed to every client by `firestore.rules`, deleted by `deleteAccount`. A
+  different date afterwards, on `PUT /v1/me/personal` or `/personal/birth-date`,
+  is 412 with `birthDateLockedMessage`. The same date again repeats the refusal
+  and changes nothing. An under-13 refusal also disables the Firebase Auth user and
+  revokes its sessions. No staff override. `PUT /v1/me/personal`: 5 a minute, 20 a day.
+- **Status endpoint (F4).** `GET /v1/me/personal/status`: 10 a minute, 200 a day per
+  account (429 `resource_exhausted`). Setting claims skips the Auth write when they
+  already hold.
+- **Callables (F2).** `joinToken`, `voiceToken`, `createLeagueTeams`, `startDraft`,
+  `draftPick`, `draftControl` and `finishDraft` need the same three things in the
+  token (`firebase/functions/src/account/gate.ts`). They throw `permission-denied`
+  with `details: { code: "account_incomplete", fields }`.
+- **Photo URLs (F5), Terms literal (F6).** Rules only; see section 4. API pictures
+  are built server side from an upload id, never from a client URL.
+- **Startup (F8, F9).** `ACCOUNT_GATE_MODE=enforce` refuses to start without a cipher.
+  A decrypt failure while looking for the age claim logs
+  `account_gate_decrypt_failed` (uid only), grants no age claim, and status still answers.
+- **Rollout switch.** Environment variable **`ACCOUNT_GATE_MODE`**: `report` (the
+  default when unset) or `enforce`. `report` logs `account_incomplete` with the
+  missing fields and route, and lets the write through. Claims are set, and the
+  age and birth-date rules apply, in both modes. Anything else stops startup.
+- **Claim backfill.** `apps/api/src/scripts/backfill_claims.ts` (dry run by default).
