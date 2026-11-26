@@ -3059,6 +3059,12 @@ service cloud.firestore {
     match /meta/{id} {
       allow read: if signedIn();
     }
+    // meta/flags is also read before sign-in (the minimum-build gate;
+    // docs/specifications/contracts/meta-flags.md). It holds no personal
+    // data. No client writes it: console or Admin SDK only.
+    match /meta/flags {
+      allow read: if true;
+    }
 
     // ---- Rate limits (written by Cloud Functions only) --------------------
 
