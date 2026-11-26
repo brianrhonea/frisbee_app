@@ -27,6 +27,12 @@ const Ctx = createContext<{ status: PersonalDetailsStatus | null; refresh: () =>
 /** Whether the signed-in member has given their personal details. */
 export const usePersonalStatus = () => useContext(Ctx);
 
+/** A 200 that isn't the shape we need is a failed check, never a pass. */
+const validStatus = (s: unknown): s is PersonalDetailsStatus =>
+  !!s && typeof s === "object" && typeof (s as PersonalDetailsStatus).complete === "boolean" && typeof (s as PersonalDetailsStatus).required === "boolean";
+const validAgreement = (a: unknown): a is AgreementStatus =>
+  !!a && typeof a === "object" && typeof (a as AgreementStatus).agreed === "boolean";
+
 const dismissKey = (uid: string) => `stall10.personalPrompt.${uid}`;
 function dismissed(uid: string): boolean {
   try {
@@ -70,6 +76,11 @@ export function PersonalGate({ children }: { children: ReactNode }) {
     callApi<PersonalDetailsStatus>(u, "/v1/me/personal/status").then(
       (s) => {
         if (mine !== latest.current) return;
+        if (!validStatus(s)) {
+          setStatus(null);
+          setStatusFailed(true);
+          return;
+        }
         setStatus(s);
         setStatusFailed(false);
       },
@@ -87,6 +98,11 @@ export function PersonalGate({ children }: { children: ReactNode }) {
     callApi<AgreementStatus>(u, agreementPath).then(
       (a) => {
         if (mine !== agreeLatest.current) return;
+        if (!validAgreement(a)) {
+          setAgreed(null);
+          setAgreeFailed(true);
+          return;
+        }
         setAgreed(a.agreed);
         setAgreeFailed(false);
       },

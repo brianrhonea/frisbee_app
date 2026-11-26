@@ -56,7 +56,7 @@ export type CardTournament = Pick<
 };
 
 /**
- * "3 spots left" while registration is open: turf while there's room,
+ * "3 spots left" while registration is open: indigo while there's room,
  * neutral "Full · waitlist" once there isn't (never amber: that's only
  * the viewer's own to-dos).
  */

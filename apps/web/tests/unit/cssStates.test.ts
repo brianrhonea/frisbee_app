@@ -52,7 +52,7 @@ describe("green means success only (K5-A)", () => {
   const accentOnDone = rules.filter((r) =>
     r.selector
       .split(",")
-      .some((s) => /(\.form-ok|\.rsvp-pill\.going|\.rsvp-mine\.going|\.rsvp-group\.going|\.video-status\.ok|\.username-input\.ok|\.spots-left|\.hosted-champion|\.gt-champion|\.st-win|\.st-pos|\.hosted-plus|li\.done)/.test(s)),
+      .some((s) => /(\.form-ok|\.rsvp-pill\.going|\.rsvp-mine\.going|\.rsvp-group\.going|\.video-status\.ok|\.username-input\.ok|\.hosted-champion|\.gt-champion|\.st-win|\.st-pos|\.hosted-plus|li\.done)/.test(s)),
   );
   it("done, going, ok, champion and positive-number rules use the success tokens, not the accent", () => {
     expect(accentOnDone.length).toBeGreaterThan(10);

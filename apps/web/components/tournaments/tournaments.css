@@ -1,5 +1,5 @@
 /* Hosted tournaments and leagues: lists, the form, the event page, games
-   and results. Uses the site's tokens (site.css): turf for actions and
+   and results. Uses the site's tokens (site.css): the indigo accent for actions and
    what's selected, scoreboard navy for a live (or today's) event, amber
    only for what's the viewer's to do, red only while it's live. */
 
@@ -43,7 +43,7 @@
 .hosted-live-pill i { width: 8px; height: 8px; border-radius: 50%; background: var(--live); }
 .hosted-today-pill { background: var(--board-2); color: var(--on-board); }
 
-/* Section tabs: underlined, turf on the open one. */
+/* Section tabs: underlined, indigo on the open one. */
 .hosted-tabs {
   display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none;
 }
@@ -241,12 +241,12 @@ dialog.dialog:has(.live-dialog) { width: min(100% - 32px, 480px); }
   .live-step-score { font-size: 2rem; }
 }
 
-/* Spots left on a tournament card (F10): turf while there is room, neutral when full; never amber. */
-.row-card small.spots-left { color: var(--success); font-weight: 700; }
+/* Spots left on a tournament card (F10): indigo ink (information, not success) while there is room, muted when full; never amber. */
+.row-card small.spots-left { color: var(--accent-ink); font-weight: 700; }
 .row-card small.spots-left.spots-full { color: var(--muted); font-weight: 500; }
 .row-card .spots-lines { display: grid; gap: 1px; }
 
-/* A league's schedule a week at a time: ‹ Week 3 › (turf arrows). */
+/* A league's schedule a week at a time: ‹ Week 3 › (indigo arrows). */
 .league-week-nav { display: flex; align-items: center; gap: 8px; }
 .league-week-title { flex: 1; display: grid; justify-items: center; text-align: center; gap: 2px; }
 .league-week-title b { font-family: var(--font-score); font-weight: 800; font-size: 1.6rem; line-height: 1.1; }
@@ -261,7 +261,7 @@ dialog.dialog:has(.live-dialog) { width: min(100% - 32px, 480px); }
 .bracket-page-head { display: grid; gap: 4px; }
 .bracket-page-head h1 { margin: 0; }
 
-/* Entering a team: one of the viewer's teams to pick, turf when picked. */
+/* Entering a team: one of the viewer's teams to pick, indigo when picked. */
 .enter-team-option {
   display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line);
   border-radius: var(--radius-control, 12px); background: var(--card); cursor: pointer;
@@ -271,7 +271,7 @@ dialog.dialog:has(.live-dialog) { width: min(100% - 32px, 480px); }
 .enter-team-option input[type="radio"] { accent-color: var(--accent); }
 
 /* The event form a step at a time: "Step 2 of 6 · When & where" over a
-   turf bar of the steps, then Back / Next (Save draft / Publish). */
+   indigo bar of the steps, then Back / Next (Save draft / Publish). */
 .form-steps { display: grid; gap: 8px; }
 .form-steps-title { font-size: 0.85rem; color: var(--ink-soft); }
 .form-steps-bar { display: flex; gap: 4px; }
