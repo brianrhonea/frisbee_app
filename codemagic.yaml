@@ -131,8 +131,10 @@ workflows:
       <<: *environment
       groups:
         - frisbee_secrets
-    # Every push to main builds against production and submits it for App
-    # Store review. Release it by hand in App Store Connect once approved.
+    # Every push to main builds against production and uploads it to
+    # TestFlight. Submitting for App Store review is off until prod is set up
+    # (release-audit INF-1): submit by hand in App Store Connect, or turn
+    # submit_to_app_store back on with the owner's approval.
     triggering:
       events:
         - push
@@ -145,5 +147,5 @@ workflows:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
-        submit_to_app_store: true
+        submit_to_app_store: false
         release_type: MANUAL
