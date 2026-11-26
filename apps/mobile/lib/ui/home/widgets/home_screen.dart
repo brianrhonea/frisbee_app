@@ -296,7 +296,12 @@ class _HomeScreenState extends State<HomeScreen> {
           UserPostItem(:final post) => _userPostCard(post),
           final TeamPostItem p => _teamPostCard(p),
         },
-      if (vm.hasMorePosts)
+      if (vm.postsError)
+        _FeedNote(
+          text: "Couldn't load posts.",
+          action: ('Try again', vm.refreshFeed),
+        )
+      else if (vm.hasMorePosts)
         Center(
           child: vm.loadingMorePosts
               ? const Padding(
@@ -339,6 +344,15 @@ class _HomeScreenState extends State<HomeScreen> {
     final feed = vm.teamFeed;
     final posts = vm.teamPosts;
     if (vm.teamsLoaded && vm.teams.isEmpty) {
+      // Teams that failed to load aren't "no teams": no join card then.
+      if (vm.postsError) {
+        return [
+          _FeedNote(
+            text: "Couldn't load your teams.",
+            action: ('Try again', vm.refreshFeed),
+          ),
+        ];
+      }
       return [
         if (vm.showOnboarding)
           GetStartedCard(steps: vm.onboarding, onStep: _onboardingStep)
@@ -377,6 +391,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
             ),
+          )
+        else if (feed.error)
+          _FeedNote(
+            text: "Couldn't load posts.",
+            action: ('Try again', vm.refreshFeed),
           )
         else if (feed.hasMore)
           Center(
