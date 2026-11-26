@@ -24,7 +24,7 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
-import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 // Run with `npm run test:rules` (starts the Firestore emulator; needs Java).
 
@@ -416,9 +416,28 @@ describe("club teams (16 and over): joined through the API only", () => {
     await assertSucceeds(deleteDoc(doc(fs, ...invitePath)));
   });
 
-  it("changing a team's level to club is allowed, and its members stay", async () => {
-    await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), { name: "Team", level: "club", city: "" }));
-    await assertSucceeds(getDoc(doc(db(PLAYER), "teams", TEAM)));
+  it("a client can't change a team's level to club (SEC-4: the API re-checks ages)", async () => {
+    const team = (uid: string) => doc(db(uid), "teams", TEAM);
+    for (const uid of [OWNER, COACH]) {
+      await assertFails(updateDoc(team(uid), { level: "club" }));
+      await assertFails(updateDoc(team(uid), { name: "Team", level: "club", city: "" }));
+    }
+    // Nor by deleting it (a team with no level reads as club).
+    await assertFails(updateDoc(team(OWNER), { level: deleteField() }));
+    // Or any other level.
+    await assertFails(updateDoc(team(OWNER), { level: "youth" }));
+    await assertFails(updateDoc(team(PLAYER), { level: "club" }));
+    await assertFails(updateDoc(doc(db(OUTSIDER), "teams", TEAM), { level: "club" }));
+    // Its members stay, and the level is as it was.
+    await assertSucceeds(getDoc(team(PLAYER)));
+    expect((await getDoc(team(PLAYER))).data()?.level).toBe("college");
+  });
+
+  it("a team's other details still edit, even when the write repeats the level", async () => {
+    const team = doc(db(OWNER), "teams", TEAM);
+    await assertSucceeds(updateDoc(team, { name: "Renamed", city: "Denver" }));
+    await assertSucceeds(updateDoc(team, { name: "Again", level: "college", city: "Austin" }));
+    expect((await getDoc(team)).data()).toMatchObject({ name: "Again", city: "Austin", level: "college" });
   });
 });
 
@@ -923,9 +942,10 @@ describe("roles and removal", () => {
     await assertSucceeds(deleteDoc(rec(OWNER)));
   });
 
-  it("a team's name and level can be edited, but never its division", async () => {
+  it("a team's name can be edited, but never its division or (through a client) its level", async () => {
     const team = (uid: string) => doc(db(uid), "teams", TEAM);
-    await assertSucceeds(updateDoc(team(OWNER), { name: "Renamed", level: "club" }));
+    await assertSucceeds(updateDoc(team(OWNER), { name: "Renamed" }));
+    await assertFails(updateDoc(team(OWNER), { name: "Renamed", level: "club" }));
     await assertFails(updateDoc(team(OWNER), { division: "open" }));
     await assertFails(updateDoc(team(OWNER), { name: "Again", division: "women" }));
   });
