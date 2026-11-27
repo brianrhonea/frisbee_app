@@ -312,3 +312,12 @@
 /* The compact Calendars card under the schedule: names on one wrapped line. */
 .schedule-page .cal-list { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-bottom: 6px; }
 .schedule-page .cal-list + p { margin: 0; }
+
+/* --- Teams tab (MyTeams, TeamFinder): headings over list rows (C3), no boxes -------------- */
+.teams-page .teams-section { display: grid; gap: var(--space-sm); }
+.teams-page .teams-section > .card-title { margin: 0; font-size: var(--text-section-size); }
+.teams-page .teams-rows, .teams-page .community-list { list-style: none; margin: 0; padding: 0; }
+.teams-page .community-list > li { border-bottom: 1px solid var(--line); }
+.teams-page .community-list .ui-row { border-bottom: 0; }
+.teams-page .community-list .team-list.nested { margin: 0 0 var(--space-sm) var(--space-xxl); }
+.teams-page .stack { gap: var(--space-xl); }

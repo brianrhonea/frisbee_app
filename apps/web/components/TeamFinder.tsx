@@ -8,6 +8,7 @@ import { getPublicApi, problem } from "@/lib/client";
 import { listingSubtitle } from "@/lib/site";
 import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
+import { ListRow } from "./ui/ListRow";
 import { minQueryLength } from "./explore/filters";
 import { ErrorNote } from "@/components/StatusViews";
 
@@ -75,7 +76,7 @@ export function TeamFinder() {
 
   const shown = result && result.q === q ? result.teams : null;
   return (
-    <section className="card team-finder" id="find" aria-labelledby="find-title">
+    <section className="teams-section team-finder" id="find" aria-labelledby="find-title">
       <h2 className="card-title" id="find-title">
         Find a team or group
       </h2>
@@ -100,21 +101,22 @@ export function TeamFinder() {
       ) : shown.length === 0 ? (
         <p className="muted small">No teams or groups match &ldquo;{q}&rdquo;.</p>
       ) : (
-        <div className="stack team-finder-list">
+        <ul className="teams-rows team-finder-list">
           {shown.map((t) => {
             const group = (t.kind ?? "team") !== "team";
             const sub = listingSubtitle(t);
             return (
-              <Link key={t.id} className="row-card" href={`/teams/${encodeURIComponent(t.id)}`}>
-                <Avatar name={t.name} />
-                <span>
-                  <b>{t.name || "Team"}</b>
-                  <small>{group ? [sub, t.requiresApproval ? "Approval required" : "Open to join"].filter(Boolean).join(" · ") : sub}</small>
-                </span>
-              </Link>
+              <li key={t.id}>
+                <ListRow
+                  href={`/teams/${encodeURIComponent(t.id)}`}
+                  leading={<Avatar name={t.name} size={40} />}
+                  title={t.name || "Team"}
+                  subtitle={group ? [sub, t.requiresApproval ? "Approval required" : "Open to join"].filter(Boolean).join(" · ") : sub}
+                />
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
     </section>
   );

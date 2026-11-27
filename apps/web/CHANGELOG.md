@@ -4,6 +4,14 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.70.0 — 2026-11-27
+
+H4 My teams restyle. Same teams, communities, invites, create, join with a code and the team finder.
+
+- Your teams, Communities and the finder's results are headings over list rows (C3) with the logo, name and role, kind and place; no boxes.
+- More space between the sections.
+- Not built: a Join button on finder results. Teams join by invite or code, and the page's Join with a code stays; a per-row Join would be a new action.
+
 ## 0.69.0 — 2026-11-27
 
 H6 Roster restyle. Same members, filter, line picker, pending invites and Invite.
