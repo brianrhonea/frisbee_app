@@ -102,20 +102,52 @@ describe("Team header Message (S4 C6)", () => {
     expect(screen.getByRole("button", { name: "Message Olive Owner" })).toBeEnabled();
   });
 
-  it("is not there for a signed-in outsider (no staff list reaches them), for signed-out visitors, or while loading", () => {
-    hub = { teamId: "t1", kind: "team", youth: false, viewer: { state: "outsider", uid: "me" } };
+  it("gives a signed-in outsider the staff only, read from the roster", async () => {
+    hub = { teamId: "t1", kind: "team", youth: false, privateGroup: false, viewer: { state: "outsider", uid: "me" } };
+    callApi.mockResolvedValueOnce({
+      kind: "team",
+      players: [],
+      members: [
+        { uid: "own", name: "Olive Owner", tier: "owner", roles: [] },
+        { uid: "me", name: "Me Myself", tier: "coach", roles: [] },
+        { uid: "pl1", name: "Pat Player", tier: "player", roles: [] },
+      ],
+    });
+    render(<MessageStaff />);
+    fireEvent.click(screen.getByRole("button", { name: "Message" }));
+    expect(await screen.findByRole("button", { name: "Message Olive Owner" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Team chat" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Message Me Myself" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Message Pat Player" })).toBeNull();
+    expect(callApi).toHaveBeenCalledWith(auth.user, "/v1/teams/t1/roster");
+  });
+
+  it("shows why the staff couldn't load", async () => {
+    hub = { teamId: "t1", kind: "team", youth: false, privateGroup: false, viewer: { state: "outsider", uid: "me" } };
+    callApi.mockRejectedValueOnce(new ApiError("Only members can see this roster.", 403));
+    render(<MessageStaff />);
+    fireEvent.click(screen.getByRole("button", { name: "Message" }));
+    expect(await screen.findByText("Only members can see this roster.")).toBeInTheDocument();
+  });
+
+  it("is not there for signed-out visitors, outsiders of a youth team or a private group, or while loading", () => {
+    hub = { teamId: "t1", kind: "team", youth: false, viewer: { state: "visitor" } };
+    auth = { user: null };
     const a = render(<MessageStaff />);
     expect(a.container).toBeEmptyDOMElement();
     a.unmount();
-    hub = { teamId: "t1", kind: "team", youth: false, viewer: { state: "visitor" } };
-    auth = { user: null };
+    auth = { user: { uid: "me" } };
+    hub = { teamId: "t1", kind: "team", youth: true, viewer: { state: "outsider", uid: "me" } };
     const b = render(<MessageStaff />);
     expect(b.container).toBeEmptyDOMElement();
     b.unmount();
-    auth = { user: { uid: "me" } };
-    hub = { teamId: "t1", kind: "team", youth: false, viewer: { state: "loading" } };
+    hub = { teamId: "g1", kind: "community", youth: false, privateGroup: true, viewer: { state: "outsider", uid: "me" } };
     const c = render(<MessageStaff />);
     expect(c.container).toBeEmptyDOMElement();
+    c.unmount();
+    hub = { teamId: "t1", kind: "team", youth: false, viewer: { state: "loading" } };
+    const d = render(<MessageStaff />);
+    expect(d.container).toBeEmptyDOMElement();
     expect(callApi).not.toHaveBeenCalled();
   });
 

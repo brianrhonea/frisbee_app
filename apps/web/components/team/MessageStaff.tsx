@@ -1,14 +1,15 @@
 "use client";
 import Link from "next/link";
+import type { TeamRoster } from "@stall10/shared";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { problem } from "@/lib/client";
+import { useEffect, useState } from "react";
+import { callApi, problem } from "@/lib/client";
 import { useAuth } from "../AuthProvider";
 import { Avatar } from "../Avatar";
 import { Dialog } from "../Dialog";
 import { openConversation } from "../MessageButton";
 import { roleLabel } from "../ProfileDashboard";
-import { ErrorNote } from "../StatusViews";
+import { ErrorNote, Loading } from "../StatusViews";
 import { Button } from "../ui/Button";
 import { StatusPill } from "../ui/StatusPill";
 import { ListRow } from "../ui/ListRow";
@@ -44,15 +45,17 @@ export function staffOf(people: StaffPerson[], viewerUid: string): StaffPerson[]
  * The team header's Message button. Members get "Team chat" at the top of a small dialog, then the team's
  * staff (from the team doc the hub already holds). Each person opens a normal direct conversation
  * (`POST /v1/conversations`, as a player's page does): the server's message settings decide, and its refusal
- * is shown here. Members only: a signed-in outsider cannot read the team doc, and no staff list reaches the
- * website for them (the app has the same limit), so they and signed-out visitors do not see Message.
+ * is shown here. A signed-in person who is not on the team gets the staff only, read from the roster
+ * (`GET /v1/teams/:id/roster`, which any signed-in person may read) when the dialog opens. Signed-out visitors
+ * never see Message, and neither does anyone outside a youth team or a private group, whose roster is private.
  */
 export function MessageStaff() {
-  const { teamId, kind, viewer } = useTeamHub();
+  const { teamId, kind, youth, privateGroup, viewer } = useTeamHub();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
-  // Members only: a signed-in outsider cannot read the team doc, and the website has no staff list for them.
-  if (!user || viewer.state !== "member") return null;
+  const member = viewer.state === "member";
+  const outsider = viewer.state === "outsider" && !youth && !privateGroup;
+  if (!user || (!member && !outsider)) return null;
   return (
     <>
       <Button size="small" className="btn-quiet" aria-haspopup="dialog" onClick={() => setOpen(true)}>
@@ -73,8 +76,26 @@ function StaffList({ teamId, kind, onClose }: { teamId: string; kind: string; on
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
-  if (!user || viewer.state !== "member") return null;
-  const staff = staffOf(peopleOf(viewer.team), user.uid);
+  const [fetched, setFetched] = useState<StaffPerson[] | null>(null);
+  const [loadError, setLoadError] = useState("");
+  const member = viewer.state === "member";
+
+  // Outsiders can't read the team doc: the roster has its members and tiers.
+  useEffect(() => {
+    if (member || !user) return;
+    let live = true;
+    callApi<TeamRoster>(user, `/v1/teams/${encodeURIComponent(teamId)}/roster`).then(
+      (r) => live && setFetched(r.members),
+      (e) => live && setLoadError(problem(e, "Couldn't load the team's staff. Try again.")),
+    );
+    return () => {
+      live = false;
+    };
+  }, [member, user, teamId]);
+
+  if (!user) return null;
+  const people = viewer.state === "member" ? peopleOf(viewer.team) : fetched;
+  const staff = people ? staffOf(people, user.uid) : null;
 
   async function message(uid: string) {
     if (!user) return;
@@ -98,11 +119,17 @@ function StaffList({ teamId, kind, onClose }: { teamId: string; kind: string; on
           ×
         </button>
       </div>
-      <Link className="btn btn-primary" href={`/teams/${encodeURIComponent(teamId)}/chat`} onClick={onClose}>
-        Team chat
-      </Link>
+      {member && (
+        <Link className="btn btn-primary" href={`/teams/${encodeURIComponent(teamId)}/chat`} onClick={onClose}>
+          Team chat
+        </Link>
+      )}
       <h3 className="line-group-title">{kind === "team" ? "Team staff" : "Organizers"}</h3>
-      {staff.length === 0 ? (
+      {loadError ? (
+        <ErrorNote>{loadError}</ErrorNote>
+      ) : !staff ? (
+        <Loading label="Loading…" />
+      ) : staff.length === 0 ? (
         <p className="muted small">No one else to message.</p>
       ) : (
         <ul className="staff-rows">

@@ -226,7 +226,7 @@ test("C5 Overlap: the personal editor asks too", async ({ page }) => {
   await expect(confirm).toBeHidden();
 });
 
-test("C6 Header Message: Team chat and the staff for a member; none for an outsider or a visitor", async ({ page, browser, baseURL }) => {
+test("C6 Header Message: Team chat and the staff for a member; staff only for an outsider; none for a visitor", async ({ page, browser, baseURL }) => {
   const w = world();
   await openMember(page, `/teams/${w.teamId}`);
   const head = page.locator(".team-head");
@@ -241,14 +241,17 @@ test("C6 Header Message: Team chat and the staff for a member; none for an outsi
   await dialog.getByRole("button", { name: "Message Cam Lindqvist" }).click();
   await expect(page).toHaveURL(/\/messages\?c=/, { timeout: 20_000 });
 
-  // A signed-in outsider (Ada on Cam's team) and a visitor get no Message: only members have a staff list.
+  // A signed-in outsider (Ada on Cam's team): the staff only, no Team chat.
   await openMember(page, "/teams");
   await page.getByRole("searchbox", { name: "Search teams and communities by name" }).fill("cascade request");
   await page.locator(".team-finder-list .ui-row a.ui-row-main", { hasText: "Cascade Request Team" }).click();
   await expect(page.locator(".team-head").getByRole("heading", { level: 1 })).toHaveText("Cascade Request Team", { timeout: 20_000 });
   const teamUrl = page.url();
-  await expect(page.locator(".team-head").getByRole("button", { name: "Request to join" })).toBeVisible();
-  await expect(page.locator(".team-head").getByRole("button", { name: "Message" })).toHaveCount(0);
+  await page.locator(".team-head").getByRole("button", { name: "Message" }).click();
+  const out = page.getByRole("dialog", { name: "Message the team" });
+  await expect(out.getByRole("button", { name: "Message Cam Lindqvist" })).toBeVisible();
+  await expect(out.getByRole("link", { name: "Team chat" })).toHaveCount(0);
+  await page.keyboard.press("Escape");
 
   // A visitor: no Message.
   const ctx = await browser.newContext({ baseURL: baseURL!, storageState: { cookies: [], origins: [] } });
