@@ -268,9 +268,9 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
         </div>
       </header>
 
-      <aside className="side-nav">
+      <div className="side-nav">
         <nav aria-label="Site" className="side-tabs">
-          <h2 className="side-label">Your sideline</h2>
+          <p className="side-label">Your sideline</p>
           {tabLinks("nav-item", true)}
         </nav>
         {user ? (
@@ -296,7 +296,7 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
           </nav>
           <small className="side-copy">© {new Date().getFullYear()} Stall 10</small>
         </div>
-      </aside>
+      </div>
 
       {/* Phones, where the side nav (and its Create a post) is hidden. */}
       {fab && (

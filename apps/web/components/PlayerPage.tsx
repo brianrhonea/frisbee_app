@@ -190,7 +190,7 @@ function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePage; loc
                   type="button"
                   className="btn btn-small"
                   onClick={async () => {
-                    if ((await askConfirm(`Unblock ${first}? You'll see each other's posts and can follow and message again.`))) {
+                    if ((await askConfirm({ title: `Unblock ${first}?`, message: "You'll see each other's posts and can follow and message again.", confirmLabel: "Unblock" }))) {
                       void unblockPerson(user, uid).catch((e) => alert((e as Error).message));
                     }
                   }}

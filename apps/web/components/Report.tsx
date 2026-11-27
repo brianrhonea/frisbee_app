@@ -176,7 +176,7 @@ export function BlockButton({
   async function block() {
     if (!user) return;
     if (
-      !(await askConfirm(`Block ${name}? You won't see each other's posts, comments or messages, and neither of you can follow or message the other. Teams you share still work. They aren't told.`))
+      !(await askConfirm({ title: `Block ${name}?`, message: "You won't see each other's posts, comments or messages, and neither of you can follow or message the other. Teams you share still work. They aren't told.", confirmLabel: "Block", destructive: true }))
     )
       return;
     setBusy(true);

@@ -288,7 +288,7 @@ export function TeamCommunity() {
               className="btn btn-small"
               disabled={busy}
               onClick={async () => {
-                if ((await askConfirm(team.orgLinked ? "Leave the community?" : "Cancel the request?"))) void call(base, "DELETE");
+                if ((await askConfirm(team.orgLinked ? { title: "Leave the community?", confirmLabel: "Leave community" } : { title: "Cancel the request?", confirmLabel: "Cancel request", cancelLabel: "Keep request" }))) void call(base, "DELETE");
               }}
             >
               {team.orgLinked ? "Leave community" : "Cancel request"}

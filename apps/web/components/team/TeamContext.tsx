@@ -158,4 +158,4 @@ export function useTeamHub(): TeamHubInfo {
 }
 
 /** What a member is asked before leaving (Settings › Leave and the team page's More menu). */
-export const LEAVE_CONFIRM = "Leave? You'll need a new invite to come back.";
+export const LEAVE_CONFIRM = { title: "Leave this team?", message: "You'll need a new invite to come back.", confirmLabel: "Leave team" };

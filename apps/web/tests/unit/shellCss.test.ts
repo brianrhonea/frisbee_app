@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 // Phones' bottom tab bar covers the foot of the screen, so every sticky or
 // fixed bar at the foot is offset above it (Sprint 3 S3). Those bars' own CSS
 // loads with their pages, so this reads the shell's rule.
-const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../../app/app.css"), "utf8");
+const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../../app/app.css"), "utf8").replace(/\r\n/g, "\n");
 const phone = css.slice(css.indexOf("@media (max-width: 599px) {\n  .fab-post"));
 
 describe("bottom bars sit above the phone tab bar", () => {

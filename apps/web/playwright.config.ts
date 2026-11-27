@@ -3,6 +3,8 @@ import { defineConfig, devices } from "@playwright/test";
 // Browser tests for the website (UI rework board: P6, N8-N10). Runs against
 // `next dev` on port 3000, started here unless one is already running.
 // Widths follow the UI guide's layouts: phone, tablet, laptop, desktop.
+// E2E_PORT picks another port for the dev server (when 3000 is taken).
+const port = process.env.E2E_PORT ?? "3000";
 const widths = [
   { name: "phone", width: 375, height: 812, mobile: true },
   { name: "tablet", width: 768, height: 1024, mobile: true },
@@ -20,7 +22,7 @@ export default defineConfig({
   timeout: 60_000,
   expect: { toHaveScreenshot: { maxDiffPixelRatio: 0.01, animations: "disabled" } },
   use: {
-    baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000",
+    baseURL: process.env.E2E_BASE_URL ?? `http://localhost:${port}`,
     trace: "retain-on-failure",
   },
   projects: [
@@ -46,8 +48,8 @@ export default defineConfig({
   webServer: process.env.E2E_BASE_URL
     ? undefined
     : {
-        command: "pnpm dev",
-        url: "http://localhost:3000/learn",
+        command: `pnpm dev -p ${port}`,
+        url: `http://localhost:${port}/learn`,
         reuseExistingServer: true,
         timeout: 180_000,
       },

@@ -19,7 +19,7 @@ export function BlockedSettings() {
   const me = user;
 
   async function unblock(uid: string, name: string) {
-    if (!(await askConfirm(`Unblock ${name}? You'll see each other's posts and can follow and message again.`))) return;
+    if (!(await askConfirm({ title: `Unblock ${name}?`, message: "You'll see each other's posts and can follow and message again.", confirmLabel: "Unblock" }))) return;
     setBusy(uid);
     setError(null);
     try {

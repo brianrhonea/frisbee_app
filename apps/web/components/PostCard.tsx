@@ -240,7 +240,7 @@ export function PostCard({ post: initial, standalone = false }: { post: PublicPo
   if (blocks.hides(post.authorId) || blocks.hides(target?.authorId)) return null;
 
   async function remove() {
-    if (!user || !(await askConfirm(post.repostOf ? "Take back this repost?" : "Delete this post? This can't be undone."))) return;
+    if (!user || !(await askConfirm(post.repostOf ? { title: "Take back this repost?", confirmLabel: "Take back" } : { title: "Delete this post?", message: "This can't be undone.", confirmLabel: "Delete", destructive: true }))) return;
     setError(null);
     try {
       await callApi(user, `/v1/posts/${encodeURIComponent(post.id)}`, { method: "DELETE" });

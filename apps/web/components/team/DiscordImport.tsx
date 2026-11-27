@@ -114,7 +114,7 @@ export function DiscordImport() {
     if (!user || !plan || !view) return;
     if (
       view.moving.length > 0 &&
-      !(await askConfirm(`Move ${view.moving.length} room${view.moving.length === 1 ? "" : "s"} to teams? These are in the community chat now and will be deleted there once their team has them, with any messages in them: ${view.moving.map((r) => `#${r.name}`).join(", ")}.`))
+      !(await askConfirm({ title: `Move ${view.moving.length} room${view.moving.length === 1 ? "" : "s"} to teams?`, confirmLabel: "Move rooms", destructive: true, message: `These are in the community chat now and will be deleted there once their team has them, with any messages in them: ${view.moving.map((r) => `#${r.name}`).join(", ")}.` }))
     ) {
       return;
     }

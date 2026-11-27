@@ -4,6 +4,17 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.63.5 — 2026-11-26
+
+UI review fixes for the shell and components (Sprint 3 lane C). No routes, logic or permissions change.
+
+- Blocker: an EmptyState's primary button was invisible (`.empty a` set the accent colour on an accent fill); it is now `.empty a:not(.btn)`.
+- Confirm dialogs have their own title and confirm label for unblock, block, delete post, take back repost, leave team or community, make owner, cancel request, move Discord rooms, deal players, regenerate or replace the schedule, the staff actions, finish and cancel draft ("Keep draft" / "Cancel draft"), and "Tell the community?" ("Post it" / "Not now"). Destructive: delete post, block, make owner, move rooms, deal teams, regenerate and replace schedule.
+- Phone: `--tabbar-h` is on `:root`; focused fields scroll above the tab bar (`scroll-padding-bottom`); the floating Post button hides where the stats dock or tournament bar shows; tab and rail labels are 11 px and ellipsise.
+- Sidebar links are 48 px high; the search clear button has a 48 px hit area and the WebKit cancel button is hidden; summary-tile labels wrap and tiles go two across under 360 px.
+- Second confirm question answers the first with no; a ReactNode message is not wrapped in a paragraph; ErrorState drops the old `form-error error-note` classes; SearchField's `role="search"` is opt-in (`landmark`); "Your sideline" is a paragraph and the sidebar a plain `div`.
+- Tests: CRLF-safe CSS reads, new unit and browser checks for each fix, and `E2E_PORT` to run the browser tests on another port.
+
 ## 0.63.4 — 2026-11-26
 
 Browser-test setup only: the route check (N8) is its own Playwright project that runs after the width projects (it starts a stub API on port 8787, which must not run beside them), and the shell width test has a longer timeout for first-visit compiles.

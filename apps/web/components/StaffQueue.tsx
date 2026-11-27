@@ -7,10 +7,10 @@ import { ReportCard } from "./ReportQueue";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { ErrorNote } from "@/components/StatusViews";
 
-const confirms: Partial<Record<StaffAction, string>> = {
-  remove: "Remove it for everyone? Every open report on it closes.",
-  suspend: "Suspend this account? They're signed out and can't sign in, post or message until you lift it.",
-  warn: "Send them a warning notification?",
+const confirms: Partial<Record<StaffAction, { title: string; message?: string; confirmLabel: string; destructive?: boolean }>> = {
+  remove: { title: "Remove it for everyone?", message: "Every open report on it closes.", confirmLabel: "Remove", destructive: true },
+  suspend: { title: "Suspend this account?", message: "They're signed out and can't sign in, post or message until you lift it.", confirmLabel: "Suspend", destructive: true },
+  warn: { title: "Send a warning?", message: "They get a warning notification.", confirmLabel: "Send warning" },
 };
 
 /**

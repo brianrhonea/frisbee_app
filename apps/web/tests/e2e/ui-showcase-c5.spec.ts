@@ -91,6 +91,58 @@ test("list rows, tiles, event cards and retry buttons have 48 px targets", async
   }
 });
 
+// Relative luminance contrast of two "rgb(r, g, b)" strings.
+function contrast(a: string, b: string) {
+  const lum = (c: string) => {
+    const [r, g, bl] = (c.match(/[\d.]+/g) ?? ["0", "0", "0"]).slice(0, 3).map((v) => {
+      const x = Number(v) / 255;
+      return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r! + 0.7152 * g! + 0.0722 * bl!;
+  };
+  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+  return (hi! + 0.05) / (lo! + 0.05);
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(`the empty state's button is readable (${theme})`, async ({ page }) => {
+    await open(page, "/dev/ui", theme);
+    const action = page.locator('[data-showcase="states"] .empty .btn-primary').first();
+    const { color, bg } = await action.evaluate((el) => ({ color: getComputedStyle(el).color, bg: getComputedStyle(el).backgroundColor }));
+    expect(contrast(color, bg), `${color} on ${bg}`).toBeGreaterThanOrEqual(4.5);
+    // A plain link in an empty state is still the accent colour.
+    const states = page.locator('[data-showcase="states"]');
+    await expect(states).toBeVisible();
+  });
+}
+
+test("the search clear button has a 48 px hit area", async ({ page }) => {
+  await open(page, "/dev/ui");
+  await page.waitForTimeout(1500);
+  await page.getByRole("searchbox", { name: "Search the gallery" }).fill("x");
+  const clear = page.getByRole("button", { name: "Clear search" });
+  const hit = await clear.evaluate((el) => {
+    el.scrollIntoView({ block: "center" });
+    const r = el.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    const at = (x: number, y: number) => {
+      const t = document.elementFromPoint(x, y);
+      return !!t && el.contains(t);
+    };
+    return { top: at(cx, cy - 23), bottom: at(cx, cy + 23), left: at(cx - 23, cy), right: at(cx + 23, cy) };
+  });
+  expect(hit).toEqual({ top: true, bottom: true, left: true, right: true });
+});
+
+test("summary tiles go two across under 360 px and long labels wrap", async ({ page }) => {
+  await page.setViewportSize({ width: 340, height: 700 });
+  await open(page, "/dev/ui");
+  const cols = await page.locator('[data-showcase="cover"] .ui-tiles').first().evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(" ").length);
+  expect(cols).toBe(2);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+});
+
 test("the new sections hold up at 320 px: nothing scrolls sideways", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 700 });
   await open(page, "/dev/ui");

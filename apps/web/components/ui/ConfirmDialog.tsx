@@ -64,7 +64,11 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   const ask = useCallback<Ask>(
     (options) =>
       new Promise<boolean>((resolve) => {
-        setOpen({ options: typeof options === "string" ? { message: options } : options, resolve });
+        // A second question while one is open answers the first with "no".
+        setOpen((prev) => {
+          prev?.resolve(false);
+          return { options: typeof options === "string" ? { message: options } : options, resolve };
+        });
       }),
     [],
   );
@@ -79,7 +83,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       {open && o ? (
         <ConfirmDialog
           title={o.title ?? "Are you sure?"}
-          message={o.message ? <p>{o.message}</p> : undefined}
+          message={o.message || undefined}
           confirmLabel={o.confirmLabel}
           cancelLabel={o.cancelLabel}
           destructive={o.destructive}

@@ -140,7 +140,10 @@ a.ui-event-main:hover .ui-event-title { text-decoration: underline; }
 }
 a.ui-tile-face:hover { border-color: var(--line-2); }
 .ui-tile-value { font-family: var(--font-score); font-weight: 800; font-size: var(--text-heading3-size); line-height: 1; font-variant-numeric: tabular-nums; }
-.ui-tile-label { color: var(--muted); font-size: var(--text-secondary-size); }
+.ui-tile-label { color: var(--muted); font-size: var(--text-secondary-size); overflow-wrap: anywhere; min-width: 0; }
+.ui-tile-face { min-width: 0; }
+/* Under about 360 px three tiles no longer fit side by side. */
+@media (max-width: 360px) { .ui-tiles { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 /* --- ListRow ------------------------------------------------------------------ */
 .ui-row { display: flex; align-items: center; gap: var(--space-md); min-height: 56px; border-bottom: 1px solid var(--line); }
@@ -192,7 +195,10 @@ a.ui-tile-face:hover { border-color: var(--line-2); }
 .ui-search:focus-within { border-color: var(--accent); outline: 2px solid var(--accent); outline-offset: 1px; }
 .ui-search input { flex: 1; min-width: 0; min-height: 44px; border: 0; background: none; color: var(--ink); font: inherit; }
 .ui-search input:focus { outline: none; }
-.ui-search-clear { display: inline-grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 50%; background: none; color: var(--muted); cursor: pointer; }
+.ui-search-clear { position: relative; display: inline-grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 50%; background: none; color: var(--muted); cursor: pointer; }
+/* A 48 px hit area around the 36 px button. */
+.ui-search-clear::after { content: ""; position: absolute; inset: -6px; }
+.ui-search input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; display: none; }
 .ui-search-clear:hover { background: var(--field); color: var(--ink); }
 .ui-search-clear:focus-visible { outline: 2px solid var(--accent); }
 

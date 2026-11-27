@@ -68,9 +68,11 @@ export interface SearchFieldProps extends Omit<InputHTMLAttributes<HTMLInputElem
   onChange: (value: string) => void;
   onSubmit?: (value: string) => void;
   clearLabel?: string;
+  /** Marks the box as the page's search landmark; leave off for a filter box inside a list. */
+  landmark?: boolean;
 }
 
-export function SearchField({ label, value, onChange, onSubmit, clearLabel = "Clear search", className, onKeyDown, ...rest }: SearchFieldProps) {
+export function SearchField({ label, value, onChange, onSubmit, clearLabel = "Clear search", landmark = false, className, onKeyDown, ...rest }: SearchFieldProps) {
   function key(e: KeyboardEvent<HTMLInputElement>) {
     onKeyDown?.(e);
     if (e.defaultPrevented) return;
@@ -83,7 +85,7 @@ export function SearchField({ label, value, onChange, onSubmit, clearLabel = "Cl
     }
   }
   return (
-    <div className={`ui-search${className ? ` ${className}` : ""}`} role="search">
+    <div className={`ui-search${className ? ` ${className}` : ""}`} role={landmark ? "search" : undefined}>
       <NavIcon name="search" size={18} />
       <input {...rest} type="search" aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} onKeyDown={key} enterKeyHint="search" autoComplete="off" />
       {value ? (
