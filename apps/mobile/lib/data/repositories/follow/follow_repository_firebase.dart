@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/follow.dart';
 import '../../../utils/result.dart';
+import '../../services/api_client.dart';
 import '../../services/firestore_utils.dart';
 import '../../services/shared_streams.dart';
 import 'follow_repository.dart';
@@ -13,8 +14,16 @@ class FollowRepositoryFirebase implements FollowRepository {
   FollowRepositoryFirebase({
     FirebaseFirestore? firestore,
     SharedStreams? sharedStreams,
+    ApiClient? api,
   }) : _db = firestore ?? FirebaseFirestore.instance,
-       _shared = sharedStreams ?? SharedStreams.instance;
+       _shared = sharedStreams ?? SharedStreams.instance,
+       _api = api;
+
+  /// The Stall 10 API: follows and follow requests are written through it
+  /// (`/v1/follows`, `/v1/me/follow-requests`); there's no direct fallback.
+  final ApiClient? _api;
+
+  static String _enc(String s) => Uri.encodeComponent(s);
 
   final FirebaseFirestore _db;
 
@@ -56,40 +65,41 @@ class FollowRepositoryFirebase implements FollowRepository {
     FollowTarget target, {
     bool notify = false,
   }) => guard(
-    () => _follows(uid).doc(target.key).set({
-      ...Follow(target: target, notify: notify).toMap(),
-      'createdAt': FieldValue.serverTimestamp(),
+    () => _api.required.put('/v1/follows', {
+      'type': target.type.name,
+      'targetId': target.id,
+      'groupId': ?target.groupId,
+      'notify': notify,
     }),
   );
 
   @override
   Future<Result<void>> unfollow(String uid, String key) =>
-      guard(() => _follows(uid).doc(key).delete());
+      guard(() => _api.required.delete('/v1/follows/${_enc(key)}'));
 
   @override
-  Future<Result<void>> setNotify(String uid, String key, bool notify) =>
-      guard(() => _follows(uid).doc(key).update({'notify': notify}));
+  Future<Result<void>> setNotify(String uid, String key, bool notify) => guard(
+    () => _api.required.patch('/v1/follows/${_enc(key)}', {'notify': notify}),
+  );
 
   @override
   Stream<bool> watchFollowRequested(String uid, String owner) =>
       _requests(owner).doc(uid).snapshots().map((d) => d.exists);
 
+  /// Follows a private profile: the server makes it a request the owner
+  /// answers (`status: requested`); the follow itself is the same route.
   @override
   Future<Result<void>> requestFollow(AppUser me, String owner) => guard(
-    () => _requests(owner).doc(me.uid).set({
-      ...FollowRequest(
-        uid: me.uid,
-        name: me.label,
-        username: me.username,
-        photoUrl: me.photoUrl,
-      ).toMap(),
-      'createdAt': FieldValue.serverTimestamp(),
+    () => _api.required.put('/v1/follows', {
+      'type': FollowType.user.name,
+      'targetId': owner,
+      'notify': false,
     }),
   );
 
   @override
   Future<Result<void>> cancelFollowRequest(String uid, String owner) =>
-      guard(() => _requests(owner).doc(uid).delete());
+      guard(() => _api.required.delete('/v1/follows/requests/${_enc(owner)}'));
 
   @override
   Stream<List<FollowRequest>> watchFollowRequests(String owner) => _shared.get(
@@ -108,29 +118,27 @@ class FollowRepositoryFirebase implements FollowRepository {
 
   /// firestore.rules let the owner write the requester's follow only in
   /// the same batch that removes their request.
+  /// Accepting twice is `not_found` the second time: it's done.
   @override
   Future<Result<void>> acceptFollowRequest(
     AppUser owner,
     FollowRequest request,
-  ) => guard(() {
-    final target = FollowTarget.user(
-      owner.uid,
-      owner.label,
-      photoUrl: owner.photoUrl,
-    );
-    return (_db.batch()
-          ..set(_follows(request.uid).doc(target.key), {
-            ...Follow(target: target).toMap(),
-            'approved': true,
-            'createdAt': FieldValue.serverTimestamp(),
-          })
-          ..delete(_requests(owner.uid).doc(request.uid)))
-        .commit();
+  ) => guard(() async {
+    try {
+      await _api.required.post(
+        '/v1/me/follow-requests/${_enc(request.uid)}/accept',
+        const {},
+      );
+    } on ApiException catch (e) {
+      if (e.code != 'not_found') rethrow;
+    }
   });
 
   @override
   Future<Result<void>> declineFollowRequest(String owner, String requester) =>
-      guard(() => _requests(owner).doc(requester).delete());
+      guard(
+        () => _api.required.delete('/v1/me/follow-requests/${_enc(requester)}'),
+      );
 
   @override
   Stream<FollowCounts> watchCounts(String key) => _shared.get(

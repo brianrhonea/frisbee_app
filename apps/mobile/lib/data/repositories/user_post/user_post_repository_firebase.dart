@@ -9,9 +9,11 @@ import '../../../domain/models/user_post.dart';
 import '../../../utils/result.dart';
 import '../../services/api_client.dart';
 import '../../services/attachment_storage.dart';
+import '../../services/upload_client.dart';
 import '../../services/firestore_utils.dart';
 import 'user_post_repository.dart';
 import '../../../domain/models/outbox.dart';
+import '../outbox/outbox_payloads.dart';
 import '../outbox/outbox_repository.dart';
 import '../../../domain/models/word_filter.dart';
 import '../../../domain/models/follow.dart';
@@ -24,33 +26,59 @@ class UserPostRepositoryFirebase implements UserPostRepository {
     required AttachmentStorage attachments,
     FirebaseFirestore? firestore,
     ApiClient? api,
+    UploadClient? uploads,
     OutboxRepository? outbox,
   }) : _files = attachments,
        _db = firestore ?? FirebaseFirestore.instance,
        _api = api,
+       _uploads = uploads ?? UploadClient(api: api),
        _outbox = outbox {
     outbox?.register(
       OutboxKind.userPost,
       OutboxHandler(
         send: (job, files, author) async {
-          final post = UserPost.fromMap(
-            '',
-            Map<String, dynamic>.from(job.payload['post'] as Map? ?? const {}),
+          final post = _queuedPost(job);
+          if (post != null && _isRecordedWorkout(post)) {
+            return _asVoid(await _saveRecordedWorkout(post, author, job.id));
+          }
+          final body = OutboxPayloads.userPost(job);
+          if (body == null) {
+            return Result.error(
+              const ApiException(
+                'failed_precondition',
+                OutboxPayloads.unmappable,
+              ),
+            );
+          }
+          return _asVoid(
+            await _create(job.id, body, files, ledger: outbox, key: job.id),
           );
-          final r = await _save(
-            UserPostDraft(post: post, newImages: files),
-            author,
-            newId: job.id,
-          );
-          return switch (r) {
-            Ok() => const Result.ok(null),
-            Error(:final error) => Result.error(error),
-          };
         },
         sent: (job) => existsOnServer(_posts.doc(job.id)),
       ),
     );
   }
+
+  static Result<void> _asVoid<T>(Result<T> r) => switch (r) {
+    Ok() => const Result.ok(null),
+    Error(:final error) => Result.error(error),
+  };
+
+  /// The post a queued job holds, as the composer made it.
+  static UserPost? _queuedPost(OutboxJob job) => job.payload['post'] is Map
+      ? UserPost.fromMap(
+          '',
+          Map<String, dynamic>.from(job.payload['post'] as Map),
+        )
+      : null;
+
+  /// A recorded run (with its GPS route or seconds): the API's workout can't
+  /// carry those yet, so it's saved the old way. See
+  /// [OutboxPayloads.workoutNeedsDirect].
+  static bool _isRecordedWorkout(UserPost post) =>
+      OutboxPayloads.workoutNeedsDirect(post.workout?.toMap());
+
+  final UploadClient _uploads;
 
   /// Holds new posts made offline until they can go out.
   final OutboxRepository? _outbox;
@@ -72,9 +100,6 @@ class UserPostRepositoryFirebase implements UserPostRepository {
   Future<bool> _profileIsPrivate(String uid) async =>
       (await _db.collection('profiles').doc(uid).get()).data()?['private'] ==
       true;
-
-  static String imageFolder(String uid, String postId) =>
-      'users/$uid/posts/$postId/${DateTime.now().millisecondsSinceEpoch}';
 
   List<UserPost> _list(QuerySnapshot<Map<String, dynamic>> snap) => [
     for (final d in snap.docs) UserPost.fromMap(d.id, plainData(d.data())),
@@ -353,25 +378,66 @@ class UserPostRepositoryFirebase implements UserPostRepository {
       post: draft.post.copyWith(body: maskSwearing(draft.post.body)),
       newImages: draft.newImages,
     );
-    final outbox = _outbox;
-    // Only new posts wait offline; an edit needs the post as it stands.
-    if (outbox == null ||
-        !draft.post.isNew ||
-        draft.newImages.any((i) => i.tooLarge)) {
-      return _save(draft, author);
+    if (draft.newImages.where((i) => i.tooLarge).firstOrNull case final big?) {
+      return Result.error(
+        AttachmentTooLargeException(
+          big.name,
+          limit: maxBytesFor(big.contentType),
+        ),
+      );
     }
+    // Only new posts wait offline; an edit needs the post as it stands, so
+    // offline it fails with a retry (contracts/phase1-writes.md D8).
+    if (!draft.post.isNew) return _edit(draft);
     final id = _posts.doc().id;
+    final post = draft.post;
+    final outbox = _outbox;
+    Future<Result<void>> now() async {
+      if (_isRecordedWorkout(post)) {
+        return _asVoid(await _saveRecordedWorkout(post, author, id));
+      }
+      final body = OutboxPayloads.userPost(
+        OutboxJob(
+          id: id,
+          uid: author.uid,
+          kind: OutboxKind.userPost,
+          createdAt: DateTime.now(),
+          target: 'posts',
+          label: 'Post',
+          payload: {'post': jsonSafe(post.toEditableMap())},
+          files: [
+            for (final (i, f) in draft.newImages.indexed)
+              OutboxFile(name: f.name, path: '$id/$i', size: f.size),
+          ],
+        ),
+      );
+      if (body == null) {
+        return Result.error(
+          const ApiException(
+            'invalid_argument',
+            'Write something or add a photo.',
+          ),
+        );
+      }
+      return _asVoid(
+        await _create(id, body, draft.newImages, ledger: outbox, key: id),
+      );
+    }
+
+    if (outbox == null) {
+      return switch (await now()) {
+        Ok() => Result.ok(id),
+        Error(:final error) => Result.error(error),
+      };
+    }
     final r = await outbox.submit(
       kind: OutboxKind.userPost,
       id: id,
       target: 'posts',
       label: 'Post',
-      payload: {'post': draft.post.toEditableMap()},
+      payload: {'post': post.toEditableMap()},
       files: draft.newImages,
-      sendNow: () async => switch (await _save(draft, author, newId: id)) {
-        Ok() => const Result.ok(null),
-        Error(:final error) => Result.error(error),
-      },
+      sendNow: now,
     );
     return switch (r) {
       Ok() => Result.ok(id),
@@ -379,109 +445,112 @@ class UserPostRepositoryFirebase implements UserPostRepository {
     };
   }
 
-  /// Saves [draft]; a new post gets [newId] (the queue's) or a fresh id.
-  Future<Result<String>> _save(
-    UserPostDraft draft,
-    AppUser author, {
-    String? newId,
+  /// `POST /v1/posts` for post [id]: uploads [files] first (photos, under
+  /// [id]), then sends [body] with `id` and `uploadIds`. A 409 (it's
+  /// already there) comes back as an `already_exists` error, which the
+  /// queue counts as sent.
+  Future<Result<String>> _create(
+    String id,
+    Map<String, Object?> body,
+    List<NewAttachment> files, {
+    UploadLedger? ledger,
+    String? key,
   }) => guard(() async {
+    final api = _api.required;
+    final ready = files.isEmpty
+        ? const <ReadyUpload>[]
+        : await _uploads.uploadAll(
+            purpose: UploadPurpose.post,
+            itemId: id,
+            files: files,
+            ledger: ledger,
+            ledgerKey: key,
+          );
+    final r = await api.post('/v1/posts', {
+      ...body,
+      'id': id,
+      'uploadIds': [for (final u in ready) u.id],
+    });
+    return r['id'] as String? ?? id;
+  });
+
+  /// A recorded run saved straight to Firestore: its GPS route and seconds
+  /// aren't in the API's workout yet.
+  Future<Result<String>> _saveRecordedWorkout(
+    UserPost post,
+    AppUser author,
+    String id,
+  ) => guard(() async {
+    final ref = _posts.doc(id);
+    await ref.set({
+      ...post.toEditableMap(),
+      'authorId': author.uid,
+      'authorName': author.label,
+      'authorPhotoUrl': author.photoUrl,
+      'private': await _profileIsPrivate(author.uid),
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    return id;
+  });
+
+  /// `PATCH /v1/posts/:id`: the words, links and photos. The workout and a
+  /// shared event can't change; a repost only has its note.
+  Future<Result<String>> _edit(UserPostDraft draft) => guard(() async {
+    final api = _api.required;
     final post = draft.post;
-    final ref = post.isNew ? _posts.doc(newId) : _posts.doc(post.id);
-    final before = post.isNew
-        ? const <ChatAttachment>[]
-        : UserPost.fromMap(ref.id, plainData((await ref.get()).data())).images;
-    final uploaded = draft.newImages.isEmpty
-        ? const <ChatAttachment>[]
-        : await _files.upload(imageFolder(author.uid, ref.id), draft.newImages);
-    final saved = post.copyWith(images: [...post.images, ...uploaded]);
-    try {
-      if (post.isNew) {
-        await ref.set({
-          ...saved.toEditableMap(),
-          'authorId': author.uid,
-          'authorName': author.label,
-          'authorPhotoUrl': author.photoUrl,
-          'private': await _profileIsPrivate(author.uid),
-          'createdAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-      } else {
-        await ref.update({
-          ...saved.toEditableMap(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-      }
-    } catch (_) {
-      await _files
-          .delete(uploaded.map((i) => i.path))
-          .catchError((Object _) => <void>[]);
-      rethrow;
+    final ready = draft.newImages.isEmpty
+        ? const <ReadyUpload>[]
+        : await _uploads.uploadAll(
+            purpose: UploadPurpose.post,
+            itemId: post.id,
+            files: draft.newImages,
+          );
+    final body = <String, Object?>{'body': post.body.trim()};
+    if (!post.isRepost) {
+      body
+        ..['links'] = post.links
+        ..['keepImages'] = [for (final i in post.images) i.path]
+        ..['uploadIds'] = [for (final u in ready) u.id]
+        // Null takes the tag off.
+        ..['tournament'] = post.tournamentKey == null
+            ? null
+            : {'key': post.tournamentKey, 'name': post.tournamentName ?? ''};
     }
-    final kept = {for (final i in saved.images) i.path};
-    final removed = [
-      for (final i in before)
-        if (!kept.contains(i.path)) i.path,
-    ];
-    if (removed.isNotEmpty) await _files.delete(removed);
-    return ref.id;
+    await api.patch('/v1/posts/${Uri.encodeComponent(post.id)}', body);
+    return post.id;
   });
 
   @override
   Future<Result<void>> setLiked(String postId, String uid, bool liked) => guard(
-    () => _posts.doc(postId).update({
-      'likedBy': liked
-          ? FieldValue.arrayUnion([uid])
-          : FieldValue.arrayRemove([uid]),
-    }),
+    () => _api.required.send(
+      liked ? 'PUT' : 'DELETE',
+      '/v1/posts/${Uri.encodeComponent(postId)}/like',
+    ),
   );
 
   @override
   Future<Result<String>> repost(UserPost original, String note, AppUser me) =>
       guard(() async {
-        note = cleanText(note);
-        final post = UserPost.repost(original, note: note);
-        final originalId = post.originalId;
-        final id = UserPost.repostId(originalId, me.uid);
-        final private = await _profileIsPrivate(me.uid);
-        // Both or neither, so the count matches the reposts.
-        final batch = _db.batch()
-          ..set(_posts.doc(id), {
-            ...post.toEditableMap(),
-            'authorId': me.uid,
-            'authorName': me.label,
-            'authorPhotoUrl': me.photoUrl,
-            'private': private,
-            'createdAt': FieldValue.serverTimestamp(),
-            'updatedAt': FieldValue.serverTimestamp(),
-          })
-          ..update(_posts.doc(originalId), {
-            'repostedBy': FieldValue.arrayUnion([me.uid]),
-          });
-        await batch.commit();
-        return id;
+        final originalId = original.originalId;
+        await _api.required.put(
+          '/v1/posts/${Uri.encodeComponent(originalId)}/repost',
+          {'note': cleanText(note).trim()},
+        );
+        return UserPost.repostId(originalId, me.uid);
       });
 
   @override
-  Future<Result<void>> undoRepost(String originalId, String uid) =>
-      guard(() async {
-        final batch = _db.batch()
-          ..delete(_posts.doc(UserPost.repostId(originalId, uid)))
-          ..update(_posts.doc(originalId), {
-            'repostedBy': FieldValue.arrayRemove([uid]),
-          });
-        await batch.commit();
-      });
+  Future<Result<void>> undoRepost(String originalId, String uid) => guard(
+    () => _api.required.send(
+      'DELETE',
+      '/v1/posts/${Uri.encodeComponent(originalId)}/repost',
+    ),
+  );
 
   @override
-  Future<Result<void>> deletePost(String id) => guard(() async {
-    final ref = _posts.doc(id);
-    final images = UserPost.fromMap(
-      id,
-      plainData((await ref.get()).data()),
-    ).images;
-    await ref.delete();
-    await _files.delete(images.map((i) => i.path));
-  });
+  Future<Result<void>> deletePost(String id) =>
+      guard(() => _api.required.delete('/v1/posts/${Uri.encodeComponent(id)}'));
 
   @override
   Future<Result<Uint8List>> downloadImage(ChatAttachment image) =>

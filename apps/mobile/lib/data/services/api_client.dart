@@ -28,6 +28,19 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+/// Writes that go through the API have no direct-to-Firestore fallback
+/// (contracts/phase1-writes.md D10): a build without an `API_BASE_URL` can't
+/// make them, and says so.
+extension RequiredApi on ApiClient? {
+  /// This client, or an [ApiException] when the build has no API.
+  ApiClient get required =>
+      this ??
+      (throw const ApiException(
+        'failed_precondition',
+        "This version of the app can't do that. Update the app.",
+      ));
+}
+
 /// Calls the Stall 10 API (apps/api) with the user's Firebase ID token and
 /// App Check token. The API validates every request and reads and writes
 /// Firebase for the app; see ARCHITECTURE.md.

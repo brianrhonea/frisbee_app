@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:firebase_auth_mocks/firebase_auth_mocks.dart';
 import 'package:frisbee_app/data/services/api_client.dart';
+import 'package:frisbee_app/data/services/upload_client.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
@@ -34,6 +35,9 @@ class FakeApi {
   FakeApi({this.uid = 'u1'});
 
   final String uid;
+
+  /// While true every request fails to connect, as with no network.
+  bool offline = false;
   final sent = <Sent>[];
   final puts = <String>[];
   final routes = <String, Object>{};
@@ -57,6 +61,10 @@ class FakeApi {
     return (r.single.body as Map).cast<String, Object?>();
   }
 
+  /// The upload client over this fake (its PUTs reach [puts]).
+  UploadClient uploadClient() =>
+      UploadClient(api: client(), client: httpClient);
+
   /// Makes the API client, signed in as [uid].
   ApiClient client({void Function(Map<String, String>)? onIncomplete}) =>
       ApiClient(
@@ -66,6 +74,7 @@ class FakeApi {
       )..onAccountIncomplete = onIncomplete;
 
   late final MockClient httpClient = MockClient((req) async {
+    if (offline) throw http.ClientException('no network');
     if (req.url.host == 'storage.test') {
       puts.add('${req.method} ${req.url.path} ${req.bodyBytes.length}');
       final r = _answer('PUT storage', req);
