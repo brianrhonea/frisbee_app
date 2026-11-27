@@ -4,6 +4,16 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.62.0 — 2026-11-26
+
+Website shell matching the boards (Sprint 3 S3, UI-Q5 and UI-Q11). No route changes.
+
+- Sidebar from 900 px; an icon rail from 600 to 899 px; the tabs as a bar fixed to the bottom under 600 px (it was a row under the top bar). The right panel shows from 1200 px, and the whole shell is capped at 1600 px.
+- Members' tab order is Home, Discover, Teams, Schedule, Chats. Learn is no longer a member tab: it opens under Discover (highlighted there, a "Learn to play" link in the sidebar, and a card on Discover). Signed-out visitors keep Learn as a tab.
+- Bottom-fixed elements (floating Post, voice bar, game and stats docks, whiteboard toast) sit above the bottom bar, with the safe-area inset.
+- A "Skip to content" link; the icon rail's create button has a name.
+- Tests: tests/e2e/shell.spec.ts (N9) and tests/unit/AppFrame.test.tsx.
+
 ## 0.61.0 — 2026-11-26
 
 Release-branch merge of #3a (account gate, web 0.60.0/0.60.1 on hold/3a-account-gate) with C1-C4 (0.59.9-0.59.14).

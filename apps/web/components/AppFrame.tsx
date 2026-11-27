@@ -274,12 +274,12 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
           {tabLinks("nav-item", true)}
         </nav>
         {user ? (
-          <button type="button" className="btn btn-primary side-create" onClick={() => compose(router)}>
+          <button type="button" className="btn btn-primary side-create" aria-label="Create a post" onClick={() => compose(router)}>
             <NavIcon name="plus" size={18} />
             <span>Create a post</span>
           </button>
         ) : (
-          <Link className="btn btn-primary side-create" href="/sign-up">
+          <Link className="btn btn-primary side-create" href="/sign-up" aria-label="Join Stall 10">
             <NavIcon name="plus" size={18} />
             <span>Join Stall 10</span>
           </Link>

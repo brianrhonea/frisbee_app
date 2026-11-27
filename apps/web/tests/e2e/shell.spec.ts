@@ -7,6 +7,13 @@ import { open } from "./helpers";
 // Signed out (visitors keep Learn as a tab; members' order is unit-tested in
 // tests/unit/AppFrame.test.tsx).
 
+/** Clicks a link once the dev server has hydrated the page, and waits out the dev compile of the next one. */
+async function clickAndWait(page: import("@playwright/test").Page, link: import("@playwright/test").Locator, url: RegExp) {
+  await page.waitForTimeout(2500);
+  await link.click();
+  await expect(page).toHaveURL(url, { timeout: 30_000 });
+}
+
 const pagesToCheck = ["/", "/explore", "/learn", "/sign-in", "/tournaments", "/teams"];
 
 /** Which navigation shows, from what the browser lays out. */
@@ -57,15 +64,13 @@ test("each tab opens its page (visitors)", async ({ page }) => {
     ["Communities", "/explore?only=groups"],
     ["Learn", "/learn"],
   ]);
-  await nav.getByRole("link", { name: "Tournaments" }).click();
-  await expect(page).toHaveURL(/\/tournaments$/);
+  await clickAndWait(page, nav.getByRole("link", { name: "Tournaments" }), /\/tournaments$/);
   await expect(nav.getByRole("link", { name: "Tournaments" })).toHaveAttribute("aria-current", "page");
 });
 
 test("Discover has a clear way to Learn, and /learn still opens", async ({ page }) => {
   await open(page, "/explore");
-  await page.getByRole("link", { name: /New to ultimate/ }).click();
-  await expect(page).toHaveURL(/\/learn$/);
+  await clickAndWait(page, page.getByRole("link", { name: /New to ultimate/ }), /\/learn$/);
   await expect(page.locator("main").first()).toBeVisible();
 });
 
@@ -97,8 +102,7 @@ test("Back returns to the same scroll position", async ({ page }) => {
   await page.evaluate(() => window.scrollTo(0, 400));
   const before = await page.evaluate(() => window.scrollY);
   expect(before).toBeGreaterThan(100);
-  await page.locator("footer a", { hasText: "About" }).click();
-  await expect(page).toHaveURL(/\/about$/);
+  await clickAndWait(page, page.locator("footer a", { hasText: "About" }), /\/about$/);
   await page.goBack();
   await expect(page).toHaveURL(/\/explore$/);
   await expect.poll(() => page.evaluate(() => window.scrollY), { timeout: 5000 }).toBeGreaterThan(before - 60);
@@ -117,9 +121,34 @@ test("the bottom bar never covers the end of the page", async ({ page }) => {
   expect(gap).toBeGreaterThanOrEqual(-1);
 });
 
+test("floating and sticky bars at the foot sit above the bottom tab bar", async ({ page }) => {
+  test.skip(page.viewportSize()!.width >= 600, "phones only");
+  await open(page, "/explore");
+  // Members' floating Post button and the voice bar only exist signed in; stand-ins
+  // with their classes get the same CSS. (The game, stats and whiteboard bars load
+  // their CSS with their pages; tests/unit/shellCss.test.ts checks their offsets.)
+  const gaps = await page.evaluate(() => {
+    const frame = document.querySelector(".frame")!;
+    const hub = document.createElement("div");
+    hub.className = "team-hub";
+    frame.append(hub);
+    const make = (cls: string, parent: Element = frame) => {
+      const el = document.createElement("div");
+      el.className = cls;
+      el.textContent = cls;
+      parent.append(el);
+      return el;
+    };
+    const bar = document.querySelector(".tab-bar")!.getBoundingClientRect().top;
+    const els = [make("fab-post"), make("voice-bar")];
+    return els.map((el) => [el.className, Math.round(bar - el.getBoundingClientRect().bottom)] as const);
+  });
+  for (const [cls, gap] of gaps) expect(gap, cls).toBeGreaterThanOrEqual(0);
+});
+
 // Breakpoint edges, one project is enough: the media queries do not depend on it.
 test.describe("breakpoint edges", () => {
-  test.skip(({}, info) => info.project.name !== "laptop", "edges run once");
+  test.beforeEach(({}, info) => test.skip(info.project.name !== "laptop", "edges run once"));
   const edges: [number, "bottom" | "rail" | "side", boolean][] = [
     [599, "bottom", false],
     [600, "rail", false],
@@ -146,9 +175,12 @@ test.describe("breakpoint edges", () => {
   test("1920 px: the page is capped at 1600 px", async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 900 });
     await open(page, "/explore");
-    const w = await page.locator(".frame-main").evaluate((el) => Math.round(el.getBoundingClientRect().width));
+    const w = await page.locator(".frame").evaluate((el) => Math.round(el.getBoundingClientRect().width));
     expect(w).toBeLessThanOrEqual(1600);
-    expect(w).toBeGreaterThan(1300);
+    expect(w).toBeGreaterThan(1500);
+    // The right panel stays with the page, not at the far edge of the window.
+    const aside = await page.locator(".frame-aside").evaluate((el) => Math.round(el.getBoundingClientRect().right));
+    expect(aside).toBeLessThanOrEqual(1760);
     expect((await shell(page)).overflow).toBeLessThanOrEqual(0);
   });
 });
