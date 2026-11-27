@@ -27,9 +27,8 @@ import '../../follow/view_models/follow_viewmodel.dart';
 import '../../teams/view_models/team_home_viewmodel.dart' show pickPostImages;
 import '../../../data/repositories/moderation/moderation_repository.dart';
 
-/// A team whose roster the user isn't linked to yet, and the roster spots
-/// they could claim, best name match first.
-typedef ClaimableTeam = ({Team team, List<RosterPlayer> players});
+/// A team whose roster has a spot linked to the user.
+typedef LinkedSpot = ({Team team, RosterPlayer player});
 
 /// A player's profile. Anyone sees what the player published; on their own
 /// profile the player sees their stats computed live from the games of
@@ -66,10 +65,7 @@ class PlayerProfileViewModel extends ChangeNotifier {
          authRepository: authRepository,
        ) {
     saveDetails = Command1<void, ProfileDetails>(_saveDetails);
-    claim = Command1<void, (String, String)>(
-      (r) => _teamRepo.linkPlayer(r.$1, r.$2, _me),
-    );
-    unclaim = Command1<void, (String, String)>(
+    unlink = Command1<void, (String, String)>(
       (r) => _teamRepo.linkPlayer(r.$1, r.$2, null),
     );
     message = Command0<String>(_message);
@@ -414,35 +410,13 @@ class PlayerProfileViewModel extends ChangeNotifier {
   /// The user's roster spot on [team], if they've claimed one.
   RosterPlayer? linkedPlayer(Team team) => _mine(team.id);
 
-  /// Teams where the user hasn't claimed a roster spot, with the spots
-  /// they could claim.
-  List<ClaimableTeam> get claimable => [
+  /// The roster spots linked to the user, by team. A team admin links
+  /// people to spots; the user can only let go of their own.
+  List<LinkedSpot> get linkedSpots => [
     for (final t in _teams)
-      if (!t.isCommunity && _rosters.containsKey(t.id) && _mine(t.id) == null)
-        if (_unlinked(t.id) case final players when players.isNotEmpty)
-          (team: t, players: players),
+      if (!t.isCommunity)
+        if (_mine(t.id) case final p?) (team: t, player: p),
   ];
-
-  /// Unclaimed spots on [teamId]'s roster, those matching the user's name
-  /// first.
-  List<RosterPlayer> _unlinked(String teamId) {
-    final me = name.toLowerCase().trim();
-    final first = me.split(RegExp(r'\s+')).first;
-    int score(RosterPlayer p) {
-      final n = p.name.toLowerCase().trim();
-      if (n == me) return 0;
-      if (first.isNotEmpty && n.split(RegExp(r'\s+')).first == first) return 1;
-      return 2;
-    }
-
-    return [
-      for (final p in _rosters[teamId] ?? const <RosterPlayer>[])
-        if (p.userId == null || p.userId!.isEmpty) p,
-    ]..sort((a, b) {
-      final s = score(a).compareTo(score(b));
-      return s != 0 ? s : a.name.compareTo(b.name);
-    });
-  }
 
   /// Whether every linked team's games have loaded.
   bool get _statsLoaded =>
@@ -575,11 +549,9 @@ class PlayerProfileViewModel extends ChangeNotifier {
   /// Saves the user's bio, details and what others may see.
   late final Command1<void, ProfileDetails> saveDetails;
 
-  /// Claims roster spot (teamId, playerId) for the user.
-  late final Command1<void, (String, String)> claim;
-
-  /// Unlinks the user from roster spot (teamId, playerId).
-  late final Command1<void, (String, String)> unclaim;
+  /// Unlinks the user from roster spot (teamId, playerId), so its stats
+  /// stop counting on their profile. Only a team admin can link them again.
+  late final Command1<void, (String, String)> unlink;
 
   /// Opens a direct-message conversation with this player; the result is
   /// its id.
@@ -730,8 +702,7 @@ class PlayerProfileViewModel extends ChangeNotifier {
       s.cancel();
     }
     saveDetails.dispose();
-    claim.dispose();
-    unclaim.dispose();
+    unlink.dispose();
     message.dispose();
     changeImage.dispose();
     removeImage.dispose();

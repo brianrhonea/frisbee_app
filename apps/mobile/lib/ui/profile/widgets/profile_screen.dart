@@ -48,8 +48,7 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
 
   late final List<Command<void>> _commands = [
     vm.saveDetails,
-    vm.claim,
-    vm.unclaim,
+    vm.unlink,
     vm.deletePost,
     vm.changeImage,
     vm.removeImage,
@@ -225,8 +224,7 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
 
   List<Widget> _body() {
     final side = [
-      if (vm.isMe)
-        for (final c in vm.claimable) _ClaimCard(viewModel: vm, claim: c),
+      if (vm.isMe && vm.linkedSpots.isNotEmpty) _RosterSpotsCard(viewModel: vm),
       _OffTheSheet(details: vm.details, primary: vm.primaryTeam),
       if (vm.showsTeams) _TeamsCard(viewModel: vm),
     ];
@@ -250,8 +248,8 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
         SideColumnLayout(
           main: [_TeamsCard(viewModel: vm, wide: true)],
           side: [
-            if (vm.isMe)
-              for (final c in vm.claimable) _ClaimCard(viewModel: vm, claim: c),
+            if (vm.isMe && vm.linkedSpots.isNotEmpty)
+              _RosterSpotsCard(viewModel: vm),
           ],
         ),
       ],
@@ -888,8 +886,9 @@ class _NumbersCard extends StatelessWidget {
           : t.isEmpty
           ? Text(
               vm.isMe
-                  ? 'No tracked games yet. Link your roster spot, and your '
-                        'numbers fill in as your team tracks games.'
+                  ? 'No tracked games yet. Once a team admin links you to '
+                        'your roster spot, your numbers fill in as your team '
+                        'tracks games.'
                   : 'No tracked games yet.',
               style: TextStyle(fontSize: 12.5, color: c.muted),
             )
@@ -1305,90 +1304,76 @@ extension on TeamKind {
   };
 }
 
-/// Asks the user which roster spot on a team is theirs, so their stats
-/// count on their profile.
-class _ClaimCard extends StatelessWidget {
-  const _ClaimCard({required this.viewModel, required this.claim});
+/// The roster spots a team admin has linked to the user, whose stats count
+/// on their profile. Linking is the admin's; the user can only unlink
+/// themselves (their privacy).
+class _RosterSpotsCard extends StatelessWidget {
+  const _RosterSpotsCard({required this.viewModel});
 
   final PlayerProfileViewModel viewModel;
-  final ClaimableTeam claim;
+
+  Future<void> _unlink(BuildContext context, LinkedSpot spot) async {
+    final ok = await confirmDialog(
+      context,
+      title: 'Unlink from ${spot.team.name}?',
+      message:
+          'Your stats from ${spot.team.name} stop counting on your profile. '
+          'A team admin can link you again.',
+      confirmLabel: 'Unlink',
+      destructive: true,
+    );
+    if (ok) viewModel.unlink.execute((spot.team.id, spot.player.id));
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    final suggested = claim.players.first;
-    // The user's to do: a plain card with an amber mark and button.
     return SectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              TeamDot(color: c.highlight),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Eyebrow(
-                  'Link your stats · ${claim.team.name}',
-                  color: c.highlightInk,
+      title: 'Roster spots',
+      child: ListenableBuilder(
+        listenable: viewModel.unlink,
+        builder: (context, _) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'A team admin links you to your spot on the roster.',
+              style: AppText.caption.copyWith(color: c.muted),
+            ),
+            for (final spot in viewModel.linkedSpots)
+              ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 48),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            spot.team.name,
+                            style: AppText.bodyStrong.copyWith(color: c.ink),
+                          ),
+                          Text(
+                            [
+                              spot.player.name,
+                              if (spot.player.number != null)
+                                '#${spot.player.number}',
+                            ].join(' · '),
+                            style: AppText.caption.copyWith(color: c.muted),
+                          ),
+                        ],
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: viewModel.unlink.running
+                          ? null
+                          : () => _unlink(context, spot),
+                      child: const Text('Unlink'),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Which player on the roster is you?',
-            style: TextStyle(
-              color: c.ink,
-              fontWeight: FontWeight.w800,
-              fontSize: 15,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Games your team tracks count toward your profile once you '
-            'pick your spot.',
-            style: TextStyle(color: c.muted, fontSize: 12.5),
-          ),
-          const SizedBox(height: 12),
-          HighlightButton(
-            label: "I'm ${suggested.name}",
-            onPressed: viewModel.claim.running
-                ? null
-                : () => viewModel.claim.execute((claim.team.id, suggested.id)),
-          ),
-          if (claim.players.length > 1)
-            Center(
-              child: TextButton(
-                onPressed: viewModel.claim.running
-                    ? null
-                    : () async {
-                        final picked = await showDialog<String>(
-                          context: context,
-                          animationStyle: AppMotion.dialogStyle(context),
-                          builder: (context) => SimpleDialog(
-                            title: Text('You on ${claim.team.name}'),
-                            children: [
-                              for (final p in claim.players)
-                                SimpleDialogOption(
-                                  onPressed: () => Navigator.pop(context, p.id),
-                                  child: Text(
-                                    [
-                                      p.name,
-                                      if (p.number != null) '#${p.number}',
-                                    ].join(' · '),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        );
-                        if (picked != null) {
-                          viewModel.claim.execute((claim.team.id, picked));
-                        }
-                      },
-                child: const Text('Someone else on the roster'),
-              ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
