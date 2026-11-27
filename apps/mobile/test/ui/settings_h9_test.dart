@@ -6,7 +6,6 @@ import 'package:frisbee_app/ui/profile/view_models/profile_viewmodel.dart';
 import 'package:frisbee_app/ui/settings/widgets/settings_screen.dart';
 
 import '../testing/fakes.dart';
-import '../testing/social_fakes.dart';
 import '../ui_harness/harness.dart';
 
 void main() {
@@ -47,13 +46,7 @@ void main() {
     testWidgets('meets accessibility guidelines, ${theme.name}', (
       tester,
     ) async {
-      await pumpInApp(
-        tester,
-        screen(),
-        theme: theme,
-        width: 390,
-        height: 1100,
-      );
+      await pumpInApp(tester, screen(), theme: theme, width: 390, height: 1100);
       await tester.pumpAndSettle();
       await expectAccessible(tester);
     });

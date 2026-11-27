@@ -8,7 +8,6 @@ import 'package:frisbee_app/ui/notifications/widgets/notifications_screen.dart';
 import 'package:go_router/go_router.dart';
 
 import '../testing/fakes.dart';
-import '../testing/social_fakes.dart';
 import '../ui_harness/harness.dart';
 import 'notifications_test.dart' show note;
 
