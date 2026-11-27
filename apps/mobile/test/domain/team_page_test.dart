@@ -100,6 +100,67 @@ void main() {
     },
   );
 
+  test(
+    'Message staff: owner, coach, captain tiers only, by kind label and name',
+    () {
+      final team =
+          teamWith(
+            {
+              'cap2': TeamRole.captain,
+              'cap1': TeamRole.captain,
+              'c': TeamRole.coach,
+              'o': TeamRole.owner,
+              'adm': TeamRole.player,
+              'keep': TeamRole.player,
+            },
+            statKeepers: {'keep'},
+          ).copyWith(
+            memberPerms: const {
+              'adm': {TeamPermission.manageTeam, TeamPermission.manageMembers},
+            },
+            memberNames: const {
+              'cap2': 'Zoe',
+              'cap1': 'Abe',
+              'c': 'Cy',
+              'o': 'Olive',
+              'adm': 'Al',
+              'keep': 'Kay',
+            },
+          );
+      expect(teamMessageStaff(team), [
+        (uid: 'o', name: 'Olive', label: 'Owner'),
+        (uid: 'c', name: 'Cy', label: 'Coach'),
+        (uid: 'cap1', name: 'Abe', label: 'Captain'),
+        (uid: 'cap2', name: 'Zoe', label: 'Captain'),
+      ]);
+      // In a group a captain is an organizer.
+      final group = Team(
+        id: team.id,
+        name: 'Group',
+        division: team.division,
+        level: team.level,
+        ownerId: 'o',
+        members: team.members,
+        memberNames: team.memberNames,
+        kind: TeamKind.community,
+      );
+      expect(
+        [for (final o in teamMessageStaff(group)) o.label],
+        ['Owner', 'Coach', 'Organizer', 'Organizer'],
+      );
+    },
+  );
+
+  test('Message staff: a person without a uid is not messageable', () {
+    expect(
+      messageStaffOf(const [
+        (uid: '', name: 'Ghost', tier: TeamRole.coach),
+        (uid: 'o', name: '', tier: TeamRole.owner),
+      ], TeamKind.team),
+      [(uid: 'o', name: 'Member', label: 'Owner')],
+    );
+  });
+
   test('chat section: unread rooms first, marked, then the rest, capped', () {
     ChatRoom room(String id) => ChatRoom(
       id: id,

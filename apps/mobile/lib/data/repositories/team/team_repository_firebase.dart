@@ -1140,26 +1140,21 @@ class TeamRepositoryFirebase implements TeamRepository {
           '/v1/teams/${Uri.encodeComponent(teamId)}/roster',
         );
         final kind = enumByName(TeamKind.values, json['kind'], TeamKind.team);
-        final out = <CommunityOrganizer>[];
+        final people = <({String uid, String name, TeamRole tier})>[];
         for (final m in (json['members'] as List?) ?? const []) {
           if (m is! Map) continue;
           final role = TeamRole.values.where((r) => r.name == m['tier']);
           final uid = m['uid'];
-          if (role.isEmpty || uid is! String) continue;
-          final tier = role.first;
-          if (tier == TeamRole.player) continue;
+          // No uid: hidden or not staff to this reader, so not messageable.
+          if (role.isEmpty || uid is! String || uid.isEmpty) continue;
           final name = m['name'];
-          out.add((
+          people.add((
             uid: uid,
-            name: name is String && name.isNotEmpty ? name : 'Member',
-            label: tier.labelFor(kind),
+            name: name is String ? name : '',
+            tier: role.first,
           ));
         }
-        // The owner first, then by tier.
-        out.sort(
-          (a, b) => (a.label == 'Owner' ? 0 : 1) - (b.label == 'Owner' ? 0 : 1),
-        );
-        return out;
+        return messageStaffOf(people, kind);
       });
 
   @override

@@ -211,6 +211,48 @@ void main() {
       expect(find.text('Add player to roster'), findsNothing);
     });
 
+    testWidgets(
+      'an admin who edits the roster but cannot manage members opens the '
+      'player editor directly',
+      (tester) async {
+        seed(me: 'p3');
+        teams.teams['t1'] = teams.teams['t1']!.copyWith(
+          memberPerms: {
+            'p3': {TeamPermission.manageTeam},
+          },
+        );
+        await pump(tester, detailVm());
+        expect(find.text('Add member'), findsOneWidget);
+        await tester.tap(find.text('Add member'));
+        await tester.pumpAndSettle();
+        // No sheet with one option: the editor opens.
+        expect(find.text('Invite people'), findsNothing);
+        expect(find.byType(PlayerDialog), findsOneWidget);
+      },
+    );
+
+    testWidgets('manageTeam on a group (no roster) has no Add member', (
+      tester,
+    ) async {
+      seed(me: 'p3');
+      final old = teams.teams['t1']!;
+      teams.teams['t1'] = Team(
+        id: old.id,
+        name: 'Group',
+        division: Division.mixed,
+        level: CompetitionLevel.pickup,
+        ownerId: testUser.uid,
+        members: old.members,
+        memberNames: old.memberNames,
+        memberPerms: const {
+          'p3': {TeamPermission.manageTeam},
+        },
+        kind: TeamKind.community,
+      );
+      await pump(tester, detailVm());
+      expect(find.text('Add member'), findsNothing);
+    });
+
     testWidgets('a player without Manage members has no Add member', (
       tester,
     ) async {
@@ -263,6 +305,65 @@ void main() {
     });
   });
 
+  group('Link picker names', () {
+    Future<void> open(WidgetTester tester) async {
+      seed(me: testUser.uid);
+      await pump(tester, detailVm());
+      await tester.tap(find.text('Add member'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add player to roster'));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> pick(WidgetTester tester, String name) async {
+      await tester.tap(find.byKey(const ValueKey('link-to-member')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.text(name),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    String nameField(WidgetTester tester) => tester
+        .widget<TextFormField>(find.byType(TextFormField).first)
+        .controller!
+        .text;
+
+    testWidgets('an empty name is filled, then follows the next pick', (
+      tester,
+    ) async {
+      await open(tester);
+      await pick(tester, 'Sam');
+      expect(nameField(tester), 'Sam');
+      // Still the picked member's name: a new pick replaces it.
+      await pick(tester, 'Robin');
+      expect(nameField(tester), 'Robin');
+    });
+
+    testWidgets('a name the admin typed is never overwritten', (tester) async {
+      await open(tester);
+      await tester.enterText(
+        find.byType(TextFormField).first,
+        'Samuel (guest)',
+      );
+      await pick(tester, 'Sam');
+      expect(nameField(tester), 'Samuel (guest)');
+    });
+
+    testWidgets('editing a picked name keeps the edit on the next pick', (
+      tester,
+    ) async {
+      await open(tester);
+      await pick(tester, 'Sam');
+      await tester.enterText(find.byType(TextFormField).first, 'Sammy');
+      await pick(tester, 'Robin');
+      expect(nameField(tester), 'Sammy');
+    });
+  });
+
   group('saving a roster spot', () {
     test('a new spot with a member is one create call', () async {
       seed(me: testUser.uid);
@@ -299,7 +400,7 @@ void main() {
     });
 
     test(
-      'changing the member of an existing spot uses the link call',
+      'changing the member of an existing spot is one save (the PUT links it)',
       () async {
         seed(me: testUser.uid);
         teams.roster['t1'] = [const RosterPlayer(id: 'a', name: 'Pat')];
@@ -308,7 +409,8 @@ void main() {
         await vm.savePlayer.execute(
           const RosterPlayer(id: 'a', name: 'Pat', userId: 'p1'),
         );
-        expect(teams.links, [('t1', 'a', 'p1')]);
+        expect(teams.links, isEmpty);
+        expect(teams.roster['t1']!.single.userId, 'p1');
       },
     );
 

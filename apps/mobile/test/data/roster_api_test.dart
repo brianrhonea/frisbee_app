@@ -132,6 +132,11 @@ void main() {
         {'uid': 'c', 'name': 'Cody', 'tier': 'coach', 'roles': []},
         {'uid': 'o', 'name': 'Olive', 'tier': 'owner', 'roles': []},
         {'uid': 'p', 'name': 'Pat', 'tier': 'player', 'roles': []},
+        {'uid': 'k', 'name': 'Kay', 'tier': 'captain', 'roles': []},
+        {'uid': 'a', 'name': 'Abe', 'tier': 'captain', 'roles': []},
+        // Hidden or not staff to this reader: no uid, not messageable.
+        {'name': 'Hidden', 'tier': 'coach', 'roles': []},
+        {'uid': 's', 'name': 'Stat', 'tier': 'stats', 'roles': []},
       ],
     });
     final r = await repo.teamStaff('t1');
@@ -140,7 +145,7 @@ void main() {
         for (final o in (r as Ok<List<CommunityOrganizer>>).value)
           (o.uid, o.label),
       ],
-      [('o', 'Owner'), ('c', 'Coach')],
+      [('o', 'Owner'), ('c', 'Coach'), ('a', 'Captain'), ('k', 'Captain')],
     );
   });
 

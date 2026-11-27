@@ -250,8 +250,9 @@ abstract class TeamRepository {
   Future<Result<List<CommunityOrganizer>>> teamStaff(String teamId);
 
   /// Links roster player [playerId] to the account [uid], or unlinks it
-  /// when null, so their stats show on that player's profile. Members may
-  /// claim an unlinked player for themselves or unlink their own; admins
-  /// may link anyone.
+  /// when null, so their stats show on that player's profile. Only admins
+  /// who edit the roster link a member; a member may let go of their own
+  /// link but cannot claim a spot. (Saving a spot, `savePlayer`, carries its
+  /// `userId` too, so the app links through that.)
   Future<Result<void>> linkPlayer(String teamId, String playerId, String? uid);
 }

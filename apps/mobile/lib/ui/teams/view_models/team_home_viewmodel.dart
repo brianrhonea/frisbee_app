@@ -199,7 +199,7 @@ class TeamHomeViewModel extends ChangeNotifier {
         .listen(
           (t) {
             _team = (t?.members.containsKey(uid) ?? false) ? t : null;
-            _staff = _team == null ? _staff : communityOrganizers(_team!);
+            _staff = _team == null ? _staff : teamMessageStaff(_team!);
             _teamLoaded = true;
             _onChange();
           },
@@ -381,7 +381,7 @@ class TeamHomeViewModel extends ChangeNotifier {
     }
   }
 
-  /// The team's staff (owner, admins, coaches) the user can start a direct
+  /// The team's staff (owner, coaches, captains) the user can start a direct
   /// conversation with: not themselves, and none when messages can't be
   /// opened from here. The DM server's own checks (adults only, blocks)
   /// still apply when one is opened.

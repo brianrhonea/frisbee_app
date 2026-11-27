@@ -1149,7 +1149,7 @@ class FakeTeamRepository implements TeamRepository {
     if (t == null || privateRosters.contains(teamId)) {
       return Result.error(Exception('Not allowed'));
     }
-    return Result.ok(communityOrganizers(t));
+    return Result.ok(teamMessageStaff(t));
   }
 
   /// Every [setRosterLines] call's lines, in order.

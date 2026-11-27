@@ -47,11 +47,19 @@ class _PlayerDialogState extends State<PlayerDialog> {
     super.dispose();
   }
 
-  /// A member picked (or null for none): their name fills the Name field.
+  /// A member picked (or null for none): their name fills the Name field
+  /// only when it is empty or still holds the previously picked member's
+  /// name, so a name the admin typed is never overwritten.
   void _pickMember(String? uid) {
     setState(() {
+      final previous = _userId == null ? null : widget.members[_userId];
       _userId = uid;
-      if (uid != null) _name.text = widget.members[uid] ?? _name.text;
+      final name = uid == null ? null : widget.members[uid];
+      final current = _name.text.trim();
+      if (name != null &&
+          (current.isEmpty || (previous != null && current == previous))) {
+        _name.text = name;
+      }
     });
   }
 
