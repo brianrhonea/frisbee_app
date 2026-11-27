@@ -39,7 +39,9 @@ class UserPostRepositoryFirebase implements UserPostRepository {
         send: (job, files, author) async {
           final post = _queuedPost(job);
           if (post != null && _isRecordedWorkout(post)) {
-            return _asVoid(await _saveRecordedWorkout(post, author, job.id));
+            return _asVoid(
+              await _saveRecordedWorkout(post, author, job.id, files),
+            );
           }
           final body = OutboxPayloads.userPost(job);
           if (body == null) {
@@ -394,7 +396,9 @@ class UserPostRepositoryFirebase implements UserPostRepository {
     final outbox = _outbox;
     Future<Result<void>> now() async {
       if (_isRecordedWorkout(post)) {
-        return _asVoid(await _saveRecordedWorkout(post, author, id));
+        return _asVoid(
+          await _saveRecordedWorkout(post, author, id, draft.newImages),
+        );
       }
       final body = OutboxPayloads.userPost(
         OutboxJob(
@@ -480,17 +484,36 @@ class UserPostRepositoryFirebase implements UserPostRepository {
     UserPost post,
     AppUser author,
     String id,
+    List<NewAttachment> files,
   ) => guard(() async {
     final ref = _posts.doc(id);
-    await ref.set({
-      ...post.toEditableMap(),
-      'authorId': author.uid,
-      'authorName': author.label,
-      'authorPhotoUrl': author.photoUrl,
-      'private': await _profileIsPrivate(author.uid),
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    // A replay of a post that already landed uploads nothing more.
+    if (files.isNotEmpty && await existsOnServer(ref)) return id;
+    // Photos go to Storage as before (users/{uid}/posts/{id}/...).
+    final uploaded = files.isEmpty
+        ? const <ChatAttachment>[]
+        : await _files.upload(
+            'users/${author.uid}/posts/$id/'
+            '${DateTime.now().millisecondsSinceEpoch}',
+            files,
+          );
+    final saved = post.copyWith(images: [...post.images, ...uploaded]);
+    try {
+      await ref.set({
+        ...saved.toEditableMap(),
+        'authorId': author.uid,
+        'authorName': author.label,
+        'authorPhotoUrl': author.photoUrl,
+        'private': await _profileIsPrivate(author.uid),
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {
+      await _files
+          .delete(uploaded.map((i) => i.path))
+          .catchError((Object _) => <void>[]);
+      rethrow;
+    }
     return id;
   });
 

@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.77  | 2026-11-27 | `sprint3/17b`                           |                     |
 | 0.0.76  | 2026-11-27 | `sprint3/17b`                           |                     |
 | 0.0.75  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.74  | 2026-11-27 | `sprint3/lane-b`                        |                     |
@@ -89,6 +90,11 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.77 — 17-B review fixes (M1, L1)
+
+- M1: a recorded run (GPS route) posted with photos keeps its photos again (they upload to Storage on the direct path, for the immediate save and the outbox replay; a replay of a post that already landed uploads nothing).
+- L1: creating an event, a roster spot or a group chat again after a lost response reuses the same id for the same request, and a 409 counts as done, so no duplicate. Personal calendar events have no id in the API schema and are unchanged.
 
 ## 0.0.76 — Phase-1 writes through the API (17-B, app half)
 
