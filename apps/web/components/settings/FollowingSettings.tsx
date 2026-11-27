@@ -8,6 +8,7 @@ import { useAuth } from "../AuthProvider";
 import { Avatar } from "../Avatar";
 import { LoadMore } from "../LoadMore";
 import { SegmentedTabs } from "../ui/SegmentedTabs";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** A follow as stored (Follow in the app). */
 interface Follow {
@@ -71,7 +72,7 @@ export function FollowingSettings() {
         <span className="composer-spacer" />
         <input className="search-input" type="search" placeholder="Find" value={find} onChange={(e) => setFind(e.target.value)} />
       </div>
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       {data === undefined && !error && <p className="muted">Loading…</p>}
       {data && list.length === 0 && (
         <p className="empty">

@@ -26,6 +26,7 @@ import { confirmAndDelete, deleteGameMessage, GameRow } from "./StatsHome";
 import "./stats.css";
 import { formatDate } from "@/lib/dates";
 import { SegmentedTabs } from "../../ui/SegmentedTabs";
+import { ErrorNote } from "@/components/StatusViews";
 
 const newId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`);
 
@@ -71,7 +72,7 @@ function Tournament({ tournamentId }: { tournamentId: string }) {
   // The listener's copy, unless this page has a change of its own still saving.
   const t = local && queue.dirty ? local : (live ?? null);
 
-  if (tournaments.error ?? games.error) return <p className="form-error">{tournaments.error ?? games.error}</p>;
+  if (tournaments.error ?? games.error) return <ErrorNote>{tournaments.error ?? games.error}</ErrorNote>;
   if (!tournaments.data || !games.data) return <p className="muted" aria-busy="true">Loading…</p>;
   if (!t) {
     return (
@@ -150,7 +151,7 @@ function Tournament({ tournamentId }: { tournamentId: string }) {
           <small>Break rate</small>
         </div>
       </section>
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       <SegmentedTabs
         variant="underline"
         label="Tournament"
@@ -382,7 +383,7 @@ function AddGame({ teamId, tournament, onClose }: { teamId: string; tournament: 
         <input autoFocus value={opponent} maxLength={100} onChange={(e) => setOpponent(e.target.value)} />
       </label>
       <GameSettings gameTo={gameTo} timeouts={timeouts} onGameTo={setGameTo} onTimeouts={setTimeouts} />
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       <div className="form-actions">
         <button type="button" className="btn btn-small" onClick={onClose}>
           Cancel

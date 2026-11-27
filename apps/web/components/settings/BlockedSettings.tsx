@@ -5,9 +5,12 @@ import { problem } from "@/lib/client";
 import { unblockPerson, useBlocks } from "@/lib/moderation";
 import { useAuth } from "../AuthProvider";
 import { Avatar } from "../Avatar";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** Settings › Blocked accounts: who the member blocked, each with Unblock (the app's BlockedAccountsScreen). */
 export function BlockedSettings() {
+  const askConfirm = useConfirm();
   const { user } = useAuth();
   const blocks = useBlocks(user);
   const [busy, setBusy] = useState<string | null>(null);
@@ -16,7 +19,7 @@ export function BlockedSettings() {
   const me = user;
 
   async function unblock(uid: string, name: string) {
-    if (!window.confirm(`Unblock ${name}? You'll see each other's posts and can follow and message again.`)) return;
+    if (!(await askConfirm(`Unblock ${name}? You'll see each other's posts and can follow and message again.`))) return;
     setBusy(uid);
     setError(null);
     try {
@@ -36,7 +39,7 @@ export function BlockedSettings() {
           You and the people you block don&apos;t see each other&apos;s posts, comments or messages, and can&apos;t follow or message each
           other. Teams you share still work. They aren&apos;t told. See the <Link href="/guidelines">community guidelines</Link>.
         </p>
-        {error && <p className="form-error">{error}</p>}
+        {error && <ErrorNote>{error}</ErrorNote>}
         {!blocks.loaded ? (
           <p className="muted">Loading…</p>
         ) : blocks.blocked.length === 0 ? (

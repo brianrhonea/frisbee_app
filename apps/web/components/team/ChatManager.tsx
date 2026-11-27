@@ -5,6 +5,8 @@ import { callApi } from "@/lib/client";
 import type { Doc } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
 import { rolesInOrder, useTeamHub } from "./TeamContext";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 export interface ManagedRoom {
   name?: string;
@@ -144,6 +146,7 @@ export function ChatManager({
   folders: Doc<ManagedFolder>[];
   onDone: () => void;
 }) {
+  const askConfirm = useConfirm();
   const { teamId, viewer } = useTeamHub();
   const { user } = useAuth();
   const [editing, setEditing] = useState<Editing>(null);
@@ -240,8 +243,8 @@ export function ChatManager({
               type="button"
               className="text-btn"
               disabled={busy}
-              onClick={() => {
-                if (window.confirm(`Delete #${r.name}? Its messages and files go too.`)) void run(`${base}/chat-rooms/${encodeURIComponent(r.id)}`, "DELETE");
+              onClick={async () => {
+                if ((await askConfirm({ message: `Delete #${r.name}? Its messages and files go too.`, confirmLabel: "Delete", destructive: true }))) void run(`${base}/chat-rooms/${encodeURIComponent(r.id)}`, "DELETE");
               }}
             >
               Delete
@@ -330,8 +333,8 @@ export function ChatManager({
                   type="button"
                   className="text-btn"
                   disabled={busy}
-                  onClick={() => {
-                    if (window.confirm(`Delete the ${f.name} folder? Its rooms stay, outside any folder.`)) void run(`${base}/chat-folders/${encodeURIComponent(f.id)}`, "DELETE");
+                  onClick={async () => {
+                    if ((await askConfirm({ message: `Delete the ${f.name} folder? Its rooms stay, outside any folder.`, confirmLabel: "Delete", destructive: true }))) void run(`${base}/chat-folders/${encodeURIComponent(f.id)}`, "DELETE");
                   }}
                 >
                   Delete
@@ -341,7 +344,7 @@ export function ChatManager({
             <ul className="role-list">{roomRows(inFolder(f.id))}</ul>
           </div>
         ))}
-        {error && <p className="form-error" role="alert">{error}</p>}
+        {error && <ErrorNote>{error}</ErrorNote>}
       </div>
     </div>
   );

@@ -16,6 +16,8 @@ import { useAuth } from "../AuthProvider";
 import { ClubAgeNote } from "../ClubAge";
 import { rolesInOrder, useTeamHub } from "./TeamContext";
 import { EmptyState } from "../StatusViews";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 const levelLabels: Record<string, string> = { club: "Club", college: "College", youth: "Youth", league: "League", pickup: "Pickup" };
 
@@ -76,6 +78,7 @@ function RolePicker({ value, onChange }: { value: string[]; onChange: (v: string
  * roles put people on each team, and take teams out.
  */
 export function CommunityAdmin() {
+  const askConfirm = useConfirm();
   const { teamId: orgId, viewer } = useTeamHub();
   const requests = useLiveQuery<LinkRequest>(`teams/${orgId}/linkRequests`, [orderBy("createdAt", "desc"), limit(100)], orgId);
   const { call, busy, error } = useCall();
@@ -206,8 +209,8 @@ export function CommunityAdmin() {
                       type="button"
                       className="text-btn"
                       disabled={busy}
-                      onClick={() => {
-                        if (window.confirm(`Take ${t.name || "this team"} out of the community? The team itself stays.`)) void call(`${base}/linked-teams/${encodeURIComponent(id)}`, "DELETE");
+                      onClick={async () => {
+                        if ((await askConfirm({ message: `Take ${t.name || "this team"} out of the community? The team itself stays.`, confirmLabel: "Remove", destructive: true }))) void call(`${base}/linked-teams/${encodeURIComponent(id)}`, "DELETE");
                       }}
                     >
                       Remove
@@ -236,7 +239,7 @@ export function CommunityAdmin() {
           </ul>
         </>
       )}
-      {error && <p className="form-error" role="alert">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
     </section>
   );
 }
@@ -246,6 +249,7 @@ export function CommunityAdmin() {
  * that it's waiting or in, and leave.
  */
 export function TeamCommunity() {
+  const askConfirm = useConfirm();
   const { teamId, viewer } = useTeamHub();
   const { user } = useAuth();
   const { call, busy, error } = useCall();
@@ -283,8 +287,8 @@ export function TeamCommunity() {
               type="button"
               className="btn btn-small"
               disabled={busy}
-              onClick={() => {
-                if (window.confirm(team.orgLinked ? "Leave the community?" : "Cancel the request?")) void call(base, "DELETE");
+              onClick={async () => {
+                if ((await askConfirm(team.orgLinked ? "Leave the community?" : "Cancel the request?"))) void call(base, "DELETE");
               }}
             >
               {team.orgLinked ? "Leave community" : "Cancel request"}
@@ -318,7 +322,7 @@ export function TeamCommunity() {
           )}
         </>
       )}
-      {error && <p className="form-error" role="alert">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
     </section>
   );
 }

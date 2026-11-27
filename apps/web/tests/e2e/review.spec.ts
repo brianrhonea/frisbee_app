@@ -14,7 +14,10 @@ const pages = [
   ["discover", "/explore"],
   ["teams", "/teams"],
   ["tournaments", "/tournaments"],
+  ["learn", "/learn"],
+  ["events", "/events"],
   ["sign-in", "/sign-in"],
+  ["about", "/about"],
 ] as const;
 // [showcase section, picture name]
 const showcases = [
@@ -23,6 +26,11 @@ const showcases = [
   ["tabs", "c3_tabs"],
   ["chips", "c3_chips"],
   ["avatar", "c4_avatar"],
+  ["cover", "c5_c6_cover_tiles"],
+  ["listrow", "c7_listrow"],
+  ["event", "c8_event"],
+  ["states", "c9_states"],
+  ["fields", "c10_fields"],
 ] as const;
 
 test.skip(!phase, "set REVIEW_PHASE=before|after to capture review pictures");
@@ -39,6 +47,7 @@ for (const theme of ["light", "dark"] as const) {
   test(`showcase ${theme}`, async ({ page }, info) => {
     const size = info.project.name === "phone" ? "mobile" : "desktop";
     await open(page, "/dev/ui", theme);
+    await page.screenshot({ path: `${out}/gallery_${size}_${theme}_${phase}.png`, fullPage: true });
     for (const [section, name] of showcases) {
       await page.locator(`[data-showcase="${section}"]`).screenshot({ path: `${out}/${name}_${size}_${theme}_${phase}.png` });
     }

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { callApi, problem } from "@/lib/client";
 import { useAuth } from "./AuthProvider";
 import { ReportCard } from "./ReportQueue";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 const confirms: Partial<Record<StaffAction, string>> = {
   remove: "Remove it for everyone? Every open report on it closes.",
@@ -17,6 +19,7 @@ const confirms: Partial<Record<StaffAction, string>> = {
  * or suspend their account (and lift it). A staff tool, on the website only.
  */
 export function StaffQueue() {
+  const askConfirm = useConfirm();
   const { user } = useAuth();
   const [staff, setStaff] = useState<boolean | null>(null);
   const [reports, setReports] = useState<ReportInfo[] | null>(null);
@@ -41,7 +44,7 @@ export function StaffQueue() {
   async function act(r: ReportInfo, action: StaffAction) {
     if (!user) return;
     const ask = confirms[action];
-    if (ask && !window.confirm(ask)) return;
+    if (ask && !(await askConfirm(ask))) return;
     setBusy(r.id);
     setError(null);
     try {
@@ -58,7 +61,7 @@ export function StaffQueue() {
   if (staff === false) return <p className="empty">This page is for Stall 10&apos;s staff.</p>;
   return (
     <div className="stack">
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       {reports === null ? (
         !error && <p className="muted">Loading…</p>
       ) : reports.length === 0 ? (

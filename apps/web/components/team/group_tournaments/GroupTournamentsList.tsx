@@ -8,6 +8,7 @@ import { useTeamHub } from "../TeamContext";
 import { tournamentView, tournamentWhen } from "./format";
 import "./group_tournaments.css";
 import { StatusPill } from "../../ui/StatusPill";
+import { ErrorNote } from "@/components/StatusViews";
 
 /**
  * A group's own (hat) tournaments, in its Tournaments section
@@ -37,7 +38,7 @@ export function GroupTournamentsList() {
           </Link>
         )}
       </div>
-      {list.error && <p className="form-error">{list.error}</p>}
+      {list.error && <ErrorNote>{list.error}</ErrorNote>}
       {!list.error && !list.data && (
         <p className="muted" aria-busy="true">
           Loading…

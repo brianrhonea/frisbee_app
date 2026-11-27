@@ -29,6 +29,7 @@ import { PasswordHints } from "./PasswordHints";
 import { localToday, signUpBirthDateProblem } from "./PersonalDetailsForm";
 import { SignUpSteps } from "./SignUpSteps";
 import { suggestUsername, UsernameField, useUsernameCheck } from "./UsernameField";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** Firebase's error codes in words. */
 function message(e: unknown): string {
@@ -111,7 +112,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   }, [user, busy, next, router]);
 
   if (!authConfigured) {
-    return <p className="form-error">Signing in isn&apos;t set up on this copy of the website yet.</p>;
+    return <ErrorNote>Signing in isn&apos;t set up on this copy of the website yet.</ErrorNote>;
   }
   const auth = firebaseAuth()!;
 
@@ -203,9 +204,9 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const alerts = (
     <>
       {error && (
-        <p className="form-error" role="alert">
+        <ErrorNote>
           {error}
-        </p>
+        </ErrorNote>
       )}
       {notice && (
         <p className="form-notice" role="status">

@@ -17,6 +17,7 @@ import { useEffect, useState } from "react";
 import type { Doc } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
 import { attempt, type DivisionDoc, divisionLabel, draftApi, type TournamentDoc, teamsOf, useHasGames, useSignups, useTournamentBase } from "./data";
+import { ErrorNote } from "@/components/StatusViews";
 
 /**
  * The host turns a division's accepted players into teams (the app's
@@ -158,7 +159,7 @@ function Editor({ user, tournamentId, tournament, division: d }: { user: User; t
         {current.length === 0 ? "" : ` · ${unassigned.length} not on a team`}
         {mixed ? " · evened by gender match" : ""}.
       </p>
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       {notice && <p className="muted" role="status">{notice}</p>}
 
       {created ? (

@@ -42,6 +42,8 @@ import { type TournamentState, divisionPath, tournamentPath, useAction, useTourn
 import "./tournaments.css";
 import { StatusPill } from "../ui/StatusPill";
 import { entryTone } from "./tones";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 type Tab = "overview" | "players" | "teams" | "schedule" | "results" | "news";
 
@@ -224,10 +226,11 @@ function useReconcile(s: TournamentState) {
 }
 
 function ManagerMenu({ s }: { s: TournamentState }) {
+  const askConfirm = useConfirm();
   const router = useRouter();
   const { busy, error, run } = useAction();
   async function remove() {
-    if (!window.confirm(`Delete ${s.t?.name}? Its divisions, entries, schedule, scores and captains' chats are deleted too. This can't be undone.`)) return;
+    if (!(await askConfirm({ message: `Delete ${s.t?.name}? Its divisions, entries, schedule, scores and captains' chats are deleted too. This can't be undone.`, confirmLabel: "Delete", destructive: true }))) return;
     const r = await run(tournamentPath(s.id), "DELETE");
     if (r.ok) router.push(`/teams/${encodeURIComponent(s.t?.hostId ?? "")}`);
   }
@@ -239,7 +242,7 @@ function ManagerMenu({ s }: { s: TournamentState }) {
       <button type="button" className="btn btn-small" disabled={busy} onClick={() => void remove()}>
         Delete
       </button>
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
     </>
   );
 }
@@ -294,6 +297,7 @@ function UnpublishedDivision({ tournamentId, divisionId, label, onOpen }: { tour
 }
 
 function RunEvent({ s, onTab }: { s: TournamentState; onTab: (tab: Tab) => void }) {
+  const askConfirm = useConfirm();
   const { busy, error, setError, run } = useAction();
   const payments = usePayments(s.id, s.manager).data ?? [];
   const t = s.t;
@@ -323,7 +327,7 @@ function RunEvent({ s, onTab }: { s: TournamentState; onTab: (tab: Tab) => void 
       divisions.push({ divisionId: d.id, games: gamesBody(plan) });
     }
     const what = s.divisions.length === 1 ? "the schedule" : `the schedule for all ${s.divisions.length} divisions`;
-    if (!window.confirm(`Publish ${what}? Teams are notified, and seeds lock.`)) return;
+    if (!(await askConfirm({ message: `Publish ${what}? Teams are notified, and seeds lock.`, confirmLabel: "Publish" }))) return;
     await run(`${tournamentPath(s.id)}/schedule`, "PUT", { divisions });
   }
 
@@ -496,12 +500,13 @@ function RunEvent({ s, onTab }: { s: TournamentState; onTab: (tab: Tab) => void 
           </li>
         ))}
       </ol>
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
     </section>
   );
 }
 
 function Overview({ s, onTab }: { s: TournamentState; onTab: (tab: Tab) => void }) {
+  const askConfirm = useConfirm();
   const t = s.t!;
   const fee = spotFee(t);
   const zone = useRenderZone();
@@ -584,8 +589,8 @@ function Overview({ s, onTab }: { s: TournamentState; onTab: (tab: Tab) => void 
                     type="button"
                     className="text-btn"
                     disabled={busy}
-                    onClick={() => {
-                      if (window.confirm(`Remove the ${divisionLabel(d)} division?`)) void run(`${divisionPath(s.id, d.id)}`, "DELETE");
+                    onClick={async () => {
+                      if ((await askConfirm({ message: `Remove the ${divisionLabel(d)} division?`, confirmLabel: "Remove", destructive: true }))) void run(`${divisionPath(s.id, d.id)}`, "DELETE");
                     }}
                   >
                     Remove
@@ -595,7 +600,7 @@ function Overview({ s, onTab }: { s: TournamentState; onTab: (tab: Tab) => void 
             );
           })}
         </div>
-        {error && <p className="form-error">{error}</p>}
+        {error && <ErrorNote>{error}</ErrorNote>}
       </section>
     </div>
   );
@@ -637,6 +642,7 @@ export function InviteAnswer({ entry, href }: { entry: { status: string; replyBy
 
 /** "Your teams" (EventGuide, team side): entries of teams the viewer runs. */
 function YourTeams({ s }: { s: TournamentState }) {
+  const askConfirm = useConfirm();
   const t = s.t!;
   const { busy, error, run } = useAction();
   const open = t.status === "registration";
@@ -679,8 +685,8 @@ function YourTeams({ s }: { s: TournamentState }) {
                         type="button"
                         className="text-btn"
                         disabled={busy}
-                        onClick={() => {
-                          if (window.confirm(`Withdraw ${e.teamName}?`)) void run(`${tournamentPath(s.id)}/entries/${encodeURIComponent(e.id)}/status`, "PUT", { status: "withdrawn" });
+                        onClick={async () => {
+                          if ((await askConfirm({ message: `Withdraw ${e.teamName}?`, confirmLabel: "Withdraw", destructive: true }))) void run(`${tournamentPath(s.id)}/entries/${encodeURIComponent(e.id)}/status`, "PUT", { status: "withdrawn" });
                         }}
                       >
                         Withdraw
@@ -701,7 +707,7 @@ function YourTeams({ s }: { s: TournamentState }) {
         {mixedEntry(t) && open && t.visibility === "public" && s.divisions.length > 0 && !s.myActiveEntry && <ReserveSpot s={s} />}
         {!open && !s.myEntries.length && <p className="muted">Registration isn&apos;t open.</p>}
       </div>
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
     </section>
   );
 }
@@ -744,7 +750,7 @@ function ReserveSpot({ s }: { s: TournamentState }) {
           </label>
         )}
       </div>
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       <div className="home-actions">
         <button className="btn btn-primary btn-small" disabled={busy}>
           Start a team and reserve a spot
@@ -756,6 +762,7 @@ function ReserveSpot({ s }: { s: TournamentState }) {
 
 /** The Teams tab: seeds, entries waiting on the host, inviting teams. */
 function TeamsTab({ s }: { s: TournamentState }) {
+  const askConfirm = useConfirm();
   const d = s.division;
   const { busy, error, run } = useAction();
   // The host marks each team's bid or spot fee here, as in the app.
@@ -886,7 +893,7 @@ function TeamsTab({ s }: { s: TournamentState }) {
                     ↓
                   </button>
                   {s.entryOf(id) && (
-                    <button type="button" className="text-btn" disabled={busy} onClick={() => window.confirm(`Withdraw ${s.teamName(id)}?`) && decide(id, "withdrawn")}>
+                    <button type="button" className="text-btn" disabled={busy} onClick={async () => (await askConfirm({ message: `Withdraw ${s.teamName(id)}?`, confirmLabel: "Withdraw", destructive: true })) && decide(id, "withdrawn")}>
                       Withdraw
                     </button>
                   )}
@@ -949,7 +956,7 @@ function TeamsTab({ s }: { s: TournamentState }) {
         </section>
       )}
       {s.manager && ["draft", "registration", "seeding"].includes(s.t.status) && <InviteTeams s={s} divisionId={d.id} />}
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
     </div>
   );
 }
@@ -1002,7 +1009,7 @@ function InviteTeams({ s, divisionId }: { s: TournamentState; divisionId: string
           );
         })}
       </div>
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
     </section>
   );
 }

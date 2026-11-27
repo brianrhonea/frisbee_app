@@ -7,6 +7,7 @@ import { MembersOnlySection } from "../TeamNav";
 import { nameMap, statsUrl, useStatsGames, useStatsPlayers } from "./data";
 import { StatSheetTable } from "./StatSheetTable";
 import "./stats.css";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** Back to the Stats tab. */
 export function BackToStats({ teamId, label = "Stats" }: { teamId: string; label?: string }) {
@@ -44,7 +45,7 @@ function Season() {
       <BackToStats teamId={teamId} />
       <h2 className="card-title">Season stats</h2>
       {games.error ? (
-        <p className="form-error">{games.error}</p>
+        <ErrorNote>{games.error}</ErrorNote>
       ) : !games.data ? (
         <p className="muted" aria-busy="true">Loading…</p>
       ) : (

@@ -38,6 +38,8 @@ import {
   useSignups,
   useTournamentBase,
 } from "./data";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 type Fee = NonNullable<TournamentDoc["bidFee"]>;
 
@@ -59,7 +61,7 @@ export function PlayerSignups({ tournamentId, divisionId: initial }: { tournamen
   const { tournament, divisions, manager } = useTournamentBase(tournamentId, uid);
   const [picked, setPicked] = useState<string | null>(initial ?? null);
   if (!user) return null;
-  if (tournament.error || divisions.error) return <p className="form-error">{tournament.error ?? divisions.error}</p>;
+  if (tournament.error || divisions.error) return <ErrorNote>{tournament.error ?? divisions.error}</ErrorNote>;
   if (tournament.data === undefined || divisions.data === undefined) return <p className="muted" aria-busy="true">Loading…</p>;
   const t = tournament.data;
   if (!t) return <p className="muted">This event doesn&apos;t exist, or you can&apos;t see it.</p>;
@@ -85,6 +87,7 @@ export function PlayerSignups({ tournamentId, divisionId: initial }: { tournamen
 // ---- The player's own signup (PlayerSignupCard) ---------------------------------------
 
 function MySignup({ user, tournamentId, tournament: t, divisions }: { user: User; tournamentId: string; tournament: TournamentDoc; divisions: Doc<DivisionDoc>[] }) {
+  const askConfirm = useConfirm();
   const mine = useMySignup(tournamentId, user.uid).data;
   const payment = useMyPayment(tournamentId, user.uid).data;
   const accepted = mine?.status === "accepted" ? mine.divisionId : null;
@@ -107,7 +110,7 @@ function MySignup({ user, tournamentId, tournament: t, divisions }: { user: User
 
   async function withdraw() {
     const message = t.status === "registration" ? "You can sign up again while registration is open." : "Registration has closed, so you may not be able to sign up again.";
-    if (!window.confirm(`Withdraw from ${t.name ?? "this event"}? ${message}`)) return;
+    if (!(await askConfirm({ message: `Withdraw from ${t.name ?? "this event"}? ${message}`, confirmLabel: "Withdraw", destructive: true }))) return;
     await attempt(setBusy, setError, () => draftApi.setStatus(user, tournamentId, user.uid, "withdrawn"));
   }
 
@@ -231,7 +234,7 @@ function MySignup({ user, tournamentId, tournament: t, divisions }: { user: User
         </p>
       )}
       {fee && !paid && (mine.status === "accepted" || mine.status === "applied") && <PayOnline user={user} tournamentId={tournamentId} />}
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       <div className="home-actions">
         {t.status === "registration" && mine.status !== "accepted" && (
           <button type="button" className="text-btn" onClick={() => setEditing(true)} disabled={busy}>
@@ -325,7 +328,7 @@ function SignupForm(props: {
         </fieldset>
       )}
       <p className="muted small">Only the host, and the captains if they draft the teams, see your skill and gender match.</p>
-      {props.error && <p className="form-error">{props.error}</p>}
+      {props.error && <ErrorNote>{props.error}</ErrorNote>}
       <div className="home-actions">
         <button type="submit" className="btn btn-primary btn-small" disabled={props.busy}>
           {initial ? "Save" : "Sign up"}
@@ -341,6 +344,7 @@ function SignupForm(props: {
 // ---- The division's teams (PlayersTab._teams) --------------------------------------------
 
 function DraftedTeams({ user, tournamentId, tournament: t, division: d, manager }: { user: User; tournamentId: string; tournament: TournamentDoc; division: Doc<DivisionDoc>; manager: boolean }) {
+  const askConfirm = useConfirm();
   const signups = useSignups(tournamentId, manager).data ?? [];
   const hasGames = useHasGames(tournamentId, manager ? d.id : null);
   const [busy, setBusy] = useState(false);
@@ -354,7 +358,7 @@ function DraftedTeams({ user, tournamentId, tournament: t, division: d, manager 
   const label = teams.length === 0 ? (captains ? "Captains' draft" : "Draft teams") : created ? "View teams" : "Edit teams";
 
   async function createTeams() {
-    if (!window.confirm(`Create ${teams.length} teams? Each team is created with its captain as owner and the other players as members. You won't be able to redraft afterwards; rosters are managed on each team.`)) return;
+    if (!(await askConfirm({ message: `Create ${teams.length} teams? Each team is created with its captain as owner and the other players as members. You won't be able to redraft afterwards; rosters are managed on each team.`, confirmLabel: "Create" }))) return;
     await attempt(setBusy, setError, () => draftApi.createLeagueTeams(user, tournamentId, d.id));
   }
 
@@ -378,7 +382,7 @@ function DraftedTeams({ user, tournamentId, tournament: t, division: d, manager 
         <div className="draft-callout">
           <b>Make the teams</b>
           <p>A league plays as real teams, each with chat, a roster and its games on the schedule. Create them from your drafted teams before you publish the schedule.</p>
-          {error && <p className="form-error">{error}</p>}
+          {error && <ErrorNote>{error}</ErrorNote>}
           <button type="button" className="btn btn-primary btn-small" onClick={createTeams} disabled={busy || hasGames === true}>
             {busy ? "Creating…" : "Create teams"}
           </button>
@@ -490,8 +494,8 @@ function SignupList({ user, tournamentId, tournament: t, division: d }: { user: 
           </>
         )}
       </div>
-      {signups.error && <p className="form-error">{signups.error}</p>}
-      {error && <p className="form-error">{error}</p>}
+      {signups.error && <ErrorNote>{signups.error}</ErrorNote>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       {shown.length === 0 ? (
         <p className="muted">{all.length === 0 ? "No one has signed up yet." : "Everyone here has paid."}</p>
       ) : (

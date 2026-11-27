@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { problem } from "@/lib/client";
 import { goToStripe, PayoutsCard } from "./Payments";
+import { ErrorNote } from "@/components/StatusViews";
 
 const validId = (v: string | null): v is string => !!v && /^[A-Za-z0-9_-]{1,128}$/.test(v);
 
@@ -31,7 +32,7 @@ export function PayoutsReturn() {
   if (retry && !error) return <p className="muted" aria-busy="true">Opening Stripe…</p>;
   return (
     <div className="stack">
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       <PayoutsCard user={user} teamId={teamId} />
       <p>
         <Link href={`/teams/${encodeURIComponent(teamId)}`}>Back to the team</Link>

@@ -14,12 +14,15 @@ import { byName, bytesUsed, type Folder, removeMessage, type Video, videosApi, v
 import { useVideoComments, VideoComments, VideoEventTag, VideoNotes } from "./VideoDiscussion";
 import { VideoPlayer, type VideoSeeker } from "./VideoPlayer";
 import "./videos.css";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 /**
  * One video (/teams/:id/videos/:videoId; the app's VideoScreen): the player, who shared it, and for admins edit and
  * remove; the event it's tagged to, its notes (click one to play from there) and comments (F4–F6).
  */
 export function VideoPage({ videoId }: { videoId: string }) {
+  const askConfirm = useConfirm();
   const { teamId, viewer } = useTeamHub();
   const { user } = useAuth();
   const router = useRouter();
@@ -42,14 +45,14 @@ export function VideoPage({ videoId }: { videoId: string }) {
   );
 
   if (!member) return <MembersOnlySection what="videos" />;
-  if (live.error) return <p className="form-error">{live.error}</p>;
-  if (foldersLive.error) return <p className="form-error">{foldersLive.error}</p>;
+  if (live.error) return <ErrorNote>{live.error}</ErrorNote>;
+  if (foldersLive.error) return <ErrorNote>{foldersLive.error}</ErrorNote>;
   if (live.data === undefined || foldersLive.data === undefined) return <p className="muted" aria-busy="true">Loading…</p>;
   if (live.data === null) return <p className="empty">Video not available. It may have been removed. {back}</p>;
   const video = live.data as Video;
 
   async function remove() {
-    if (!user || !window.confirm(`Remove this video?\n\n${removeMessage(video)}`)) return;
+    if (!user || !(await askConfirm({ message: `Remove this video?\n\n${removeMessage(video)}`, confirmLabel: "Remove", destructive: true }))) return;
     setBusy(true);
     setError(null);
     try {
@@ -106,13 +109,13 @@ export function VideoPage({ videoId }: { videoId: string }) {
           </div>
           <VideoEventTag videoId={video.id} eventId={video.eventId} />
           {error && (
-            <p className="form-error" role="alert">
+            <ErrorNote>
               {error}
-            </p>
+            </ErrorNote>
           )}
         </div>
       )}
-      {discussion.error && <p className="form-error">{discussion.error}</p>}
+      {discussion.error && <ErrorNote>{discussion.error}</ErrorNote>}
       <VideoNotes videoId={video.id} notes={discussion.notes} seeker={seeker} />
       <VideoComments videoId={video.id} comments={discussion.comments} />
     </div>

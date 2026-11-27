@@ -31,6 +31,7 @@ import { formatDate, startOfToday } from "@/lib/dates";
 import { dayKey, localeFor, useRenderZone } from "@/lib/renderZone";
 import { StatusPill } from "../ui/StatusPill";
 import { entryTone, hostedTone } from "./tones";
+import { ErrorNote } from "@/components/StatusViews";
 
 export const tournamentHref = (id: string) => `/tournaments/${encodeURIComponent(id)}`;
 
@@ -205,7 +206,7 @@ export function useUpcomingTournaments(max = 50) {
 /** Upcoming published tournaments and leagues, soonest first (FindTournamentsScreen), live for members. */
 export function FindTournaments() {
   const upcoming = useUpcomingTournaments();
-  if (upcoming.error) return <p className="form-error">{upcoming.error}</p>;
+  if (upcoming.error) return <ErrorNote>{upcoming.error}</ErrorNote>;
   if (!upcoming.list) return <p className="muted" aria-busy="true">Loading…</p>;
   return <TournamentFinder list={upcoming.list} />;
 }
@@ -290,7 +291,7 @@ export function HostedTournamentsSection({ teamId, kind, manager, member }: { te
       </div>
       <Filters counts={f.statusCounts} labels={hostedStatusLabels} value={f.status} onChange={f.setStatus} label="Status" />
       {hosted.error ? (
-        <p className="form-error">{hosted.error}</p>
+        <ErrorNote>{hosted.error}</ErrorNote>
       ) : !hosted.data ? (
         <p className="muted" aria-busy="true">Loading…</p>
       ) : f.shown.length === 0 ? (

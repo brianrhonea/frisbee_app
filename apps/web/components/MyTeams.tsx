@@ -9,6 +9,7 @@ import { Avatar } from "./Avatar";
 import { roleLabel, TeamList } from "./ProfileDashboard";
 import { useMyTeams } from "./useMyTeams";
 import "./member.css";
+import { ErrorNote } from "@/components/StatusViews";
 
 interface MyTeam {
   name?: string;
@@ -56,7 +57,7 @@ export function MyTeams() {
       </div>
     );
   }
-  if (live.error) return <p className="form-error">Couldn&apos;t load your teams. Try again.</p>;
+  if (live.error) return <ErrorNote>Couldn&apos;t load your teams. Try again.</ErrorNote>;
   if (!live.data) return <p className="muted" aria-busy="true">Loading your teams…</p>;
 
   const all = live.data;

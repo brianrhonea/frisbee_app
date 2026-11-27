@@ -1,5 +1,5 @@
 "use client";
-import type { ButtonHTMLAttributes, MouseEvent, ReactNode } from "react";
+import type { ButtonHTMLAttributes, MouseEvent, ReactNode, Ref } from "react";
 import { type ButtonSize, type ButtonVariant, buttonClass } from "./buttonClass";
 
 /**
@@ -21,6 +21,8 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean;
   /** Shown before the label (hidden from assistive tech: the label says it). */
   icon?: ReactNode;
+  /** React 19 passes `ref` as a prop. */
+  ref?: Ref<HTMLButtonElement>;
 }
 
 export function Button({ variant, size, loading = false, icon, className, type = "button", onClick, children, ...rest }: ButtonProps) {

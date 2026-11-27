@@ -5,6 +5,7 @@ import { callApi, problem } from "@/lib/client";
 import { useAuth } from "../AuthProvider";
 import { PersonalDetailsForm } from "../PersonalDetailsForm";
 import { usePersonalStatus } from "../PersonalGate";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** Their legal name, birthday, contact details and address (`/v1/me/personal`). */
 export function PersonalSettings() {
@@ -21,7 +22,7 @@ export function PersonalSettings() {
   }, [user]);
 
   if (!user) return null;
-  if (error) return <p className="form-error">{error}</p>;
+  if (error) return <ErrorNote>{error}</ErrorNote>;
   if (!data) return <p className="muted">Loading…</p>;
   return (
     <div className="card">

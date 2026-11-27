@@ -15,6 +15,7 @@ import { useLiveDoc, useLiveQuery } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
 import { ErrorNote, Loading } from "../StatusViews";
 import { LEAVE_CONFIRM, useTeamHub, viewerSectionOn } from "./TeamContext";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 type Kind = "team" | "community" | "organization";
 
@@ -150,6 +151,7 @@ function moreSubtitle(section: HubSection): string | undefined {
  * outside, or opening a page.
  */
 function MoreMenu({ base, sections, path }: { base: string; sections: HubSection[]; path: string }) {
+  const askConfirm = useConfirm();
   const { teamId, kind, viewer } = useTeamHub();
   const { user } = useAuth();
   const router = useRouter();
@@ -162,7 +164,7 @@ function MoreMenu({ base, sections, path }: { base: string; sections: HubSection
   const noun = kind === "team" ? "team" : "community";
   const onSettings = path.startsWith(`${base}/settings`);
   async function leave() {
-    if (!user || !window.confirm(LEAVE_CONFIRM)) return;
+    if (!user || !(await askConfirm(LEAVE_CONFIRM))) return;
     setLeaving(true);
     setLeaveError(null);
     try {

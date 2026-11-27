@@ -9,6 +9,8 @@ import { useAuth } from "../AuthProvider";
 import { Avatar } from "../Avatar";
 import { LocalTime } from "../LocalTime";
 import { ReportButton } from "../Report";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** A comment on a team post as stored (TeamPostComment in the app). */
 interface TeamPostComment {
@@ -24,6 +26,7 @@ interface TeamPostComment {
  * author or a team admin ([moderator]) deletes a comment.
  */
 export function TeamPostComments({ teamId, postId, moderator }: { teamId: string; postId: string; moderator: boolean }) {
+  const askConfirm = useConfirm();
   const { user } = useAuth();
   const { data, error } = useLiveQuery<TeamPostComment>(
     user ? `teams/${teamId}/posts/${postId}/comments` : null,
@@ -61,7 +64,7 @@ export function TeamPostComments({ teamId, postId, moderator }: { teamId: string
   const all = [...(data ?? [])].reverse();
   return (
     <section className="comments" aria-label="Comments">
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       {data === undefined && !error && <p className="muted small">Loading comments…</p>}
       {data !== undefined && all.length === 0 && <p className="muted small">No comments yet.</p>}
       {all.map((c) => {
@@ -91,8 +94,8 @@ export function TeamPostComments({ teamId, postId, moderator }: { teamId: string
                   <button
                     type="button"
                     disabled={busy}
-                    onClick={() => {
-                      if (confirm("Delete this comment?")) void run(() => callApi(me, `${base}/${encodeURIComponent(c.id)}`, { method: "DELETE" }));
+                    onClick={async () => {
+                      if ((await askConfirm({ message: "Delete this comment?", confirmLabel: "Delete", destructive: true }))) void run(() => callApi(me, `${base}/${encodeURIComponent(c.id)}`, { method: "DELETE" }));
                     }}
                   >
                     Delete

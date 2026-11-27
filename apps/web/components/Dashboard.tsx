@@ -23,6 +23,7 @@ import { useMyTeams } from "./useMyTeams";
 import { needsRsvp, RsvpPill } from "./RsvpPill";
 import "./member.css";
 import { SegmentedTabs } from "./ui/SegmentedTabs";
+import { ErrorNote } from "@/components/StatusViews";
 
 const rsvpLabels: Record<string, string> = { going: "Going", maybe: "Maybe", notGoing: "Can't go" };
 
@@ -183,7 +184,7 @@ export function Dashboard({ user }: { user: User }) {
     return (
       <div className="page">
         <div className="card">
-          <p className="form-error">{error}</p>
+          <ErrorNote>{error}</ErrorNote>
           <button className="btn btn-small" type="button" onClick={() => void load()}>
             Try again
           </button>

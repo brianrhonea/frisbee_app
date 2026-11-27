@@ -22,6 +22,7 @@ import {
 } from "./data";
 import { NewStatsForm } from "./NewStatsForm";
 import "./stats.css";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** One game row: opponent, date, score and result (GameRow). */
 export function GameRow({ teamId, game, onDelete }: { teamId: string; game: StatsGame; onDelete?: () => void }) {
@@ -84,7 +85,7 @@ export function StatsHome() {
   const [error, setError] = useState("");
 
   const failed = games.error ?? tournaments.error;
-  if (failed) return <p className="form-error">{failed}</p>;
+  if (failed) return <ErrorNote>{failed}</ErrorNote>;
   if (!games.data || !tournaments.data) return <p className="muted" aria-busy="true">Loading…</p>;
 
   const all = games.data;
@@ -132,7 +133,7 @@ export function StatsHome() {
           onClose={() => setAdding(null)}
         />
       )}
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
 
       <section className="card st-season">
         <div className="st-season-head">

@@ -19,6 +19,7 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { callApi, problem } from "@/lib/client";
 import { useAuth } from "../AuthProvider";
+import { ErrorNote } from "@/components/StatusViews";
 
 const statusLabels: Record<string, string> = {
   open: "Not paid yet",
@@ -104,7 +105,7 @@ export function StaffPayments() {
     }
   }
 
-  if (!view) return error ? <p className="form-error">{error}</p> : <p className="muted" aria-busy="true">Loading payments…</p>;
+  if (!view) return error ? <ErrorNote>{error}</ErrorNote> : <p className="muted" aria-busy="true">Loading payments…</p>;
   if (!view.available) return <p className="empty">Online payments aren&apos;t set up on this server.</p>;
   return (
     <div className="stack staff-payments">
@@ -118,7 +119,7 @@ export function StaffPayments() {
         <span className="muted small">Last checked: {view.checkedAt ? new Date(view.checkedAt).toLocaleString() : "never"}</span>
       </div>
       {note && <p className="muted small">{note}</p>}
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
 
       {view.charges.some((c) => c.review) && (
         <section className="card">

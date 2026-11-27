@@ -18,6 +18,7 @@ import { Avatar } from "./Avatar";
 import { MembersOnly } from "./MembersOnly";
 import { type Doc, useLiveDoc, useLiveQuery } from "@/lib/live";
 import { formatDateTime } from "@/lib/dates";
+import { ErrorNote } from "@/components/StatusViews";
 
 // Stall 10's own rankings (the `rankings` Cloud Functions, nightly), as the
 // app's Rankings screen shows them: rankings/{level-division} for teams and
@@ -118,7 +119,7 @@ function TeamsForEveryone({ want, visitor }: { want: RankingWant; visitor: Visit
   if (user) return <MemberTeams want={want} />;
   if (!visitor) {
     return user === null ? (
-      <p className="form-error">Couldn&apos;t load the rankings. Try again in a minute.</p>
+      <ErrorNote>Couldn&apos;t load the rankings. Try again in a minute.</ErrorNote>
     ) : (
       <p className="muted" aria-busy="true">
         Loading…
@@ -132,7 +133,7 @@ function TeamsForEveryone({ want, visitor }: { want: RankingWant; visitor: Visit
 
 function MemberTeams({ want }: { want: RankingWant }) {
   const { data, error } = useLiveQuery<DivisionRanking>("rankings", [], "rankings");
-  if (error) return <p className="form-error">{error}</p>;
+  if (error) return <ErrorNote>{error}</ErrorNote>;
   if (!data) return <p className="muted">Loading…</p>;
   const ranked = new Map(data.filter(isShownRanking).map((r) => [r.id, r] as const));
   const choice = chooseRanking(ranked.keys(), want);
@@ -245,7 +246,7 @@ function TeamRanking({
 
 function Players() {
   const { data, error } = useLiveDoc<PlayerRanking>("playerRankings/all");
-  if (error) return <p className="form-error">{error}</p>;
+  if (error) return <ErrorNote>{error}</ErrorNote>;
   if (data === undefined) return <p className="muted">Loading…</p>;
   const players = data?.players ?? [];
   if (players.length === 0) {
