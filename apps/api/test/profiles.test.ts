@@ -37,6 +37,7 @@ describe("claim a username (usernames create, profiles username)", () => {
       keywords: profileKeywords("Pat Lee", "pat_lee"),
       photoUrl: "https://img/p.jpg",
       username: "pat_lee",
+      adult: true,
       updatedAt: new Date(now),
     });
   });
@@ -86,6 +87,7 @@ describe("profile details (validProfile, private/details)", () => {
       keywords: profileKeywords("Pat Lee", "pat"),
       photoUrl: "https://img/p.jpg",
       tags: ["ut", "austin"],
+      adult: true,
       updatedAt: new Date(now),
       bio: "Handler",
       pronouns: "they",

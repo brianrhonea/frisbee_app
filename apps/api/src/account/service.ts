@@ -115,6 +115,8 @@ export class AccountService {
         keywords: profileKeywords(name, str(profile?.username)),
         photoUrl: photo,
         ...(req.headerUploadId !== undefined && { headerUrl: header ?? deleteField }),
+        // Server-only (firestore.rules): set from the age claim, never written false (D-1317).
+        ...(caller.ageOk === true && { adult: true }),
         updatedAt: serverTime,
       });
     });

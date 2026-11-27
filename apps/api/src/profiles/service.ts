@@ -50,13 +50,15 @@ export class ProfileService {
   }
 
   /** The directory fields every profile write carries (_base in the app). */
-  private static base(who: { name: string; photoUrl: string | null }, username: string | null, tags: string[]): Data {
+  private static base(who: { name: string; photoUrl: string | null }, username: string | null, tags: string[], caller: Caller): Data {
     const name = who.name || username || "Player";
     return {
       name,
       keywords: profileKeywords(name, username),
       photoUrl: who.photoUrl,
       tags,
+      // Server-only (firestore.rules): set from the age claim, never written false (D-1317).
+      ...(caller.ageOk === true && { adult: true }),
       updatedAt: serverTime,
     };
   }
@@ -89,6 +91,7 @@ export class ProfileService {
         keywords: profileKeywords(name, handle),
         photoUrl: user?.photoUrl ?? null,
         username: handle,
+        ...(caller.ageOk === true && { adult: true }),
         updatedAt: serverTime,
       });
     });
@@ -103,7 +106,7 @@ export class ProfileService {
       // Read in the transaction, so a privacy change can't slip between.
       const profile = await tx.get(p.profile(caller.uid));
       const isPrivate = profile?.private === true;
-      const base = ProfileService.base(who, usernameOf(profile), isPrivate ? [] : tags);
+      const base = ProfileService.base(who, usernameOf(profile), isPrivate ? [] : tags, caller);
       if (isPrivate) {
         tx.merge(p.profile(caller.uid), base);
         tx.merge(p.hidden(caller.uid), { ...details, tags, updatedAt: serverTime });
@@ -124,7 +127,7 @@ export class ProfileService {
     await this.store.transact(async (tx) => {
       const profile = (await tx.get(p.profile(caller.uid))) ?? {};
       const hidden = (await tx.get(p.hidden(caller.uid))) ?? {};
-      const base = ProfileService.base(who, usernameOf(profile), []);
+      const base = ProfileService.base(who, usernameOf(profile), [], caller);
       if ((profile.private === true) === makePrivate && Object.keys(profile).length > 0) return;
       if (makePrivate) {
         const moved: Data = {};
@@ -161,7 +164,7 @@ export class ProfileService {
     await this.store.transact(async (tx) => {
       const profile = await tx.get(p.profile(caller.uid));
       const isPrivate = profile?.private === true;
-      const base = ProfileService.base(who, usernameOf(profile), tags);
+      const base = ProfileService.base(who, usernameOf(profile), tags, caller);
       if (isPrivate) tx.merge(p.hidden(caller.uid), { ...fields, updatedAt: serverTime });
       else tx.merge(p.profile(caller.uid), { ...base, ...fields });
     });

@@ -188,6 +188,22 @@ describe("the claims", () => {
     expect(s.users.claims.get("u1")).toEqual({ ageOk: true, terms: termsVersion });
   });
 
+  it("D-1317: the profile gets adult:true wherever the age claim is issued or already held, never for a minor, and is never created", async () => {
+    s.store.put("profiles/u1", { name: "Pat" });
+    await s.call("bare", "PUT", "/v1/me/personal/birth-date", { birthDate: "1995-04-02" });
+    expect(s.store.doc("profiles/u1")).toEqual({ name: "Pat", adult: true });
+    // A caller whose token already says ageOk is marked by the next status call.
+    s.store.put("profiles/u2", { name: "Una" });
+    await s.call("token", "GET", "/v1/me/personal/status", undefined, "u2");
+    expect(s.store.doc("profiles/u2")).toEqual({ name: "Una", adult: true });
+    // A minor's profile is left alone; with no profile nothing is made.
+    s.store.put("profiles/u3", { name: "Teen" });
+    await s.call("bare", "PUT", "/v1/me/personal/birth-date", { birthDate: "2009-06-01" }, "u3");
+    expect(s.store.doc("profiles/u3")).toEqual({ name: "Teen" });
+    await s.call("token", "GET", "/v1/me/personal/status", undefined, "u4");
+    expect(s.store.doc("profiles/u4")).toBeUndefined();
+  });
+
   it("agreeing before a birth date sets only terms", async () => {
     await s.call("bare", "PUT", "/v1/me/agreement", { version: termsVersion });
     expect(s.users.claims.get("u1")).toEqual({ terms: termsVersion });

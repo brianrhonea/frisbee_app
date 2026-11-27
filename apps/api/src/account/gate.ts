@@ -63,10 +63,35 @@ export class AccountGate {
    */
   async sync(caller: Caller, log?: GateLog): Promise<boolean> {
     const { claims } = await this.evaluate(caller, log);
+    // D-1317: whoever has (or just earned) the age claim is marked on their
+    // profile too, so Firestore rules can hide everyone else from lists and DMs.
+    if (caller.ageOk === true || claims[ageOkClaim] === true) await this.markAdult(caller.uid);
     if (Object.keys(claims).length === 0) return false;
     if (!this.users.setClaims) return false;
     await this.users.setClaims(caller.uid, claims);
     return true;
+  }
+
+  /**
+   * Sets `adult: true` on the profile, when there is one and it lacks it
+   * (with [write] false, only says so). Server-only (firestore.rules:
+   * clients can't write it), set only from the age claim and never written
+   * false or removed. No profile yet: nothing is created here; the API's
+   * profile writes set it when the profile is made, and the next sync after
+   * that does. Answers what it found: "already", "set" (or would be) or "noProfile".
+   */
+  async markAdult(uid: string, write = true): Promise<"already" | "set" | "noProfile"> {
+    const path = `profiles/${uid}`;
+    const before = await this.store.get(path);
+    if (!before) return "noProfile";
+    if (before.adult === true) return "already";
+    if (!write) return "set";
+    return this.store.transact(async (tx) => {
+      const profile = await tx.get(path);
+      if (!profile) return "noProfile";
+      if (profile.adult !== true) tx.update(path, { adult: true });
+      return "set";
+    });
   }
 
   /** The saved birth date, or null when there is none or it can't be opened (logged, no detail of it). */

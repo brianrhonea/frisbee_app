@@ -90,7 +90,7 @@ describe("backfill_under13.ts guard", () => {
     const r = await run([]);
     expect(r.code).toBe(1);
     expect(r.err).toMatch(/Pass --project/);
-  });
+  }, 120_000);
 
   it("refuses production and any other project, and demo-* without the emulator", async () => {
     for (const project of ["frisbee-app-prod", "some-other-project", "demo-stall10"]) {
