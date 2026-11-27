@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.72  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.71  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.70  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.69  | 2026-11-27 | `sprint3/lane-b`                        |                     |
@@ -84,6 +85,10 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.72 — H4 My teams
+
+- Teams tab: your teams and communities are `ListRow`s with a role pill (`StatusPill`) and no box; headings on the shared type scale. Explore's team, community and player results are `ListRow`s too (a team's Join stays on its page). Routes, join with code, find and start are unchanged.
 
 ## 0.0.71 — H6 Roster and permissions
 

@@ -11,6 +11,7 @@ import '../../../domain/models/player_profile.dart';
 import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
 import '../../core/themes/theme.dart';
+import '../../core/ui/list_row.dart';
 import '../../core/ui/layout.dart';
 import '../../core/ui/scoreboard.dart';
 import '../../core/ui/status_views.dart';
@@ -700,19 +701,16 @@ class _ResultTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = listing;
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
+    return ListRow(
       leading: TeamBadge(community: t.isCommunity),
-      title: Text(t.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: Text(
-        t.isCommunity
-            ? '${t.subtitle} · '
-                  '${t.requiresApproval ? 'Approval required' : 'Open to join'}'
-            : t.subtitle,
-      ),
+      title: t.name,
+      subtitle: t.isCommunity
+          ? '${t.subtitle} · '
+                '${t.requiresApproval ? 'Approval required' : 'Open to join'}'
+          : t.subtitle,
       trailing: vm.isMine(t.id)
           ? Tag(t.isCommunity ? 'Your community' : 'Your team')
-          : const Icon(Icons.chevron_right),
+          : Icon(Icons.chevron_right, color: AppColors.of(context).muted),
       onTap: () => context.go(Routes.team(t.id)),
     );
   }
@@ -737,12 +735,11 @@ class PlayerTile extends StatelessWidget {
       if (p.details.school.isNotEmpty) p.details.school,
       if (p.details.hometown.isNotEmpty) p.details.hometown,
     ].join(' · ');
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
+    return ListRow(
       leading: PersonAvatar(name: p.name, photoUrl: p.photoUrl),
-      title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: subtitle.isEmpty ? null : Text(subtitle),
-      trailing: const Icon(Icons.chevron_right),
+      title: p.name,
+      subtitle: subtitle.isEmpty ? null : subtitle,
+      trailing: Icon(Icons.chevron_right, color: AppColors.of(context).muted),
       onTap: () => context.push(Routes.player(p.uid)),
     );
   }

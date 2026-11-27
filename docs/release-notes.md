@@ -10,6 +10,10 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.72
+
+- **Teams:** a cleaner list of your teams with your role on each.
+
 ## 0.0.71
 
 - **Roster:** tidier member and role lists.

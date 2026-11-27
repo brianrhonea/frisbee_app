@@ -8,6 +8,8 @@ import '../../../utils/result.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/scoreboard.dart' show SectionHeader;
+import '../../core/ui/list_row.dart';
+import '../../core/ui/status_pill.dart';
 import '../../core/ui/status_views.dart';
 import '../../shell/widgets/app_shell.dart' show ProfileButton;
 import '../view_models/teams_viewmodel.dart';
@@ -315,25 +317,17 @@ class _Heading extends StatelessWidget {
           Expanded(
             child: Semantics(
               header: true,
-              child: Text(
-                text,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.2,
-                  color: c.ink,
-                ),
-              ),
+              child: Text(text, style: AppText.section.copyWith(color: c.ink)),
             ),
           ),
-          Text('$count', style: TextStyle(fontSize: 13, color: c.muted)),
+          Text('$count', style: AppText.secondary.copyWith(color: c.muted)),
         ],
       ),
     );
   }
 }
 
-/// One card of rows with hairlines between them.
+/// Rows with hairlines between them (no box round them).
 class _Rows extends StatelessWidget {
   const _Rows({required this.children});
 
@@ -342,21 +336,19 @@ class _Rows extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    return Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (final (i, w) in children.indexed) ...[
-            if (i > 0) Divider(height: 1, thickness: 1, color: c.border),
-            w,
-          ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final (i, w) in children.indexed) ...[
+          if (i > 0) Divider(height: 1, thickness: 1, color: c.border),
+          w,
         ],
-      ),
+      ],
     );
   }
 }
 
-/// The user's role: turf for those who run the team, outlined otherwise.
+/// The user's role: turf for those who run the team, neutral otherwise.
 class _RolePill extends StatelessWidget {
   const _RolePill(this.role, this.kind);
 
@@ -364,26 +356,10 @@ class _RolePill extends StatelessWidget {
   final TeamKind kind;
 
   @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    final lead = role.canEdit;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-      decoration: BoxDecoration(
-        color: lead ? c.accentSoft : null,
-        border: lead ? null : Border.all(color: c.border2),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        role.labelFor(kind),
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: lead ? FontWeight.w700 : FontWeight.w600,
-          color: lead ? c.accentInk : c.ink2,
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => StatusPill(
+    role.labelFor(kind),
+    tone: role.canEdit ? PillTone.accent : PillTone.neutral,
+  );
 }
 
 /// A team or community row: its initials, name, role and what it is.
@@ -405,55 +381,21 @@ class _Row extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Row(
-          children: [
-            TeamInitials(name: name, kind: kind),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: c.ink,
-                          ),
-                        ),
-                      ),
-                      if (role case final r?) ...[
-                        const SizedBox(width: 6),
-                        _RolePill(r, kind),
-                      ],
-                    ],
-                  ),
-                  if (meta.isNotEmpty) ...[
-                    const SizedBox(height: 3),
-                    Text(
-                      meta,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 12.5, color: c.muted),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(Icons.chevron_right, size: 20, color: c.muted),
+    return ListRow(
+      leading: TeamInitials(name: name, kind: kind),
+      title: name,
+      subtitle: meta.isEmpty ? null : meta,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (role case final r?) ...[
+            _RolePill(r, kind),
+            const SizedBox(width: AppSpace.sm),
           ],
-        ),
+          Icon(Icons.chevron_right, size: 20, color: c.muted),
+        ],
       ),
+      onTap: onTap,
     );
   }
 }
