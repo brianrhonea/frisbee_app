@@ -7,6 +7,12 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.54.1 - 2026-11-27
+
+Security review F1 (privacy).
+
+- `GET /v1/teams/:teamId/roster` for a signed-in non-member applies the public roster's hiding: private, teams-hidden and (in enforce mode) unmarked people are left out, a spot linked to one shows as "Player", and only owner, coach and captain members carry a `uid`. Members' view is unchanged. `staffTiers` added to the shared package.
+
 ## 0.54.0 - 2026-11-27
 
 Sprint 4 owner feedback.
