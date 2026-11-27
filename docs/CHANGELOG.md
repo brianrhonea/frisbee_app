@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.83  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.82  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.81  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.80  | 2026-11-27 | `sprint3/lane-b`                        |                     |
@@ -95,6 +96,10 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.83 — H9 fix: settings rows on the page, no outer card
+
+- Settings groups: rows sit on the page under their headings with hairlines between, no outer card. Rows stay list tiles, so behaviour and tests are unchanged. H6 member rows left as they are (tests depend on their list-tile and menu structure).
 
 ## 0.0.82 — Screenshots: logo mark on every wide picture
 

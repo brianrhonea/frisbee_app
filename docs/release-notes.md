@@ -10,6 +10,10 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.83
+
+- **Settings:** a lighter, simpler look.
+
 ## 0.0.82
 
 - **Internal:** no visible change.

@@ -6,11 +6,11 @@ const appName = 'Stall 10';
 
 /// Matches `version:` in pubspec.yaml (checked by test/version_test.dart).
 /// The log of versions is in docs/CHANGELOG.md.
-const appVersion = '0.0.82';
+const appVersion = '0.0.83';
 
 /// The build number, the `+N` in pubspec.yaml (checked by
 /// test/version_test.dart). `meta/flags.minBuild` is compared with this.
-const appBuild = 82;
+const appBuild = 83;
 
 /// The app icon: a "10" whose "0" is a flying disc. Drawn, with every
 /// platform's launcher icon, by tool/brand/stall10_logo.py.
