@@ -41,6 +41,7 @@ import 'package:frisbee_app/ui/schedule/widgets/schedule_screen.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import 'shot_env.dart';
 import '../testing/fakes.dart';
 import '../testing/group_tournament_fakes.dart';
 import '../testing/meeting_fakes.dart';
@@ -125,7 +126,7 @@ void main() {
 
   Future<void> size(WidgetTester tester) async {
     await tester.runAsync(_loadFonts);
-    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.physicalSize = const Size(shotWidth * 3.0, shotHeight * 3.0);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
   }

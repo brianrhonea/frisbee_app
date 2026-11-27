@@ -35,6 +35,7 @@ import 'package:frisbee_app/ui/personal/widgets/personal_details_screen.dart';
 import 'package:frisbee_app/ui/profile/view_models/profile_viewmodel.dart';
 import 'package:frisbee_app/ui/settings/widgets/settings_screen.dart';
 
+import 'shot_env.dart';
 import '../testing/fakes.dart';
 import '../testing/social_fakes.dart';
 
@@ -80,7 +81,7 @@ void main() {
 
   Future<void> pump(WidgetTester tester, Widget home) async {
     await tester.runAsync(_loadFonts);
-    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.physicalSize = const Size(shotWidth * 3.0, shotHeight * 3.0);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
