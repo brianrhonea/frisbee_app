@@ -153,6 +153,32 @@ void main() {
       },
     );
 
+    test('permission admins and stats keepers are not staff', () async {
+      add(
+        teamWith(
+          {
+            'owner': TeamRole.owner,
+            'coach': TeamRole.coach,
+            'p1': TeamRole.player,
+            'cap': TeamRole.captain,
+            testUser.uid: TeamRole.player,
+          },
+          statKeepers: {'cap'},
+        ).copyWith(
+          memberNames: const {'cap': 'Cass'},
+          memberPerms: const {
+            'p1': {TeamPermission.manageTeam, TeamPermission.manageMembers},
+          },
+        ),
+      );
+      final vm = homeVm();
+      await pumpEventQueue();
+      expect(
+        [for (final o in vm.messageableStaff) (o.uid, o.label)],
+        [('owner', 'Owner'), ('coach', 'Coach'), ('cap', 'Captain')],
+      );
+    });
+
     test('a member does not ask the roster endpoint', () async {
       add(team({'owner': TeamRole.owner, testUser.uid: TeamRole.player}));
       final vm = homeVm();

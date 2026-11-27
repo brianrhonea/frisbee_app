@@ -190,11 +190,19 @@ void main() {
     );
     expect(find.text('Thursday practice'), findsOneWidget);
 
-    // A day with nothing on keeps the list; nothing is highlighted.
+    // A day with nothing on keeps the list and highlights the next day
+    // that has events (Nov 28), where the list scrolls to.
     await tester.tap(find.bySemanticsLabel('Friday, November 20'));
     await tester.pumpAndSettle();
     expect(find.text('Thursday practice'), findsOneWidget);
-    expect(find.byKey(const ValueKey('picked-day-section')), findsNothing);
+    expect(find.byKey(const ValueKey('picked-day-section')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('picked-day-section')),
+        matching: find.text('Snowmelt Hat'),
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byTooltip('Today'));
     await tester.pumpAndSettle();

@@ -364,17 +364,31 @@ String encodePolyline(List<RoutePoint> path) {
   return out.toString();
 }
 
+/// The most points [decodePolyline] returns; a longer path is cut there.
+const maxPolylinePoints = 4000;
+
+/// Decodes an encoded polyline (see [encodePolyline]). A route comes from
+/// Firestore, so the input may be hostile: at most [maxPolylinePoints]
+/// points are read, a character outside the encoding's alphabet or a
+/// number longer than 32 bits (e.g. endless continuation characters) makes
+/// the whole path invalid (empty), a point off the globe (latitude beyond
+/// 90, longitude beyond 180) is dropped, and a truncated tail is ignored.
 List<RoutePoint> decodePolyline(String encoded) {
   final path = <RoutePoint>[];
   var i = 0;
   var lat = 0;
   var lng = 0;
+  var malformed = false;
   int? read() {
     var shift = 0;
     var result = 0;
     while (true) {
       if (i >= encoded.length) return null;
       final b = encoded.codeUnitAt(i++) - 63;
+      if (b < 0 || b > 0x3f || shift > 30) {
+        malformed = true;
+        return null;
+      }
       result |= (b & 0x1f) << shift;
       shift += 5;
       if (b < 0x20) break;
@@ -382,13 +396,17 @@ List<RoutePoint> decodePolyline(String encoded) {
     return (result & 1) != 0 ? ~(result >> 1) : result >> 1;
   }
 
-  while (i < encoded.length) {
+  for (var n = 0; i < encoded.length && n < maxPolylinePoints; n++) {
     final dLat = read();
     final dLng = read();
+    if (malformed) return const [];
     if (dLat == null || dLng == null) break;
     lat += dLat;
     lng += dLng;
-    path.add(RoutePoint(lat / 1e5, lng / 1e5));
+    final la = lat / 1e5;
+    final ln = lng / 1e5;
+    if (la.abs() > 90 || ln.abs() > 180) continue;
+    path.add(RoutePoint(la, ln));
   }
   return path;
 }

@@ -102,3 +102,43 @@ List<CommunityOrganizer> communityOrganizers(Team team) {
     kind == TeamKind.organization
     ? (title: 'Next event', empty: 'No events scheduled')
     : (title: 'Next pickup', empty: 'No pickup scheduled');
+
+/// Who the Message sheet offers: the members whose tier is owner, coach or
+/// captain (never a permission-based admin or a stats keeper), labelled by
+/// the team's kind ("Captain" on a team), sorted owner, coach, captain,
+/// then by name. A person without a uid cannot be messaged and is dropped.
+/// The outsider path (the roster endpoint) uses the same rule.
+List<CommunityOrganizer> messageStaffOf(
+  Iterable<({String uid, String name, TeamRole tier})> people,
+  TeamKind kind,
+) {
+  final staff = [
+    for (final p in people)
+      if (p.uid.isNotEmpty && p.tier != TeamRole.player) p,
+  ];
+  int rank(TeamRole r) => switch (r) {
+    TeamRole.owner => 0,
+    TeamRole.coach => 1,
+    _ => 2,
+  };
+  staff.sort((a, b) {
+    final byTier = rank(a.tier).compareTo(rank(b.tier));
+    if (byTier != 0) return byTier;
+    final byName = a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    return byName != 0 ? byName : a.uid.compareTo(b.uid);
+  });
+  return [
+    for (final p in staff)
+      (
+        uid: p.uid,
+        name: p.name.isEmpty ? 'Member' : p.name,
+        label: p.tier.labelFor(kind),
+      ),
+  ];
+}
+
+/// [messageStaffOf] for a team the user is a member of.
+List<CommunityOrganizer> teamMessageStaff(Team team) => messageStaffOf([
+  for (final MapEntry(key: uid, value: role) in team.members.entries)
+    (uid: uid, name: team.memberNames[uid] ?? '', tier: role),
+], team.kind);

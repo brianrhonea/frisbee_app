@@ -80,7 +80,7 @@ class _MembersTabState extends State<MembersTab> {
             : team.nameOf(a.key).compareTo(team.nameOf(b.key));
       });
     return [
-      if (viewModel.canManageMembers) ...[
+      if (viewModel.canManageMembers || _canAddPlayer(team)) ...[
         Align(
           alignment: Alignment.centerLeft,
           child: FilledButton.icon(
@@ -136,10 +136,22 @@ class _MembersTabState extends State<MembersTab> {
     ];
   }
 
-  /// "Add member": invite people, and on a team with a roster, add a player
-  /// to it.
+  /// Whether the user can add a roster player here: a team with a roster
+  /// and manageTeam (an admin who can edit the roster).
+  bool _canAddPlayer(Team team) =>
+      TeamSection.forTeam(team).contains(TeamSection.roster) &&
+      viewModel.canEdit;
+
+  /// "Add member": invite people (Manage members), and on a team with a
+  /// roster, add a player to it (Edit roster). With only one of the two,
+  /// it opens straight away, as on the website.
   Future<void> _addMember(BuildContext context, Team team) async {
-    final hasRoster = TeamSection.forTeam(team).contains(TeamSection.roster);
+    final canInvite = viewModel.canManageMembers;
+    final canPlayer = _canAddPlayer(team);
+    if (!canInvite && canPlayer) {
+      await showPlayerEditor(context, viewModel);
+      return;
+    }
     final choice = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -174,7 +186,7 @@ class _MembersTabState extends State<MembersTab> {
               ),
               onTap: () => Navigator.pop(context, 'invite'),
             ),
-            if (hasRoster && viewModel.canEdit)
+            if (canPlayer)
               ListTile(
                 minVerticalPadding: 12,
                 leading: const Icon(Icons.badge_outlined),

@@ -129,8 +129,9 @@ void main() {
     await tester.pumpAndSettle();
     vm.setView(ScheduleView.month);
     await shotPump(tester, ScheduleScreen(viewModel: vm));
-    // Pick a day in the grid: the list scrolls to it.
-    await tester.tap(find.bySemanticsLabel('Saturday, November 21'));
+    // Pick an empty day: the list scrolls to the next day with events and
+    // highlights it.
+    await tester.tap(find.bySemanticsLabel('Friday, November 20'));
     await tester.pumpAndSettle();
     await shotCapture(tester, 'month');
   });
@@ -183,13 +184,36 @@ void main() {
       await shotCapture(tester, 'roster-roles');
     });
 
+    testWidgets('add member, manageTeam-only admin', skip: skip != null, (
+      tester,
+    ) async {
+      // An admin who edits the roster but cannot manage members: Add member
+      // opens the player editor directly.
+      teams.teams['t1'] = teams.teams['t1']!.copyWith(
+        memberPerms: {
+          me: {TeamPermission.manageTeam},
+        },
+        members: {
+          ...teams.teams['t1']!.members,
+          me: TeamRole.player,
+          'owner2': TeamRole.owner,
+        },
+      );
+      await open(tester);
+      await tester.tap(find.text('Add member'));
+      await tester.pumpAndSettle();
+      expect(find.text('Add player'), findsOneWidget);
+      expect(find.text('Invite people'), findsNothing);
+      await shotCapture(tester, 'roster-add-member');
+    });
+
     testWidgets('add member and link picker', skip: skip != null, (
       tester,
     ) async {
       await open(tester);
       await tester.tap(find.text('Add member'));
       await tester.pumpAndSettle();
-      await shotCapture(tester, 'roster-add-member');
+      await shotCapture(tester, 'roster-add-member-sheet');
       await tester.tap(find.text('Add player to roster'));
       await tester.pumpAndSettle();
       await shotCapture(tester, 'roster-add-player');
@@ -340,6 +364,7 @@ void main() {
           members: {
             'owner': TeamRole.owner,
             'coach': TeamRole.coach,
+            'cap': TeamRole.captain,
             me: TeamRole.player,
             'sam': TeamRole.player,
           },
@@ -347,6 +372,7 @@ void main() {
           memberNames: {
             'owner': 'Olive Nguyen',
             'coach': 'Riley Chen',
+            'cap': 'Cass Wu',
             me: 'Test User',
             'sam': 'Sam Ortiz',
           },
@@ -385,12 +411,14 @@ void main() {
           members: {
             'owner': TeamRole.owner,
             'coach': TeamRole.coach,
+            'cap': TeamRole.captain,
             'sam': TeamRole.player,
           },
         ).copyWith(
           memberNames: {
             'owner': 'Olive Nguyen',
             'coach': 'Riley Chen',
+            'cap': 'Cass Wu',
             'sam': 'Sam Ortiz',
           },
         );

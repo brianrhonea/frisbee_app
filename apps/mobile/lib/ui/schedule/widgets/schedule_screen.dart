@@ -166,6 +166,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         ),
       ];
     }
+    // The picked day's section, or the next day with events when the
+    // picked day is empty (the list scrolls there), as on the website.
+    final picked = days.where((d) => !d.isBefore(vm.selectedDay)).firstOrNull;
     return [
       for (final d in days)
         _DaySection(
@@ -173,7 +176,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           day: d,
           viewModel: vm,
           onSwiped: _onSwiped,
-          highlightPicked: keyed,
+          highlightPicked: keyed && d == picked,
         ),
     ];
   }
@@ -731,7 +734,8 @@ class _DaySection extends StatelessWidget {
   final ScheduleViewModel viewModel;
   final void Function(ScheduleEntry, SeriesScope) onSwiped;
 
-  /// Tints the section when it is the day picked in the month grid.
+  /// Tints the section: the day picked in the month grid, or the next day
+  /// with events when the picked day has none.
   final bool highlightPicked;
 
   @override
@@ -741,7 +745,7 @@ class _DaySection extends StatelessWidget {
     final events = vm.eventsOn(day);
     final isToday = day == vm.today;
     final selected = day == vm.selectedDay;
-    final tinted = highlightPicked && selected;
+    final tinted = highlightPicked;
     return Padding(
       padding: const EdgeInsets.only(top: AppSpace.lg),
       child: DecoratedBox(
