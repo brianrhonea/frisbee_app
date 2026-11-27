@@ -27,8 +27,9 @@ class HostEventScreen extends StatelessWidget {
         listenable: viewModel,
         builder: (context, _) {
           if (!viewModel.loaded) return const LoadingState();
-          if (viewModel.error != null)
+          if (viewModel.error != null) {
             return ErrorState(error: viewModel.error);
+          }
           final sections = viewModel.sections;
           return ConstrainedContent(
             child: ListView(
