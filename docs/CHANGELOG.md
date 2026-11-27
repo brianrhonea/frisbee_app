@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.85  | 2026-11-27 | `sprint4/lane-b`, `sprint4/lane-b2`         |                     |
 | 0.0.84  | 2026-11-27 | `sprint3/17b`                           |                     |
 | 0.0.83  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.82  | 2026-11-27 | `sprint3/lane-b`                        |                     |
@@ -97,6 +98,16 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.85 — Sprint 4 owner feedback
+
+- Schedule Month lists the whole month by day again; tapping a grid day scrolls the list to it and highlights it.
+- Roster: People | Roles switch, Add member sheet (Invite people, Add player to roster), Link to a member picker; a linked player is created in one API call (412 shown when that person already has a spot). Member rows restyled.
+- Teams search: Join / Ask to join on results where a join path already exists.
+- Profile no longer offers to claim a roster spot (admins link players); your linked spots show with Unlink.
+- Event editors warn before saving an event that overlaps one already on the loaded schedule.
+- Team page Message opens a sheet: Team chat (members) and the owner, coaches and captains to message; signed-in outsiders get the staff list from GET roster.
+- Calendar event creates send a client id (409 counts as sent); recorded runs post through POST /v1/posts with the route and photos via /v1/uploads (no direct Firestore or Storage write).
 
 ## 0.0.84 — 17-B review fixes (M1, L1)
 

@@ -10,6 +10,15 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.85
+
+- **Schedule:** Month view shows the whole month as a list again; tap a day to jump to it.
+- **Teams:** a Roles view and an Add member button on the roster; admins can link a player to a member when adding them. Join right from search results.
+- **Profile:** you no longer link yourself to a roster spot; a team admin does it when adding you. You can still unlink yourself.
+- **Events:** a warning if a new event overlaps something already on your schedule.
+- **Message on a team page** reaches the team's owner, coaches or captains.
+- **Reliability:** calendar events and recorded runs can't be duplicated by a retry; runs now save through the server.
+
 ## 0.0.84
 
 - **Fixes:** photos on a recorded run post are kept again; retrying a new event, roster spot or group chat after a bad connection no longer makes a duplicate.

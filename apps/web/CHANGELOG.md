@@ -4,6 +4,17 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.75.0 — 2026-11-27
+
+Sprint 4 owner feedback (parity with app 0.0.85).
+
+- Schedule Month: a scrollable list of the whole month under the grid; clicking a day scrolls to it and highlights it.
+- Roster: Roles tab, Add member menu (Invite people, Add player to roster), Link to a member picker; a linked player is saved in one call. "This is me" claiming removed; Unlink me kept.
+- Teams search: Join / Ask to join / Request to join where a join path exists.
+- Event editors: overlap warning before saving (loaded events only).
+- Team header Message: Team chat for members plus the staff to message; signed-in outsiders get staff from GET roster.
+- Phone team header keeps the Settings gear visible; phone Home no longer shifts or scrolls after load.
+
 ## 0.74.0 — 2026-11-27
 
 UI review fixes (restyle only).
