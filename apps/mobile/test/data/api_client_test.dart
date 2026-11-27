@@ -49,6 +49,34 @@ void main() {
       expect(jsonDecode(sent.body), {'name': 'Haze'});
     });
 
+    test(
+      'a non-string error code falls back to internal, not a TypeError',
+      () async {
+        for (final code in [
+          42,
+          true,
+          null,
+          {'a': 1},
+          ['x'],
+        ]) {
+          final api = _client(
+            (_) async => _json({
+              'error': {'code': code, 'message': 'Nope.'},
+            }, 400),
+          );
+          await expectLater(
+            api.post('/v1/teams', {}),
+            throwsA(
+              isA<ApiException>()
+                  .having((e) => e.code, 'code', 'internal')
+                  .having((e) => e.message, 'message', 'Nope.'),
+            ),
+            reason: 'code: $code',
+          );
+        }
+      },
+    );
+
     test("throws the API's own message and fields", () async {
       final api = _client(
         (_) async => _json({
