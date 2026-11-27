@@ -199,15 +199,22 @@ describe("Roles tab (S4 C2)", () => {
     expect(screen.getByRole("link", { name: "Edit roles" })).toHaveAttribute("href", "/teams/t1/settings#team-roles");
   });
 
-  it("gives a member manager the members' roles in settings, and a player nothing to edit", () => {
+  it("gives only the owner Edit roles: not a member manager, not a player", () => {
     hub = { ...hub, viewer: viewerWith("captain", ["manageMembers"]) };
     const a = render(<RolesTab roster={roster} />);
-    expect(screen.getByRole("link", { name: "Edit roles" })).toHaveAttribute("href", "/teams/t1/settings#member-roles");
+    expect(screen.queryByRole("link", { name: "Edit roles" })).toBeNull();
     a.unmount();
     hub = { ...hub, viewer: viewerWith("player", []) };
     render(<RolesTab roster={roster} />);
     expect(screen.queryByRole("link", { name: "Edit roles" })).toBeNull();
     expect(screen.getByRole("heading", { level: 3, name: /Handlers/ })).toBeInTheDocument();
+  });
+
+  it("lists Coach and Captain only while someone holds the tier (Owner always)", () => {
+    const players = roster.members.filter((m) => m.tier !== "coach" && m.tier !== "captain");
+    render(<RolesTab roster={{ ...roster, members: players }} />);
+    const items = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent?.replace(/\s+/g, " ").trim());
+    expect(items).toEqual(["Owner 1", "Stats 0", "Handlers 1", "Tournament lead 0"]);
   });
 
   it("leaves out the stats tier on a community, and shows nothing to an outsider", () => {

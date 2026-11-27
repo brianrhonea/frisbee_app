@@ -353,3 +353,9 @@
 
 /* Home: the team strip holds its place while the teams load, so the feed under it does not jump (S4). */
 .team-strip-loading { min-height: 96px; }
+
+/* Your own profile: roster spots a team admin linked you to. */
+.roster-spot-rows { list-style: none; margin: var(--space-sm) 0 0; padding: 0; display: grid; gap: var(--space-xs); }
+.roster-spot-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); min-height: 48px; }
+.roster-spot-text { display: grid; min-width: 0; }
+.roster-spot-text a { font-weight: 600; overflow-wrap: anywhere; }

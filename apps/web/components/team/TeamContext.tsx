@@ -85,7 +85,7 @@ interface TeamHubInfo {
   privateGroup: boolean;
   /** A team whose "Public team page" is off (its listing's publicPage): only members see inside, as a private group. */
   privatePage: boolean;
-  /** A team that takes join requests (its listing's allowJoinRequests, F26): signed-in outsiders get "Request to join". */
+  /** A team that takes join requests (its listing's allowJoinRequests, F26): signed-in outsiders get "Ask to join". */
   joinRequests?: boolean;
   /** A youth team (isYouthTeam): visitors see its card only, and only members its roster. */
   youth: boolean;

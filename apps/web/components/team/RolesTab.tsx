@@ -14,27 +14,30 @@ const tierOrder = ["owner", "coach", "captain", "stats"] as const;
 /**
  * The roster's Roles tab (members only): each tier (owner, coach, captain, stats) and each of the team's
  * custom roles, with the people who hold it. It reads what the hub and the roster already hold (the team
- * doc's roles and memberRoles; no new permission model). The ones who can edit roles get "Edit roles",
- * which opens the roles editor in Settings (the owner's) or the members' tiers there (member managers').
+ * doc's roles and memberRoles; no new permission model). Coach and captain are listed only while someone holds
+ * the tier, as in the app. Only the owner gets "Edit roles" (the app's canSetRoles), which opens the roles editor
+ * in Settings.
  */
 export function RolesTab({ roster }: { roster: TeamRoster }) {
   const { teamId, kind, viewer } = useTeamHub();
   if (viewer.state !== "member") return null;
   const team = viewer.team;
-  const tiers = tierOrder.filter((t) => t !== "stats" || kind === "team");
   const custom = rolesInOrder(team.roles);
   const memberRoles = team.memberRoles ?? {};
   const holdersOfTier = (t: string) => roster.members.filter((m) => m.tier === t);
+  // As the app: Owner (and Stats, on a team) always; Coach and Captain are older tiers, listed only while someone holds one.
+  const tiers = tierOrder.filter((t) => (t === "stats" ? kind === "team" : t === "owner" || holdersOfTier(t).length > 0));
   const holdersOfRole = (id: string) => roster.members.filter((m) => memberRoles[m.uid]?.includes(id));
   const owner = viewer.tier === "owner";
-  const canEdit = owner || viewer.can("manageMembers");
+  // Only the owner sets roles (the app's canSetRoles).
+  const canEdit = owner;
 
   return (
     <section className="roster-section" aria-label="Roles">
       <div className="roles-bar">
         <h2 className="card-title">Roles</h2>
         {canEdit && (
-          <Link className={buttonClass({ size: "small" })} href={`/teams/${encodeURIComponent(teamId)}/settings#${owner ? "team-roles" : "member-roles"}`}>
+          <Link className={buttonClass({ size: "small" })} href={`/teams/${encodeURIComponent(teamId)}/settings#team-roles`}>
             Edit roles
           </Link>
         )}

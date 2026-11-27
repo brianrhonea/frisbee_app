@@ -1,3 +1,5 @@
+import { type Repeat, seriesTimes } from "@stall10/shared";
+
 /**
  * Overlap warning for the event editors (Sprint 4 C5): does the event being saved run into one already loaded
  * in the schedule? Pure and local: it only looks at the events the page already holds, never fetches other
@@ -11,11 +13,13 @@
  *   ends does not.
  * - An all-day event (`allDay: true`) covers its whole day. It overlaps another all-day event on a shared day,
  *   and a timed event that touches that day. (The website has no all-day events today; this is for when it does.)
- * - The event being edited never overlaps itself (`ignoreId`). A repeating event is checked on its first
- *   occurrence only.
+ * - The event being edited never overlaps itself (`ignoreId`), nor do the other events of its own series
+ *   (`series`). A new repeating event is checked on every occurrence (`repeat`), as the app does.
  */
 export interface Span {
   id?: string;
+  /** The series the event belongs to, when it repeats (as on the API's events). */
+  series?: { id: string } | null;
   title?: string;
   startsAt?: string | null;
   endsAt?: string | null;
@@ -52,12 +56,30 @@ export function spansOverlap(a: Span, b: Span): boolean {
   return x[0] < y[1] && y[0] < x[1];
 }
 
-/** The first of [others] the [candidate] overlaps, or null. */
-export function findOverlap(candidate: Span, others: Span[], ignoreId?: string): Span | null {
+/** A new event's repeat, with the time zone its times are written in. */
+export interface SeriesRule {
+  repeat: Repeat;
+  timeZone: string;
+}
+
+/**
+ * The first of [others] the [candidate] overlaps, or null. With [series] (a new repeating event) every
+ * occurrence is checked, not only the first. [ignoreId] and the candidate's own `series` leave out the
+ * event being edited and the rest of its series.
+ */
+export function findOverlap(candidate: Span, others: Span[], ignoreId?: string, series?: SeriesRule | null): Span | null {
   if (cancelled(candidate)) return null;
-  for (const o of others) {
-    if (cancelled(o) || (ignoreId && o.id === ignoreId)) continue;
-    if (spansOverlap(candidate, o)) return o;
+  const starts = candidate.startsAt;
+  const times: Span[] =
+    series && starts && !Number.isNaN(Date.parse(starts))
+      ? seriesTimes(starts, candidate.endsAt ?? null, series.repeat, series.timeZone).map((t) => ({ ...candidate, ...t }))
+      : [candidate];
+  for (const c of times) {
+    for (const o of others) {
+      if (cancelled(o) || (ignoreId && o.id === ignoreId)) continue;
+      if (candidate.series && o.series?.id === candidate.series.id) continue;
+      if (spansOverlap(c, o)) return o;
+    }
   }
   return null;
 }

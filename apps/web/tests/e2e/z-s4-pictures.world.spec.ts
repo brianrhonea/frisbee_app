@@ -8,6 +8,8 @@ import { openMember, shootMember } from "./helpers";
 type World = { teamId: string; password: string; users: Record<"ada" | "ben" | "cam", { email: string; uid: string }> };
 const world = () => JSON.parse(readFileSync("review/web/.auth/world.json", "utf8")) as World;
 test.setTimeout(240_000);
+// PIC_PREFIX=S4-fix- names the folders and files of a fix round (S4-fix-month/S4-fix-month_375_light_after.png).
+const P = process.env.PIC_PREFIX ?? "S4-";
 const phase = () => process.env.REVIEW_PHASE ?? "after";
 
 /** Light and dark pictures of what is on screen now. */
@@ -22,34 +24,34 @@ async function snap(page: Page, screen: string, suffix = "") {
 
 test("pictures: Month view", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("stall10.schedule.view", "month"));
-  await shootMember(page, "S4-month", "/schedule");
+  await shootMember(page, `${P}month`, "/schedule");
 });
 
 test("pictures: Roster, Roles tab, Add member, link picker", async ({ page }) => {
   const w = world();
   await openMember(page, `/teams/${w.teamId}/roster`);
-  await snap(page, "S4-roster");
+  await snap(page, `${P}roster`);
   const main = page.getByRole("main");
   const roles = main.getByRole("tab", { name: "Roles" });
   if (await roles.count()) {
     await roles.click();
     await page.waitForTimeout(300);
-    await snap(page, "S4-roster", "_roles");
+    await snap(page, `${P}roster`, "_roles");
     await main.getByRole("tab", { name: "Roster" }).click();
   }
   const add = main.getByRole("button", { name: "Add member" });
   if (await add.count()) {
     await add.click();
     await page.waitForTimeout(200);
-    await snap(page, "S4-roster", "_addmember");
+    await snap(page, `${P}roster`, "_addmember");
     await page.getByRole("menuitem", { name: "Add player to roster" }).click();
     await page.waitForTimeout(300);
-    await snap(page, "S4-roster", "_linkpicker");
+    await snap(page, `${P}roster`, "_linkpicker");
     const picker = page.getByLabel(/Link to a member/);
     if ((await picker.locator("option").count()) > 1) {
       await picker.selectOption({ index: 1 });
       await page.waitForTimeout(200);
-      await snap(page, "S4-roster", "_linkpicker-picked");
+      await snap(page, `${P}roster`, "_linkpicker-picked");
     }
   }
 });
@@ -60,12 +62,18 @@ test("pictures: Teams search with Join", async ({ page }) => {
   await expect(page.locator(".team-finder-list .ui-row").first()).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(800);
   await page.locator("#find").scrollIntoViewIfNeeded();
-  await snap(page, "S4-teams-search");
+  await snap(page, `${P}teams-search`);
 });
 
 test("pictures: profile and the roster spots (no claiming)", async ({ page, browser, baseURL }) => {
   const w = world();
-  await shootMember(page, "S4-profile", `/players/${w.users.ada.uid}`);
+  await shootMember(page, `${P}profile`, `/players/${w.users.ada.uid}`);
+  const spots = page.getByRole("region", { name: "Roster spots" });
+  await spots.waitFor({ timeout: 15_000 }).catch(() => undefined);
+  if (await spots.count()) {
+    await spots.scrollIntoViewIfNeeded();
+    await snap(page, `${P}profile`, "_own-spots");
+  }
   // A member with no spot (Ben): the baseline offers "This is me" on the unlinked spot; the change does not.
   const ctx = await browser.newContext({ baseURL: baseURL!, viewport: page.viewportSize()!, storageState: { cookies: [], origins: [] } });
   const ben = await ctx.newPage();
@@ -76,7 +84,7 @@ test("pictures: profile and the roster spots (no claiming)", async ({ page, brow
   await ben.getByRole("button", { name: /^Log in$|^Sign in$/ }).click();
   await expect(ben).not.toHaveURL(/sign-in/, { timeout: 60_000 });
   await openMember(ben, `/teams/${w.teamId}/stats/players`);
-  await snap(ben, "S4-profile", "_roster-spots");
+  await snap(ben, `${P}profile`, "_roster-spots");
   await ctx.close();
 });
 
@@ -90,22 +98,22 @@ test("pictures: overlap confirm", async ({ page }) => {
   const day = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
   await form.getByLabel(/^Starts/).fill(`${day}T19:00`);
   await form.getByLabel(/^Ends/).fill(`${day}T20:30`);
-  await snap(page, "S4-overlap", "_form");
+  await snap(page, `${P}overlap`, "_form");
   // The baseline would save the event (it has no warning), so only the changed tree submits.
   if (phase() === "after") {
     await form.getByRole("button", { name: "Add", exact: true }).click();
     await expect(page.getByRole("dialog", { name: "Overlapping event" })).toBeVisible();
-    await snap(page, "S4-overlap", "_confirm");
+    await snap(page, `${P}overlap`, "_confirm");
   }
 });
 
 test("pictures: team header and its Message dialog", async ({ page }) => {
   const w = world();
-  await shootMember(page, "S4-team-header", `/teams/${w.teamId}`);
+  await shootMember(page, `${P}team-header`, `/teams/${w.teamId}`);
   const message = page.locator(".team-head").getByRole("button", { name: "Message" });
   if (await message.count()) {
     await message.click();
     await page.waitForTimeout(300);
-    await snap(page, "S4-team-header", "_message");
+    await snap(page, `${P}team-header`, "_message");
   }
 });

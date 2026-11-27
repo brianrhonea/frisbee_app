@@ -17,6 +17,7 @@ vi.mock("@/components/team/TeamContext", async () => {
   };
 });
 
+import { ApiError } from "@/lib/client";
 import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
 import { TeamEventEditor } from "@/components/team/TeamEventEditor";
 
@@ -85,5 +86,76 @@ describe("Overlap warning in the team event editor (S4 C5)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
     await waitFor(() => expect(onDone).toHaveBeenCalledWith("new2"));
     expect(screen.queryByRole("dialog", { name: "Overlapping event" })).toBeNull();
+  });
+
+  it("checks every occurrence of a repeating event: a later one that clashes asks too", async () => {
+    // Weekly from Wed Jun 12 2030 at 09:00 to Jun 26 (Jun 12, 19, 26): only the last one meets "Late game".
+    const later = { id: "c", title: "Late game", startsAt: new Date(2030, 5, 26, 9, 30).toISOString(), endsAt: new Date(2030, 5, 26, 11).toISOString() };
+    render(
+      <ConfirmProvider>
+        <TeamEventEditor others={[later]} onDone={vi.fn()} />
+      </ConfirmProvider>,
+    );
+    fill("Morning run", 9, 10);
+    fireEvent.change(screen.getByLabelText("Repeat"), { target: { value: "weekly" } });
+    fireEvent.change(screen.getByLabelText("Ends on"), { target: { value: "2030-06-26" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    const dialog = await screen.findByRole("dialog", { name: "Overlapping event" });
+    expect(dialog).toHaveTextContent(/This overlaps with Late game/);
+    expect(callApi).not.toHaveBeenCalled();
+  });
+});
+
+describe("New team events carry a client id (S4 fix D1)", () => {
+  const idRule = /^[A-Za-z0-9]{1,40}$/;
+
+  it("sends an id that fits the API's rule", async () => {
+    callApi.mockResolvedValueOnce({ id: "x" });
+    const onDone = setup();
+    fill("Morning run", 9, 10);
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    const body = callApi.mock.calls[0]![2].body as { id: string };
+    expect(body.id).toMatch(idRule);
+  });
+
+  it("reuses the same id on a retry after a failure", async () => {
+    callApi.mockRejectedValueOnce(new ApiError("Couldn't reach Stall 10.", 0)).mockResolvedValueOnce({ id: "x" });
+    const onDone = setup();
+    fill("Morning run", 9, 10);
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    await screen.findByRole("alert");
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    expect(callApi).toHaveBeenCalledTimes(2);
+    expect(callApi.mock.calls[1]![2].body.id).toBe(callApi.mock.calls[0]![2].body.id);
+  });
+
+  it("treats a 409 already_exists replay as success, with the id it sent", async () => {
+    callApi.mockRejectedValueOnce(new ApiError("Already exists.", 409, "already_exists"));
+    const onDone = setup();
+    fill("Morning run", 9, 10);
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
+    const sent = callApi.mock.calls[0]![2].body.id as string;
+    expect(onDone).toHaveBeenCalledWith(sent);
+  });
+
+  it("a double-click sends one id, so the API can't make two events", async () => {
+    let resolve!: (v: { id: string }) => void;
+    let posts = 0;
+    callApi.mockImplementation((_u: unknown, _path: string, init?: { method?: string }) => {
+      if (init?.method !== "POST") return Promise.resolve([]);
+      return posts++ === 0 ? new Promise((r) => (resolve = r)) : Promise.reject(new ApiError("Already exists.", 409, "already_exists"));
+    });
+    const onDone = setup();
+    fill("Morning run", 9, 10);
+    const add = screen.getByRole("button", { name: "Add" });
+    fireEvent.click(add);
+    fireEvent.click(add);
+    resolve({ id: "x" });
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    const ids = new Set(callApi.mock.calls.filter((c) => c[2]?.method === "POST").map((c) => c[2].body.id));
+    expect(ids.size).toBe(1);
   });
 });

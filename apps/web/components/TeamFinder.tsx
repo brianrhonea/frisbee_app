@@ -141,7 +141,7 @@ export function TeamFinder() {
 export function joinPathOf(t: Pick<PublicListing, "kind" | "requiresApproval" | "allowJoinRequests">): { label: string; path: string; done: string } | null {
   if ((t.kind ?? "team") === "team") {
     // A team joins by code or invite unless it takes join requests.
-    return t.allowJoinRequests === true ? { label: "Request to join", path: "join-requests", done: "Requested" } : null;
+    return t.allowJoinRequests === true ? { label: "Ask to join", path: "join-requests", done: "Requested" } : null;
   }
   return t.requiresApproval === true
     ? { label: "Ask to join", path: "join-requests", done: "Requested" }

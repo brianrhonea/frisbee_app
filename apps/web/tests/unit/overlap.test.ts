@@ -41,6 +41,31 @@ describe("overlap check (S4 C5)", () => {
     expect(spansOverlap(allDay, { startsAt: new Date(2026, 10, 25).toISOString(), allDay: true })).toBe(false);
   });
 
+  it("checks every occurrence of a new repeating event, not only the first", () => {
+    // Weekly from Tue Nov 24 18:00, until Dec 15: Nov 24, Dec 1, Dec 8, Dec 15. Practice sits on the third (Dec 8).
+    const start = new Date(2026, 10, 24, 18).toISOString();
+    const end = new Date(2026, 10, 24, 19).toISOString();
+    const rule = { repeat: { freq: "weekly" as const, until: "2026-12-15" }, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+    const third = { id: "x", title: "Game", startsAt: new Date(2026, 11, 8, 18, 30).toISOString(), endsAt: new Date(2026, 11, 8, 20).toISOString() };
+    expect(findOverlap({ startsAt: start, endsAt: end }, [third])).toBeNull();
+    expect(findOverlap({ startsAt: start, endsAt: end }, [third], undefined, rule)).toBe(third);
+    // Beyond the series' last date there is nothing to meet.
+    const late = { ...third, startsAt: new Date(2026, 11, 22, 18).toISOString(), endsAt: new Date(2026, 11, 22, 19).toISOString() };
+    expect(findOverlap({ startsAt: start, endsAt: end }, [late], undefined, rule)).toBeNull();
+    // A daily series is met on any day, at the same time of day only.
+    const daily = { repeat: { freq: "daily" as const, until: "2026-11-30" }, timeZone: rule.timeZone };
+    const sameHour = { title: "Run", startsAt: new Date(2026, 10, 27, 18, 15).toISOString(), endsAt: new Date(2026, 10, 27, 18, 45).toISOString() };
+    const otherHour = { title: "Run", startsAt: new Date(2026, 10, 27, 9).toISOString(), endsAt: new Date(2026, 10, 27, 10).toISOString() };
+    expect(findOverlap({ startsAt: start, endsAt: end }, [sameHour], undefined, daily)).toBe(sameHour);
+    expect(findOverlap({ startsAt: start, endsAt: end }, [otherHour], undefined, daily)).toBeNull();
+  });
+
+  it("leaves out the other events of the series being edited", () => {
+    const mine = { id: "s_1", series: { id: "s" }, title: "Practice", startsAt: at(18), endsAt: at(20) };
+    expect(findOverlap({ id: "s_0", series: { id: "s" }, startsAt: at(19), endsAt: at(21) }, [mine])).toBeNull();
+    expect(findOverlap({ id: "s_0", series: { id: "other" }, startsAt: at(19), endsAt: at(21) }, [mine])).toBe(mine);
+  });
+
   it("says nothing about an event without a usable start", () => {
     expect(findOverlap({ startsAt: "not a date" }, [{ startsAt: at(18) }])).toBeNull();
     expect(findOverlap({ startsAt: at(18) }, [{ title: "No time" }])).toBeNull();

@@ -111,6 +111,16 @@ async function fsMerge(path, data) {
   must(res.ok, `firestore ${path}`, await res.text());
 }
 
+/** Sets one member's tier on the team doc, leaving the rest of it as it is. */
+async function fsSetMember(teamId, uid, tier) {
+  const res = await fetch(`http://${FS}/v1/projects/${PROJECT}/databases/(default)/documents/teams/${teamId}?updateMask.fieldPaths=members.${uid}`, {
+    method: "PATCH",
+    headers: { authorization: "Bearer owner", "content-type": "application/json" },
+    body: JSON.stringify({ fields: { members: enc({ [uid]: tier }) } }),
+  });
+  must(res.ok, `firestore teams/${teamId} members.${uid}`, await res.text());
+}
+
 const at = (days, hour, minute = 0) => {
   const d = new Date();
   d.setDate(d.getDate() + days);
@@ -172,6 +182,9 @@ export async function seedWorld() {
       },
       memberRoles: { [cam.uid]: ["coordinators"], [ben.uid]: ["handlers"] },
     });
+    // Cam holds the Coach tier too (the Message dialog lists tiers only; there is no captain, so Roles shows none).
+    // The API no longer makes new coaches (roles do), so the tier is written to the team doc as an older team has it.
+    await fsSetMember(teamId, cam.uid, "coach");
     // Teams and groups Ada is not on: a team that takes join requests, an open group, an approval group and a plain team.
     const cascade = await api(cam, "POST", "/v1/teams", { name: "Cascade Request Team", division: "open", level: "college", city: "Tacoma" });
     await api(cam, "PUT", `/v1/teams/${cascade.id}/allow-join-requests`, { on: true });
