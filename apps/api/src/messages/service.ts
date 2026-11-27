@@ -113,7 +113,6 @@ export class ConversationService {
     const existing = await this.store.get(p.conv(id));
     if (existing) return { id, status: (existing.status as OpenConversationResult["status"]) ?? "accepted" };
     await checkNotBlocked(this.store, caller.uid, other);
-    await this.refuseHidden(other);
     const [profile, user, theyFollowMe, iFollowThem] = await Promise.all([
       this.store.get(p.profile(other)),
       this.store.get(p.user(other)),
@@ -129,7 +128,12 @@ export class ConversationService {
           ? "request"
           : null;
     const theirName = clip(typeof profile.name === "string" && profile.name ? profile.name : "Player", 80);
-    if (!status) throw new ApiError("permission_denied", `${theirName} doesn't take messages from you.`);
+    // D-1317: a hidden account answers exactly as one that takes no messages
+    // (same code and text), checked after the profile and policy so the
+    // refusal can't tell a stranger which it was.
+    if (!status || (await this.adults?.isHidden(other))) {
+      throw new ApiError("permission_denied", `${theirName} doesn't take messages from you.`);
+    }
     await checkNotMuted(this.store, caller.uid, this.now());
     const me = await this.name(caller);
     return this.store.transact(async (tx) => {

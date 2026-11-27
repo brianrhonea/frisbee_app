@@ -13,6 +13,7 @@ import {
   setRosterLinesRequestSchema,
   type TeamRoster,
 } from "@stall10/shared";
+import type { AdultVisibility } from "../account/adult_visibility.js";
 import type { Caller } from "../auth.js";
 import { isPrivateProfile, validId } from "../browse/model.js";
 import { isDraftedLeagueTeam, pinnedImageUrl } from "../browse/visibility.js";
@@ -49,6 +50,8 @@ export class RosterService {
     private readonly store: DocStore,
     /** Buckets visitors may load profile photos from (visibility.ts photoBuckets). */
     private readonly buckets: readonly string[] = [],
+    /** D-1317: linked accounts without the adult claim are shown as private. */
+    private readonly adults?: AdultVisibility,
   ) {}
 
   /**
@@ -140,6 +143,7 @@ export class RosterService {
     const uids = [...new Set(players.map((p) => str(p.data.userId)).filter(Boolean))];
     const found = await this.store.getAll(uids.map((uid) => `profiles/${uid}`));
     const profiles = new Map(uids.map((uid, i) => [uid, found[i] ?? undefined]));
+    const noAdult = this.adults ? await this.adults.hidden(uids) : new Set<string>();
     return {
       players: players
         .map(({ data }) => {
@@ -147,7 +151,8 @@ export class RosterService {
           const profile = profiles.get(linked);
           // A private profile, or one that hides its teams (or a link to a
           // profile that's gone), isn't named or tied to the roster for visitors.
-          const shown = !!profile && !isPrivateProfile(profile) && mapOf(profile.visibility).teams !== false;
+          // An account D-1317 hides (no adult claim) is private as well.
+          const shown = !!profile && !isPrivateProfile(profile) && mapOf(profile.visibility).teams !== false && !noAdult.has(linked);
           const out: PublicRosterPlayer = { name: (linked && !shown ? "" : str(data.name)) || "Player" };
           if (typeof data.number === "number" && Number.isInteger(data.number)) out.number = data.number;
           const pos = positions.find((p) => p === data.position);

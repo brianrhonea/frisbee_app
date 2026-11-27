@@ -212,7 +212,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   if (deps.me) meRoutes(app, new MeService(deps.me.repo, deps.me.imageUrl, deps.now), deps.writeLimits !== false ? writes : undefined);
   if (deps.browse) {
     const buckets = deps.browse.photoBuckets ?? [];
-    const roster = deps.store ? new RosterService(deps.store, buckets) : undefined;
+    const roster = deps.store ? new RosterService(deps.store, buckets, adults) : undefined;
     browseRoutes(app, new BrowseService(deps.browse.repo, deps.browse.imageUrl, deps.now, buckets, adults), { ...deps.browse, roster });
   }
   if (deps.browse && deps.publicTournaments) {
@@ -232,7 +232,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     if (personal) personalRoutes(app, personal, gate, deps.writeLimits !== false ? writes : undefined);
     if (deps.exports) exportRoutes(app, new ExportService(deps.exports, deps.store, deps.users, personal, deps.now));
     const reads = deps.writeLimits !== false ? writes : undefined;
-    rosterRoutes(app, new RosterService(deps.store, deps.browse?.photoBuckets ?? []), reads);
+    rosterRoutes(app, new RosterService(deps.store, deps.browse?.photoBuckets ?? [], adults), reads);
     teamShareRoutes(app, new TeamShareService(deps.store));
     postRoutes(app, new PostService(deps.store, deps.users, deps.now), revalidate, reads);
     const editor = new PostEditor(deps.store, deps.users, deps.media, deps.now);
