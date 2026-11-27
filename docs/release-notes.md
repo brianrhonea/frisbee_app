@@ -10,6 +10,10 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.69
+
+- **Events:** a cleaner event page with a cover, who is going and your answer.
+
 ## 0.0.68
 
 - **Chats:** quick filters for team chats and direct messages, with counts, and cleaner rows.

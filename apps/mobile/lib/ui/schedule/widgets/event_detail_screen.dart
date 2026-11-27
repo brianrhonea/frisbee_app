@@ -12,10 +12,11 @@ import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
 import '../../core/ui/back_or.dart';
 import '../../core/ui/confirm_dialog.dart';
+import '../../core/ui/cover_header.dart';
+import '../../core/ui/scoreboard.dart' show NeedsYouPill, SectionHeader;
 import '../../core/ui/error_message.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/layout.dart' show DateBadge, ScreenSize, SectionCard;
-import '../../core/ui/scoreboard.dart' show NeedsYouPill, TeamDot;
 import '../../core/ui/status_views.dart';
 import '../../core/ui/view_model_host.dart';
 import '../view_models/event_detail_viewmodel.dart';
@@ -347,8 +348,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   }
 }
 
-/// An event's summary card: whose schedule it's on and its type, the
-/// title, the day and time, the location (tap for directions) and
+/// An event's summary: a cover band with its date badge on the edge
+/// (`CoverHeader`), the title with whose schedule it's on and its type,
+/// then the day and time, the location (tap for directions) and
 /// [calendarButton]. Notes go in [EventNotes].
 class EventHeader extends StatelessWidget {
   const EventHeader({
@@ -364,7 +366,7 @@ class EventHeader extends StatelessWidget {
   /// Whose schedule it's on, e.g. the team's name, before the type.
   final String? owner;
 
-  /// A personal event: its dot is the personal colour.
+  /// A personal event (kept for callers; the cover has no team colour).
   final bool personal;
 
   /// "Add to calendar", under the details.
@@ -374,88 +376,69 @@ class EventHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     final e = event;
-    return SectionCard(
-      padding: const EdgeInsets.all(AppSpace.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        CoverHeader(
+          title: e.title,
+          subtitle: [?owner, e.type.label].join(' \u00b7 '),
+          roundAvatar: false,
+          avatar: DateBadge(date: e.startsAt, size: 72),
+        ),
+        const SizedBox(height: AppSpace.lg),
+        Padding(
+          padding: EdgeInsets.zero,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              TeamDot(color: personal ? c.personal : c.team),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  [?owner, e.type.label].join(' · '),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: c.muted,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            e.title,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.3,
-              height: 1.2,
-              color: c.ink,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              DateBadge(date: e.startsAt, size: 48),
-              const SizedBox(width: 12),
-              Expanded(
-                child: DetailLines(
-                  DateFormat.yMMMMEEEEd().format(e.startsAt),
-                  eventTimeRange(e),
-                ),
-              ),
-            ],
-          ),
-          if (e.series case final series?) ...[
-            const SizedBox(height: 8),
-            RepeatNote(series: series),
-          ],
-          if (e.location.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            InkWell(
-              onTap: () => showDirectionsSheet(context, place: e.location),
-              borderRadius: BorderRadius.circular(controlRadius),
-              child: Row(
+              Row(
                 children: [
-                  DetailIcon(Icons.place_outlined),
+                  const DetailIcon(Icons.schedule),
                   const SizedBox(width: 12),
-                  Expanded(child: DetailLines(e.location, null)),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(8, 12, 0, 12),
-                    child: Text(
-                      'Directions',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: c.accent,
-                      ),
+                  Expanded(
+                    child: DetailLines(
+                      DateFormat.yMMMMEEEEd().format(e.startsAt),
+                      eventTimeRange(e),
                     ),
                   ),
                 ],
               ),
-            ),
-          ],
-          if (calendarButton case final button?) ...[
-            const SizedBox(height: 14),
-            button,
-          ],
-        ],
-      ),
+              if (e.series case final series?) ...[
+                const SizedBox(height: 8),
+                RepeatNote(series: series),
+              ],
+              if (e.location.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                InkWell(
+                  onTap: () => showDirectionsSheet(context, place: e.location),
+                  borderRadius: BorderRadius.circular(controlRadius),
+                  child: Row(
+                    children: [
+                      const DetailIcon(Icons.place_outlined),
+                      const SizedBox(width: 12),
+                      Expanded(flex: 2, child: DetailLines(e.location, null)),
+                      Flexible(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 12, 0, 12),
+                          child: Text(
+                            'Directions',
+                            textAlign: TextAlign.end,
+                            style: AppText.label.copyWith(color: c.accent),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              if (calendarButton case final button?) ...[
+                const SizedBox(height: 14),
+                button,
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -494,17 +477,10 @@ class DetailLines extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: c.ink,
-          ),
-        ),
+        Text(title, style: AppText.bodyStrong.copyWith(color: c.ink)),
         if (subtitle != null) ...[
           const SizedBox(height: 2),
-          Text(subtitle!, style: TextStyle(fontSize: 13, color: c.muted)),
+          Text(subtitle!, style: AppText.secondary.copyWith(color: c.muted)),
         ],
       ],
     );
@@ -518,17 +494,15 @@ class EventNotes extends StatelessWidget {
   final String notes;
 
   @override
-  Widget build(BuildContext context) => SectionCard(
-    title: 'Notes',
-    padding: const EdgeInsets.all(14),
-    child: Text(
-      notes,
-      style: TextStyle(
-        fontSize: 14,
-        height: 1.5,
-        color: AppColors.of(context).ink2,
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      const SectionHeader('Notes'),
+      Text(
+        notes,
+        style: AppText.body.copyWith(color: AppColors.of(context).ink2),
       ),
-    ),
+    ],
   );
 }
 
@@ -542,20 +516,35 @@ class _RsvpSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: Listenable.merge([viewModel.setRsvp, viewModel.saveNote]),
-    builder: (context, _) => _section(),
+    builder: (context, _) => _section(context),
   );
 
-  Widget _section() {
+  Widget _section(BuildContext context) {
     final vm = viewModel;
     final r = vm.responses;
     final type = vm.event?.type ?? EventType.other;
-    return SectionCard(
-      title: 'Are you in?',
-      action: vm.needsRsvp ? const NeedsYouPill('Needs RSVP') : null,
-      padding: const EdgeInsets.all(14),
+    final going = r[RsvpStatus.going]!.length;
+    return Padding(
+      padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Row(
+            children: [
+              const Expanded(child: SectionHeader('Are you in?')),
+              if (vm.needsRsvp) const NeedsYouPill('Needs RSVP'),
+            ],
+          ),
+          // How many are coming, in words.
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpace.sm),
+            child: Text(
+              going == 1 ? '1 person going' : '$going people going',
+              style: AppText.secondary.copyWith(
+                color: AppColors.of(context).muted,
+              ),
+            ),
+          ),
           RsvpChoice<RsvpStatus>(
             options: [
               for (final s in RsvpStatus.values)
@@ -752,21 +741,26 @@ class _Responses extends StatelessWidget {
   Widget build(BuildContext context) {
     final r = viewModel.responders;
     final type = viewModel.event?.type ?? EventType.other;
-    return SectionCard(
-      title: 'Responses',
-      padding: const EdgeInsets.all(14),
-      child: RsvpResponses(
-        groups: [
-          for (final s in RsvpStatus.values)
-            (
-              label: s.labelFor(type),
-              people: r[s]!,
-              tone: s == RsvpStatus.going ? RsvpTone.yes : RsvpTone.other,
-            ),
-          (
-            label: 'No reply',
-            people: withoutNotes(viewModel.noResponse),
-            tone: RsvpTone.none,
+    return Padding(
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SectionHeader('Responses'),
+          RsvpResponses(
+            groups: [
+              for (final s in RsvpStatus.values)
+                (
+                  label: s.labelFor(type),
+                  people: r[s]!,
+                  tone: s == RsvpStatus.going ? RsvpTone.yes : RsvpTone.other,
+                ),
+              (
+                label: 'No reply',
+                people: withoutNotes(viewModel.noResponse),
+                tone: RsvpTone.none,
+              ),
+            ],
           ),
         ],
       ),

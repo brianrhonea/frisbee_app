@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.69  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.68  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.67  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.66  | 2026-11-27 | `sprint3/lane-b`                        |                     |
@@ -81,6 +82,10 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.69 — H3 Event details and RSVP
+
+- Event page: a cover band with the date badge on its edge (`CoverHeader` gained `roundAvatar`), calm detail lines, an attendee count under "Are you in?" ("2 people going"), Going / Maybe / Can't go, Responses and Notes without boxes. RSVP, note, reactions, poll, edit and delete are unchanged.
 
 ## 0.0.68 — H7 Chats redesign
 

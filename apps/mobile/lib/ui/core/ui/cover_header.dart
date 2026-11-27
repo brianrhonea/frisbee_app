@@ -23,6 +23,7 @@ class CoverHeader extends StatelessWidget {
     this.actions = const [],
     this.coverHeight = 120,
     this.avatarSize = 72,
+    this.roundAvatar = true,
   });
 
   final String title;
@@ -36,6 +37,10 @@ class CoverHeader extends StatelessWidget {
   final List<Widget> actions;
   final double coverHeight;
   final double avatarSize;
+
+  /// A round picture (people, teams) or a rounded square (e.g. an event's
+  /// date badge).
+  final bool roundAvatar;
 
   @override
   Widget build(BuildContext context) {
@@ -90,16 +95,27 @@ class CoverHeader extends StatelessWidget {
               bottom: -avatarSize / 2,
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
+                  shape: roundAvatar ? BoxShape.circle : BoxShape.rectangle,
+                  borderRadius: roundAvatar
+                      ? null
+                      : BorderRadius.circular(AppRadius.card),
                   border: Border.all(color: c.background, width: 4),
                 ),
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
+                    shape: roundAvatar ? BoxShape.circle : BoxShape.rectangle,
+                    borderRadius: roundAvatar
+                        ? null
+                        : BorderRadius.circular(AppRadius.card),
                     border: Border.all(color: c.border),
                   ),
                   position: DecorationPosition.foreground,
-                  child: ClipOval(child: avatar),
+                  child: roundAvatar
+                      ? ClipOval(child: avatar)
+                      : ClipRRect(
+                          borderRadius: BorderRadius.circular(AppRadius.card),
+                          child: avatar,
+                        ),
                 ),
               ),
             ),
