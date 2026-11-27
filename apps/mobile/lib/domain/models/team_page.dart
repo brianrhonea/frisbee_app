@@ -103,6 +103,10 @@ List<CommunityOrganizer> communityOrganizers(Team team) {
     ? (title: 'Next event', empty: 'No events scheduled')
     : (title: 'Next pickup', empty: 'No pickup scheduled');
 
+/// The tiers the Message sheet offers, listed so a new tier is not staff by
+/// default.
+const messageStaffTiers = {TeamRole.owner, TeamRole.coach, TeamRole.captain};
+
 /// Who the Message sheet offers: the members whose tier is owner, coach or
 /// captain (never a permission-based admin or a stats keeper), labelled by
 /// the team's kind ("Captain" on a team), sorted owner, coach, captain,
@@ -114,7 +118,7 @@ List<CommunityOrganizer> messageStaffOf(
 ) {
   final staff = [
     for (final p in people)
-      if (p.uid.isNotEmpty && p.tier != TeamRole.player) p,
+      if (p.uid.isNotEmpty && messageStaffTiers.contains(p.tier)) p,
   ];
   int rank(TeamRole r) => switch (r) {
     TeamRole.owner => 0,
