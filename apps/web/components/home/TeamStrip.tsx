@@ -12,7 +12,8 @@ import { StartOrJoinButton } from "./StartOrJoin";
 
 export function TeamStrip({ uid }: { uid: string }) {
   const live = useMyTeams(uid);
-  if (!live.data) return null;
+  // While the teams load the row's place is held, so what is under it does not jump down when it arrives.
+  if (!live.data) return <div className="team-strip team-strip-loading" aria-hidden="true" />;
   const spaces = spacesOf(live.data);
   return (
     <nav className="team-strip" aria-label="Your teams and communities">

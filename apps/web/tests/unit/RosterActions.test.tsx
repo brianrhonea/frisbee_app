@@ -58,38 +58,31 @@ beforeEach(() => {
   hub = { teamId: "t1", kind: "team", name: "Hawks", viewer: viewerWith("owner", ["manageTeam", "manageMembers"]) };
 });
 
-describe("saveRosterPlayer: create, then the admin link call", () => {
-  it("posts the spot unlinked, then links the member", async () => {
-    callApi.mockResolvedValueOnce({ id: "p9" }).mockResolvedValueOnce(undefined);
-    const r = await saveRosterPlayer(user as never, "t1", { ...draftOf(), name: "Ben", number: "7", userId: "ben" }, null);
+describe("saveRosterPlayer: one call, with the linked member in the body", () => {
+  it("creates the spot already linked", async () => {
+    callApi.mockResolvedValueOnce({ id: "p9" });
+    const r = await saveRosterPlayer(user as never, "t1", { ...draftOf(), name: "Ben", number: "7", userId: "ben" });
     expect(r).toEqual({ id: "p9", error: "" });
-    expect(callApi).toHaveBeenNthCalledWith(1, user, "/v1/teams/t1/roster-players", {
+    expect(callApi).toHaveBeenCalledTimes(1);
+    expect(callApi).toHaveBeenCalledWith(user, "/v1/teams/t1/roster-players", {
       method: "POST",
-      body: { name: "Ben", number: 7, position: "hybrid", userId: null, paid: false },
+      body: { name: "Ben", number: 7, position: "hybrid", userId: "ben", paid: false },
     });
-    expect(callApi).toHaveBeenNthCalledWith(2, user, "/v1/teams/t1/roster-players/p9/link", { method: "PUT", body: { userId: "ben" } });
   });
 
-  it("makes no link call when no member is picked, and none when the link is unchanged on an edit", async () => {
+  it("creates an unlinked spot, and edits a spot with PUT", async () => {
     callApi.mockResolvedValue({ id: "p9" });
-    await saveRosterPlayer(user as never, "t1", { ...draftOf(), name: "Walk-on" }, null);
-    expect(callApi).toHaveBeenCalledTimes(1);
+    await saveRosterPlayer(user as never, "t1", { ...draftOf(), name: "Walk-on" });
+    expect(callApi).toHaveBeenCalledWith(user, "/v1/teams/t1/roster-players", expect.objectContaining({ method: "POST", body: expect.objectContaining({ userId: null }) }));
     callApi.mockClear();
-    await saveRosterPlayer(user as never, "t1", { ...draftOf(), id: "p1", name: "Ada L", userId: "ada" }, "ada");
+    await saveRosterPlayer(user as never, "t1", { ...draftOf(), id: "p1", name: "Ada L", userId: "ada" });
     expect(callApi).toHaveBeenCalledTimes(1);
     expect(callApi).toHaveBeenCalledWith(user, "/v1/teams/t1/roster-players/p1", expect.objectContaining({ method: "PUT", body: expect.objectContaining({ userId: "ada" }) }));
   });
 
-  it("keeps the spot's id and says so when only the link fails", async () => {
-    callApi.mockResolvedValueOnce({ id: "p9" }).mockRejectedValueOnce(new ApiError("Only one of the team's members can be linked to a spot.", 403));
-    const r = await saveRosterPlayer(user as never, "t1", { ...draftOf(), name: "Ben", userId: "ben" }, null);
-    expect(r.id).toBe("p9");
-    expect(r.error).toContain("Saved, but couldn't link the member: Only one of the team's members");
-  });
-
-  it("returns the server's message, without an id, when the spot can't be saved", async () => {
-    callApi.mockRejectedValueOnce(new ApiError("Only admins can change the roster.", 403));
-    expect(await saveRosterPlayer(user as never, "t1", { ...draftOf(), name: "Ben" }, null)).toEqual({ id: "", error: "Only admins can change the roster." });
+  it("returns the server's message, without an id, when the member is already on another spot", async () => {
+    callApi.mockRejectedValueOnce(new ApiError("That member is already on another spot.", 412));
+    expect(await saveRosterPlayer(user as never, "t1", { ...draftOf(), name: "Ben", userId: "ben" })).toEqual({ id: "", error: "That member is already on another spot." });
   });
 });
 
@@ -133,8 +126,8 @@ describe("Add member (S4 C2)", () => {
     expect(openInvite).toHaveBeenCalledWith("people");
   });
 
-  it("adds a player to the roster, linking a member who has no spot yet", async () => {
-    callApi.mockResolvedValueOnce({ id: "p2" }).mockResolvedValueOnce(undefined);
+  it("adds a player to the roster, linked to a member who has no spot yet", async () => {
+    callApi.mockResolvedValueOnce({ id: "p2" });
     const onAdded = vi.fn();
     render(<AddMember roster={roster} onAdded={onAdded} />);
     fireEvent.click(screen.getByRole("button", { name: "Add member" }));
@@ -145,7 +138,7 @@ describe("Add member (S4 C2)", () => {
     fireEvent.change(picker, { target: { value: "ben" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(onAdded).toHaveBeenCalled());
-    expect(callApi).toHaveBeenNthCalledWith(2, user, "/v1/teams/t1/roster-players/p2/link", { method: "PUT", body: { userId: "ben" } });
+    expect(callApi).toHaveBeenCalledWith(user, "/v1/teams/t1/roster-players", expect.objectContaining({ method: "POST", body: expect.objectContaining({ name: "Ben Okafor", userId: "ben" }) }));
     expect(screen.queryByLabelText(/Link to a member/)).toBeNull();
   });
 

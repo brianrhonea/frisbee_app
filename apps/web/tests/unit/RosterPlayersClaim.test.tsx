@@ -61,16 +61,16 @@ describe("Roster spots are linked by an admin, never claimed (S4 C4)", () => {
     expect(screen.queryByRole("button", { name: "Add player" })).toBeNull();
   });
 
-  it("lets an admin add a player and link a member through the picker (create, then link)", async () => {
+  it("lets an admin add a player and link a member through the picker (one call)", async () => {
     tier = "captain";
-    callApi.mockResolvedValueOnce({ id: "p9" }).mockResolvedValueOnce(undefined);
+    callApi.mockResolvedValueOnce({ id: "p9" });
     players = players.filter((p) => p.id !== "p2");
     render(<RosterPlayersPage />);
     fireEvent.click(screen.getByRole("button", { name: "Add player" }));
     fireEvent.change(screen.getByLabelText(/Link to a member/), { target: { value: "ben" } });
     expect(screen.getByLabelText("Name")).toHaveValue("Ben");
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(callApi).toHaveBeenCalledTimes(2));
-    expect(callApi).toHaveBeenNthCalledWith(2, user, "/v1/teams/t1/roster-players/p9/link", { method: "PUT", body: { userId: "ben" } });
+    await waitFor(() => expect(callApi).toHaveBeenCalledTimes(1));
+    expect(callApi).toHaveBeenCalledWith(user, "/v1/teams/t1/roster-players", expect.objectContaining({ method: "POST", body: expect.objectContaining({ userId: "ben" }) }));
   });
 });

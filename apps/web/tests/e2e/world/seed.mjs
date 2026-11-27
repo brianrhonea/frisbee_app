@@ -159,6 +159,28 @@ export async function seedWorld() {
     await api(cam, "POST", `/v1/teams/${other.id}/invites`, { uid: ada.uid });
     await api(ada, "POST", `/v1/me/team-invites/${other.id}/accept`);
     await api(ada, "POST", "/v1/teams", { name: "Seattle Ultimate Community", kind: "community", city: "Seattle", description: "Pickup, leagues and events around Seattle." });
+    // Stats on (the roster spots page lives there).
+    await api(ada, "PUT", `/v1/teams/${teamId}/sections`, { stats: true });
+    // Sprint 4: a roster with one linked and one unlinked spot, and custom roles (new coaches and captains are
+    // made with roles now): Cam, an admin through a role that manages the team; Ben, a handler.
+    await api(ada, "POST", `/v1/teams/${teamId}/roster-players`, { name: "Ada Rivers", number: 1, position: "handler", userId: ada.uid, paid: true });
+    await api(ada, "POST", `/v1/teams/${teamId}/roster-players`, { name: "Sam Walk-on", number: 42, position: "cutter", userId: null, paid: false });
+    await api(ada, "PUT", `/v1/teams/${teamId}/roles`, {
+      roles: {
+        coordinators: { name: "Coordinators", color: 0, position: 0, perms: ["manageTeam"] },
+        handlers: { name: "Handlers", color: 0, position: 1, perms: [] },
+      },
+      memberRoles: { [cam.uid]: ["coordinators"], [ben.uid]: ["handlers"] },
+    });
+    // Teams and groups Ada is not on: a team that takes join requests, an open group, an approval group and a plain team.
+    const cascade = await api(cam, "POST", "/v1/teams", { name: "Cascade Request Team", division: "open", level: "college", city: "Tacoma" });
+    await api(cam, "PUT", `/v1/teams/${cascade.id}/allow-join-requests`, { on: true });
+    // (Ben makes the groups: team creation is limited per person per minute.) One open and one approval group per browser width (A for 375, B for 1440): the tests join them.
+    for (const x of ["A", "B"]) {
+      await api(ben, "POST", "/v1/teams", { name: `Cascade Open Group ${x}`, kind: "community", city: "Tacoma", description: "Open pickup." });
+      await api(ben, "POST", "/v1/teams", { name: `Cascade Approval Group ${x}`, kind: "organization", city: "Tacoma", requiresApproval: true });
+    }
+    await api(cam, "POST", "/v1/teams", { name: "Cascade Plain Team", division: "open", level: "college", city: "Tacoma" });
   }
   // Profile feed posts, then a direct message thread (Ben writes to Ada, so Ada has an unread count).
   const feed = await api(ada, "GET", "/v1/feed").catch(() => ({ posts: [] }));

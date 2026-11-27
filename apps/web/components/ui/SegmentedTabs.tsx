@@ -48,8 +48,15 @@ export function SegmentedTabs({ items, value, onChange, label, variant = "segmen
       first.current = false;
       return;
     }
-    const el = bar.current?.querySelector<HTMLElement>('[aria-selected="true"]');
-    el?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+    // Only the bar scrolls: scrollIntoView would also move the page when the bar sits near the screen's
+    // edge (the feed tabs on a phone's Home scrolled the page by itself after load).
+    const b = bar.current;
+    const el = b?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!b || !el) return;
+    const t = el.getBoundingClientRect();
+    const r = b.getBoundingClientRect();
+    if (t.left < r.left) b.scrollLeft -= r.left - t.left;
+    else if (t.right > r.right) b.scrollLeft += t.right - r.right;
   }, [value]);
 
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {

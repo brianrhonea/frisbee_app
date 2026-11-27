@@ -35,40 +35,28 @@ export const draftOf = (p?: StatsPlayer, userId: string | null = null, name = ""
 const rosterBase = (teamId: string) => `/v1/teams/${encodeURIComponent(teamId)}/roster-players`;
 
 /**
- * Saves a roster spot the way the API owns it: the spot first (`POST` or `PUT .../roster-players`, always
- * unlinked or as it was), then the link to a member through the admin link call (`PUT .../:id/link`).
- * Wave 1 of the owner's "easy linking": a later API change may let the create take the member directly.
- * `was` is the link the spot already had. Returns the spot's id (empty when it was not written) and an error message (empty when both calls went
- * through), so a failed link can be retried as an edit rather than adding the spot twice.
+ * Saves a roster spot in one call (`POST` or `PUT .../roster-players`): the API takes the linked member in
+ * the same body (an admin's, who must be on the team; a member already on another spot is refused, and its
+ * message is returned). Returns the spot's id (empty when it was not written) and an error message.
  */
-export async function saveRosterPlayer(
-  user: User,
-  teamId: string,
-  d: PlayerDraft,
-  was: string | null,
-): Promise<{ id: string; error: string }> {
+export async function saveRosterPlayer(user: User, teamId: string, d: PlayerDraft): Promise<{ id: string; error: string }> {
   const body: SaveRosterPlayerRequest = {
     name: d.name.trim(),
     number: d.number === "" ? null : Number.parseInt(d.number, 10),
     position: d.position,
-    userId: d.id ? was : null,
+    userId: d.userId,
     paid: d.paid,
   };
-  let id = d.id;
   try {
-    if (id) await callApi(user, `${rosterBase(teamId)}/${encodeURIComponent(id)}`, { method: "PUT", body });
-    else id = (await callApi<{ id: string }>(user, rosterBase(teamId), { method: "POST", body })).id;
-  } catch (e) {
-    return { id: d.id, error: problem(e, "Couldn't save that. Try again.") };
-  }
-  if (d.userId !== was) {
-    try {
-      await callApi(user, `${rosterBase(teamId)}/${encodeURIComponent(id)}/link`, { method: "PUT", body: { userId: d.userId } });
-    } catch (e) {
-      return { id, error: `Saved, but couldn't link the member: ${problem(e, "Try again.")}` };
+    if (d.id) {
+      await callApi(user, `${rosterBase(teamId)}/${encodeURIComponent(d.id)}`, { method: "PUT", body });
+      return { id: d.id, error: "" };
     }
+    const r = await callApi<{ id: string }>(user, rosterBase(teamId), { method: "POST", body });
+    return { id: r.id, error: "" };
+  } catch (e) {
+    return { id: "", error: problem(e, "Couldn't save that. Try again.") };
   }
-  return { id, error: "" };
 }
 
 /**

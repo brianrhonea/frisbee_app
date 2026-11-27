@@ -50,12 +50,11 @@ export function AddMember({ roster, onAdded }: { roster: TeamRoster; onAdded: ()
     if (!user) return;
     setBusy(true);
     setError("");
-    const r = await saveRosterPlayer(user, teamId, d, null);
+    const r = await saveRosterPlayer(user, teamId, d);
     setBusy(false);
-    if (r.id) onAdded();
-    if (!r.error) setAdding(null);
-    else if (r.id) setAdding({ ...d, id: r.id });
-    if (r.error) setError(r.error);
+    if (r.error) return setError(r.error);
+    onAdded();
+    setAdding(null);
   }
 
   return (

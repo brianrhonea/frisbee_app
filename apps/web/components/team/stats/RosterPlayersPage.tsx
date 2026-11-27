@@ -21,8 +21,9 @@ const positionLabel = Object.fromEntries(positions) as Record<string, string>;
 /**
  * Roster spots, kept for stats (the app's Roster tab): people with or
  * without an account. Admins who manage the team add, edit, mark paid,
- * link to a member and remove them; any member claims an unlinked spot as
- * theirs (their stats then show on their profile) or lets go of their own.
+ * link to a member and remove them. A member never claims a spot (the API
+ * refuses it): an admin links them when adding the player, and the member may
+ * let go of their own spot (their stats then leave their profile).
  */
 export function RosterPlayersPage() {
   return (
@@ -71,18 +72,13 @@ function RosterPlayers() {
     }
   }
 
-  // The spot, then its link (the admin link call): see saveRosterPlayer.
+  // The spot and its linked member go in one call: see saveRosterPlayer.
   const save = async (d: PlayerDraft) => {
-    const was = roster.find((p) => p.id === d.id)?.userId ?? null;
-    let spot = "";
     const ok = await run(async () => {
-      const r = await saveRosterPlayer(user!, teamId, d, was);
-      spot = r.id;
+      const r = await saveRosterPlayer(user!, teamId, d);
       if (r.error) throw new ApiError(r.error, 0);
     });
-    // A link that failed leaves the spot written: keep the form on it, so a retry edits it.
     if (ok) setEditing(null);
-    else if (spot && !d.id) setEditing({ ...d, id: spot });
   };
 
   const link = (p: StatsPlayer, userId: string | null) =>

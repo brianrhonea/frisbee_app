@@ -118,7 +118,15 @@ export function TeamFinder() {
                   leading={<Avatar name={t.name} size={40} />}
                   title={t.name || "Team"}
                   subtitle={group ? [sub, t.requiresApproval ? "Approval required" : "Open to join"].filter(Boolean).join(" · ") : sub}
-                  trailing={user && !mineIds.has(t.id) && mine.data !== undefined ? <FinderJoin team={t} /> : undefined}
+                  trailing={
+                    user && mine.data !== undefined ? (
+                      mineIds.has(t.id) ? (
+                        <span className="muted small">Member</span>
+                      ) : (
+                        <FinderJoin team={t} />
+                      )
+                    ) : undefined
+                  }
                 />
               </li>
             );
