@@ -126,6 +126,15 @@ const app = buildApp({
       // Merged, so other claims (staff) stay; no write when nothing changes.
       await setMergedClaims(auth, uid, claims);
     },
+    async ageOkOf(uids) {
+      const ok = new Set<string>();
+      // getUsers takes at most 100 identifiers a call.
+      for (let i = 0; i < uids.length; i += 100) {
+        const found = await auth.getUsers(uids.slice(i, i + 100).map((uid) => ({ uid })));
+        for (const u of found.users) if (u.customClaims?.ageOk === true) ok.add(u.uid);
+      }
+      return ok;
+    },
     async setDisabled(uid, disabled) {
       await auth.updateUser(uid, { disabled });
       if (disabled) await auth.revokeRefreshTokens(uid);
