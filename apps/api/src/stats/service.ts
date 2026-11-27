@@ -177,8 +177,10 @@ export class StatsService {
   async savePlayer(caller: Caller, rawTeam: unknown, rawPlayer: unknown | undefined, body: unknown): Promise<{ id: string }> {
     const teamId = docIdParam(rawTeam);
     const creating = rawPlayer === undefined;
-    const id = creating ? this.store.newId(`teams/${teamId}/roster`) : docIdParam(rawPlayer);
     const p = parseBody(saveRosterPlayerSchema, body);
+    // A client-chosen id makes a replay a 409 (tx.create below); an edit can't name a different one.
+    const id = creating ? (p.id ?? this.store.newId(`teams/${teamId}/roster`)) : docIdParam(rawPlayer);
+    if (!creating && p.id !== undefined && p.id !== id) throw new ApiError("invalid_argument", "A spot's id can't be changed.");
     await this.store.transact(async (tx) => {
       const team = await tx.get(paths.team(teamId));
       const existing = await tx.get(paths.player(teamId, id));

@@ -154,7 +154,7 @@ export class ConversationService {
   async createGroup(caller: Caller, body: unknown): Promise<GroupAddedResult> {
     const req = parseBody(createGroupRequestSchema, body);
     await checkNotMuted(this.store, caller.uid, this.now());
-    const id = `g-${randomBytes(15).toString("base64").replace(/[^A-Za-z0-9]/g, "").slice(0, 20) || "x"}`;
+    const id = req.id ?? `g-${randomBytes(15).toString("base64").replace(/[^A-Za-z0-9]/g, "").slice(0, 20) || "x"}`;
     const me = await this.name(caller);
     await this.store.transact(async (tx) => {
       tx.create(p.conv(id), {

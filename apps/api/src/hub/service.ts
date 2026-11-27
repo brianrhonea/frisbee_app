@@ -220,7 +220,8 @@ export class HubService {
     if (!can(team, caller.uid, "manageEvents")) throw denied("You can't add events to this team.");
     await checkNotMuted(this.store, caller.uid, this.now());
     const { req, details, poll, isPublic, audience } = this.eventFields(team, body);
-    const id = this.store.newId(`teams/${teamId}/events`);
+    // A client-chosen id makes a replay a 409 (tx.create below); a series' events are `{id}_{index}`.
+    const id = req.id ?? this.store.newId(`teams/${teamId}/events`);
     const occurrences = req.repeat
       ? seriesOccurrences(id, { ...req, repeat: req.repeat })
       : [{ id, startsAt: details.startsAt, endsAt: details.endsAt, series: null }];
@@ -266,6 +267,7 @@ export class HubService {
     const team = await this.team(teamId);
     if (!can(team, caller.uid, "manageEvents")) throw denied("You can't edit this team's events.");
     const { req, details, poll, isPublic, audience } = this.eventFields(team, body, true);
+    if (req.id !== undefined && req.id !== id) throw new ApiError("invalid_argument", "An event's id can't be changed.");
     const current = scope === "following" ? await this.store.get(p.event(teamId, id)) : null;
     const later = current ? laterIds(current) : [];
     const writeId = later.length ? this.store.newId(`teams/${teamId}/events`) : null;

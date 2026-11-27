@@ -107,6 +107,14 @@ export const eventPollSchema = z.strictObject({
  */
 export const saveTeamEventRequestSchema = z
   .strictObject({
+    /**
+     * New events only (a replay of the same id is a 409, so the outbox can retry safely): the
+     * event's id, or a series' (its events are `{id}_{index}`). The server mints one when absent.
+     */
+    id: z
+      .string()
+      .regex(/^[A-Za-z0-9]{1,40}$/, "Invalid id.")
+      .optional(),
     title: clean(z.string().trim().min(1, "Give it a title.").max(100, "Keep the title under 100 characters.")),
     type: z.enum(teamEventTypes).default("practice"),
     startsAt: isoDate,
