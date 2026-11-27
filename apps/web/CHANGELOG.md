@@ -4,6 +4,16 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.63.0 — 2026-11-26
+
+Shared components C5-C10, the website halves (Sprint 3). Same names as the app's: CoverHeader, SummaryTiles, ListRow, EventCard, DateBadge, EmptyState, ErrorState, LoadingState, TextField, SearchField, ConfirmDialog. All in `components/ui/`, every state on the `/dev/ui` gallery. No business logic, routes or permissions change.
+
+- New: CoverHeader, SummaryTiles, ListRow, EventCard (RSVP chip, Cancelled, Repeats), DateBadge, TextField, TextArea, SearchField, ConfirmDialog, and `useConfirm()` with a `ConfirmProvider` in the layout (destructive variant; Esc cancels; focus returns to the opener; messages keep their line breaks).
+- `StatusViews.tsx` (`Loading`, `EmptyState`, `ErrorNote`) now renders the shared LoadingState, EmptyState and ErrorState (a soft red box, `role="alert"`, a 48 px Try again button).
+- `DateTile` and the event list's date badge are the shared DateBadge.
+- `Dialog` keeps Tab inside the dialog (it wraps at the ends), so every modal has a focus trap.
+- `Button` accepts `ref`.
+
 ## 0.62.0 — 2026-11-26
 
 Website shell matching the boards (Sprint 3 S3, UI-Q5 and UI-Q11). No route changes.
