@@ -248,8 +248,10 @@ export class RosterService {
  * a hidden person (private profile, teams hidden, no D-1317 adult claim) is
  * left out of `members`, and a spot linked to one shows as "Player" with its
  * number and position only. Everyone else keeps their public card but
- * without `uid`, except staff (staffTiers), whose uid the Message sheet
- * needs to open a conversation. A spot's person never carries a uid.
+ * with no `uid` field, except staff (staffTiers), whose uid the Message sheet
+ * needs to open a conversation. A spot's person has no `uid` field. Visible
+ * (public) people remain resolvable by username or photo URL (accepted);
+ * hidden people are never included.
  */
 function outsiderView(
   kind: TeamRoster["kind"],
