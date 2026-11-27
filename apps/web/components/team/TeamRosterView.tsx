@@ -24,6 +24,7 @@ import { ErrorNote, Loading } from "../StatusViews";
 import { InviteButton } from "./InviteDialog";
 import { useTeamHub } from "./TeamContext";
 import { StatusPill } from "../ui/StatusPill";
+import { ListRow } from "../ui/ListRow";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 /** In place of a youth team's roster for anyone who isn't on it (the app says the same). */
@@ -153,12 +154,12 @@ export function TeamRosterView({ publicRoster = null, youth = false }: { publicR
 
       {viewer.state === "member" && viewer.can("manageMembers") && <PendingInvitesCard teamId={teamId} version={version} />}
 
-      <section className="card">
+      <section className="roster-section">
         <h2 className="card-title">Members</h2>
         {members.length === 0 ? (
           <p className="muted small">No one matches.</p>
         ) : (
-          <ul className="member-grid member-rows">
+          <ul className="roster-rows">
             {members.map((m) => (
               <MemberCard key={m.uid} member={m} kind={roster.kind} me={m.uid === user.uid} />
             ))}
@@ -190,7 +191,7 @@ function VisitorRoster({ roster, teamId }: { roster: PublicRoster; teamId: strin
         />
         <span className="muted small">{roster.players.length} players</span>
       </div>
-      <section className="card">
+      <section className="roster-section">
         <h2 className="card-title">Roster</h2>
         {roster.players.length === 0 ? (
           <p className="muted small">No players on the roster yet.</p>
@@ -357,7 +358,7 @@ function PlayersCard({
   );
 
   return (
-    <section className="card">
+    <section className="roster-section">
       <h2 className="card-title">Roster</h2>
       {canEditLines && roster.players.length > 0 && (
         <div className="lines-bar">
@@ -434,7 +435,7 @@ function PendingInvitesCard({ teamId, version }: { teamId: string; version: numb
   }
 
   return (
-    <section className="card">
+    <section className="roster-section">
       <h2 className="card-title">Invites pending · {invites.length}</h2>
       {error && <ErrorNote>{error}</ErrorNote>}
       <ul className="invite-rows">
@@ -463,27 +464,33 @@ function PendingInvitesCard({ teamId, version }: { teamId: string; version: numb
   );
 }
 
-/** A member's row: who they are, then their role as a pill (turf for those who run the team, outlined otherwise) and custom roles. */
+/**
+ * A member's row (a ListRow, C3): who they are, then their role as a pill (accent for those who run the
+ * team, so captains and coaches stand out; neutral otherwise) and custom roles.
+ */
 function MemberCard({ member, kind, me }: { member: RosterMember; kind: string; me: boolean }) {
   const tier = roleLabel(member.tier, kind);
   return (
     <li>
-      <Link href={`/players/${member.uid}`} className="member-card">
-        <Avatar name={member.name} url={member.photoUrl} size={36} />
-        <span>
-          <b>
+      <ListRow
+        href={`/players/${member.uid}`}
+        leading={<Avatar name={member.name} url={member.photoUrl} size={40} />}
+        title={
+          <>
             {member.name}
             {me && <span className="muted"> (you)</span>}
-          </b>
-          {member.username && <small className="muted">@{member.username}</small>}
-        </span>
-        <span className="member-roles">
-          <span className={`role-pill${leads.has(member.tier) ? " lead" : ""}`}>{tier}</span>
-          {member.roles.map((r) => (
-            <StatusPill key={r}>{r}</StatusPill>
-          ))}
-        </span>
-      </Link>
+          </>
+        }
+        subtitle={member.username ? `@${member.username}` : undefined}
+        trailing={
+          <span className="member-roles">
+            <StatusPill tone={leads.has(member.tier) ? "accent" : "neutral"}>{tier}</StatusPill>
+            {member.roles.map((r) => (
+              <StatusPill key={r}>{r}</StatusPill>
+            ))}
+          </span>
+        }
+      />
     </li>
   );
 }

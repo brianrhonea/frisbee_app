@@ -4,6 +4,14 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.69.0 — 2026-11-27
+
+H6 Roster restyle. Same members, filter, line picker, pending invites and Invite.
+
+- Members are list rows (C3): picture, name, @username and role pills; those who run the team (owner, coach, captain and so on) are in the accent tone, others neutral.
+- The roster, invites and members sections lose their boxes: a heading and spacing separate them.
+- Not built: a Members/Roles tab pair and an Add member button. Roles are managed in Settings (owner only) and adding is Invite; both would be new screens, so they are left for owner direction.
+
 ## 0.68.0 — 2026-11-27
 
 H5 Team overview and feed restyle. Same sections, posts, composer, comments, pins, invite, follow, join and share.

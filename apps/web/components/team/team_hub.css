@@ -505,3 +505,10 @@
   .team-hub .team-head .ui-cover-avatar { grid-row: 1; }
   .team-hub .team-head .ui-cover-actions { grid-column: 1 / -1; grid-row: 4; justify-content: flex-start; padding-top: var(--space-md); }
 }
+
+/* --- Roster (TeamRosterView.tsx): sections without boxes, members as list rows (C3) -------- */
+.team-hub .roster-section { display: grid; gap: var(--space-sm); }
+.team-hub .roster-section > .card-title { margin: 0; font-size: var(--text-section-size); }
+.team-hub .roster-rows { list-style: none; margin: 0; padding: 0; }
+.team-hub .roster-rows .ui-row-trailing .member-roles { display: inline-flex; flex-wrap: wrap; gap: var(--space-xs); justify-content: flex-end; }
+.team-hub .toolbar { align-items: center; }
