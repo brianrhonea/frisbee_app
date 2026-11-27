@@ -7,6 +7,8 @@ import { type Signal, useChangeSignal } from "@/lib/live";
 import { appScheme } from "@/lib/site";
 import { useAuth } from "./AuthProvider";
 import { PostCard } from "./PostCard";
+import { EmptyState, ErrorState, LoadingState } from "./ui/States";
+import { buttonClass } from "./ui/buttonClass";
 
 /**
  * One post on its own page. Visitors get the cached public copy
@@ -70,21 +72,17 @@ export function LivePost({ postId, initial }: { postId: string; initial: PublicP
   }
   if (user && failed) {
     return (
-      <Unavailable text={failed}>
-        <button
-          type="button"
-          className="btn btn-small"
-          onClick={() => {
-            setFailed(null);
-            setAttempt((n) => n + 1);
-          }}
-        >
-          Try again
-        </button>
-      </Unavailable>
+      <ErrorState
+        onRetry={() => {
+          setFailed(null);
+          setAttempt((n) => n + 1);
+        }}
+      >
+        {failed}
+      </ErrorState>
     );
   }
-  if (user === undefined || user) return <p className="muted">Loading…</p>;
+  if (user === undefined || user) return <LoadingState />;
   return (
     <Unavailable text="This post isn't public.">
       <Link href={`/sign-in?next=${encodeURIComponent(`/posts/${postId}`)}`}>Log in</Link> to see it if its author
@@ -98,7 +96,7 @@ function OpenInAppCard({ postId }: { postId: string }) {
   return (
     <div className="cta-card">
       <p>See the replies in the Stall 10 app.</p>
-      <a className="btn btn-primary btn-small" href={`${appScheme}://open/p/${encodeURIComponent(postId)}`}>
+      <a className={buttonClass({ variant: "primary", size: "small" })} href={`${appScheme}://open/p/${encodeURIComponent(postId)}`}>
         Open in the app
       </a>
     </div>
@@ -106,10 +104,8 @@ function OpenInAppCard({ postId }: { postId: string }) {
 }
 
 function Unavailable({ text, children }: { text: string; children?: React.ReactNode }) {
+  // With more to say, the words are the title and [children] the rest; alone, the words are all there is.
   return (
-    <div className="card">
-      <h2 className="card-title">{text}</h2>
-      {children && <p className="muted small">{children}</p>}
-    </div>
+    <EmptyState title={children ? text : undefined}>{children ?? text}</EmptyState>
   );
 }

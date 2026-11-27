@@ -19,10 +19,13 @@ export function LoadingState({ label = "Loading…" }: { label?: string }) {
   );
 }
 
-/** Nothing there yet: what it means in [children], an optional [title], and the next step as [action]. */
-export function EmptyState({ children, title, action }: { children: ReactNode; title?: string; action?: ReactNode }) {
+/**
+ * Nothing there yet: what it means in [children], an optional [title], and the next step as [action].
+ * [quiet] is for one inside a card (the card is the frame): no dashed box, left aligned, secondary size.
+ */
+export function EmptyState({ children, title, action, quiet = false }: { children: ReactNode; title?: string; action?: ReactNode; quiet?: boolean }) {
   return (
-    <div className="empty empty-state ui-empty">
+    <div className={`empty empty-state ui-empty${quiet ? " ui-empty-quiet" : ""}`}>
       {title ? <b className="ui-empty-title">{title}</b> : null}
       <p>{children}</p>
       {action && <div className="empty-action">{action}</div>}

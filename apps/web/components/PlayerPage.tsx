@@ -15,7 +15,8 @@ import { BlockButton, ReportButton } from "./Report";
 import { PostCard } from "./PostCard";
 import { DashboardLayout, ProfileCard, StatTiles, TeamList } from "./ProfileDashboard";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-import { ErrorNote } from "@/components/StatusViews";
+import { EmptyState, ErrorState, LoadingState } from "@/components/ui/States";
+import { Button } from "@/components/ui/Button";
 import { RosterSpots } from "./RosterSpots";
 
 const statColumns: Array<[keyof StatTotals, string]> = [
@@ -101,32 +102,30 @@ export function LivePlayer({ uid }: { uid: string }) {
   if (!member) {
     return failed?.notFound ? (
       <div className="page">
-        <p className="empty">This player couldn&apos;t be found.</p>
+        <EmptyState title="Player not found">This player couldn&apos;t be found.</EmptyState>
       </div>
     ) : failed ? (
       <div className="page">
-        <ErrorNote>{failed.text}</ErrorNote>
-        <button
-          type="button"
-          className="btn btn-small"
-          onClick={() => {
+        <ErrorState
+          onRetry={() => {
             setFailed(null);
             setAttempt((n) => n + 1);
           }}
         >
-          Try again
-        </button>
+          {failed.text}
+        </ErrorState>
       </div>
     ) : (
       <div className="page">
-        <p className="muted" aria-busy="true">Loading…</p>
+        <LoadingState />
       </div>
     );
   }
   return <PlayerView uid={uid} page={member} locked={member.locked} />;
 }
 
-function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePage; locked: boolean }) {
+/** The page for one player once loaded (exported for the component tests). */
+export function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePage; locked: boolean }) {
   const askConfirm = useConfirm();
   const { profile, posts } = page;
   const name = profile.name || "Player";
@@ -159,8 +158,8 @@ function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePage; loc
   // Report and Block, for anyone else's profile (the app's ⋯ menu).
   const safety = someoneElse && (
     <span className="profile-safety">
-      <ReportButton target={{ kind: "user", uid }} authorName={name} />
-      {!blocks.hides(uid) && <BlockButton uid={uid} name={name} label="Block" />}
+      <ReportButton target={{ kind: "user", uid }} authorName={name} className="btn btn-ghost btn-small" />
+      {!blocks.hides(uid) && <BlockButton uid={uid} name={name} label="Block" className="btn btn-ghost btn-small danger" />}
     </span>
   );
   // Follow and Message, as the app's profile header has them.
@@ -168,7 +167,6 @@ function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePage; loc
     <>
       {follow}
       <MessageButton uid={uid} />
-      {safety}
     </>
   );
 
@@ -176,55 +174,45 @@ function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePage; loc
   if (someoneElse && blocks.hides(uid)) {
     const mine = blocks.blockedByMe(uid);
     return (
-      <div className="page page-wide">
-        <DashboardLayout side={<ProfileCard profile={{ ...profile, bio: undefined, teams: [] }} actions={safety} />}>
-          <div className="card">
-            <h2 className="card-title">{mine ? `You blocked ${first}` : "You can't see this profile"}</h2>
-            <p className="muted small">
-              {mine
-                ? `You don't see each other's posts, comments or messages, and neither of you can follow or message the other.`
-                : `${first}'s posts and details aren't available to you.`}
-            </p>
-            {mine && user && (
-              <p>
-                <button
-                  type="button"
-                  className="btn btn-small"
-                  onClick={async () => {
-                    if ((await askConfirm({ title: `Unblock ${first}?`, message: "You'll see each other's posts and can follow and message again.", confirmLabel: "Unblock" }))) {
-                      void unblockPerson(user, uid).catch((e) => alert((e as Error).message));
-                    }
-                  }}
-                >
-                  Unblock
-                </button>
-              </p>
-            )}
-          </div>
-        </DashboardLayout>
+      <div className="page page-wide player-page">
+        <ProfileCard profile={{ ...profile, bio: undefined, teams: [] }} secondary={safety} />
+        <EmptyState
+          title={mine ? `You blocked ${first}` : "You can't see this profile"}
+          action={
+            mine && user ? (
+              <Button
+                onClick={async () => {
+                  if ((await askConfirm({ title: `Unblock ${first}?`, message: "You'll see each other's posts and can follow and message again.", confirmLabel: "Unblock" }))) {
+                    void unblockPerson(user, uid).catch((e) => alert((e as Error).message));
+                  }
+                }}
+              >
+                Unblock
+              </Button>
+            ) : undefined
+          }
+        >
+          {mine
+            ? `You don't see each other's posts, comments or messages, and neither of you can follow or message the other.`
+            : `${first}'s posts and details aren't available to you.`}
+        </EmptyState>
       </div>
     );
   }
 
   if (locked) {
     return (
-      <div className="page page-wide">
-        <DashboardLayout side={<ProfileCard profile={profile} actions={actions} staff={staff} />}>
-          <div className="card">
-            <h2 className="card-title">This profile is private</h2>
-            <p className="muted small">
-              {first} shares their stats, teams and posts with the people they approve. Ask to follow, and{" "}
-              {first} can accept you.
-            </p>
-          </div>
-        </DashboardLayout>
+      <div className="page page-wide player-page">
+        <ProfileCard profile={profile} actions={actions} secondary={safety} staff={staff} />
+        <EmptyState title="This profile is private">
+          {first} shares their stats, teams and posts with the people they approve. Ask to follow, and {first} can accept you.
+        </EmptyState>
       </div>
     );
   }
 
   const side = (
     <>
-      <ProfileCard profile={profile} actions={actions} staff={staff} />
       {profile.visibility?.stats !== false && <StatTiles stats={choice.seasons} teamName={picked?.name} />}
       {profile.visibility?.teams !== false && (
         <TeamList teams={(profile.teams ?? []).map((t) => ({ id: t.id, name: t.name, subtitle: t.subtitle }))} />
@@ -234,7 +222,8 @@ function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePage; loc
   );
 
   return (
-    <div className="page page-wide">
+    <div className="page page-wide player-page">
+      <ProfileCard profile={profile} actions={actions} secondary={safety} staff={staff} />
       <DashboardLayout side={side}>
         {seasons.length > 0 && profile.visibility?.stats !== false && (
           <div className="card">
@@ -309,7 +298,7 @@ function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePage; loc
 
         <h2 className="section-title">Posts</h2>
         {posts.length === 0 ? (
-          <p className="empty">No posts yet.</p>
+          <EmptyState>No posts yet.</EmptyState>
         ) : (
           <div className="stack">
             {posts.map((p) => (

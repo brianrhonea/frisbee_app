@@ -8,12 +8,13 @@ import { useAuth } from "../AuthProvider";
 import { Avatar } from "../Avatar";
 import { LocalTime } from "../LocalTime";
 import { openConversation } from "../MessageButton";
-import { DateTile } from "./DateTile";
 import { useTeamHub } from "./TeamContext";
 import { JoinButton } from "./TeamNav";
-import { NeedsPill } from "../RsvpPill";
 import type { Room } from "./TeamStatTiles";
-import { ErrorNote } from "@/components/StatusViews";
+import { Button } from "../ui/Button";
+import { EventCard } from "../ui/EventCard";
+import { ListRow } from "../ui/ListRow";
+import { EmptyState, ErrorState, LoadingState } from "../ui/States";
 
 // The community page's own sections (redesign F27), on a pickup
 // community's or a school or club's page: the next event with RSVP, the
@@ -60,12 +61,18 @@ export function NextPickupCard({ event }: { event?: PickupEvent }) {
     return (
       <div className="card pickup-card pickup-empty">
         <h2 className="card-title">{text.title}</h2>
-        <p className="muted small">{text.empty}</p>
-        {member.can("manageEvents") && (
-          <Link className="btn btn-small" href={`${base}/schedule?new=event`}>
-            New event
-          </Link>
-        )}
+        <EmptyState
+          quiet
+          action={
+            member.can("manageEvents") ? (
+              <Link className="btn btn-small" href={`${base}/schedule?new=event`}>
+                New event
+              </Link>
+            ) : undefined
+          }
+        >
+          {text.empty}
+        </EmptyState>
       </div>
     );
   }
@@ -90,22 +97,23 @@ export function NextPickupCard({ event }: { event?: PickupEvent }) {
   const count = (s: string) => Object.values(event.rsvps ?? {}).filter((x) => x === s).length;
   return (
     <div className="card pickup-card">
-      <div className="card-head">
-        <h2 className="card-title">{text.title}</h2>
-        {needs && <NeedsPill>RSVP needed</NeedsPill>}
-      </div>
-      <Link className="pickup-event" href={`${base}/schedule?event=${encodeURIComponent(event.id)}`}>
-        <DateTile startsAt={event.startsAt} />
-        <span className="pickup-info">
-          <b>{event.title || "Event"}</b>
-          <small>
+      <h2 className="card-title">{text.title}</h2>
+      {/* The shared event card: date badge, title, details and your answer ("Needs RSVP" while open). */}
+      <EventCard
+        href={`${base}/schedule?event=${encodeURIComponent(event.id)}`}
+        startsAt={event.startsAt}
+        title={event.title || "Event"}
+        meta={
+          <>
             <LocalTime iso={event.startsAt} style="dateTime" />
-          </small>
-          {event.location && <small>{event.location}</small>}
-          {/* Outsiders read the public copy, which has no answers. */}
-          {member && <small className="pickup-going">{goingCount(event.rsvps)} going</small>}
-        </span>
-      </Link>
+            {event.location ? ` · ${event.location}` : ""}
+            {/* Outsiders read the public copy, which has no answers. */}
+            {member ? ` · ${goingCount(event.rsvps)} going` : ""}
+          </>
+        }
+        answer={member ? mine : undefined}
+        needsRsvp={needs}
+      />
       {member ? (
         <div className={`rsvp-ask${needs ? " needs" : ""}`}>
           <div className="segmented rsvp-buttons" role="group" aria-label="Your answer">
@@ -127,11 +135,7 @@ export function NextPickupCard({ event }: { event?: PickupEvent }) {
       ) : (
         <PickupJoin />
       )}
-      {error && (
-        <ErrorNote>
-          {error}
-        </ErrorNote>
-      )}
+      {error && <ErrorState>{error}</ErrorState>}
     </div>
   );
 }
@@ -177,24 +181,19 @@ export function CommunityChat({ chat }: { chat: TeamChatSummary<Room> | undefine
         </Link>
       </div>
       {!section ? (
-        <p className="muted small">Loading…</p>
+        <LoadingState />
       ) : section.rooms.length === 0 ? (
-        <p className="muted small">No rooms yet.</p>
+        <EmptyState quiet>No rooms yet.</EmptyState>
       ) : (
         <ul className="community-rooms">
           {section.rooms.map(({ room, unread }) => (
             <li key={room.id}>
-              <Link
+              <ListRow
                 href={`${base}?room=${encodeURIComponent(room.id)}`}
-                className={unread ? "unread" : ""}
-                aria-label={`#${roomHandle(room.name)}${unread ? ", new messages" : ""}`}
-              >
-                <span className="room-hash" aria-hidden="true">
-                  #
-                </span>
-                <span className="room-name">{roomHandle(room.name)}</span>
-                {unread && <span className="unread-dot" aria-hidden="true" />}
-              </Link>
+                leading={<span className="room-hash" aria-hidden="true">#</span>}
+                title={roomHandle(room.name)}
+                unread={unread}
+              />
             </li>
           ))}
         </ul>
@@ -220,17 +219,18 @@ export function CommunityOrganizers() {
       <ul className="organizer-list">
         {people.map((p) => (
           <li key={p.uid}>
-            <Link className="person" href={`/players/${p.uid}`}>
-              <Avatar name={p.name} size={32} />
-              <span>
-                <b>
+            <ListRow
+              href={`/players/${p.uid}`}
+              leading={<Avatar name={p.name} size={40} />}
+              title={
+                <>
                   {p.name}
-                  {p.uid === viewer.uid && <small className="muted"> (you)</small>}
-                </b>
-                <small className="organizer-role">{p.label}</small>
-              </span>
-            </Link>
-            {p.uid !== viewer.uid && <OrganizerMessage uid={p.uid} />}
+                  {p.uid === viewer.uid && <span className="muted"> (you)</span>}
+                </>
+              }
+              subtitle={p.label}
+              trailing={p.uid !== viewer.uid ? <OrganizerMessage uid={p.uid} /> : undefined}
+            />
           </li>
         ))}
       </ul>
@@ -257,9 +257,9 @@ function OrganizerMessage({ uid }: { uid: string }) {
   }
   return (
     <span className="organizer-message">
-      <button type="button" className="btn btn-small" disabled={busy} onClick={() => void open()}>
+      <Button size="small" loading={busy} onClick={() => void open()}>
         Message
-      </button>
+      </Button>
       {error && (
         <span className="form-error small" role="alert">
           {error}

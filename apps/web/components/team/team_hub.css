@@ -158,9 +158,8 @@
 .team-hub .card-head .small, .team-hub .card-head a { color: var(--accent); font-weight: 600; text-decoration: none; }
 .team-hub .card-head a:hover { text-decoration: underline; }
 .team-hub .coming-up .ui-event { padding: var(--space-sm) var(--space-md); border-color: transparent; background: var(--field); }
-.team-hub .member-preview-list { gap: 4px; margin: 0; }
-.team-hub .member-preview-list > li { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px 0; }
-.team-hub .member-preview-list .person { flex: 1; font-weight: 600; font-size: 0.92rem; }
+.team-hub .member-preview-list, .team-hub .community-rooms, .team-hub .organizer-list { list-style: none; margin: 0; padding: 0; }
+.team-hub .member-preview-list .ui-row:last-child, .team-hub .community-rooms .ui-row:last-child, .team-hub .organizer-list .ui-row:last-child { border-bottom: 0; }
 .team-hub .member-preview-actions:has(> :first-child) { margin-top: 12px; }
 .team-hub .member-preview-actions { justify-content: flex-end; }
 @media (max-width: 1000px) {
@@ -464,34 +463,12 @@
 .team-hub .team-more-menu .post-error { display: block; padding: 4px 12px; }
 .team-hub .team-more-note { display: block; padding: 6px 12px; color: var(--muted); font-size: 0.78rem; max-width: 240px; }
 /* The community page (F27): the next pickup card, its chat rooms and organizers. Amber only for "RSVP needed" and unread rooms. */
-.team-hub .pickup-card .card-head { align-items: center; }
-.team-hub .pickup-event { display: flex; gap: 14px; align-items: center; color: inherit; text-decoration: none; padding: 4px 0; }
-.team-hub .pickup-event:hover b { text-decoration: underline; }
-.team-hub .pickup-event .date-tile { flex-shrink: 0; }
-.team-hub .pickup-info { flex: 1; min-width: 0; display: grid; gap: 2px; }
-.team-hub .pickup-info b { font-size: 1rem; font-weight: 700; }
-.team-hub .pickup-info small { font-size: 0.8rem; color: var(--muted); }
-.team-hub .pickup-info small.pickup-going { color: var(--success); font-weight: 700; }
+.team-hub .pickup-card { display: grid; justify-content: stretch; align-items: start; gap: var(--space-md); background: var(--card); }
+.team-hub .pickup-card > .card-title { margin: 0; }
+.team-hub .pickup-card .ui-event { background: var(--field); border-color: transparent; }
 .team-hub .pickup-card .rsvp-ask { margin: 12px 0 0; }
-.team-hub .pickup-empty { display: grid; gap: 8px; justify-items: start; }
-.team-hub .pickup-empty p { margin: 0; }
 .team-hub .pickup-join { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 12px 0 0; }
-.team-hub .community-rooms { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
-.team-hub .community-rooms a {
-  display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: var(--radius-control);
-  color: var(--ink-soft); text-decoration: none; font-size: 0.9rem;
-}
-.team-hub .community-rooms a:hover { background: var(--field); }
-.team-hub .community-rooms a.unread { color: var(--ink); font-weight: 700; }
-.team-hub .community-rooms .room-hash { color: var(--muted); font-weight: 700; }
-.team-hub .community-rooms .room-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.team-hub .community-rooms .unread-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--disc); flex: none; }
-.team-hub .organizer-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-.team-hub .organizer-list li { display: flex; align-items: center; gap: 10px; }
-.team-hub .organizer-list .person { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none; }
-.team-hub .organizer-list .person > span { display: grid; min-width: 0; }
-.team-hub .organizer-list .person b { font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.team-hub .organizer-role { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.team-hub .community-rooms .room-hash { color: var(--muted); font-weight: 700; font-size: var(--text-body-size); }
 .team-hub .organizer-message { display: grid; justify-items: end; gap: 4px; }
 
 /* Tournament invites waiting on the team (TournamentInvites). */

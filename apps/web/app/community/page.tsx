@@ -5,6 +5,8 @@ import { connection } from "next/server";
 import { ForVisitors } from "@/components/ForVisitors";
 import { MoreFeed } from "@/components/MoreFeed";
 import { PostCard } from "@/components/PostCard";
+import { EmptyState } from "@/components/ui/States";
+import { buttonClass } from "@/components/ui/buttonClass";
 import { getPublic, tags } from "@/lib/api";
 
 export const metadata: Metadata = {
@@ -26,7 +28,7 @@ export default async function Community() {
         <p>What players are posting on Stall 10.</p>
       </div>
       {page.posts.length === 0 ? (
-        <p className="empty">No posts yet.</p>
+        <EmptyState>No posts yet.</EmptyState>
       ) : (
         <div className="stack">
           {page.posts.map((p) => (
@@ -38,7 +40,7 @@ export default async function Community() {
       <ForVisitors>
         <div className="cta-card">
           <p>That&apos;s the latest. Sign up to follow players and see your whole feed.</p>
-          <Link className="btn btn-primary btn-small" href="/sign-up">
+          <Link className={buttonClass({ variant: "primary", size: "small" })} href="/sign-up">
             Sign up free
           </Link>
         </div>

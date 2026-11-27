@@ -312,14 +312,21 @@
 }
 @media (max-width: 640px) { .create-kinds { grid-template-columns: 1fr; } }
 
-/* --- Profile (ProfileDashboard) ------------------------------------------- */
-.dash .profile-card { box-shadow: none; }
-.dash .profile-card h1 { font-weight: 800; letter-spacing: -0.03em; }
-.dash .tile { justify-items: start; padding: 12px 14px; border: 0; background: var(--field); border-radius: var(--radius-control); }
-.dash .tile b { font-family: var(--font-score); font-weight: 800; font-size: 1.9rem; line-height: 1; color: var(--ink); }
-.dash .tile small { font-weight: 600; }
-.dash .team-list a { border-radius: var(--radius-control); }
-@media (max-width: 480px) { .dash .tiles { grid-template-columns: repeat(2, 1fr); } }
+/* --- Profile (PlayerPage): the shared cover header, then stats and teams beside the posts ------ */
+.player-page { display: grid; gap: var(--space-xl); }
+.player-page .profile-badges { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin-bottom: var(--space-md); }
+.player-page .profile-about { display: grid; gap: var(--space-md); }
+.player-page .profile-about .bio { margin: 0; overflow-wrap: anywhere; line-height: 1.5; max-width: 62ch; }
+.player-page .profile-facts { display: flex; flex-wrap: wrap; gap: var(--space-xs) var(--space-lg); margin: 0; padding: 0; list-style: none; color: var(--muted); font-size: var(--text-secondary-size); }
+.player-page .profile-facts li { display: flex; align-items: center; gap: var(--space-sm); min-width: 0; overflow-wrap: anywhere; }
+.player-page .profile-secondary { margin-top: var(--space-xs); }
+.player-page .profile-safety { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-inline: calc(var(--space-md) * -1); }
+.player-page .profile-safety .btn-ghost { color: var(--muted); }
+.player-page .ui-cover-actions { flex-wrap: wrap; justify-content: flex-end; }
+.dash .ui-tile-face { border-radius: var(--radius-control); background: var(--field); border-color: transparent; align-content: start; justify-items: start; text-align: left; min-height: 0; }
+.dash .ui-tiles { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-sm); }
+.dash .teams-rows { list-style: none; margin: 0; padding: 0; }
+.dash .teams-rows .ui-row:last-child { border-bottom: 0; }
 /* ==== end Member pages =================================================== */
 /* The compact Calendars card under the schedule: names on one wrapped line. */
 .schedule-page .cal-list { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-bottom: 6px; }
