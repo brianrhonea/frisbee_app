@@ -4,6 +4,13 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.63.8 — 2026-11-27
+
+Signed-in browser fixtures (emulators only, synthetic data) and the profile directory's adult filter.
+
+- `PersonPicker` lists profiles with `where("adult", "==", true)` next to the keyword filter (the new Firestore rules refuse a profiles list without it); unit test added.
+- Opt-in `E2E_WORLD=1` Playwright projects: seed a synthetic world through the real API into the Auth and Firestore emulators (two teams with chat, single and weekly events, posts, DMs, notifications, a community, adult profiles and one unmarked minor that must not be found), sign Ada in through the sign-in form, and capture the H screens at 375 and 1440 px, light and dark. See tests/e2e/world/start.md. The normal suite is unchanged.
+
 ## 0.63.7 — 2026-11-26
 
 - The four scripted smooth scrolls (compose, back to top on Home and Videos, jump to a pinned message) use a shared `prefersReducedMotion()` helper and scroll instantly under reduced motion (N13).

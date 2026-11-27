@@ -48,7 +48,7 @@ export function PersonPicker({
     const key = [...words].sort((a, b) => b.length - a.length)[0]!.slice(0, 20);
     let live = true;
     const t = setTimeout(() => {
-      getDocs(query(collection(db, "profiles"), where("keywords", "array-contains", key), limit(searchLimit * 2)))
+      getDocs(query(collection(db, "profiles"), where("keywords", "array-contains", key), where("adult", "==", true), limit(searchLimit * 2)))
         .then((snap) => {
           if (!live) return;
           const people = snap.docs
