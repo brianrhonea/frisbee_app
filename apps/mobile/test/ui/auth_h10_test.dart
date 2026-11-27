@@ -35,9 +35,7 @@ void main() {
     expect(find.textContaining('Sign up', findRichText: true), findsOneWidget);
   });
 
-  testWidgets('sign in: empty fields show the errors in words', (
-    tester,
-  ) async {
+  testWidgets('sign in: empty fields show the errors in words', (tester) async {
     await pumpInApp(tester, signIn(), width: 390, height: 844);
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));

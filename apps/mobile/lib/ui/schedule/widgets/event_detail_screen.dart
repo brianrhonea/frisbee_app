@@ -12,7 +12,6 @@ import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
 import '../../core/ui/back_or.dart';
 import '../../core/ui/confirm_dialog.dart';
-import '../../core/ui/cover_header.dart';
 import '../../core/ui/scoreboard.dart' show NeedsYouPill, SectionHeader;
 import '../../core/ui/error_message.dart';
 import '../../core/themes/theme.dart';
@@ -379,11 +378,25 @@ class EventHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        CoverHeader(
-          title: e.title,
-          subtitle: [?owner, e.type.label].join(' \u00b7 '),
-          roundAvatar: false,
-          avatar: DateBadge(date: e.startsAt, size: 72),
+        // Events have no cover picture, so no empty band: the date badge
+        // and title sit on the page.
+        Row(
+          children: [
+            DateBadge(date: e.startsAt, size: 64),
+            const SizedBox(width: AppSpace.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(e.title, style: AppText.heading3.copyWith(color: c.ink)),
+                  Text(
+                    [?owner, e.type.label].join(' \u00b7 '),
+                    style: AppText.secondary.copyWith(color: c.muted),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: AppSpace.lg),
         Padding(

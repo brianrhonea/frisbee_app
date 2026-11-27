@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.77  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.76  | 2026-11-27 | `sprint3/17b`                           |                     |
 | 0.0.75  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.74  | 2026-11-27 | `sprint3/lane-b`                        |                     |
@@ -89,6 +90,10 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.77 — H3 fix: no empty cover band on events
+
+- Event page: the empty pale cover band is gone; the date badge and title sit on the page (events have no cover picture).
 
 ## 0.0.76 — Phase-1 writes through the API (17-B, app half)
 

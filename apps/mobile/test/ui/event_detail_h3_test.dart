@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/domain/models/team_event.dart';
 import 'package:frisbee_app/ui/core/ui/cover_header.dart';
+import 'package:frisbee_app/ui/core/ui/layout.dart' show DateBadge;
 import 'package:frisbee_app/ui/schedule/view_models/event_detail_viewmodel.dart';
 import 'package:frisbee_app/ui/schedule/widgets/event_detail_screen.dart';
 
@@ -50,7 +51,8 @@ void main() {
   testWidgets('cover, details, count and the three answers', (tester) async {
     await pumpInApp(tester, screen(), width: 390, height: 1400);
     await tester.pumpAndSettle();
-    expect(find.byType(CoverHeader), findsOneWidget);
+    expect(find.byType(CoverHeader), findsNothing);
+    expect(find.byType(DateBadge), findsOneWidget);
     expect(find.text('Thursday practice'), findsWidgets);
     expect(find.text('Riverside Field 2'), findsOneWidget);
     expect(find.text('1 person going'), findsOneWidget);

@@ -65,13 +65,7 @@ void main() {
     testWidgets('meets accessibility guidelines, ${theme.name}', (
       tester,
     ) async {
-      await pumpInApp(
-        tester,
-        screen(),
-        theme: theme,
-        width: 390,
-        height: 900,
-      );
+      await pumpInApp(tester, screen(), theme: theme, width: 390, height: 900);
       await tester.pumpAndSettle();
       await expectAccessible(tester);
     });
