@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.68  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.67  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.66  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.65  | 2026-11-27 | `sprint3/lane-b`                        |                     |
@@ -80,6 +81,11 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.68 — H7 Chats redesign
+
+- Chats: filters All, Teams, Direct, Unread, Requests and Archived (Teams and Direct are the approved addition UI-Q12: `InboxFilter.teams` and `.direct`), each with its unread count; chips are 48 px targets. Team chats and conversations are `ListRow`s (unread dot, muted bell, selected tint, time) with no card around the list. Swipe actions, long-press menu, search, requests, folding sections and the chat screens (send, pending, failed) are unchanged.
+- `ListRow` takes `onLongPress`, `onSecondaryTap` and a `subtitleStyle`.
 
 ## 0.0.67 — H2 Schedule redesign (Month, Week, List)
 

@@ -19,6 +19,7 @@ import '../../core/ui/error_message.dart';
 import '../../core/ui/layout.dart';
 import '../../core/ui/scoreboard.dart' show SectionHeader;
 import '../../core/ui/scroll_to_top.dart';
+import '../../core/ui/list_row.dart';
 import '../../core/ui/status_views.dart';
 import '../../core/ui/user_avatar.dart';
 import '../../core/ui/view_model_host.dart';
@@ -384,6 +385,10 @@ class _InboxListState extends State<InboxList> {
             child: _FilterBar(
               selected: vm.filter,
               unread: vm.unreadCount,
+              unreadTeams: vm.unreadTeamChats,
+              unreadDirect: vm.allItems
+                  .where((i) => i.unread && !i.muted)
+                  .length,
               requests: vm.requestItems
                   .where((i) => i.isGroup || !blocks.hides(i.otherId))
                   .length,
@@ -408,6 +413,8 @@ class _InboxListState extends State<InboxList> {
                           title: switch (vm.filter) {
                             InboxFilter.requests => 'No message requests',
                             InboxFilter.archived => 'Nothing archived',
+                            InboxFilter.teams => 'No team chats',
+                            InboxFilter.direct => 'No direct messages',
                             _ when vm.allItems.isEmpty => 'No messages yet',
                             _ => 'Nothing here',
                           },
@@ -437,22 +444,17 @@ class _InboxListState extends State<InboxList> {
                         if (i < lead) {
                           final t = i - (headed ? 1 : 0);
                           final s = teamChats[t];
-                          return _CardSlice(
-                            flat: widget.flat,
-                            first: t == 0,
-                            last: t == teamChats.length - 1,
-                            child: _TeamChatTile(
-                              summary: s,
-                              onTap: () {
-                                _openSwipe.value = null;
-                                final room = s.openRoom;
-                                context.push(
-                                  room == null
-                                      ? Routes.teamChat(s.team.id)
-                                      : Routes.chatRoom(s.team.id, room.id),
-                                );
-                              },
-                            ),
+                          return _TeamChatTile(
+                            summary: s,
+                            onTap: () {
+                              _openSwipe.value = null;
+                              final room = s.openRoom;
+                              context.push(
+                                room == null
+                                    ? Routes.teamChat(s.team.id)
+                                    : Routes.chatRoom(s.team.id, room.id),
+                              );
+                            },
                           );
                         }
                         if (headed && i == lead) {
@@ -464,12 +466,7 @@ class _InboxListState extends State<InboxList> {
                         }
                         final d = i - lead - (headed ? 1 : 0);
                         final item = shownItems[d];
-                        Widget slice(Widget child) => _CardSlice(
-                          flat: widget.flat,
-                          first: d == 0,
-                          last: d == shownItems.length - 1,
-                          child: child,
-                        );
+                        Widget slice(Widget child) => child;
                         final tile = _InboxTile(
                           item: item,
                           selected: item.key == selectedKey,
@@ -519,19 +516,24 @@ class _InboxListState extends State<InboxList> {
   );
 }
 
-/// All / Unread / Requests / Archived as pill chips on one line, scrolling
-/// sideways if they don't fit. Unread's count is amber (it's the user's to
-/// do); Requests' is turf.
+/// All / Teams / Direct / Unread / Requests / Archived as pill chips on
+/// one line, scrolling sideways if they don't fit. Teams, Direct and
+/// Unread show how many have news (amber: it's the user's to read);
+/// Requests' count is turf. Each chip is a 48 px tap target.
 class _FilterBar extends StatelessWidget {
   const _FilterBar({
     required this.selected,
     required this.unread,
+    required this.unreadTeams,
+    required this.unreadDirect,
     required this.requests,
     required this.onSelect,
   });
 
   final InboxFilter selected;
   final int unread;
+  final int unreadTeams;
+  final int unreadDirect;
   final int requests;
   final ValueChanged<InboxFilter> onSelect;
 
@@ -540,6 +542,8 @@ class _FilterBar extends StatelessWidget {
     final c = AppColors.of(context);
     final filters = [
       (InboxFilter.all, 'All', 0),
+      (InboxFilter.teams, 'Teams', unreadTeams),
+      (InboxFilter.direct, 'Direct', unreadDirect),
       (InboxFilter.unread, 'Unread', unread),
       (InboxFilter.requests, 'Requests', requests),
       (InboxFilter.archived, 'Archived', 0),
@@ -549,60 +553,61 @@ class _FilterBar extends StatelessWidget {
       child: Row(
         children: [
           for (final (filter, label, count) in filters) ...[
-            if (filter != InboxFilter.all) const SizedBox(width: 8),
+            if (filter != InboxFilter.all) const SizedBox(width: AppSpace.sm),
             Semantics(
               button: true,
               selected: filter == selected,
               label: count > 0 ? '$label, $count' : label,
               excludeSemantics: true,
-              child: Material(
-                color: filter == selected ? c.chipOn : c.card,
-                shape: StadiumBorder(
-                  side: filter == selected
-                      ? BorderSide.none
-                      : BorderSide(color: c.border2),
-                ),
-                child: InkWell(
-                  customBorder: const StadiumBorder(),
-                  onTap: () => onSelect(filter),
-                  child: Container(
-                    height: 36,
-                    padding: EdgeInsets.only(
-                      left: 14,
-                      right: count > 0 ? 8 : 14,
-                    ),
-                    alignment: Alignment.center,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          label,
-                          maxLines: 1,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: filter == selected
-                                ? FontWeight.w700
-                                : FontWeight.w600,
-                            color: filter == selected ? c.onChipOn : c.ink,
-                          ),
+              child: InkWell(
+                customBorder: const StadiumBorder(),
+                onTap: () => onSelect(filter),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 48),
+                  child: Center(
+                    widthFactor: 1,
+                    child: Material(
+                      color: filter == selected ? c.chipOn : c.card,
+                      shape: StadiumBorder(
+                        side: filter == selected
+                            ? BorderSide.none
+                            : BorderSide(color: c.border2),
+                      ),
+                      child: Container(
+                        constraints: const BoxConstraints(minHeight: 36),
+                        padding: EdgeInsets.only(
+                          left: 14,
+                          right: count > 0 ? 8 : 14,
                         ),
-                        if (count > 0) ...[
-                          const SizedBox(width: 6),
-                          if (filter == InboxFilter.unread)
-                            CountPill(count)
-                          else
+                        alignment: Alignment.center,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
                             Text(
-                              '$count',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                                color: filter == selected
-                                    ? c.onChipOn
-                                    : c.accent,
+                              label,
+                              maxLines: 1,
+                              style: AppText.label.copyWith(
+                                color: filter == selected ? c.onChipOn : c.ink,
                               ),
                             ),
-                        ],
-                      ],
+                            if (count > 0) ...[
+                              const SizedBox(width: 6),
+                              if (filter == InboxFilter.requests)
+                                Text(
+                                  '$count',
+                                  style: AppText.label.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: filter == selected
+                                        ? c.onChipOn
+                                        : c.accent,
+                                  ),
+                                )
+                              else
+                                CountPill(count),
+                            ],
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -631,117 +636,6 @@ class _SwipeAction {
   final VoidCallback onTap;
 }
 
-/// One row of a card that's built row by row (so long lists stay lazy):
-/// the card's border and rounded corners on its [first] and [last] rows,
-/// a line between rows. [flat]: no card, just the line below.
-class _CardSlice extends StatelessWidget {
-  const _CardSlice({
-    required this.first,
-    required this.last,
-    required this.child,
-    this.flat = false,
-  });
-
-  final bool first;
-  final bool last;
-  final bool flat;
-  final Widget child;
-
-  static const _radius = Radius.circular(16);
-
-  @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    if (flat) {
-      return DecoratedBox(
-        position: DecorationPosition.foreground,
-        decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: c.border)),
-        ),
-        child: child,
-      );
-    }
-    final radius = BorderRadius.vertical(
-      top: first ? _radius : Radius.zero,
-      bottom: last ? _radius : Radius.zero,
-    );
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: CustomPaint(
-        foregroundPainter: _SlicePainter(
-          color: c.border,
-          first: first,
-          last: last,
-        ),
-        child: ClipRRect(
-          borderRadius: radius,
-          child: ColoredBox(color: c.card, child: child),
-        ),
-      ),
-    );
-  }
-}
-
-/// The outline of a [_CardSlice]: its sides, its top (rounded) when it's
-/// the first row, and its bottom: rounded when last, else the line under
-/// the row.
-class _SlicePainter extends CustomPainter {
-  const _SlicePainter({
-    required this.color,
-    required this.first,
-    required this.last,
-  });
-
-  final Color color;
-  final bool first;
-  final bool last;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-    const r = 16.0;
-    final w = size.width - 0.5;
-    final h = size.height - 0.5;
-    const x = 0.5;
-    const round = Radius.circular(r);
-    final top = first ? x + r : 0.0;
-    final bottom = last ? h - r : size.height;
-    final path = Path()
-      ..moveTo(x, top)
-      ..lineTo(x, bottom)
-      ..moveTo(w, top)
-      ..lineTo(w, bottom);
-    if (first) {
-      path
-        ..moveTo(x, x + r)
-        ..arcToPoint(const Offset(x + r, x), radius: round)
-        ..lineTo(w - r, x)
-        ..arcToPoint(Offset(w, x + r), radius: round);
-    }
-    if (last) {
-      path
-        ..moveTo(x, h - r)
-        ..arcToPoint(Offset(x + r, h), radius: round, clockwise: false)
-        ..lineTo(w - r, h)
-        ..arcToPoint(Offset(w, h - r), radius: round, clockwise: false);
-    } else {
-      path
-        ..moveTo(x, h)
-        ..lineTo(w, h);
-    }
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(_SlicePainter old) =>
-      old.color != color || old.first != first || old.last != last;
-}
-
-/// Swipe left to show buttons behind an entry, like a phone's own inbox.
-/// [open] holds which entry is showing its buttons; one at a time.
 class _SwipeActions extends StatefulWidget {
   const _SwipeActions({
     super.key,
@@ -900,75 +794,20 @@ class _TeamChatTile extends StatelessWidget {
     final c = AppColors.of(context);
     final unread = summary.unread;
     final when = summary.lastAt;
-    return Material(
-      color: c.card,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-          child: Row(
-            children: [
-              TeamBadge(
-                size: 44,
-                community: summary.team.kind == TeamKind.community,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            summary.team.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: _InboxTile._titleStyle(c, unread),
-                          ),
-                        ),
-                        if (when != null)
-                          Text(
-                            _InboxTile._when(when),
-                            style: _InboxTile._timeStyle(c, unread),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            summary.subtitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            // "Cam mentioned you: ..." stands out, as Discord's.
-                            style: summary.mention != null
-                                ? _InboxTile._previewStyle(c, unread).copyWith(
-                                    color: c.accent,
-                                    fontWeight: FontWeight.w700,
-                                  )
-                                : _InboxTile._previewStyle(c, unread),
-                          ),
-                        ),
-                        if (unread) ...[
-                          const SizedBox(width: 8),
-                          Icon(
-                            Icons.circle,
-                            size: 10,
-                            color: c.highlight,
-                            semanticLabel: 'Unread',
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+    return ListRow(
+      leading: TeamBadge(
+        size: 44,
+        community: summary.team.kind == TeamKind.community,
       ),
+      title: summary.team.name,
+      subtitle: summary.subtitle,
+      // "Cam mentioned you: ..." stands out, as Discord's.
+      subtitleStyle: summary.mention != null
+          ? TextStyle(color: c.accent, fontWeight: FontWeight.w700)
+          : null,
+      trailing: when == null ? null : _InboxTile.timeText(c, when, unread),
+      unread: unread,
+      onTap: onTap,
     );
   }
 }
@@ -995,123 +834,36 @@ class _InboxTile extends StatelessWidget {
     final unread = item.unread && !item.muted;
     final when = item.lastAt;
     final typing = item.typing;
-    return Material(
-      color: selected ? c.accentSoft : c.card,
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: onActions,
-        onSecondaryTap: onActions,
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border(
-              left: BorderSide(
-                color: selected ? c.accent : Colors.transparent,
-                width: 3,
-              ),
+    return ListRow(
+      leading: item.isGroup
+          ? _GroupFaces(faces: item.faces)
+          : UserAvatar(uid: item.otherId, name: item.title, radius: 22),
+      title: item.title,
+      subtitle: typing ?? item.preview,
+      subtitleStyle: typing == null
+          ? null
+          : TextStyle(
+              fontStyle: FontStyle.italic,
+              fontWeight: FontWeight.w600,
+              color: c.accent,
             ),
-          ),
-          padding: const EdgeInsets.fromLTRB(11, 12, 14, 12),
-          child: Row(
-            children: [
-              if (item.isGroup)
-                _GroupFaces(faces: item.faces)
-              else
-                UserAvatar(uid: item.otherId, name: item.title, radius: 22),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            item.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: _titleStyle(c, unread),
-                          ),
-                        ),
-                        if (item.muted)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 4),
-                            child: Icon(
-                              Icons.notifications_off_outlined,
-                              size: 14,
-                              color: c.muted,
-                              semanticLabel: 'Muted',
-                            ),
-                          ),
-                        if (when != null)
-                          Text(_when(when), style: _timeStyle(c, unread)),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: typing != null
-                              ? Text(
-                                  typing,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontStyle: FontStyle.italic,
-                                    fontWeight: FontWeight.w600,
-                                    color: c.accent,
-                                  ),
-                                )
-                              : Text(
-                                  item.preview,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: _previewStyle(c, unread),
-                                ),
-                        ),
-                        if (unread) ...[
-                          const SizedBox(width: 8),
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Icon(
-                              Icons.circle,
-                              size: 10,
-                              color: c.highlight,
-                              semanticLabel: 'Unread',
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      trailing: when == null ? null : timeText(c, when, unread),
+      unread: unread,
+      muted: item.muted,
+      selected: selected,
+      onTap: onTap,
+      onLongPress: onActions,
+      onSecondaryTap: onActions,
     );
   }
 
-  /// Unread rows are bold, with the time in amber ink: they're the user's
-  /// to read.
-  static TextStyle _titleStyle(AppColors c, bool unread) => TextStyle(
-    fontSize: 15,
-    fontWeight: unread ? FontWeight.w800 : FontWeight.w600,
-    color: c.ink,
-  );
-
-  static TextStyle _timeStyle(AppColors c, bool unread) => TextStyle(
-    fontSize: 12,
-    fontWeight: unread ? FontWeight.w700 : FontWeight.w400,
-    color: unread ? c.highlightInk : c.muted,
-  );
-
-  static TextStyle _previewStyle(AppColors c, bool unread) => TextStyle(
-    fontSize: 13,
-    color: unread ? c.ink2 : c.muted,
-    fontWeight: unread ? FontWeight.w600 : FontWeight.w400,
+  /// The time, in amber ink when unread: it's the user's to read.
+  static Widget timeText(AppColors c, DateTime d, bool unread) => Text(
+    _when(d),
+    style: AppText.caption.copyWith(
+      fontWeight: unread ? FontWeight.w700 : FontWeight.w500,
+      color: unread ? c.highlightInk : c.muted,
+    ),
   );
 
   static String _when(DateTime d) {

@@ -10,6 +10,10 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.68
+
+- **Chats:** quick filters for team chats and direct messages, with counts, and cleaner rows.
+
 ## 0.0.67
 
 - **Schedule:** a new List view next to Week and Month, and the events are easier to read.
