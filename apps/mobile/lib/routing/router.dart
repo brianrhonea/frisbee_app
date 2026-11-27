@@ -213,6 +213,9 @@ GoRouter router(
     ),
     // The rules are part of Learn to play now; old links land there.
     GoRoute(path: Routes.rules, redirect: (_, _) => Routes.learnRules),
+    // A moderation warning's notification links to the guidelines, which
+    // live on the website; Settings has the link to them.
+    GoRoute(path: Routes.guidelines, redirect: (_, _) => Routes.settings),
     // Settings, from the gear on the user's profile: slides over the page
     // (a panel on wide screens), and its sections slide over it.
     GoRoute(

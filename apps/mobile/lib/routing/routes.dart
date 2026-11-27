@@ -107,6 +107,10 @@ abstract final class Routes {
   /// Learn to play, opened at the rules of ultimate.
   static const learnRules = '/learn?part=rules';
 
+  /// The Community Guidelines: a moderation warning's link (the page is on
+  /// the website), sent to Settings, which links to it.
+  static const guidelines = '/guidelines';
+
   /// A post's page; [comment] puts the cursor in the comment box.
   static String post(String id, {bool comment = false}) =>
       '$postsPath/$id${comment ? '?comment=1' : ''}';
