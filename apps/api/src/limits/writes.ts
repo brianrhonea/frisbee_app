@@ -37,6 +37,11 @@ export const routeWriteLimits: Record<string, Limit[]> = {
   "POST /v1/posts/:id/comments": [{ max: 30, windowMs: minute }],
   "PUT /v1/posts/:id/repost": [{ max: 20, windowMs: minute }],
   "PUT /v1/follows": [{ max: 30, windowMs: minute }, { max: 300, windowMs: day }],
+  // New events notify a whole team (and a repeat makes a series) and new roster spots
+  // are the stats keeper's: their own buckets (hub "write" 30 a minute and stats 90 a minute) are shared with
+  // other writes, so these route limits bound just the creates.
+  "POST /v1/teams/:teamId/events": [{ max: 10, windowMs: minute }, { max: 200, windowMs: day }],
+  "POST /v1/teams/:teamId/roster-players": [{ max: 30, windowMs: minute }, { max: 500, windowMs: day }],
   // Publishing a schedule rewrites up to thousands of games.
   "POST /v1/teams/:teamId/group-tournaments/:tournamentId/schedule": [{ max: 5, windowMs: minute }, { max: 50, windowMs: day }],
   "PUT /v1/tournaments/:id/divisions/:divisionId/schedule": [{ max: 5, windowMs: minute }, { max: 50, windowMs: day }],

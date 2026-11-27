@@ -64,6 +64,8 @@ describe("write limits", () => {
     ["POST", "/v1/posts/p1/comments", 30, undefined],
     ["PUT", "/v1/posts/p1/repost", 20, undefined],
     ["PUT", "/v1/follows", 30, 300],
+    ["POST", "/v1/teams/t1/events", 10, 200],
+    ["POST", "/v1/teams/t1/roster-players", 30, 500],
   ] as const;
   for (const [method, url, perMinute, perDay] of social) {
     it(`${method} ${url}: ${perMinute} a minute${perDay ? ` and ${perDay} a day` : ""}, per caller`, async () => {
