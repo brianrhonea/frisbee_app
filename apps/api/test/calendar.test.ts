@@ -324,6 +324,64 @@ describe("members", () => {
 });
 
 describe("events", () => {
+  describe("client id (idempotent create)", () => {
+    const url = "/v1/calendars/me/events";
+
+    it("uses the id it is given, and a replay is a 409 that changes nothing", async () => {
+      const first = await s.call("POST", url, { ...event, id: "cev1abc" });
+      expect(first.statusCode).toBe(201);
+      expect(first.json()).toEqual({ id: "cev1abc" });
+      expect(s.store.doc("users/me/events/cev1abc")).toMatchObject({ title: "Track session" });
+      const replay = await s.call("POST", url, { ...event, id: "cev1abc", title: "Changed" });
+      expect(replay.statusCode).toBe(409);
+      expect(replay.json().error.code).toBe("already_exists");
+      expect(s.store.doc("users/me/events/cev1abc")?.title).toBe("Track session");
+    });
+
+    it("keeps the id out of the stored event, and makes a series' events {id}_{index}", async () => {
+      const body = { ...event, id: "ser1", repeat: { freq: "weekly", until: "2026-12-09" }, timeZone: "America/Chicago" };
+      const first = await s.call("POST", url, body);
+      expect(first.statusCode).toBe(201);
+      expect(first.json()).toEqual({ id: "ser1_0" });
+      expect(s.store.doc("users/me/events/ser1_0")).not.toHaveProperty("id");
+      const before = s.store.docs.size;
+      expect((await s.call("POST", url, body)).statusCode).toBe(409);
+      expect(s.store.docs.size).toBe(before);
+    });
+
+    it("scopes an id to its calendar: another calendar may reuse it, an outsider or viewer cannot touch it", async () => {
+      const other = await newCalendar();
+      await invite(other, "pat", "edit");
+      await s.call("POST", `/v1/me/calendar-invites/${other}/accept`, undefined, "pat");
+      expect((await s.call("POST", url, { ...event, id: "shared1" })).statusCode).toBe(201);
+      expect((await s.call("POST", `/v1/calendars/${other}/events`, { ...event, id: "shared1", title: "Other" })).statusCode).toBe(201);
+      expect(s.store.doc("users/me/events/shared1")?.title).toBe("Track session");
+      expect(s.store.doc(`calendars/${other}/events/shared1`)?.title).toBe("Other");
+      // An editor replaying the owner's id on the same calendar gets 409 and overwrites nothing.
+      const clash = await s.call("POST", `/v1/calendars/${other}/events`, { ...event, id: "shared1", title: "Hijack" }, "pat");
+      expect(clash.statusCode).toBe(409);
+      expect(s.store.doc(`calendars/${other}/events/shared1`)?.title).toBe("Other");
+      // Someone not on the calendar learns nothing about its ids.
+      expect((await s.call("POST", url, { ...event, id: "shared1" }, "sam")).statusCode).toBe(404);
+    });
+
+    it("refuses a bad id, and an edit that names another event's id", async () => {
+      for (const id of ["", "has space", "a/b", "x".repeat(41), "under_score"]) {
+        expect((await s.call("POST", url, { ...event, id })).statusCode, id).toBe(400);
+      }
+      await s.call("POST", url, { ...event, id: "ev2" });
+      expect((await s.call("PATCH", `${url}/ev2`, { ...event, id: "other" })).statusCode).toBe(400);
+      expect((await s.call("PATCH", `${url}/ev2`, { ...event, id: "ev2", title: "Renamed" })).statusCode).toBe(204);
+      expect(s.store.doc("users/me/events/ev2")?.title).toBe("Renamed");
+    });
+
+    it("mints an id when none is given, as before", async () => {
+      const res = await s.call("POST", url, event);
+      expect(res.statusCode).toBe(201);
+      expect(s.store.doc(`users/me/events/${res.json().id}`)).toBeDefined();
+    });
+  });
+
   it("saves My calendar's events where the app does, with validMine's fields only", async () => {
     const res = await s.call("POST", "/v1/calendars/me/events", event);
     expect(res.statusCode).toBe(201);

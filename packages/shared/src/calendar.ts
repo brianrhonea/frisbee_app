@@ -130,6 +130,14 @@ const isoDate = z.iso.datetime({ offset: true, message: "Pick a date and time." 
  */
 export const calendarEventSchema = z
   .strictObject({
+    /**
+     * New events only (a replay of the same id is a 409 already_exists, so the app's outbox can retry safely):
+     * the event's id, or a series' (its events are `{id}_{index}`). The server mints one when absent.
+     */
+    id: z
+      .string()
+      .regex(/^[A-Za-z0-9]{1,40}$/, "Invalid id.")
+      .optional(),
     title: z.string().trim().min(1, "Give the event a title.").max(100, "Keep titles under 100 characters."),
     type: z.enum(eventTypes).default("other"),
     startsAt: isoDate,

@@ -1218,7 +1218,7 @@ describe("roster and plays", () => {
     await assertFails(setDoc(ref, spot(OUTSIDER)));
   });
 
-  it("members claim an unlinked spot for themselves and let go of their own", async () => {
+  it("members can no longer claim a spot (admins set links), but still let go of their own", async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
       const fs = ctx.firestore();
       await setDoc(doc(fs, "teams", TEAM, "roster", "r1"), { name: "Pat", number: 4, position: "cutter", userId: null });
@@ -1231,8 +1231,15 @@ describe("roster and plays", () => {
     await assertFails(updateDoc(spot(PLAYER, "r2"), { userId: PLAYER }));
     await assertFails(updateDoc(spot(PLAYER, "r2"), { userId: null }));
     await assertFails(updateDoc(spot(OUTSIDER, "r1"), { userId: OUTSIDER }));
-    await assertSucceeds(updateDoc(spot(PLAYER, "r1"), { userId: PLAYER }));
+    // Claiming an unlinked spot for yourself is now denied (Sprint 4 A3)...
+    await assertFails(updateDoc(spot(PLAYER, "r1"), { userId: PLAYER }));
+    // ...but an admin sets the link, and then the member may let go of it (and only that).
+    await assertSucceeds(updateDoc(spot(CAPTAIN, "r1"), { userId: PLAYER }));
+    await assertFails(updateDoc(spot(PLAYER, "r1"), { userId: STATS }));
+    await assertFails(updateDoc(spot(PLAYER, "r1"), { userId: PLAYER, number: 99 }));
     await assertSucceeds(updateDoc(spot(PLAYER, "r1"), { userId: null }));
+    // Once let go, they can't take it back.
+    await assertFails(updateDoc(spot(PLAYER, "r1"), { userId: PLAYER }));
   });
 
   it("a spot's line is the API's: editing keeps it, no client sets or changes it", async () => {
@@ -1243,7 +1250,8 @@ describe("roster and plays", () => {
     const spot = { name: "Sam B", number: 8, position: "cutter", userId: null };
     // Editing the player keeps their line (or, from an older app, drops it).
     await assertSucceeds(setDoc(ref(COACH), { ...spot, line: "o" }));
-    await assertSucceeds(updateDoc(ref(PLAYER), { userId: PLAYER }));
+    await assertFails(updateDoc(ref(PLAYER), { userId: PLAYER }));
+    await assertSucceeds(updateDoc(ref(COACH), { userId: PLAYER }));
     await assertSucceeds(updateDoc(ref(PLAYER), { userId: null }));
     await assertFails(setDoc(ref(COACH), { ...spot, line: "d" }));
     await assertFails(updateDoc(ref(COACH), { line: "both" }));

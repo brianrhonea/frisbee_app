@@ -32,7 +32,9 @@ function workoutRecord(w: WorkoutPost): Data {
   return {
     activity: w.activity,
     durationMinutes: w.durationMinutes,
-    ...(w.distanceKm !== undefined && { distanceKm: Math.round(w.distanceKm * 100) / 100 }),
+    ...(w.durationSeconds !== undefined && { durationSeconds: w.durationSeconds }),
+    // At least 0.01: the rules want a distance above zero.
+    ...(w.distanceKm !== undefined && { distanceKm: Math.max(0.01, Math.round(w.distanceKm * 100) / 100) }),
     ...(w.effort !== undefined && { effort: w.effort }),
     exercises: w.exercises.map((e) => ({
       name: e.name,
@@ -40,6 +42,15 @@ function workoutRecord(w: WorkoutPost): Data {
       ...(e.reps !== undefined && { reps: e.reps }),
       ...(e.weight && { weight: e.weight }),
     })),
+    // A recorded GPS route, as WorkoutRoute.toMap stores it.
+    ...(w.route && {
+      route: {
+        path: w.route.path,
+        splitsMi: w.route.splitsMi,
+        splitsKm: w.route.splitsKm,
+        ...(w.route.elevationGainM !== undefined && { elevationGainM: Math.round(w.route.elevationGainM) }),
+      },
+    }),
   };
 }
 

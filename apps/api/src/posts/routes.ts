@@ -6,6 +6,8 @@ import { noRevalidate, type Revalidate, webTags } from "../web/revalidate.js";
 import type { PostEditor } from "./editor.js";
 import type { PostService } from "./service.js";
 
+const postBodyLimit = 192 * 1024;
+
 type Id = { Params: { id: string } };
 type CommentId = { Params: { id: string; commentId: string } };
 
@@ -43,7 +45,8 @@ export function postEditorRoutes(app: FastifyInstance, editor: PostEditor, reval
   const changed = (req: FastifyRequest, uid: string, postId?: string) =>
     revalidate([webTags.player(uid), webTags.feed, ...(postId ? [webTags.post(postId)] : [])], req.log);
 
-  app.post("/v1/posts", async (req, reply) => {
+  // A recorded run carries its route (up to 80,000 characters of polyline, doubled in the worst case by JSON escapes).
+  app.post("/v1/posts", { bodyLimit: postBodyLimit }, async (req, reply) => {
     const caller = requireCaller(req);
     const result = await editor.create(caller, req.body);
     await changed(req, caller.uid);

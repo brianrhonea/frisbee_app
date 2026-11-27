@@ -2,8 +2,8 @@
 // rosterStatus rules in firebase/firestore.rules, ported. Games and
 // tournaments are saved whole (StatsGame.toMap / StatsTournament.toMap),
 // by owners, coaches, captains and members with stats access
-// (canKeepStats); roster spots by admins who manage the team, and a member
-// may claim an unlinked spot for themselves or let go of their own. The
+// (canKeepStats); roster spots by admins who manage the team (only admins link a
+// spot to an account; a member may let go of their own link). The
 // Admin SDK skips the rules, so every conjunct is checked here.
 import {
   linkRosterPlayerSchema,
@@ -181,6 +181,11 @@ export class StatsService {
     // A client-chosen id makes a replay a 409 (tx.create below); an edit can't name a different one.
     const id = creating ? (p.id ?? this.store.newId(`teams/${teamId}/roster`)) : docIdParam(rawPlayer);
     if (!creating && p.id !== undefined && p.id !== id) throw new ApiError("invalid_argument", "A spot's id can't be changed.");
+    // One account, one spot per team. Checked for admins only, before the transaction (which can't query).
+    if (p.userId !== null) {
+      const team = await this.store.get(paths.team(teamId));
+      if (team && can(team, caller.uid, "manageTeam")) await this.refuseSecondSpot(teamId, p.userId, id);
+    }
     await this.store.transact(async (tx) => {
       const team = await tx.get(paths.team(teamId));
       const existing = await tx.get(paths.player(teamId, id));
@@ -215,34 +220,51 @@ export class StatsService {
   }
 
   /**
-   * Links a spot to an account or unlinks it (linkPlayer). Admins may link
-   * any member or unlink anyone (the first update rule); any member may
-   * claim an unlinked spot for themselves or let go of their own (the
-   * second), changing nothing else.
+   * Refuses linking [userId] to spot [spotId] when another spot on the team already has that account (one
+   * person, one spot, so their stats and profile count once). Not atomic with the write: two admins linking the
+   * same person to two spots at the same instant could both pass; the admins then fix the second.
+   */
+  private async refuseSecondSpot(teamId: string, userId: string, spotId: string): Promise<void> {
+    const linked = await this.queries.ids(`teams/${teamId}/roster`, 5, { userId });
+    if (linked.some((other) => other !== spotId)) {
+      throw new ApiError("failed_precondition", "That person is already linked to another spot on this team.");
+    }
+  }
+
+  /**
+   * Links a spot to an account or unlinks it (linkPlayer). Only admins link: any member of the team, one
+   * account per spot (the first update rule). A member may let go of their own link (the second rule),
+   * changing nothing else, but can't claim a spot: roster links are the admins' to set.
    */
   async linkPlayer(caller: Caller, rawTeam: unknown, rawPlayer: unknown, body: unknown): Promise<void> {
     const teamId = docIdParam(rawTeam);
     const id = docIdParam(rawPlayer);
     const { userId } = parseBody(linkRosterPlayerSchema, body);
+    if (userId !== null) {
+      const current = await this.store.get(paths.player(teamId, id));
+      const team = await this.store.get(paths.team(teamId));
+      if (current && current.userId !== userId && team && can(team, caller.uid, "manageTeam")) {
+        await this.refuseSecondSpot(teamId, userId, id);
+      }
+    }
     await this.store.transact(async (tx) => {
       const team = await tx.get(paths.team(teamId));
       const spot = await tx.get(paths.player(teamId, id));
       if (!team) throw noTeam();
-      if (!isMember(team, caller.uid)) throw new ApiError("permission_denied", "Only the team's members can claim a spot.");
+      if (!isMember(team, caller.uid)) throw new ApiError("permission_denied", "Only the team's members can change a roster link.");
       if (!spot) throw new ApiError("not_found", "That player was removed.");
       const was = typeof spot.userId === "string" ? spot.userId : null;
-      const admin = can(team, caller.uid, "manageTeam") && adminSpotValid(spot) && (userId === null || strings(team.memberIds).includes(userId) || userId === was);
-      const self = (was === null && userId === caller.uid) || (was === caller.uid && userId === null);
-      if (!admin && !self) {
-        const manager = can(team, caller.uid, "manageTeam");
-        const message =
-          was !== null && was !== caller.uid && !manager
-            ? "This spot is linked to someone else."
-            : manager
-              ? "Only one of the team's members can be linked to a spot."
-              : was === caller.uid
-                ? "You can only unlink yourself from your spot."
-                : "You can only claim a spot for yourself.";
+      const manager = can(team, caller.uid, "manageTeam");
+      const admin = manager && adminSpotValid(spot) && (userId === null || strings(team.memberIds).includes(userId) || userId === was);
+      const letGo = was === caller.uid && userId === null;
+      if (!admin && !letGo) {
+        const message = manager
+          ? "Only one of the team's members can be linked to a spot."
+          : was === caller.uid
+            ? "You can only unlink yourself from your spot."
+            : was !== null
+              ? "This spot is linked to someone else."
+              : "Only a team admin can link a player to a spot.";
         throw new ApiError("permission_denied", message);
       }
       tx.update(paths.player(teamId, id), { userId });

@@ -98,3 +98,19 @@ These come on top of the steps above, with the same rule: the owner runs every d
 - Sign up a new adult. `profiles/{uid}.adult` should appear within seconds.
 - Search for people in the app and on the website.
 - Try to DM an unmarked test account. It is refused with the same message as a "nobody" message policy.
+
+## Sprint 4 additions (lane A: API, shared, rules): dev order
+
+Same rule as above: the owner runs every deploy. Nothing here is deployed by the lane.
+
+1. **API** with the Sprint 4 lane A changes:
+   - A1: `POST /v1/calendars/:id/events` takes an optional client `id` (a replay is 409 `already_exists`).
+   - A2: `POST /v1/posts` takes a recorded run (`workout.route`, `workout.durationSeconds`) and a 192 KB body limit on that one route.
+   - A3: `PUT .../roster-players/:playerId/link` no longer lets a member claim a spot, and one account may be linked to only one spot per team (412 `failed_precondition`).
+2. **New app and website builds** that call these routes: the app's recorded-run post and personal-event create go through the API, and the app and website stop offering "link me to this player" to non-admins. Raise `meta/flags.minBuild` to that app build once it is on TestFlight.
+3. **Firestore rules for the roster claim (A3).** Deploy `firebase/firestore.rules` to dev with `firebase deploy --only firestore:rules --project frisbee-app-brianrhonea-dev`, **only after steps 1 and 2**. The second `allow update` on `roster/{playerId}` loses its claim branch: older app builds and the old website can no longer claim a spot straight in Firestore (the API already refuses it from step 1). A member can still unlink themselves.
+4. **After the `minBuild` raise: close the direct recorded-workout create in the rules.** Until then `posts/{postId}` create stays open for `kind == 'workout'` with a `route`, because older app builds write recorded runs straight to Firestore (the "M2/L3" direct path, 17-B). Once no older build is in use, tighten `match /posts/{postId}` so a client create of a workout post is refused (the API, which writes through the Admin SDK, is then the only way), add the rules test, and deploy the rules to dev. **This step is not in this change set.**
+5. **Device checks:**
+   - Record a short run on the phone, post it with a photo, and open the post: the route, time and distance show.
+   - Add a calendar event while offline, go online and let it retry: exactly one event.
+   - As a plain member, try to link yourself to a roster spot: refused. As an admin, add a player already linked to a member, then try to link the same member to a second spot: refused.

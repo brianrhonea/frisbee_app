@@ -130,24 +130,103 @@ export const workoutExerciseSchema = z.strictObject({
   weight: z.string().trim().max(20, "Keep weights under 20 characters.").optional(),
 });
 
+/** Most points on a recorded route (WorkoutRoute.maxPoints), and the longest encoded path (validRoute). */
+export const workoutRoutePointsMax = 4000;
+export const workoutRoutePathMax = 80000;
+/** Most whole-mile / whole-kilometre splits on a route (WorkoutRoute.maxSplits). */
+export const workoutRouteSplitsMax = 1000;
+/** Fastest average speed a recorded workout may claim, km/h (nothing human-powered gets near it). */
+export const workoutRouteMaxKmh = 120;
+
 /**
- * A workout typed in by hand (validWorkout, without a GPS route: routes are
- * recorded in the app). Minutes 1–1440, distance up to 1000 km, effort 1–10.
+ * Decodes Google's encoded polyline (5 decimals, as the app's encodePolyline writes it) into [lat, lng] pairs.
+ * Null when it is malformed (a character outside the format, a truncated value), has more than [maxPoints]
+ * points, or a point is off the globe (latitude within 90, longitude within 180).
  */
-export const workoutSchema = z.strictObject({
-  activity: z.enum(workoutActivities),
-  durationMinutes: z
-    .number()
-    .int("Whole minutes only.")
-    .min(1, "A workout lasts at least a minute.")
-    .max(1440, "A workout lasts at most 24 hours."),
-  distanceKm: z.number().positive().max(1000, "Distances go up to 1,000 km.").optional(),
-  effort: z.number().int().min(1).max(10).optional(),
-  exercises: z
-    .array(workoutExerciseSchema)
-    .max(workoutExercisesMax, `Add at most ${workoutExercisesMax} exercises.`)
-    .default([]),
+export function decodeRoutePath(encoded: string, maxPoints = workoutRoutePointsMax): [number, number][] | null {
+  const points: [number, number][] = [];
+  let i = 0;
+  let lat = 0;
+  let lng = 0;
+  const read = (): number | null => {
+    let shift = 0;
+    let result = 0;
+    for (;;) {
+      if (i >= encoded.length || shift > 30) return null;
+      const b = encoded.charCodeAt(i++) - 63;
+      if (b < 0 || b > 63) return null;
+      result += (b & 0x1f) * 2 ** shift;
+      shift += 5;
+      if (b < 0x20) break;
+    }
+    return result % 2 === 1 ? -Math.floor((result + 1) / 2) : result / 2;
+  };
+  while (i < encoded.length) {
+    const dLat = read();
+    const dLng = read();
+    if (dLat === null || dLng === null) return null;
+    lat += dLat;
+    lng += dLng;
+    if (Math.abs(lat) > 90e5 || Math.abs(lng) > 180e5) return null;
+    points.push([lat / 1e5, lng / 1e5]);
+    if (points.length > maxPoints) return null;
+  }
+  return points;
+}
+
+const splitSeconds = z.array(z.number().int().min(1).max(86400)).max(workoutRouteSplitsMax).default([]);
+
+/**
+ * A recorded GPS route (validRoute; WorkoutRoute in the app): an encoded polyline of 2 to 4000 points, every
+ * point on the globe, and the seconds each whole mile and kilometre took.
+ */
+export const workoutRouteSchema = z.strictObject({
+  path: z
+    .string()
+    .min(1, "The route is empty.")
+    .max(workoutRoutePathMax, "That route is too long to share.")
+    .superRefine((path, ctx) => {
+      const points = decodeRoutePath(path);
+      if (!points) ctx.addIssue({ code: "custom", message: "That route isn't valid or has too many points." });
+      else if (points.length < 2) ctx.addIssue({ code: "custom", message: "The route is too short to share." });
+    }),
+  splitsMi: splitSeconds,
+  splitsKm: splitSeconds,
+  elevationGainM: z.number().min(0).max(20000).optional(),
 });
+export type WorkoutRoute = z.output<typeof workoutRouteSchema>;
+
+/**
+ * A workout (validWorkout): typed in by hand, or recorded with GPS ([durationSeconds] and [route], as the app's
+ * Workout.recorded sends them). Minutes 1–1440, seconds 1–86400, distance up to 1000 km, effort 1–10. A route
+ * is checked for size, coordinates and a believable average speed.
+ */
+export const workoutSchema = z
+  .strictObject({
+    activity: z.enum(workoutActivities),
+    durationMinutes: z
+      .number()
+      .int("Whole minutes only.")
+      .min(1, "A workout lasts at least a minute.")
+      .max(1440, "A workout lasts at most 24 hours."),
+    /** Exact moving time of a recorded workout; [durationMinutes] is this rounded up. */
+    durationSeconds: z.number().int().min(1).max(86400, "A workout lasts at most 24 hours.").optional(),
+    distanceKm: z.number().positive().max(1000, "Distances go up to 1,000 km.").optional(),
+    effort: z.number().int().min(1).max(10).optional(),
+    exercises: z
+      .array(workoutExerciseSchema)
+      .max(workoutExercisesMax, `Add at most ${workoutExercisesMax} exercises.`)
+      .default([]),
+    route: workoutRouteSchema.optional(),
+  })
+  .refine(
+    (w) => {
+      if (!w.route || w.distanceKm === undefined) return true;
+      const seconds = w.durationSeconds ?? w.durationMinutes * 60;
+      return w.distanceKm / (seconds / 3600) <= workoutRouteMaxKmh;
+    },
+    { message: "That distance is too far for that time.", path: ["distanceKm"] },
+  );
 export type WorkoutInput = z.input<typeof workoutSchema>;
 export type WorkoutPost = z.output<typeof workoutSchema>;
 

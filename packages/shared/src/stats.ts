@@ -346,7 +346,7 @@ export const saveRosterPlayerSchema = z.strictObject({
 });
 export type SaveRosterPlayerRequest = z.input<typeof saveRosterPlayerSchema>;
 
-/** `PUT /v1/teams/:teamId/roster-players/:playerId/link`: claim a spot (your uid) or let go of yours (null). */
+/** `PUT /v1/teams/:teamId/roster-players/:playerId/link`: an admin links a team member (or unlinks anyone); a member may let go of their own link (null). Nobody claims a spot for themselves. */
 export const linkRosterPlayerSchema = z.strictObject({ userId: id.nullable() });
 
 export interface CreatedId {
