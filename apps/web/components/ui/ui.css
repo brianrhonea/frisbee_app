@@ -115,6 +115,7 @@ a.ui-event-main:hover .ui-event-title { text-decoration: underline; }
 .ui-event-title { font-size: var(--text-body-size); overflow-wrap: anywhere; }
 .ui-event-meta { color: var(--muted); font-size: var(--text-secondary-size); }
 .ui-event-pills { display: inline-flex; align-items: center; gap: var(--space-sm); flex-wrap: wrap; }
+.ui-event-selected { background: var(--accent-soft); border-color: var(--accent); }
 .ui-event-cancelled .ui-event-title { text-decoration: line-through; color: var(--muted); }
 
 /* --- CoverHeader ------------------------------------------------------------ */

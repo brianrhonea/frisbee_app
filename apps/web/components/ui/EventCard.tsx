@@ -26,11 +26,15 @@ export interface EventCardProps {
   cancelled?: boolean;
   recurring?: boolean;
   href?: string;
+  /** The one open beside a list (marks the link current). */
+  selected?: boolean;
+  /** Link without scrolling to the top: for a list that opens its details beside it. */
+  scroll?: boolean;
   /** Extra pills or actions after the details. */
   children?: ReactNode;
 }
 
-export function EventCard({ startsAt, title, meta, answer, needsRsvp = false, cancelled = false, recurring = false, href, children }: EventCardProps) {
+export function EventCard({ startsAt, title, meta, answer, needsRsvp = false, cancelled = false, recurring = false, href, selected = false, scroll, children }: EventCardProps) {
   const body = (
     <>
       <DateBadge startsAt={startsAt} />
@@ -41,9 +45,9 @@ export function EventCard({ startsAt, title, meta, answer, needsRsvp = false, ca
     </>
   );
   return (
-    <article className={`ui-event${cancelled ? " ui-event-cancelled" : ""}`} data-cancelled={cancelled || undefined}>
+    <article className={`ui-event${cancelled ? " ui-event-cancelled" : ""}${selected ? " ui-event-selected" : ""}`} data-cancelled={cancelled || undefined}>
       {href ? (
-        <Link className="ui-event-main" href={href}>
+        <Link className="ui-event-main" href={href} scroll={scroll} aria-current={selected ? "true" : undefined}>
           {body}
         </Link>
       ) : (

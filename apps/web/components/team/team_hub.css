@@ -93,34 +93,20 @@
   margin: 0; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
 }
 
-/* --- Schedule (TeamSchedule.tsx): rows with date tiles in one card ----- */
-.team-hub .sched-tools { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+/* --- Schedule (TeamSchedule.tsx): event cards (C8) in a calm list, the open one beside it ----- */
+.team-hub .sched-tools { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); flex-wrap: wrap; }
 .team-hub .sched-tools .schedule-new { margin: 0; }
-.team-hub .sched-card { padding: 0; overflow: hidden; }
-.team-hub .sched-list { gap: 0; }
-.team-hub .sched-list > li + li { border-top: 1px solid var(--line); }
-.team-hub .sched-list a.team-sched-row {
-  display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 14px; align-items: center;
-  padding: 12px 16px; border-radius: 0; color: var(--ink);
-}
-.team-hub .sched-list a.team-sched-row:hover { background: var(--bg-2); }
-.team-hub .sched-list a.team-sched-row.active { background: var(--field); box-shadow: inset 3px 0 0 var(--accent); }
-.team-hub .sched-main { display: grid; min-width: 0; gap: 2px; }
-.team-hub .sched-main b { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.team-hub .sched-main small { color: var(--muted); font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.team-hub .rsvp-line { display: flex; align-items: center; gap: 10px; }
-.team-hub .rsvp-line > small { color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
-/* Today: a soft accent tint with a 2px accent outline (visible on the white card in both themes). */
-.team-hub .sched-list a.team-sched-row.today { background: var(--accent-soft); color: var(--accent-ink); box-shadow: inset 0 0 0 2px var(--accent); }
-.team-hub .sched-list a.team-sched-row.today small, .team-hub .sched-list a.team-sched-row.today .rsvp-line > small { color: var(--accent-ink); }
-.team-hub .sched-list a.team-sched-row.today .date-tile { background: var(--card); color: var(--accent-ink); }
-.team-hub .sched-list a.team-sched-row.today .type-dot { background: var(--accent-ink); }
-.team-hub .sched-list a.team-sched-row.today.active { box-shadow: inset 3px 0 0 var(--accent), inset 0 0 0 2px var(--accent); }
-.team-hub .schedule-meeting .type-dot { background: var(--personal); }
-.team-hub .sched-card + .pager { margin-top: 12px; }
+.team-hub .sched-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-sm); }
+.team-hub .sched-list .ui-event { border-color: transparent; }
+.team-hub .sched-list .ui-event-selected { border-color: var(--accent); }
+.team-hub .schedule-meeting-live { color: var(--live-ink); font-weight: 700; }
+.team-hub .sched-list + .pager { margin-top: var(--space-md); }
 
 /* The open event. */
-.team-hub .event-detail { padding: 20px; }
+.team-hub .event-detail { display: grid; gap: var(--space-md); align-content: start; }
+.team-hub .event-detail > p, .team-hub .event-detail > .event-cal { margin: 0; }
+.team-hub .event-detail .ui-cover-photo { height: 64px; }
+.team-hub .event-detail .ui-cover-title { font-size: var(--text-section-size); }
 .team-hub .event-detail-head .type-chip { display: inline-flex; align-items: center; margin: 0; background: var(--field); color: var(--ink-soft); }
 .team-hub .event-detail-head .type-chip .type-dot { margin-right: 6px; vertical-align: 0; }
 .team-hub .event-detail h2 { margin: 12px 0 4px; font-size: 1.45rem; font-weight: 800; letter-spacing: -0.02em; }
@@ -147,8 +133,6 @@
 .team-hub .rsvp-group ul { font-size: 0.84rem; overflow-wrap: anywhere; }
 @media (max-width: 560px) {
   .team-hub .rsvp-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .team-hub .sched-list a.team-sched-row { grid-template-columns: 44px minmax(0, 1fr); gap: 12px; padding: 12px; }
-  .team-hub .sched-list a.team-sched-row .rsvp-line { grid-column: 2; }
   .team-hub .date-tile { width: 44px; height: 46px; }
 }
 
@@ -273,7 +257,7 @@
 .team-hub .event-place { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
 .team-hub .event-place a { font-weight: 700; text-decoration: none; }
 .team-hub .event-place a:hover { text-decoration: underline; }
-.team-hub .event-notes { margin: 12px 0; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); }
+.team-hub .event-notes { margin: 0; padding: var(--space-md); border-radius: var(--radius); background: var(--field); }
 .team-hub .event-notes h3 { margin: 0; font-size: 0.82rem; font-weight: 800; color: var(--muted); }
 .team-hub .event-notes .post-body { margin-top: 4px; }
 .team-hub .rsvp-ask .rsvp-buttons button { display: grid; justify-items: center; gap: 0; line-height: 1.2; }

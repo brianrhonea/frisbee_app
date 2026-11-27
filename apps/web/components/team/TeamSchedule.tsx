@@ -16,13 +16,15 @@ import { type Meeting, meetingHref, meetingsHref, useTeamMeetings } from "./meet
 import { type TeamViewer, useTeamHub, viewerSectionOn } from "./TeamContext";
 import { TeamEventEditor } from "./TeamEventEditor";
 import { EventVideos } from "./videos/EventVideos";
-import { DateTile, isToday } from "./DateTile";
-import { needsRsvp, NeedsPill, RsvpPill } from "../RsvpPill";
+import { needsRsvp, NeedsPill } from "../RsvpPill";
 import { NoteQuote, RsvpNoteField } from "../RsvpNote";
 import "./team_schedule_meetings.css";
 import { startOfToday } from "@/lib/dates";
 import { validId } from "@/lib/text";
 import { EmptyState, Loading } from "../StatusViews";
+import { CoverHeader } from "../ui/CoverHeader";
+import { DateBadge } from "../ui/DateBadge";
+import { EventCard } from "../ui/EventCard";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { ErrorNote } from "@/components/StatusViews";
 
@@ -246,38 +248,35 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
         {entries.length === 0 ? (
           <EmptyState>{past ? "No past events." : "Nothing scheduled."}</EmptyState>
         ) : (
-          <div className="card sched-card">
-            <ul className="hub-items sched-list">
-              {entries.map((x) => {
-                if (x.kind === "meeting") return <MeetingItem key={`m-${x.meeting.id}`} teamId={teamId} meeting={x.meeting} />;
-                const e = x.event;
-                const on = e.id === open?.id;
-                return (
-                  <li key={e.id}>
-                    <Link
-                      href={link({ event: e.id })}
-                      scroll={false}
-                      className={`team-sched-row${on ? " active" : ""}${isToday(e.startsAt) ? " today" : ""}`}
-                      aria-current={on ? "true" : undefined}
-                    >
-                      <DateTile startsAt={e.startsAt} />
-                      <span className="sched-main">
-                        <b>
-                          <span className="type-dot" aria-hidden="true" />
-                          {e.title || typeLabels[e.type ?? ""] || "Event"}
-                        </b>
-                        <small>
-                          <LocalTime iso={e.startsAt} style="dateTime" />
-                          {e.location ? ` · ${e.location}` : ""}
-                        </small>
-                      </span>
-                      {member && <RsvpLine event={e} uid={member.uid} past={past} />}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
+          <ul className="sched-list">
+            {entries.map((x) => {
+              if (x.kind === "meeting") return <MeetingItem key={`m-${x.meeting.id}`} teamId={teamId} meeting={x.meeting} />;
+              const e = x.event;
+              const mine = member ? e.rsvps?.[member.uid] : undefined;
+              const going = Object.values(e.rsvps ?? {}).filter((s) => s === "going").length;
+              return (
+                <li key={e.id}>
+                  <EventCard
+                    startsAt={e.startsAt}
+                    title={e.title || typeLabels[e.type ?? ""] || "Event"}
+                    href={link({ event: e.id })}
+                    scroll={false}
+                    selected={e.id === open?.id}
+                    meta={
+                      <>
+                        <LocalTime iso={e.startsAt} style="dateTime" />
+                        {e.location ? ` · ${e.location}` : ""}
+                        {member ? ` · ${going} going` : ""}
+                      </>
+                    }
+                    answer={member ? mine : undefined}
+                    needsRsvp={!!member && !past && needsRsvp(mine, e.startsAt, e.endsAt)}
+                    recurring={!!e.series}
+                  />
+                </li>
+              );
+            })}
+          </ul>
         )}
         {live.more && (
           <div className="pager">
@@ -315,37 +314,19 @@ function MeetingItem({ teamId, meeting }: { teamId: string; meeting: Meeting }) 
   const live = meeting.status === "live";
   return (
     <li className="schedule-meeting">
-      <Link href={meetingHref(teamId, meeting.id)} className={`team-sched-row${live ? " today" : ""}`}>
-        <DateTile startsAt={meeting.startsAt} />
-        <span className="sched-main">
-          <b>
-            <span className="type-dot" aria-hidden="true" />
-            {meeting.title || "Meeting"}
-          </b>
-          <small>
+      <EventCard
+        startsAt={meeting.startsAt}
+        title={meeting.title || "Meeting"}
+        href={meetingHref(teamId, meeting.id)}
+        meta={
+          <>
             <LocalTime iso={meeting.startsAt} style="dateTime" />
             {" · "}
             <span className={live ? "schedule-meeting-live" : ""}>{live ? "Live now" : "Video meeting"}</span>
-          </small>
-        </span>
-      </Link>
+          </>
+        }
+      />
     </li>
-  );
-}
-
-/**
- * A row's answers: how many are going and the member's own answer as a
- * pill (the app's RsvpStatusPill): Going in turf, others neutral, and
- * "Needs RSVP" in amber only on an upcoming event they haven't answered.
- */
-function RsvpLine({ event, uid, past }: { event: TeamEventDoc; uid: string; past: boolean }) {
-  const mine = event.rsvps?.[uid];
-  const going = Object.values(event.rsvps ?? {}).filter((s) => s === "going").length;
-  return (
-    <span className="rsvp-line">
-      <small>{going} going</small>
-      <RsvpPill answer={mine} type={event.type} needs={!past && needsRsvp(mine, event.startsAt, event.endsAt)} />
-    </span>
   );
 }
 
@@ -392,46 +373,50 @@ function EventDetail({ event, onEdit }: { event: Doc<TeamEventDoc>; onEdit?: () 
   }
 
   return (
-    <article className="card event-detail">
+    <article className="event-detail">
       {scope.dialog}
-      <div className="event-detail-head">
-        <p className="pill type-chip">
-          <span className="type-dot" aria-hidden="true" />
-          {typeLabels[event.type ?? ""] ?? "Event"}
-        </p>
-        {onEdit && (
-          <span className="post-admin">
-            {!event.tournamentId && (
-              <button type="button" className="btn btn-small btn-quiet" onClick={onEdit}>
-                Edit
-              </button>
-            )}
-            <button
-              type="button"
-              className="btn btn-small btn-quiet"
-              disabled={busy}
-              onClick={async () => {
-                // A repeating event: this one, or it and every later one.
-                if (event.series) {
-                  void scope.ask(`Delete "${event.title || "Event"}"?`, "Delete").then((which) => which && void send(scopeQuery(which), "DELETE"));
-                } else if ((await askConfirm({ message: "Delete this event for everyone?", confirmLabel: "Delete", destructive: true }))) void send("", "DELETE");
-              }}
-            >
-              Delete
-            </button>
-          </span>
-        )}
-      </div>
-      <h2>{event.title || "Event"}</h2>
-      <p className="muted">
-        <LocalTime iso={event.startsAt} style="dateTime" />
-        {event.endsAt && (
+      <CoverHeader
+        as="h2"
+        avatar={<DateBadge startsAt={event.startsAt} />}
+        title={event.title || "Event"}
+        subtitle={
           <>
-            {" – "}
-            <LocalTime iso={event.endsAt} style="dateTime" />
+            {typeLabels[event.type ?? ""] ?? "Event"}
+            {" · "}
+            <LocalTime iso={event.startsAt} style="dateTime" />
+            {event.endsAt && (
+              <>
+                {" – "}
+                <LocalTime iso={event.endsAt} style="dateTime" />
+              </>
+            )}
           </>
-        )}
-      </p>
+        }
+        actions={
+          onEdit ? (
+            <span className="post-admin">
+              {!event.tournamentId && (
+                <button type="button" className="btn btn-small btn-quiet" onClick={onEdit}>
+                  Edit
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn btn-small btn-quiet"
+                disabled={busy}
+                onClick={async () => {
+                  // A repeating event: this one, or it and every later one.
+                  if (event.series) {
+                    void scope.ask(`Delete "${event.title || "Event"}"?`, "Delete").then((which) => which && void send(scopeQuery(which), "DELETE"));
+                  } else if ((await askConfirm({ message: "Delete this event for everyone?", confirmLabel: "Delete", destructive: true }))) void send("", "DELETE");
+                }}
+              >
+                Delete
+              </button>
+            </span>
+          ) : undefined
+        }
+      />
       {event.location && (
         <p className="event-place">
           <span>{event.location}</span>

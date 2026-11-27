@@ -4,6 +4,15 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.67.0 — 2026-11-27
+
+H3 Event details and RSVP restyle. Same events, RSVP answers, notes, reactions, polls, edit, delete and series scope.
+
+- The team schedule is a list of event cards (C8): date badge, title, time, place, how many are going, your answer or Needs RSVP, and Repeats. The open event is outlined.
+- The open event has a cover header (C5) with the date badge, its title, type and time, and Edit and Delete beside it; place, notes and Add to calendar sit under it without extra boxes.
+- EventCard takes selected and scroll options for lists that open their details beside them.
+- Test notes: the K5-B/K5-C checks that named the old team-schedule today row no longer apply (that row is gone; the date badge shows the day).
+
 ## 0.66.0 — 2026-11-27
 
 H7 Chats restyle with the filters the app has (UI-Q12). Same inbox, requests, archive, search, sending and unread rules.
