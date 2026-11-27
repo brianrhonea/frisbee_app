@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:logging/logging.dart';
 
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/chat.dart';
@@ -93,11 +92,6 @@ class TeamRepositoryFirebase implements TeamRepository {
   /// One listener per query, shared by every screen (see [SharedStreams]).
   final SharedStreams _shared;
 
-  static final _log = Logger('TeamRepository');
-
-  /// Teams whose legacy roster status is being moved, so it runs once.
-  final _migrating = <String>{};
-
   // No 0/O/1/I to keep codes easy to read aloud.
   static const _codeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   static const _codeLength = 6;
@@ -128,7 +122,10 @@ class TeamRepositoryFirebase implements TeamRepository {
       _teams.doc(teamId).collection('joins').doc(uid);
 
   /// Older roster entries kept paid (and the retired USA Ultimate onUsau
-  /// flag) on the entry itself.
+  /// flag) on the entry itself. Read as a fallback for what an admin sees;
+  /// nothing moves it any more (the app's migration went with the roster
+  /// writes, contracts/phase1-writes.md D7), and saving the spot through the
+  /// API rewrites the entry without it.
   static const _legacyStatusKeys = ['onUsau', 'paid'];
 
   String _newCode(int length) => String.fromCharCodes(
@@ -1061,7 +1058,6 @@ class TeamRepositoryFirebase implements TeamRepository {
     final status = countedSnapshots(_status(teamId), 'rosterStatus');
     return combineLatest(roster, status, (r, s) {
       final status = {for (final d in s.docs) d.id: plainData(d.data())};
-      _moveLegacyStatus(teamId, r.docs, status.keys.toSet());
       return _sorted([
         for (final d in r.docs)
           RosterPlayer.fromMap(
@@ -1081,45 +1077,26 @@ class TeamRepositoryFirebase implements TeamRepository {
       ? {for (final k in _legacyStatusKeys) k: data[k]}
       : null;
 
-  /// Moves status still stored on roster entries (readable by every member)
-  /// into rosterStatus, then strips it from the entry. Runs when an admin
-  /// views the roster, since only admins may write either collection.
-  void _moveLegacyStatus(
-    String teamId,
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> roster,
-    Set<String> hasStatus,
-  ) {
-    final legacy = [
-      for (final d in roster)
-        if (_legacyStatus(d.data()) != null) d,
-    ];
-    if (legacy.isEmpty || !_migrating.add(teamId)) return;
-    final batch = _db.batch();
-    for (final d in legacy) {
-      if (!hasStatus.contains(d.id)) {
-        batch.set(_status(teamId).doc(d.id), {
-          'paid': d.data()['paid'] as bool? ?? false,
-        });
-      }
-      batch.update(d.reference, {
-        for (final k in _legacyStatusKeys) k: FieldValue.delete(),
-      });
-    }
-    batch
-        .commit()
-        .catchError((Object e) => _log.warning('Roster status move failed', e))
-        .whenComplete(() => _migrating.remove(teamId));
-  }
-
+  /// `POST /v1/teams/:teamId/roster-players` for a new spot (with an id the
+  /// client picked, so a replay is a 409), `PUT .../:playerId` to save one;
+  /// `paid` goes along (the server keeps it in the admin-only status).
   @override
   Future<Result<void>> savePlayer(String teamId, RosterPlayer player) =>
       guard(() async {
-        final col = _roster(teamId);
-        final ref = player.id.isEmpty ? col.doc() : col.doc(player.id);
-        await (_db.batch()
-              ..set(ref, player.toMap())
-              ..set(_status(teamId).doc(ref.id), player.toStatusMap()))
-            .commit();
+        final api = _requireApi();
+        final body = {
+          'name': player.name.trim(),
+          'number': player.number,
+          'position': player.position.name,
+          'userId': player.userId,
+          'paid': player.paid,
+        };
+        final base = '/v1/teams/${Uri.encodeComponent(teamId)}/roster-players';
+        if (player.id.isEmpty) {
+          await api.post(base, {...body, 'id': _roster(teamId).doc().id});
+        } else {
+          await api.put('$base/${Uri.encodeComponent(player.id)}', body);
+        }
       });
 
   /// The API, or an error saying it can't be reached (writes only it makes).
@@ -1159,20 +1136,27 @@ class TeamRepositoryFirebase implements TeamRepository {
     },
   );
 
+  /// `PUT .../roster-players/:playerId/link`: an admin links a member, or a
+  /// member claims (or lets go of) a spot for themselves.
   @override
   Future<Result<void>> linkPlayer(
     String teamId,
     String playerId,
     String? uid,
-  ) => guard(() => _roster(teamId).doc(playerId).update({'userId': uid}));
+  ) => guard(
+    () => _requireApi().put(
+      '/v1/teams/${Uri.encodeComponent(teamId)}/roster-players/'
+      '${Uri.encodeComponent(playerId)}/link',
+      {'userId': uid},
+    ),
+  );
 
   @override
   Future<Result<void>> deletePlayer(String teamId, String playerId) => guard(
-    () =>
-        (_db.batch()
-              ..delete(_roster(teamId).doc(playerId))
-              ..delete(_status(teamId).doc(playerId)))
-            .commit(),
+    () => _requireApi().delete(
+      '/v1/teams/${Uri.encodeComponent(teamId)}/roster-players/'
+      '${Uri.encodeComponent(playerId)}',
+    ),
   );
 }
 
