@@ -38,6 +38,7 @@ async function shell(page: import("@playwright/test").Page) {
 }
 
 test("the navigation fits the width and nothing scrolls sideways", async ({ page }, info) => {
+  test.setTimeout(150_000); // six pages, some compiled on first visit by the dev server
   const w = page.viewportSize()!.width;
   for (const path of pagesToCheck) {
     await open(page, path);

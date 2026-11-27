@@ -4,6 +4,10 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.63.4 — 2026-11-26
+
+Browser-test setup only: the route check (N8) is its own Playwright project that runs after the width projects (it starts a stub API on port 8787, which must not run beside them), and the shell width test has a longer timeout for first-visit compiles.
+
 ## 0.63.3 — 2026-11-26
 
 Browser tests only (Sprint 3 N8 and N10): every page in `app/**/page.tsx` opens signed out (77 checks, with a stub API answering 404 so server-rendered pages do not need a real one), and the shell works by keyboard (skip link, reading order, focus rings, only the visible navigation is reachable, arrows on chips and tabs). The review-picture spec also captures the new gallery sections.

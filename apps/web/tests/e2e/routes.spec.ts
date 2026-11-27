@@ -52,9 +52,6 @@ test.describe("every page opens (signed out)", () => {
   test.afterAll(async () => {
     await new Promise<void>((done) => (stub ? stub.close(() => done()) : done()));
   });
-  test.beforeEach(({}, info) => {
-    test.skip(info.project.name !== "laptop", "routes run once, at laptop width");
-  });
   test("the route list covers the route map", () => {
     expect(routes.length).toBeGreaterThanOrEqual(75);
     for (const must of ["/", "/explore", "/learn", "/schedule", "/teams", "/messages", "/profile", "/settings", "/tournaments", "/sign-in", "/staff", "/teams/t1/chat", "/tournaments/tn1/bracket"]) {

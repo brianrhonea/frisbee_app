@@ -23,15 +23,26 @@ export default defineConfig({
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000",
     trace: "retain-on-failure",
   },
-  projects: widths.map((w) => ({
-    name: w.name,
-    use: {
-      ...devices["Desktop Chrome"],
-      viewport: { width: w.width, height: w.height },
-      isMobile: w.mobile,
-      hasTouch: w.mobile,
+  projects: [
+    ...widths.map((w) => ({
+      name: w.name,
+      testIgnore: /routes\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: w.width, height: w.height },
+        isMobile: w.mobile,
+        hasTouch: w.mobile,
+      },
+    })),
+    // N8: every route opens. It starts a stub API on port 8787 (server-rendered pages ask
+    // for public data), so it runs after the others, never beside them.
+    {
+      name: "routes",
+      testMatch: /routes\.spec\.ts/,
+      dependencies: widths.map((w) => w.name),
+      use: { ...devices["Desktop Chrome"], viewport: { width: 1024, height: 768 } },
     },
-  })),
+  ],
   webServer: process.env.E2E_BASE_URL
     ? undefined
     : {
