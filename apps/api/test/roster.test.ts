@@ -247,10 +247,31 @@ describe("roster for a signed-in non-member (F1)", () => {
     ]);
   });
 
-  it("a linked former member who isn't a member never shows a uid", async () => {
+  it("a linked former member who isn't a member has no uid key", async () => {
     outsiderTeam();
     const body = (await s.get("/v1/teams/o1/roster", "visitor")).json();
-    expect(JSON.stringify(body.players)).not.toContain('"uid"');
+    for (const p of body.players) expect(p.person ? Object.hasOwn(p.person, "uid") : false).toBe(false);
+    for (const m of body.members.filter((m: { tier: string }) => !["owner", "coach", "captain"].includes(m.tier))) expect(Object.hasOwn(m, "uid")).toBe(false);
+  });
+
+  it("never lets a hidden member's uid or Storage photo reach an outsider", async () => {
+    outsiderTeam();
+    const photo = "https://firebasestorage.googleapis.com/v0/b/proj.firebasestorage.app/o/users%2Fpriv%2Fprofile%2Fme.jpg?alt=media&token=t";
+    s.store.put("profiles/priv", { name: "Pia Private", username: "pia", private: true, photoUrl: photo });
+    s.store.put("profiles/shy", { name: "Shy Coach", username: "shy", visibility: { teams: false }, photoUrl: photo.replace("priv", "shy") });
+    const text = (await s.get("/v1/teams/o1/roster", "visitor")).body;
+    expect(text).not.toContain("priv");
+    expect(text).not.toContain("shy");
+    expect(text).not.toContain("firebasestorage");
+  });
+
+  it("a spot linked to a teams-hidden profile is a bare Player with no person", async () => {
+    outsiderTeam();
+    s.store.put("profiles/hush", { name: "Hush Hidden", username: "hush", visibility: { teams: false } });
+    s.store.put("teams/o1/roster/h", { name: "Hush Hidden", number: 12, userId: "hush" });
+    const body = (await s.get("/v1/teams/o1/roster", "visitor")).json();
+    expect(body.players.find((p: { id: string }) => p.id === "h")).toEqual({ id: "h", name: "Player", number: 12 });
+    expect(JSON.stringify(body)).not.toContain("hush");
   });
 
   it("members still see everyone, with uids, private flags and linked cards", async () => {

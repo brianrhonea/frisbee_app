@@ -44,10 +44,12 @@ export const staffTiers = ["owner", "coach", "captain"] as const;
 
 /**
  * What `GET /v1/teams/:id/roster` returns a signed-in NON-member (and what
- * members still get, in full, as TeamRoster): the same shape with `uid`
- * absent except on staff (staffTiers) who show their teams, adults and public
- * profile; hidden people are left out of `members` and a spot linked to one
- * is a bare "Player" with no `person`. A spot's `person` never carries a uid.
+ * members still get, in full, as TeamRoster): the same shape with no `uid`
+ * field except on staff (staffTiers) who show their teams, adults and public
+ * profile; hidden people are never included (left out of `members`, and a
+ * spot linked to one is a bare "Player" with no `person`). A spot's `person`
+ * has no `uid` field. Visible (public) people remain resolvable by username
+ * or photo URL, which is accepted: their profiles are already public.
  */
 export type OutsiderRosterPerson = Omit<RosterPerson, "uid"> & { uid?: string };
 export interface OutsiderRosterPlayer extends Omit<RosterPlayer, "person"> {
