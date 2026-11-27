@@ -8,6 +8,7 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { FirestoreBrowseRepository } from "./browse/repository.js";
 import { photoBuckets } from "./browse/visibility.js";
+import { configureImageBuckets } from "./browse/model.js";
 import { FirestoreRateLimiter } from "./limits/limiter.js";
 import { FirestoreCalendarRepository } from "./calendar/repository.js";
 import { FirestoreMeRepository } from "./me/repository.js";
@@ -68,6 +69,7 @@ const webServerKey = process.env.WEB_SERVER_KEY?.trim() || undefined;
 /** The Storage buckets whose pictures profiles may show (this project's, either domain). */
 const profilePhotoBuckets = [...new Set([process.env.STORAGE_BUCKET?.trim(), `${projectId}.firebasestorage.app`, `${projectId}.appspot.com`].filter((b): b is string => Boolean(b)))];
 configurePhotoTrust(profilePhotoBuckets, process.env.FIREBASE_STORAGE_EMULATOR_HOST);
+configureImageBuckets(profilePhotoBuckets);
 const imageUrl = storageUrl(process.env.STORAGE_BUCKET || `${projectId}.firebasestorage.app`);
 
 const app = buildApp({

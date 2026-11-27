@@ -218,7 +218,8 @@ export class PersonalService {
     const refusal = await this.store.get(refusalPath(uid));
     if (!refusal) return false;
     const date = await this.openDate(refusal, refusalPath(uid));
-    if (date === null) return false;
+    // A refusal whose date can't be read can't be shown to be anything but an under-13 one: fail closed (stay disabled).
+    if (date === null) return true;
     // A refusedAt that isn't a Date can't be trusted: judge the age on the birth date itself (age 0, under 13), so the account stays disabled (review 4.1d).
     const at = refusal.refusedAt instanceof Date ? refusal.refusedAt : new Date(`${date}T00:00:00Z`);
     return birthDateProblem(date, at) === tooYoungMessage;

@@ -69,6 +69,7 @@ import type { TeamRepository } from "./repository.js";
 import { tooFastMessage } from "./service.js";
 import { tooFast } from "../limits/memory.js";
 import { type Counter, count, type Limit } from "../limits/model.js";
+import { trustedProfilePhoto } from "../media/photo_url.js";
 
 /** Failed switches to the club level per team per day; the next one is refused outright. */
 export const failedClubSwitchLimit: Limit = { max: 3, windowMs: 24 * 60 * 60_000 };
@@ -340,7 +341,8 @@ export class MembershipService {
       const profile = profiles[i] ?? {};
       const card: PendingInvite = { uid, name: str(profile.name) || "Someone" };
       if (str(profile.username)) card.username = str(profile.username);
-      if (str(profile.photoUrl)) card.photoUrl = str(profile.photoUrl);
+      const photo = trustedProfilePhoto(profile.photoUrl, uid);
+      if (photo) card.photoUrl = photo;
       if (profile.private === true) card.private = true;
       if (str(data.invitedByName)) card.invitedByName = str(data.invitedByName);
       if (data.createdAt instanceof Date) card.invitedAt = data.createdAt.toISOString();

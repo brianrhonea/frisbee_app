@@ -20,6 +20,7 @@ import { ApiError, parseBody } from "../errors.js";
 import { docIdParam } from "../ids.js";
 import { type Data, type DocStore, deleteField } from "../store.js";
 import { can, isGroup, mapOf } from "./access.js";
+import { trustedProfilePhoto } from "../media/photo_url.js";
 
 const positions = ["handler", "cutter", "hybrid"] as const;
 /** What anyone who isn't on a youth team sees in place of its roster (the app and website say the same). */
@@ -209,7 +210,8 @@ export class RosterService {
         const p = profiles[i] ?? {};
         const card: RosterPerson = { uid, name: str(p.name) || str(names[uid]) || "Member" };
         if (str(p.username)) card.username = str(p.username);
-        if (str(p.photoUrl)) card.photoUrl = str(p.photoUrl);
+        const photo = trustedProfilePhoto(p.photoUrl, uid);
+        if (photo) card.photoUrl = photo;
         if (p.private === true) card.private = true;
         return [uid, card];
       }),

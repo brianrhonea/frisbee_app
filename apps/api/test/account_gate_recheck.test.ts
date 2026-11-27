@@ -156,9 +156,8 @@ describe("review 4.1: lifting a suspension fails closed", () => {
       return super.open(...args);
     }
   }
-  function setup(cipher?: PersonalCipher) {
+  function setup(cipher?: PersonalCipher, users: FakeUsers = new FakeUsers()) {
     const store = new FakeStore(() => now);
-    const users = new FakeUsers();
     const app = buildApp({ verifier: new FakeVerifier(), users, teams: new FakeTeamRepository(), store, ...(cipher && { personal: cipher }), now: () => now });
     const call = (method: "POST" | "PUT", url: string, body?: object, uid = "me", kind = "token") =>
       app.inject({ method, url, ...(body && { payload: body }), headers: { authorization: `Bearer ${kind}:${uid}` } });
@@ -207,6 +206,36 @@ describe("review 4.1: lifting a suspension fails closed", () => {
     expect((await lift()).statusCode).toBe(204);
     expect(s.users.disabled.has("pat")).toBe(false);
     expect(s.store.doc("limits/pat")).toMatchObject({ suspended: false });
+  });
+
+  it("a refusal whose date can't be read keeps the account disabled (3a-F: fails closed)", async () => {
+    const cipher = new FakeCipher();
+    const s = setup(cipher);
+    const sealed = await cipher.seal(Buffer.from("{}", "utf8"), "ageRefusals/pat");
+    s.store.put("ageRefusals/pat", { ciphertext: sealed.ciphertext, key: sealed.key, format: 1, refusedAt: new Date(now) });
+    const lift = await suspended(s);
+    expect((await lift()).statusCode).toBe(204);
+    expect(s.users.disabled.has("pat")).toBe(true);
+  });
+
+  it("an under-13 refusal that lands while the lift runs disables the account again (4.1b race)", async () => {
+    const cipher = new FakeCipher();
+    let arrive: () => Promise<void> = async () => {};
+    class RacyUsers extends FakeUsers {
+      override async setDisabled(uid: string, disabled: boolean) {
+        await super.setDisabled(uid, disabled);
+        if (!disabled) await arrive();
+      }
+    }
+    const s = setup(cipher, new RacyUsers());
+    const lift = await suspended(s);
+    arrive = async () => {
+      // The refusal arrives between the check and the re-enable.
+      const sealed = await cipher.seal(Buffer.from(JSON.stringify({ birthDate: "2018-01-01" }), "utf8"), "ageRefusals/pat");
+      s.store.put("ageRefusals/pat", { ciphertext: sealed.ciphertext, key: sealed.key, format: 1, refusedAt: new Date(now) });
+    };
+    expect((await lift()).statusCode).toBe(204);
+    expect(s.users.disabled.has("pat")).toBe(true);
   });
 
   it("an under-13 refusal whose refusedAt isn't a Date keeps the account disabled", async () => {

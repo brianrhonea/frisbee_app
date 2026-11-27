@@ -7,7 +7,6 @@ import { AdultVisibility, adultClaimTtlMs } from "../src/account/adult_visibilit
 import type { AccountGateMode } from "../src/auth.js";
 import { buildApp } from "../src/app.js";
 import type { BrowseRepository, Data, Doc } from "../src/browse/repository.js";
-import { MemoryRateLimiter } from "../src/limits/memory.js";
 import { FakeMediaStorage, FakeStore, FakeTeamRepository, FakeUsers, FakeVerifier } from "./fakes.js";
 
 const now = Date.UTC(2026, 10, 14, 12);
@@ -76,7 +75,7 @@ function setup(mode: AccountGateMode) {
     now: () => now,
     writeLimits: false,
     accountGateMode: mode,
-    browse: { repo, limiter: new MemoryRateLimiter(), imageUrl: (p) => `https://img.test/${p}`, photoBuckets: ["x"] },
+    browse: { repo, limiter: { admit: async () => true }, imageUrl: (p) => `https://img.test/${p}`, photoBuckets: ["x"] },
   });
   for (const [uid, name] of [["amy", "Amy"], ["adult", "Ada"], ["legacy", "Lee"]] as const) {
     repo.profileMap.set(uid, { name, username: uid, private: false });

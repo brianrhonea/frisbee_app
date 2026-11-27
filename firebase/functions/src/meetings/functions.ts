@@ -26,6 +26,7 @@ import {
 } from "./model";
 import { requireCompleteAccount } from "../account/gate";
 import { enforceAppCheck } from "../options";
+import { trustedProfilePhoto } from "../media/photo_url";
 
 const livekitUrl = defineSecret("LIVEKIT_URL");
 const livekitKey = defineSecret("LIVEKIT_API_KEY");
@@ -67,11 +68,11 @@ export const joinToken = onCall({ secrets, enforceAppCheck }, async (req) => {
     const code = decision === "notStarted" || decision === "needsApproval" ? "failed-precondition" : "permission-denied";
     throw new HttpsError(code, joinMessages[decision]);
   }
-  const photoUrl = profile.get("photoUrl");
+  const photoUrl = trustedProfilePhoto(profile.get("photoUrl"), uid);
   const token = new AccessToken(livekitKey.value().trim(), livekitSecret.value().trim(), {
     identity: uid,
     name: displayName(teamData!, uid, profile.get("name")),
-    metadata: JSON.stringify(typeof photoUrl === "string" ? { photoUrl } : {}),
+    metadata: JSON.stringify(photoUrl ? { photoUrl } : {}),
     ttl: "6h",
   });
   token.addGrant({
@@ -107,11 +108,11 @@ export const voiceToken = onCall({ secrets, enforceAppCheck }, async (req) => {
   const teamData = team.data() as VoiceTeam | undefined;
   const decision = voiceDecision(teamData, room.data() as VoiceRoomDoc | undefined, uid);
   if (!decision.ok) throw new HttpsError(decision.code, decision.message);
-  const photoUrl = profile.get("photoUrl");
+  const photoUrl = trustedProfilePhoto(profile.get("photoUrl"), uid);
   const token = new AccessToken(livekitKey.value().trim(), livekitSecret.value().trim(), {
     identity: uid,
     name: displayName(teamData!, uid, profile.get("name")),
-    metadata: JSON.stringify(typeof photoUrl === "string" ? { photoUrl } : {}),
+    metadata: JSON.stringify(photoUrl ? { photoUrl } : {}),
     ttl: "6h",
   });
   token.addGrant({
