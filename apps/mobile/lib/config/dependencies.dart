@@ -204,7 +204,10 @@ List<SingleChildWidget> get firebaseProviders => [
       flags: context.read<FeatureFlags>(),
     ),
   ),
-  Provider<EventRepository>(create: (_) => EventRepositoryFirebase()),
+  Provider<EventRepository>(
+    create: (context) =>
+        EventRepositoryFirebase(api: context.read<ApiClient?>()),
+  ),
   Provider<TeamPostRepository>(
     // Made at start (as are the other four the offline queue sends
     // through), so queued items go out without opening their screens.
