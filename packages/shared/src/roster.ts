@@ -36,6 +36,34 @@ export interface RosterMember extends RosterPerson {
   roles: string[];
 }
 
+/**
+ * Who a team's Message sheet lists: the tiers a non-member may direct-message.
+ * The roster route gives a non-member a `uid` for these members only.
+ */
+export const staffTiers = ["owner", "coach", "captain"] as const;
+
+/**
+ * What `GET /v1/teams/:id/roster` returns a signed-in NON-member (and what
+ * members still get, in full, as TeamRoster): the same shape with `uid`
+ * absent except on staff (staffTiers) who show their teams, adults and public
+ * profile; hidden people are left out of `members` and a spot linked to one
+ * is a bare "Player" with no `person`. A spot's `person` never carries a uid.
+ */
+export type OutsiderRosterPerson = Omit<RosterPerson, "uid"> & { uid?: string };
+export interface OutsiderRosterPlayer extends Omit<RosterPlayer, "person"> {
+  person?: OutsiderRosterPerson;
+}
+export interface OutsiderRosterMember extends OutsiderRosterPerson {
+  tier: string;
+  roles: string[];
+}
+export interface OutsiderTeamRoster {
+  kind: TeamRoster["kind"];
+  players: OutsiderRosterPlayer[];
+  members: OutsiderRosterMember[];
+  teams: RosterTeam[];
+}
+
 /** A team a community lists (its `linkedTeams`). */
 export interface RosterTeam {
   id: string;
