@@ -112,6 +112,7 @@
 .schedule-page .schedule-view { margin-left: auto; }
 .sched-days { display: grid; gap: var(--space-lg); }
 .sched-day { display: grid; gap: var(--space-sm); }
+.sched-month-list { position: relative; max-height: 30rem; overflow-y: auto; overscroll-behavior: contain; align-content: start; padding-right: var(--space-xs); }
 .sched-day-head {
   margin: 0; font-size: var(--text-caption-size); font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
 }

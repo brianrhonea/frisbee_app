@@ -1,0 +1,6 @@
+/* The header Message dialog: team chat and staff (S4 C6). */
+dialog.dialog:has(.staff-list) { width: min(100% - 32px, 440px); }
+.staff-list { display: grid; gap: var(--space-md); }
+.staff-list > * { margin: 0; }
+.staff-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); }
+.staff-rows { list-style: none; margin: 0; padding: 0; }

@@ -36,6 +36,8 @@ import { type Meeting, type MeetingData, meetingHref, teamBase, teamMeetingQueri
 import { memberViewer, type TeamDoc } from "./team/TeamContext";
 import { scheduleMeetings, type TeamEventDoc, teamEventQueries } from "./team/TeamSchedule";
 import { useAuth } from "./AuthProvider";
+import { ScheduleMonthList } from "./ScheduleMonthList";
+import { findOverlap, overlapMessage, type Span } from "@/lib/overlap";
 import { type ShareChoice, ShareEventField, shareEvent } from "./team/ShareEvent";
 import { fromLocalInput, startOfToday, toLocalInput } from "@/lib/dates";
 import { useMyTeams } from "./useMyTeams";
@@ -391,6 +393,7 @@ export function Schedule() {
             key={editing.id ?? "new"}
             event={editing}
             calendars={writable}
+            others={rows.map(spanOf)}
             onDone={(saved) => {
               setEditing(null);
               if (saved) void load();
@@ -460,11 +463,24 @@ export function Schedule() {
                 );
               })}
             </div>
-            {/* The picked day's events. */}
-            <section className="sched-day picked" aria-label={dayLabelOf(picked)}>
-              <h3 className="sched-day-head">{dayLabelOf(picked)}</h3>
-              {pickedItems.length === 0 ? <p className="muted small">Nothing scheduled</p> : <ul className="sched-list">{pickedItems.map(renderRow)}</ul>}
-            </section>
+            {weekView ? (
+              /* Week: the picked day's events. */
+              <section className="sched-day picked" aria-label={dayLabelOf(picked)}>
+                <h3 className="sched-day-head">{dayLabelOf(picked)}</h3>
+                {pickedItems.length === 0 ? <p className="muted small">Nothing scheduled</p> : <ul className="sched-list">{pickedItems.map(renderRow)}</ul>}
+              </section>
+            ) : (
+              /* Month: the whole month as a scrollable list by day; the grid scrolls it to a day. */
+              <ScheduleMonthList
+                label={dayLabelOf}
+                days={grid
+                  .filter((d) => d.getMonth() === month.getMonth())
+                  .map((d) => ({ day: d, items: onDay(d) }))
+                  .filter((x) => x.items.length > 0)}
+                picked={picked}
+                renderRow={renderRow}
+              />
+            )}
           </>
         ) : !data && !error ? (
           <p className="muted">Loading…</p>
@@ -526,6 +542,13 @@ export function Schedule() {
       )}
     </div>
   );
+}
+
+/** A row as the overlap check sees it (its id only for a calendar event: that is the one an edit replaces). */
+function spanOf(r: Row): Span {
+  if (r.kind === "calendar") return { id: r.event.id, title: r.event.title, startsAt: r.startsAt, endsAt: r.endsAt };
+  if (r.kind === "event") return { title: r.event.title, startsAt: r.startsAt, endsAt: r.endsAt };
+  return { title: r.meeting.title, startsAt: r.startsAt, endsAt: r.endsAt };
 }
 
 /** List or Month: how My schedule shows its days (the app's Week / Month). */
@@ -675,13 +698,17 @@ export function Invites({ invites, onAnswered }: { invites: CalendarInvite[]; on
 function EventEditor({
   event,
   calendars,
+  others = [],
   onDone,
 }: {
   event: Partial<CalendarEvent> & { calendarId?: string };
   calendars: CalendarInfo[];
+  /** The entries already loaded in the schedule, for the overlap warning (nothing more is read). */
+  others?: Span[];
   onDone: (saved: boolean) => void;
 }) {
   const { user } = useAuth();
+  const askConfirm = useConfirm();
   // Calendars made here (New shared calendar) join the list at once.
   const [made, setMade] = useState<CalendarInfo[]>([]);
   const [newCal, setNewCal] = useState(false);
@@ -719,6 +746,9 @@ function EventEditor({
     if (bad) return setError(bad);
     const which = event.series ? await scope.ask(`Save changes to "${title.trim()}"?`, "Save") : "one";
     if (!which) return;
+    // Not blocking: an overlap is asked about, and saving anyway is the user's call.
+    const clash = findOverlap({ id: event.id, title, startsAt: start, endsAt: end }, others, event.id);
+    if (clash && !(await askConfirm({ title: "Overlapping event", message: overlapMessage(clash.title, clash.startsAt), confirmLabel: "Save anyway" }))) return;
     setBusy(true);
     setError(null);
     const body = {

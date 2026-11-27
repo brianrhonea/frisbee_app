@@ -10,6 +10,7 @@ import { Dialog } from "../Dialog";
 import { NavIcon } from "../NavIcons";
 import { ShareButton } from "../ShareButton";
 import { InviteButton } from "./InviteDialog";
+import { MessageStaff } from "./MessageStaff";
 import { TeamBadge } from "./TeamBadge";
 import { type TeamDoc, type TeamViewer, useTeamHub } from "./TeamContext";
 import { JoinButton } from "./TeamNav";
@@ -21,7 +22,7 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
  * The header's buttons, as the app's compact team header: Invite (member
  * managers; turf, with an amber count of join requests), Join (groups'
  * outsiders), Follow (people not on it, as in the app: a member's feed
- * already has every post), Message (members: the team's chat), Share, and
+ * already has every post), Message (members: the team chat and the staff; signed-in outsiders: the staff), Share, and
  * members' Settings gear.
  */
 export function TeamBannerActions() {
@@ -35,11 +36,7 @@ export function TeamBannerActions() {
       <InviteButton />
       <JoinButton />
       {showsFollow(viewer.state) && <FollowButton type="team" targetId={teamId} />}
-      {member && (
-        <Link className="btn btn-small btn-quiet" href={`${base}/chat`}>
-          Message
-        </Link>
-      )}
+      <MessageStaff />
       <ShareButton url={new URL(`/teams/${encodeURIComponent(teamId)}`, siteUrl).toString()} title={`${name} on Stall 10`} className="btn btn-small btn-quiet" />
       {member && (
         <Link

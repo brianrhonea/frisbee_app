@@ -335,7 +335,7 @@ function MemberRoles() {
   const ids = (team.memberIds ?? []).slice().sort((a, b) => (team.memberNames?.[a] ?? "").localeCompare(team.memberNames?.[b] ?? ""));
   const tiers = ["coach", "captain", "player"] as const;
   return (
-    <section className="card">
+    <section className="card" id="member-roles">
       <h2 className="card-title">Members and roles</h2>
       <div className="table-scroll">
         <table className="data-table roster-table">

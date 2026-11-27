@@ -21,7 +21,9 @@ import { Avatar } from "../Avatar";
 import { roleLabel } from "../ProfileDashboard";
 import { LocalTime } from "../LocalTime";
 import { ErrorNote, Loading } from "../StatusViews";
-import { InviteButton } from "./InviteDialog";
+import { AddMember } from "./AddMember";
+import { RolesTab } from "./RolesTab";
+import { SegmentedTabs } from "../ui/SegmentedTabs";
 import { useTeamHub } from "./TeamContext";
 import { StatusPill } from "../ui/StatusPill";
 import { ListRow } from "../ui/ListRow";
@@ -50,6 +52,8 @@ export function TeamRosterView({ publicRoster = null, youth = false }: { publicR
   // A youth team's roster is its members' (and its school or club's admins'): the API refuses anyone else.
   const [youthPrivate, setYouthPrivate] = useState(false);
   const [filter, setFilter] = useState("");
+  // Members also have a Roles tab: who holds each tier and custom role.
+  const [tab, setTab] = useState<"roster" | "roles">("roster");
   // Bumped after saving lines: they're on the roster docs, not the team doc.
   const [reload, setReload] = useState(0);
 
@@ -125,25 +129,41 @@ export function TeamRosterView({ publicRoster = null, youth = false }: { publicR
   const players = roster.players.filter((p) => match(p.name, p.person?.username, p.number?.toString(), p.position));
   const members = roster.members.filter((m) => match(m.name, m.username, ...m.roles));
 
+  const showRoles = member && tab === "roles";
   return (
     <div className="stack">
-      <div className="toolbar">
-        <input
-          className="search-input"
-          type="search"
-          placeholder="Filter by name, number or role"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          aria-label="Filter the roster"
+      {member && (
+        <SegmentedTabs
+          label="Roster sections"
+          items={[
+            { id: "roster", label: "Roster" },
+            { id: "roles", label: "Roles" },
+          ]}
+          value={tab}
+          onChange={(t) => setTab(t as typeof tab)}
         />
+      )}
+      <div className="toolbar">
+        {!showRoles && (
+          <input
+            className="search-input"
+            type="search"
+            placeholder="Filter by name, number or role"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            aria-label="Filter the roster"
+          />
+        )}
         <span className="muted small">
           {roster.kind === "team" && `${roster.players.length} players · `}
           {roster.members.length} {roster.members.length === 1 ? "member" : "members"}
         </span>
-        <InviteButton />
+        <AddMember roster={roster} onAdded={() => setReload((n) => n + 1)} />
       </div>
 
-      {roster.kind === "team" && (
+      {showRoles && <RolesTab roster={roster} />}
+
+      {!showRoles && roster.kind === "team" && (
         <PlayersCard
           roster={roster}
           players={players}
@@ -152,8 +172,9 @@ export function TeamRosterView({ publicRoster = null, youth = false }: { publicR
         />
       )}
 
-      {viewer.state === "member" && viewer.can("manageMembers") && <PendingInvitesCard teamId={teamId} version={version} />}
+      {!showRoles && viewer.state === "member" && viewer.can("manageMembers") && <PendingInvitesCard teamId={teamId} version={version} />}
 
+      {!showRoles && (
       <section className="roster-section">
         <h2 className="card-title">Members</h2>
         {members.length === 0 ? (
@@ -166,6 +187,7 @@ export function TeamRosterView({ publicRoster = null, youth = false }: { publicR
           </ul>
         )}
       </section>
+      )}
     </div>
   );
 }

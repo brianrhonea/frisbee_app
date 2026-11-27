@@ -1,0 +1,2 @@
+/* Join on a Teams search result (S4 C3). */
+.finder-join { display: grid; justify-items: end; gap: var(--space-xs); max-width: 14rem; text-align: right; }
