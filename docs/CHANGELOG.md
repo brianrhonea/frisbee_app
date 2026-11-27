@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.73  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.72  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.71  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.70  | 2026-11-27 | `sprint3/lane-b`                        |                     |
@@ -85,6 +86,10 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.73 — H8 Notifications
+
+- Notifications: All and Unread filter chips (view-only, in the screen; the view model is unchanged), Today and Earlier groups without a card round them, 56 px rows on the shared type scale, unread dot kept. Tapping an entry still marks it read and opens its target. At large text, Mark all read becomes an icon so the title fits.
 
 ## 0.0.72 — H4 My teams
 
