@@ -1,4 +1,5 @@
 "use client";
+import { scrollBehavior } from "@/lib/motion";
 import type { MeHome, MyEvent, PostPage, PublicPost } from "@stall10/shared";
 import type { User } from "firebase/auth";
 import Link from "next/link";
@@ -133,7 +134,7 @@ export function Dashboard({ user }: { user: User }) {
   useEffect(
     () =>
       onHomeRefresh(() => {
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        window.scrollTo({ top: 0, behavior: scrollBehavior() });
         void load();
         if (communityLoaded) void loadCommunity();
       }),

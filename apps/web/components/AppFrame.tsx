@@ -1,4 +1,5 @@
 "use client";
+import { scrollBehavior } from "@/lib/motion";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, type ReactNode, Suspense, useEffect } from "react";
@@ -67,7 +68,7 @@ const secondary = [
 function compose(router: ReturnType<typeof useRouter>) {
   const composer = document.querySelector<HTMLTextAreaElement>(newPostBox);
   if (composer) {
-    composer.scrollIntoView({ block: "center", behavior: "smooth" });
+    composer.scrollIntoView({ block: "center", behavior: scrollBehavior() });
     composer.focus({ preventScroll: true });
   } else router.push("/#compose");
 }

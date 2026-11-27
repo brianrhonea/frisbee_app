@@ -1,4 +1,5 @@
 "use client";
+import { scrollBehavior } from "@/lib/motion";
 import { MuteButton } from "../MuteButton";
 import { where } from "firebase/firestore";
 import Link from "next/link";
@@ -488,7 +489,7 @@ function useJumpToMessage(
       setTarget(null);
       // After the thread's own scroll keeping (useThreadScroll) has run.
       requestAnimationFrame(() => {
-        body.current?.querySelector(`[data-mid="${CSS.escape(id)}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+        body.current?.querySelector(`[data-mid="${CSS.escape(id)}"]`)?.scrollIntoView({ block: "center", behavior: scrollBehavior() });
         setLit(id);
       });
       return;

@@ -4,6 +4,11 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.63.7 — 2026-11-26
+
+- The four scripted smooth scrolls (compose, back to top on Home and Videos, jump to a pinned message) use a shared `prefersReducedMotion()` helper and scroll instantly under reduced motion (N13).
+- Checked the whiteboard toast: `.frame .team-hub .wb-toast` (app.css) outranks the fixed `bottom: 24px` rule, so it sits above the phone tab bar.
+
 ## 0.63.6 — 2026-11-26
 
 Navigation motion onto the K7 tokens (N13). Motion polish only; no routing changes.
