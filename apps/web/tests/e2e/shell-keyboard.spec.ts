@@ -13,7 +13,7 @@ async function where(page: import("@playwright/test").Page) {
     // Past the last stop: the document itself, or the dev server's own overlay.
     if (!el || el === document.body || el === document.documentElement || el.closest("nextjs-portal")) return { zone: "body", visible: false, ring: false, label: "" };
     const r = el.getBoundingClientRect();
-    const zone = el.classList.contains("skip-link") ? "skip" : el.closest("header.top-bar") ? "top" : el.closest("nav.tab-bar") ? "tabbar" : el.closest("aside.side-nav") ? "side" : el.closest("footer") ? "footer" : el.closest("main") ? "main" : el.closest("aside.frame-aside") ? "aside" : "other";
+    const zone = el.classList.contains("skip-link") ? "skip" : el.closest("header.top-bar") ? "top" : el.closest("nav.tab-bar") ? "tabbar" : el.closest(".side-nav") ? "side" : el.closest("footer") ? "footer" : el.closest("main") ? "main" : el.closest("aside.frame-aside") ? "aside" : "other";
     const cs = getComputedStyle(el);
     const drawn = (c: CSSStyleDeclaration) => c.outlineStyle !== "none" && parseFloat(c.outlineWidth) >= 2;
     // Tabs and chips draw the ring on their face (a 48 px target around a smaller pill).
@@ -72,7 +72,7 @@ test("Tab visits the shell in reading order, never lands on a hidden control and
 test("only the navigation that is showing is reachable", async ({ page }) => {
   await open(page, "/explore");
   const phone = page.viewportSize()!.width < 600;
-  const hidden = page.locator(phone ? "aside.side-nav a" : "nav.tab-bar a");
+  const hidden = page.locator(phone ? ".side-nav a" : "nav.tab-bar a");
   for (const h of await hidden.all()) await expect(h).toBeHidden();
 });
 

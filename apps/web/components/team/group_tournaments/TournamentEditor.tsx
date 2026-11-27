@@ -266,7 +266,7 @@ function Editor({
   async function assignTeams() {
     const each = Math.floor(allPlayers.length / teams.length);
     const sizes = allPlayers.length % teams.length === 0 ? `${each}` : `${each}–${each + 1}`;
-    const ok = (await askConfirm(`All ${allPlayers.length} players are dealt at random into the ${teams.length} teams (${sizes} each), replacing who is on them now. Each team gets a random captain.`));
+    const ok = (await askConfirm({ title: "Deal players into teams?", message: `All ${allPlayers.length} players are dealt at random into the ${teams.length} teams (${sizes} each), replacing who is on them now. Each team gets a random captain.`, confirmLabel: "Deal teams", destructive: true }));
     if (!ok) return;
     setTeams(groupEngine.dealPlayers(allPlayers, teams));
     setBench([]);
@@ -369,7 +369,7 @@ function Editor({
 
   async function publish() {
     if (!user || problem) return;
-    if (published && !(await askConfirm({ message: "Publish a new schedule? This replaces every game, including scores already entered.", confirmLabel: "Publish" }))) return;
+    if (published && !(await askConfirm({ title: "Publish a new schedule?", message: "This replaces every game, including scores already entered.", confirmLabel: "Replace schedule", destructive: true }))) return;
     const first = !published;
     let p: GroupSchedulePlan;
     try {
@@ -386,7 +386,7 @@ function Editor({
       setPublishedTeams(teamsKey);
       setPlan(p);
       const page = `/teams/${encodeURIComponent(teamId)}/tournaments/${encodeURIComponent(saved)}`;
-      if (first && (await askConfirm({ message: `Tell the community? Post ${name.trim()} to the community feed so people see it and sign up. You can edit the post first.`, confirmLabel: "Yes" }))) {
+      if (first && (await askConfirm({ title: "Tell the community?", message: `Post ${name.trim()} to the community feed so people see it and sign up. You can edit the post first.`, confirmLabel: "Post it", cancelLabel: "Not now" }))) {
         setAnnounce({ page, id: saved });
       } else router.push(page);
     } catch (e) {

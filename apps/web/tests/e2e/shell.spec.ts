@@ -147,6 +147,46 @@ test("floating and sticky bars at the foot sit above the bottom tab bar", async 
   for (const [cls, gap] of gaps) expect(gap, cls).toBeGreaterThanOrEqual(0);
 });
 
+test("tab labels stay on one line, readable and inside their tab at 320 px and 200% text", async ({ page }) => {
+  test.skip(page.viewportSize()!.width >= 600, "phones only");
+  await page.setViewportSize({ width: 320, height: 700 });
+  await open(page, "/explore");
+  // 200% text on the labels; the visitor tabs have the long ones ("Tournaments", "Communities").
+  await page.addStyleTag({ content: ".tab-item span { font-size: 22px !important; }" });
+  const items = await page.locator(".tab-bar .tab-item").evaluateAll((els) =>
+    els.map((el) => {
+      const span = el.querySelector("span")!;
+      const a = el.getBoundingClientRect();
+      const s = span.getBoundingClientRect();
+      return { label: span.textContent, h: Math.round(s.height), within: s.left >= a.left - 1 && s.right <= a.right + 1, size: getComputedStyle(span).fontSize };
+    }),
+  );
+  expect(items.length).toBe(5);
+  for (const i of items) {
+    expect(i.within, `${i.label} inside its tab`).toBe(true);
+    expect(i.h, `${i.label} on one line`).toBeLessThan(40);
+  }
+  expect((await shell(page)).overflow).toBeLessThanOrEqual(0);
+});
+
+test("normal-size tab and rail labels are at least 11 px", async ({ page }) => {
+  await open(page, "/explore");
+  const w = page.viewportSize()!.width;
+  test.skip(w >= 900, "the full sidebar has larger labels");
+  const sel = w < 600 ? ".tab-bar .tab-item span" : ".side-tabs .nav-item span";
+  const sizes = await page.locator(sel).evaluateAll((els) => els.map((e) => parseFloat(getComputedStyle(e).fontSize)));
+  expect(sizes.length).toBeGreaterThan(3);
+  for (const s of sizes) expect(s).toBeGreaterThanOrEqual(11);
+});
+
+test("sidebar links are at least 48 px high", async ({ page }) => {
+  await open(page, "/explore");
+  test.skip(page.viewportSize()!.width < 600, "no sidebar on phones");
+  const hs = await page.locator(".side-tabs a").evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
+  expect(hs.length).toBeGreaterThan(3);
+  for (const h of hs) expect(h).toBeGreaterThanOrEqual(48);
+});
+
 // Breakpoint edges, one project is enough: the media queries do not depend on it.
 test.describe("breakpoint edges", () => {
   test.beforeEach(({}, info) => test.skip(info.project.name !== "laptop", "edges run once"));

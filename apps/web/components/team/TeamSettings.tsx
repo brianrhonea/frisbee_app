@@ -472,7 +472,7 @@ function TransferOwnership() {
           className="btn btn-quiet"
           disabled={busy || !to}
           onClick={async () => {
-            if ((await askConfirm(`Make ${team.memberNames?.[to] ?? "them"} the owner?`))) {
+            if ((await askConfirm({ title: `Make ${team.memberNames?.[to] ?? "them"} the owner?`, confirmLabel: "Make owner", destructive: true }))) {
               void act(`/v1/teams/${encodeURIComponent(teamId)}/owner`, "POST", { uid: to }, "Done.");
             }
           }}

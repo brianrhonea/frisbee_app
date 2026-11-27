@@ -36,7 +36,7 @@ export function EmptyState({ children, title, action }: { children: ReactNode; t
  */
 export function ErrorState({ children, title, onRetry, retryLabel = "Try again" }: { children: ReactNode; title?: string; onRetry?: () => void; retryLabel?: string }) {
   return (
-    <div className="form-error error-note ui-error" role="alert">
+    <div className="ui-error" role="alert">
       <svg className="ui-error-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <circle cx="12" cy="12" r="9" />
         <path d="M12 7v6M12 16.5v.01" />

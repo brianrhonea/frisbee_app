@@ -182,13 +182,13 @@ function Board(props: { user: User; tournamentId: string; divisionId: string; dr
   const control = (a: DraftControlAction) => act(() => draftApi.control(user, tournamentId, divisionId, a));
 
   async function cancel() {
-    if ((await askConfirm({ message: "Cancel the draft? Every pick is thrown away. You can then choose captains and start again.", confirmLabel: "Cancel it", destructive: true }))) control("cancel");
+    if ((await askConfirm({ title: "Cancel the draft?", message: "Every pick is thrown away. You can then choose captains and start again.", confirmLabel: "Cancel draft", cancelLabel: "Keep draft", destructive: true }))) control("cancel");
   }
   async function finish() {
     const message = remaining === 0
       ? "This saves each captain's picks as the division's teams."
       : `${remaining} players have not been picked and will be left off the teams. You can still add them on the teams screen.`;
-    if ((await askConfirm({ message: `Finish the draft? ${message}`, confirmLabel: "Yes" }))) act(() => draftApi.finish(user, tournamentId, divisionId));
+    if ((await askConfirm({ title: "Finish the draft?", message, confirmLabel: "Finish draft" }))) act(() => draftApi.finish(user, tournamentId, divisionId));
   }
 
   const clockText = running && left !== null ? `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}` : null;

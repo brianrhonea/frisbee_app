@@ -404,7 +404,7 @@ function PublishCard({ s }: { s: TournamentState }) {
   const played = s.games.some((g) => g.status !== "scheduled");
   async function publish() {
     if (!plan || !d) return;
-    if (s.published && !(await askConfirm(played ? "Regenerate the schedule? Scores already entered are lost: every game is regenerated from the current seeds." : "Regenerate the schedule? Every game is regenerated from the current seeds."))) return;
+    if (s.published && !(await askConfirm({ title: "Regenerate the schedule?", message: played ? "Scores already entered are lost: every game is regenerated from the current seeds." : "Every game is regenerated from the current seeds.", confirmLabel: "Regenerate", destructive: true }))) return;
     await run(`${divisionPath(s.id, d.id)}/schedule`, "PUT", {
       games: plan.games.map((g) => ({
         id: g.id,

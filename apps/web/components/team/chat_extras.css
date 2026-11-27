@@ -142,7 +142,7 @@
   .pin-card-open { padding: 12px 14px 10px; }
 }
 /* A message jumped to from a pin, tinted for a moment. */
-.message.jumped { background: var(--accent-soft); border-radius: 10px; transition: background 0.4s; }
+.message.jumped { background: var(--accent-soft); border-radius: 10px; transition: background var(--dur-base) var(--ease); }
 /* The room's ⋯ menu in the thread header (Pinned messages). */
 .thread-menu-wrap { position: relative; display: inline-flex; }
 .thread-more { font-size: 1.2rem; line-height: 1; padding: 2px 8px; }

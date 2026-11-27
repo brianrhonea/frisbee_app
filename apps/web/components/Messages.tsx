@@ -626,7 +626,7 @@ function ConversationView({
                   type="button"
                   className="btn"
                   onClick={async () => {
-                    if (user && (await askConfirm(`Unblock ${info.title}? You'll see each other's posts and can message again.`))) {
+                    if (user && (await askConfirm({ title: `Unblock ${info.title}?`, message: "You'll see each other's posts and can message again.", confirmLabel: "Unblock" }))) {
                       void unblockPerson(user, other).catch((e) => setError((e as Error).message));
                     }
                   }}
