@@ -524,8 +524,9 @@
   .team-hub .team-head .ui-cover-extra { grid-column: 2; grid-row: 2; margin-top: 2px; }
   .team-hub .team-head .ui-cover-actions { grid-column: 1 / -1; grid-row: 3; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; justify-content: flex-start; justify-self: stretch; padding-top: var(--space-sm); min-height: 0; mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
   .team-hub .team-head .ui-cover-actions > * { flex: none; }
-  /* The row scrolls, but the Settings gear stays at its end, always on screen (S4). */
-  .team-hub .team-head .ui-cover-actions { mask-image: none; }
-  .team-hub .team-head .ui-cover-actions .team-gear { position: sticky; right: 0; margin-left: auto; }
+  /* Every action stays on screen and none covers another (S4 fix): the row wraps instead of scrolling, and the
+     Settings gear takes the end of the last line. */
+  .team-hub .team-head .ui-cover-actions { flex-wrap: wrap; overflow: visible; mask-image: none; row-gap: var(--space-xs); }
+  .team-hub .team-head .ui-cover-actions .team-gear { margin-left: auto; }
   .team-hub .team-head .ui-cover-title { font-size: 1.3rem; }
 }

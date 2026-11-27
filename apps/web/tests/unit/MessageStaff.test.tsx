@@ -43,28 +43,37 @@ beforeEach(() => {
 });
 
 describe("staffOf", () => {
-  it("keeps owner, coach and captain, then admins, and never the viewer or a plain player", () => {
+  it("keeps owner, coach and captain, in that order then by name, and never the viewer or a plain player", () => {
     const people = [
       { uid: "pl1", name: "Pat", tier: "player" },
       { uid: "me", name: "Me", tier: "owner" },
-      { uid: "adm", name: "Ada Admin", tier: "player", admin: true },
-      { uid: "cap", name: "Cass", tier: "captain" },
+      { uid: "capB", name: "Bea", tier: "captain" },
+      { uid: "cap", name: "Abe", tier: "captain" },
+      { uid: "coB", name: "Zed", tier: "coach" },
       { uid: "co", name: "Cory", tier: "coach" },
       { uid: "own", name: "Olive", tier: "owner" },
     ];
-    expect(staffOf(people, "me").map((p) => p.uid)).toEqual(["own", "co", "cap", "adm"]);
+    expect(staffOf(people, "me").map((p) => p.uid)).toEqual(["own", "co", "coB", "cap", "capB"]);
   });
 
-  it("counts a member as an admin by a permission or a custom role that manages the team", () => {
+  it("drops people without a uid (the API keeps it from outsiders for non-staff and hidden people)", () => {
+    const people = [
+      { name: "Hidden Coach", tier: "coach" },
+      { uid: "own", name: "Olive", tier: "owner" },
+    ];
+    expect(staffOf(people, "me").map((p) => p.name)).toEqual(["Olive"]);
+  });
+
+  it("does not count permission-based admins or custom roles as staff, for members too", () => {
     const t = {
       memberIds: ["a", "b", "c", "d"],
-      memberNames: { a: "A", b: "B", c: "C", d: "D" },
-      members: { a: "player", b: "player", c: "player", d: "player" },
-      memberPerms: { a: ["manageTeam"], d: ["keepStats"] },
-      memberRoles: { b: ["r1"], c: ["r2"] },
-      roles: { r1: { name: "Coordinators", perms: ["manageTeam"] }, r2: { name: "Handlers", perms: [] } },
+      memberNames: { a: "A", b: "B", c: "C", d: "Dee" },
+      members: { a: "player", b: "player", c: "player", d: "coach" },
+      memberPerms: { a: ["manageTeam"] },
+      memberRoles: { b: ["r1"] },
+      roles: { r1: { name: "Coordinators", perms: ["manageTeam"] } },
     };
-    expect(staffOf(peopleOf(t as never), "x").map((p) => p.uid)).toEqual(["a", "b"]);
+    expect(staffOf(peopleOf(t as never), "x").map((p) => p.uid)).toEqual(["d"]);
   });
 });
 
@@ -111,6 +120,7 @@ describe("Team header Message (S4 C6)", () => {
         { uid: "own", name: "Olive Owner", tier: "owner", roles: [] },
         { uid: "me", name: "Me Myself", tier: "coach", roles: [] },
         { uid: "pl1", name: "Pat Player", tier: "player", roles: [] },
+        { name: "Hidden Coach", tier: "coach", roles: [] },
       ],
     });
     render(<MessageStaff />);
@@ -119,6 +129,7 @@ describe("Team header Message (S4 C6)", () => {
     expect(screen.queryByRole("link", { name: "Team chat" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Message Me Myself" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Message Pat Player" })).toBeNull();
+    expect(screen.queryByText("Hidden Coach")).toBeNull();
     expect(callApi).toHaveBeenCalledWith(auth.user, "/v1/teams/t1/roster");
   });
 

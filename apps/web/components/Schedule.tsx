@@ -37,6 +37,7 @@ import { memberViewer, type TeamDoc } from "./team/TeamContext";
 import { scheduleMeetings, type TeamEventDoc, teamEventQueries } from "./team/TeamSchedule";
 import { useAuth } from "./AuthProvider";
 import { ScheduleMonthList } from "./ScheduleMonthList";
+import { newEventId, postNewEvent } from "@/lib/createOnce";
 import { findOverlap, overlapMessage, type Span } from "@/lib/overlap";
 import { type ShareChoice, ShareEventField, shareEvent } from "./team/ShareEvent";
 import { fromLocalInput, startOfToday, toLocalInput } from "@/lib/dates";
@@ -546,8 +547,8 @@ export function Schedule() {
 
 /** A row as the overlap check sees it (its id only for a calendar event: that is the one an edit replaces). */
 function spanOf(r: Row): Span {
-  if (r.kind === "calendar") return { id: r.event.id, title: r.event.title, startsAt: r.startsAt, endsAt: r.endsAt };
-  if (r.kind === "event") return { title: r.event.title, startsAt: r.startsAt, endsAt: r.endsAt };
+  if (r.kind === "calendar") return { id: r.event.id, series: r.event.series, title: r.event.title, startsAt: r.startsAt, endsAt: r.endsAt };
+  if (r.kind === "event") return { series: r.event.series, title: r.event.title, startsAt: r.startsAt, endsAt: r.endsAt };
   return { title: r.meeting.title, startsAt: r.startsAt, endsAt: r.endsAt };
 }
 
@@ -729,6 +730,8 @@ function EventEditor({
   // A new event may repeat; an event of a series asks "this or following" on save.
   const [repeat, setRepeat] = useState<Repeat | null>(null);
   const scope = useSeriesScope();
+  // One id per form: a retry or a double-click sends the same one, so the API can't make two events.
+  const eventId = useRef(newEventId());
   if (!user) return null;
   const me = user;
   const all = [...calendars, ...made.filter((m) => !calendars.some((c) => c.id === m.id))];
@@ -747,7 +750,7 @@ function EventEditor({
     const which = event.series ? await scope.ask(`Save changes to "${title.trim()}"?`, "Save") : "one";
     if (!which) return;
     // Not blocking: an overlap is asked about, and saving anyway is the user's call.
-    const clash = findOverlap({ id: event.id, title, startsAt: start, endsAt: end }, others, event.id);
+    const clash = findOverlap({ id: event.id, series: event.series, title, startsAt: start, endsAt: end }, others, event.id, rule && { repeat: rule, timeZone: browserTimeZone() });
     if (clash && !(await askConfirm({ title: "Overlapping event", message: overlapMessage(clash.title, clash.startsAt), confirmLabel: "Save anyway" }))) return;
     setBusy(true);
     setError(null);
@@ -766,7 +769,7 @@ function EventEditor({
       if (event.id) {
         await callApi(me, `${base}/${encodeURIComponent(event.id)}${scopeQuery(which)}`, { method: "PATCH", body });
       } else {
-        const res = await callApi<CalendarEventResult>(me, base, { method: "POST", body });
+        const res = await postNewEvent(me, base, body, eventId.current);
         // The event is saved either way, as in the app and TeamEventEditor.
         if (canShare && share.on && !(await shareEvent(me, null, res.id, share.message, calendarId))) {
           window.alert("Event created, but it couldn't be shared. Try posting it.");

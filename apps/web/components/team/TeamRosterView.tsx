@@ -181,8 +181,8 @@ export function TeamRosterView({ publicRoster = null, youth = false }: { publicR
           <p className="muted small">No one matches.</p>
         ) : (
           <ul className="roster-rows">
-            {members.map((m) => (
-              <MemberCard key={m.uid} member={m} kind={roster.kind} me={m.uid === user.uid} />
+            {members.map((m, i) => (
+              <MemberCard key={m.uid ?? `${i}:${m.name}`} member={m} kind={roster.kind} me={m.uid === user.uid} />
             ))}
           </ul>
         )}
@@ -495,7 +495,7 @@ function MemberCard({ member, kind, me }: { member: RosterMember; kind: string; 
   return (
     <li>
       <ListRow
-        href={`/players/${member.uid}`}
+        href={member.uid ? `/players/${member.uid}` : undefined}
         leading={<Avatar name={member.name} url={member.photoUrl} size={40} />}
         title={
           <>

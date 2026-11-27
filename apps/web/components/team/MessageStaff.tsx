@@ -17,28 +17,24 @@ import { type TeamDoc, useTeamHub } from "./TeamContext";
 import "./message_staff.css";
 
 /**
- * Who runs a team: its owner, coaches and captains (the tiers that manage it), and admins: members who may
- * manage the team through a permission or a custom role (new coaches and captains are made that way now).
+ * Who the Message dialog lists: members whose tier is owner, coach or captain (as the app's does), for members
+ * and outsiders alike. Permission-based admins and custom roles are not staff here.
  */
 export const staffTiers = ["owner", "coach", "captain"];
 
-export type StaffPerson = { uid: string; name: string; tier: string; photoUrl?: string; admin?: boolean };
+/** [uid] is missing when the API keeps it from an outsider (a non-staff or hidden person): they can't be messaged. */
+export type StaffPerson = { uid?: string; name: string; tier: string; photoUrl?: string };
 
 /** The team doc's people with their tiers, from what the hub already holds. */
 export function peopleOf(team: TeamDoc): StaffPerson[] {
-  const manages = (uid: string) =>
-    (team.memberPerms?.[uid] ?? []).includes("manageTeam") ||
-    (team.memberRoles?.[uid] ?? []).some((id) => team.roles?.[id]?.perms?.includes("manageTeam"));
-  return (team.memberIds ?? []).map((uid) => ({ uid, name: team.memberNames?.[uid] || "Member", tier: team.members?.[uid] ?? "player", admin: manages(uid) }));
+  return (team.memberIds ?? []).map((uid) => ({ uid, name: team.memberNames?.[uid] || "Member", tier: team.members?.[uid] ?? "player" }));
 }
 
-const rank = (p: StaffPerson) => (staffTiers.includes(p.tier) ? staffTiers.indexOf(p.tier) : staffTiers.length);
-
-/** The staff to list: [people] who run the team, in tier order (owner, coach, captain, admins, then by name), never the viewer. Pure, for tests. */
+/** The staff to list: owner, coach, captain, then by name; never the viewer or anyone without a uid. Pure, for tests. */
 export function staffOf(people: StaffPerson[], viewerUid: string): StaffPerson[] {
   return people
-    .filter((p) => (staffTiers.includes(p.tier) || p.admin === true) && p.uid !== viewerUid)
-    .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
+    .filter((p) => staffTiers.includes(p.tier) && !!p.uid && p.uid !== viewerUid)
+    .sort((a, b) => staffTiers.indexOf(a.tier) - staffTiers.indexOf(b.tier) || a.name.localeCompare(b.name));
 }
 
 /**
@@ -85,7 +81,7 @@ function StaffList({ teamId, kind, onClose }: { teamId: string; kind: string; on
     if (member || !user) return;
     let live = true;
     callApi<TeamRoster>(user, `/v1/teams/${encodeURIComponent(teamId)}/roster`).then(
-      (r) => live && setFetched(r.members),
+      (r) => live && setFetched(r.members as StaffPerson[]),
       (e) => live && setLoadError(problem(e, "Couldn't load the team's staff. Try again.")),
     );
     return () => {
@@ -97,8 +93,8 @@ function StaffList({ teamId, kind, onClose }: { teamId: string; kind: string; on
   const people = viewer.state === "member" ? peopleOf(viewer.team) : fetched;
   const staff = people ? staffOf(people, user.uid) : null;
 
-  async function message(uid: string) {
-    if (!user) return;
+  async function message(uid: string | undefined) {
+    if (!user || !uid) return;
     setBusy(uid);
     setError("");
     try {
@@ -138,7 +134,7 @@ function StaffList({ teamId, kind, onClose }: { teamId: string; kind: string; on
               <ListRow
                 leading={<Avatar name={p.name} url={p.photoUrl} size={40} />}
                 title={p.name}
-                subtitle={<StatusPill tone="accent">{staffTiers.includes(p.tier) ? roleLabel(p.tier, kind) : "Admin"}</StatusPill>}
+                subtitle={<StatusPill tone="accent">{roleLabel(p.tier, kind)}</StatusPill>}
                 trailing={
                   <Button size="small" loading={busy === p.uid} disabled={busy !== null && busy !== p.uid} aria-label={`Message ${p.name}`} onClick={() => void message(p.uid)}>
                     Message

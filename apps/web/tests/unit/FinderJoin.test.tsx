@@ -27,7 +27,7 @@ describe("joinPathOf: the same rules as the team header's Join button", () => {
     expect(joinPathOf({ kind: "community", requiresApproval: true })).toMatchObject({ label: "Ask to join", path: "join-requests" });
   });
   it("asks to join a team only when it takes join requests; otherwise there is no path", () => {
-    expect(joinPathOf({ kind: "team", allowJoinRequests: true })).toMatchObject({ label: "Request to join", path: "join-requests" });
+    expect(joinPathOf({ kind: "team", allowJoinRequests: true })).toMatchObject({ label: "Ask to join", path: "join-requests" });
     expect(joinPathOf({ kind: "team" })).toBeNull();
     expect(joinPathOf({})).toBeNull();
   });
@@ -50,7 +50,7 @@ describe("Join on a Teams search result (S4 C3)", () => {
     expect(callApi).toHaveBeenCalledWith(auth.user, "/v1/teams/g2/join-requests", { method: "POST" });
     a.unmount();
     render(<FinderJoin team={{ id: "t2", name: "Hawks", kind: "team", allowJoinRequests: true }} />);
-    fireEvent.click(screen.getByRole("button", { name: "Request to join: Hawks" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ask to join: Hawks" }));
     await waitFor(() => expect(callApi).toHaveBeenCalledWith(auth.user, "/v1/teams/t2/join-requests", { method: "POST" }));
   });
 
@@ -66,8 +66,8 @@ describe("Join on a Teams search result (S4 C3)", () => {
   it("shows the server's refusal (the club 16+ rule) and lets them try again", async () => {
     callApi.mockRejectedValueOnce(new ApiError("Club teams are for players 16 and over. Add your date of birth first.", 403));
     render(<FinderJoin team={{ id: "t4", name: "Club Hawks", kind: "team", allowJoinRequests: true }} />);
-    fireEvent.click(screen.getByRole("button", { name: "Request to join: Club Hawks" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ask to join: Club Hawks" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Club teams are for players 16 and over");
-    expect(screen.getByRole("button", { name: "Request to join: Club Hawks" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Ask to join: Club Hawks" })).toBeEnabled();
   });
 });

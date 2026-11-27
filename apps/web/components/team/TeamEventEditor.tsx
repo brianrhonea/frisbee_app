@@ -1,6 +1,6 @@
 "use client";
 import { type SaveTeamEventRequest, type TeamEventType, teamEventTypeLabels, teamEventTypes } from "@stall10/shared";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useRef, useState } from "react";
 import { callApi } from "@/lib/client";
 import { type ShareChoice, ShareEventField, shareEvent } from "./ShareEvent";
 import { newId } from "@/lib/upload";
@@ -10,6 +10,7 @@ import type { TeamEventDoc } from "./TeamSchedule";
 import { fromLocalInput, toLocalInput } from "@/lib/dates";
 import type { Repeat as RepeatRule } from "@stall10/shared";
 import { useConfirm } from "../ui/ConfirmDialog";
+import { newEventId, postNewEvent } from "@/lib/createOnce";
 import { findOverlap, overlapMessage, type Span } from "@/lib/overlap";
 import { browserTimeZone, RepeatField, RepeatNote, repeatFormProblem, scopeQuery, useSeriesScope } from "../Repeat";
 
@@ -54,6 +55,8 @@ export function TeamEventEditor({
   // A new event may repeat; an event of a series asks "this or following" on save.
   const [repeat, setRepeat] = useState<RepeatRule | null>(null);
   const scope = useSeriesScope();
+  // One id per form: a retry or a double-click sends the same one, so the API can't make two events.
+  const eventId = useRef(newEventId());
 
   const options = poll?.options ?? [];
   function setOption(i: number, text: string) {
@@ -72,7 +75,7 @@ export function TeamEventEditor({
     if (!which) return;
     // Not blocking: an overlap is asked about, and saving anyway is the user's call.
     const end = fromLocalInput(endsAt);
-    const clash = findOverlap({ id: event?.id, title, startsAt: start, endsAt: end }, others, event?.id);
+    const clash = findOverlap({ id: event?.id, series: event?.series, title, startsAt: start, endsAt: end }, others, event?.id, rule && { repeat: rule, timeZone: browserTimeZone() });
     if (clash && !(await askConfirm({ title: "Overlapping event", message: overlapMessage(clash.title, clash.startsAt), confirmLabel: "Save anyway" }))) return;
     setBusy(true);
     setError(null);
@@ -102,7 +105,7 @@ export function TeamEventEditor({
             method: "PATCH",
             body,
           })
-        : await callApi<{ id: string }>(user, base, { method: "POST", body });
+        : await postNewEvent(user, base, body, eventId.current);
       if (canShare && share.on && !(await shareEvent(user, teamId, res.id, share.message))) {
         window.alert("Event created, but it couldn't be shared. Try posting it.");
       }

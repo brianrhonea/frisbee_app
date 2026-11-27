@@ -16,6 +16,7 @@ import { PostCard } from "./PostCard";
 import { DashboardLayout, ProfileCard, StatTiles, TeamList } from "./ProfileDashboard";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { ErrorNote } from "@/components/StatusViews";
+import { RosterSpots } from "./RosterSpots";
 
 const statColumns: Array<[keyof StatTotals, string]> = [
   ["games", "Games"],
@@ -228,6 +229,7 @@ function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePage; loc
       {profile.visibility?.teams !== false && (
         <TeamList teams={(profile.teams ?? []).map((t) => ({ id: t.id, name: t.name, subtitle: t.subtitle }))} />
       )}
+      {user?.uid === uid && <RosterSpots uid={uid} />}
     </>
   );
 

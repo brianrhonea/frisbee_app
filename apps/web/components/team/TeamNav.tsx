@@ -309,7 +309,7 @@ export function JoinButton() {
         disabled={busy || request.data === undefined}
         onClick={() => void run("POST", `/v1/teams/${teamId}/join-requests`)}
       >
-        {kind === "team" ? "Request to join" : "Ask to join"}
+        Ask to join
       </button>
     );
   }
