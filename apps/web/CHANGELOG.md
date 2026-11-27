@@ -4,6 +4,13 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.71.0 — 2026-11-27
+
+H8 Notifications restyle. Same filters, Mark all read, Clear, follow requests, opening a notification's target and unread dots.
+
+- The Requests, Today and Earlier groups are headings over rows instead of boxed cards; rows keep their icon, unread dot and clear button, with more room around them.
+- Fixes the page being wider than a phone screen (the chevron on Follow requests was cut off).
+
 ## 0.70.0 — 2026-11-27
 
 H4 My teams restyle. Same teams, communities, invites, create, join with a code and the team finder.

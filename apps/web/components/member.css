@@ -16,7 +16,7 @@
 .team-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--team); flex: none; }
 
 /* Cards on these pages: the redesign's 16px radius. */
-.huddle .card, .schedule-page .card, .messages .card, .notifications .notice-group, .settings .card,
+.huddle .card, .schedule-page .card, .messages .card, .settings .card,
 .teams-page .card, .create-page .card, .dash .card, .post-page .card { border-radius: var(--radius); }
 
 /* Delete and Leave links: neutral, not red. */
@@ -191,17 +191,16 @@
 .notifications .toolbar { gap: 8px 10px; }
 .notifications .notice-mark { font-weight: 700; text-decoration: none; }
 .notifications .notice-mark:hover:not(:disabled) { text-decoration: underline; }
-.notice-group {
-  margin-bottom: 14px; padding: 0; overflow: hidden;
-  background: var(--card); border: 1px solid var(--line);
-}
+/* Groups are a heading over rows, not boxes: spacing and the soft separators do the grouping. */
+.notifications { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-lg); }
+.notice-group { margin: 0; padding: 0; }
 .notice-group-head {
-  margin: 0; padding: 12px 18px 8px; font-size: 11px; font-weight: 800; letter-spacing: 0.1em;
+  margin: 0 0 var(--space-xs); padding: 0; font-size: var(--text-caption-size); font-weight: 800; letter-spacing: 0.1em;
   text-transform: uppercase; color: var(--muted);
 }
 .notice-group.needs .notice-group-head { color: var(--disc-ink); }
 .notifications .notice-list { gap: 0; }
-.notifications .notice { border: 0; border-top: 1px solid var(--line); border-radius: 0; padding: 12px 18px; }
+.notifications .notice { border: 0; border-top: 1px solid var(--line); border-radius: 0; padding: var(--space-md) var(--space-sm); }
 .notifications .notice:hover { background: var(--field); }
 .notifications .notice.unread { background: transparent; }
 .notifications .notice.unread:hover { background: var(--field); }
