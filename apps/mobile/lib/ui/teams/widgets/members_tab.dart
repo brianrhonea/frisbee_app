@@ -96,18 +96,11 @@ class MembersTab extends StatelessWidget {
                           if (m.key == viewModel.uid)
                             TextSpan(
                               text: ' (you)',
-                              style: TextStyle(
-                                color: c.muted,
-                                fontWeight: FontWeight.w500,
-                              ),
+                              style: AppText.body.copyWith(color: c.muted),
                             ),
                         ],
                       ),
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                        color: c.ink,
-                      ),
+                      style: AppText.bodyStrong.copyWith(color: c.ink),
                     ),
                     subtitle: _MemberRoles(
                       team: team,
@@ -176,11 +169,7 @@ class _PendingInvites extends StatelessWidget {
                   ),
                   title: Text(
                     invite.name,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15,
-                      color: c.ink,
-                    ),
+                    style: AppText.bodyStrong.copyWith(color: c.ink),
                   ),
                   subtitle: Text(
                     [
@@ -234,7 +223,7 @@ class _JoinRequests extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(14, 12, 10, 6),
       decoration: BoxDecoration(
         color: c.highlightSoft,
-        borderRadius: BorderRadius.circular(cardRadius),
+        borderRadius: BorderRadius.circular(AppRadius.card),
         border: Border.all(color: c.highlight.withValues(alpha: 0.45)),
       ),
       child: Column(
@@ -244,12 +233,7 @@ class _JoinRequests extends StatelessWidget {
             '${requests.length} '
             '${requests.length == 1 ? 'person wants' : 'people want'} '
             'to join',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.4,
-              color: c.highlightInk,
-            ),
+            style: AppText.label.copyWith(color: c.highlightInk),
           ),
           for (final r in requests)
             ListTile(
@@ -260,7 +244,7 @@ class _JoinRequests extends StatelessWidget {
               ),
               title: Text(
                 r.name.isEmpty ? 'Someone' : r.name,
-                style: TextStyle(fontWeight: FontWeight.w700, color: c.ink),
+                style: AppText.bodyStrong.copyWith(color: c.ink),
               ),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,

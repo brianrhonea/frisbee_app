@@ -186,14 +186,7 @@ class RosterTab extends StatelessWidget {
           color: c.onFeature,
         ),
       ),
-      title: Text(
-        p.name,
-        style: TextStyle(
-          fontWeight: FontWeight.w700,
-          fontSize: 15,
-          color: c.ink,
-        ),
-      ),
+      title: Text(p.name, style: AppText.bodyStrong.copyWith(color: c.ink)),
       subtitle: Padding(padding: const EdgeInsets.only(top: 4), child: details),
       onTap: canEdit && !editing ? () => _edit(context, p) : null,
       trailing: editing
@@ -235,7 +228,7 @@ class _LinesBar extends StatelessWidget {
                   vm.editingLines
                       ? 'Tap O, D or Both for each player.'
                       : 'Group the roster into O-line and D-line.',
-                  style: TextStyle(fontSize: 12.5, color: c.muted),
+                  style: AppText.caption.copyWith(color: c.muted),
                 ),
               ),
               if (vm.editingLines) ...[
