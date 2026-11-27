@@ -231,6 +231,7 @@ describe("uploads API", () => {
       memberRoles: { p1: ["chatter"] },
     });
     store.put("teams/t1/chats/c1", { writeRoles: ["chatter"], writeUsers: [] });
+    store.put("profiles/u2", { name: "U2", adult: true });
     store.put("conversations/u1_u2", { participants: ["u1", "u2"], status: "accepted" });
     // Native video upload is open (meta/flags; the flag-off cases set their own).
     store.put("meta/flags", { videoUploads: true });

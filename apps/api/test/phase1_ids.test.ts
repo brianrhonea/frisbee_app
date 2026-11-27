@@ -23,7 +23,7 @@ beforeEach(() => {
   s = setup();
   for (const [uid, name] of [["coach", "Casey"], ["player", "Pat"], ["kim", "Kim"]]) {
     s.users.records.set(uid!, { name });
-    s.store.put(`profiles/${uid}`, { name });
+    s.store.put(`profiles/${uid}`, { name, adult: true });
   }
   s.store.put("teams/t1", {
     name: "Haze",

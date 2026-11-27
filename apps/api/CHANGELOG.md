@@ -7,6 +7,20 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.53.3 - 2026-11-27
+
+Two fixes from the 17-B security review.
+
+- **DM and group recipients:** `POST /v1/conversations`, a send into a direct conversation, group
+  create and group add now refuse any recipient whose `profiles/{uid}.adult` isn't true, in every
+  `ACCOUNT_GATE_MODE` (as the rules' `adultProfile()` does), with the same words as a "nobody" message
+  policy. The `ageOk` claim check for enforce mode is unchanged. A profile not yet marked (before the
+  claims backfill) can't be messaged.
+- **Event edits:** whether a poll changed is now compared field by field (question, `multiple`,
+  options as an ordered list of id and text), not by JSON text, so key order no longer wipes votes on
+  an unrelated edit (including later events of a `scope=following` series). A missing and a null poll
+  are equal.
+
 ## 0.53.2 - 2026-11-26
 
 H1 (owner-approved schema change): a server-only `adult: true` marker on `profiles/{uid}`.
