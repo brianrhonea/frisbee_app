@@ -7,7 +7,9 @@ import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
 import '../../../routing/push_team_route.dart';
 import '../../core/themes/theme.dart';
+import '../../core/ui/app_segmented_button.dart';
 import '../../core/ui/confirm_dialog.dart';
+import '../../core/ui/status_pill.dart';
 import '../../core/ui/layout.dart';
 import '../../core/ui/status_views.dart';
 import '../../core/ui/view_model_host.dart';
@@ -16,17 +18,60 @@ import '../view_models/team_detail_viewmodel.dart';
 import 'invite_code_card.dart';
 import 'invite_members_dialog.dart';
 import 'member_permissions_dialog.dart';
-import 'roles_screen.dart';
+import 'roles_screen.dart' show RoleDot;
+import 'roster_tab.dart' show showPlayerEditor;
+import 'team_section_screen.dart' show TeamSection;
 
-class MembersTab extends StatelessWidget {
+/// What the Members tab shows: the people, or each role with who holds it.
+enum _MembersView { members, roles }
+
+class MembersTab extends StatefulWidget {
   const MembersTab({super.key, required this.viewModel});
 
   final TeamDetailViewModel viewModel;
 
   @override
+  State<MembersTab> createState() => _MembersTabState();
+}
+
+class _MembersTabState extends State<MembersTab> {
+  _MembersView _view = _MembersView.members;
+
+  TeamDetailViewModel get viewModel => widget.viewModel;
+
+  @override
   Widget build(BuildContext context) {
-    final c = AppColors.of(context);
     final team = viewModel.team!;
+    return ConstrainedContent(
+      child: ListView(
+        padding: const EdgeInsets.all(AppSpace.lg),
+        children: [
+          Center(
+            child: AppSegmentedButton<_MembersView>(
+              segments: const [
+                ButtonSegment(
+                  value: _MembersView.members,
+                  label: Text('People'),
+                ),
+                ButtonSegment(value: _MembersView.roles, label: Text('Roles')),
+              ],
+              selected: {_view},
+              showSelectedIcon: false,
+              onSelectionChanged: (s) => setState(() => _view = s.single),
+            ),
+          ),
+          const SizedBox(height: AppSpace.lg),
+          if (_view == _MembersView.roles)
+            _RolesView(viewModel: viewModel, team: team)
+          else
+            ..._people(context, team),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _people(BuildContext context, Team team) {
+    final c = AppColors.of(context);
     final members = team.members.entries.toList()
       ..sort((a, b) {
         final byRole = a.value.index.compareTo(b.value.index);
@@ -34,66 +79,165 @@ class MembersTab extends StatelessWidget {
             ? byRole
             : team.nameOf(a.key).compareTo(team.nameOf(b.key));
       });
-    return ConstrainedContent(
-      child: ListView(
-        padding: const EdgeInsets.all(AppSpace.lg),
-        children: [
-          if (viewModel.canManageMembers) ...[
-            Align(
-              alignment: Alignment.centerLeft,
-              child: FilledButton.icon(
-                onPressed: () async {
-                  await showInviteMembers(context, team);
-                  // Anyone just invited shows under Invites pending.
-                  viewModel.loadInvites.execute();
-                },
-                icon: const Icon(Icons.person_search),
-                label: Text(
-                  team.isCommunity ? 'Invite members' : 'Invite players',
+    return [
+      if (viewModel.canManageMembers) ...[
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton.icon(
+            onPressed: () => _addMember(context, team),
+            icon: const Icon(Icons.person_add_alt),
+            label: const Text('Add member'),
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+      if (viewModel.canShareCode) ...[
+        ViewModelHost(
+          create: (c) => InviteCodeViewModel(
+            teamId: team.id,
+            teamRepository: c.read(),
+            authRepository: c.read(),
+          ),
+          builder: (_, vm) => InviteCodeCard(viewModel: vm),
+        ),
+        const SizedBox(height: 16),
+      ],
+      if (viewModel.joinRequests.isNotEmpty) ...[
+        _JoinRequests(viewModel: viewModel),
+        const SizedBox(height: 16),
+      ],
+      Padding(
+        padding: const EdgeInsets.only(left: 2, bottom: 8),
+        child: Eyebrow(
+          '${members.length} member${members.length == 1 ? '' : 's'}',
+        ),
+      ),
+      Card(
+        margin: EdgeInsets.zero,
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: [
+            for (final (i, m) in members.indexed) ...[
+              if (i > 0) Divider(height: 1, color: c.border),
+              _MemberRow(
+                viewModel: viewModel,
+                team: team,
+                uid: m.key,
+                tier: m.value,
+              ),
+            ],
+          ],
+        ),
+      ),
+      if (viewModel.canSeeInvites && viewModel.pendingInvites.isNotEmpty) ...[
+        const SizedBox(height: 18),
+        _PendingInvites(viewModel: viewModel),
+      ],
+    ];
+  }
+
+  /// "Add member": invite people, and on a team with a roster, add a player
+  /// to it.
+  Future<void> _addMember(BuildContext context, Team team) async {
+    final hasRoster = TeamSection.forTeam(team).contains(TeamSection.roster);
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      sheetAnimationStyle: AppMotion.sheetStyle(context),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpace.lg,
+                0,
+                AppSpace.lg,
+                AppSpace.sm,
+              ),
+              child: Text(
+                'Add member',
+                style: AppText.section.copyWith(
+                  color: AppColors.of(context).ink,
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-          ],
-          if (viewModel.canShareCode) ...[
-            ViewModelHost(
-              create: (c) => InviteCodeViewModel(
-                teamId: team.id,
-                teamRepository: c.read(),
-                authRepository: c.read(),
+            ListTile(
+              minVerticalPadding: 12,
+              leading: const Icon(Icons.person_search),
+              title: const Text('Invite people'),
+              subtitle: Text(
+                team.isCommunity
+                    ? 'Find people to invite, or share the invite link'
+                    : 'Find players to invite, or share the invite link',
               ),
-              builder: (_, vm) => InviteCodeCard(viewModel: vm),
+              onTap: () => Navigator.pop(context, 'invite'),
             ),
-            const SizedBox(height: 16),
+            if (hasRoster && viewModel.canEdit)
+              ListTile(
+                minVerticalPadding: 12,
+                leading: const Icon(Icons.badge_outlined),
+                title: const Text('Add player to roster'),
+                subtitle: const Text(
+                  'A roster spot, optionally linked to a member',
+                ),
+                onTap: () => Navigator.pop(context, 'player'),
+              ),
           ],
-          if (viewModel.joinRequests.isNotEmpty) ...[
-            _JoinRequests(viewModel: viewModel),
-            const SizedBox(height: 16),
-          ],
-          _RolesHelp(team: team, isOwner: viewModel.isOwner),
-          const SizedBox(height: 18),
-          Padding(
-            padding: const EdgeInsets.only(left: 2, bottom: 8),
-            child: Eyebrow(
-              '${members.length} member${members.length == 1 ? '' : 's'}',
-            ),
-          ),
-          Card(
-            margin: EdgeInsets.zero,
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              children: [
-                for (final (i, m) in members.indexed) ...[
-                  if (i > 0) Divider(height: 1, color: c.border),
-                  ListTile(
-                    contentPadding: const EdgeInsets.fromLTRB(14, 2, 4, 2),
-                    onTap: () => context.push(Routes.player(m.key)),
-                    leading: PersonAvatar(name: team.nameOf(m.key), radius: 18),
-                    title: Text.rich(
+        ),
+      ),
+    );
+    if (!context.mounted || choice == null) return;
+    switch (choice) {
+      case 'invite':
+        await showInviteMembers(context, team);
+        // Anyone just invited shows under Invites pending.
+        viewModel.loadInvites.execute();
+      case 'player':
+        await showPlayerEditor(context, viewModel);
+    }
+  }
+}
+
+/// One member: avatar, name, role pills, and the manage menu for those who
+/// can. A 64 px row that opens their profile.
+class _MemberRow extends StatelessWidget {
+  const _MemberRow({
+    required this.viewModel,
+    required this.team,
+    required this.uid,
+    required this.tier,
+  });
+
+  final TeamDetailViewModel viewModel;
+  final Team team;
+  final String uid;
+  final TeamRole tier;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final name = team.nameOf(uid);
+    return InkWell(
+      onTap: () => context.push(Routes.player(uid)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 64),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 8, 4, 8),
+          child: Row(
+            children: [
+              PersonAvatar(name: name, radius: 18),
+              const SizedBox(width: AppSpace.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text.rich(
                       TextSpan(
-                        text: team.nameOf(m.key),
+                        text: name,
                         children: [
-                          if (m.key == viewModel.uid)
+                          if (uid == viewModel.uid)
                             TextSpan(
                               text: ' (you)',
                               style: AppText.body.copyWith(color: c.muted),
@@ -102,32 +246,23 @@ class MembersTab extends StatelessWidget {
                       ),
                       style: AppText.bodyStrong.copyWith(color: c.ink),
                     ),
-                    subtitle: _MemberRoles(
-                      team: team,
-                      uid: m.key,
-                      tier: m.value,
-                    ),
-                    trailing: viewModel.canManage(m.key)
-                        ? _MemberMenu(
-                            viewModel: viewModel,
-                            uid: m.key,
-                            name: team.nameOf(m.key),
-                            role: m.value,
-                            team: team,
-                            statKeeper: team.isStatKeeper(m.key),
-                          )
-                        : null,
-                  ),
-                ],
-              ],
-            ),
+                    const SizedBox(height: AppSpace.xs),
+                    _MemberRoles(team: team, uid: uid, tier: tier),
+                  ],
+                ),
+              ),
+              if (viewModel.canManage(uid))
+                _MemberMenu(
+                  viewModel: viewModel,
+                  uid: uid,
+                  name: name,
+                  role: tier,
+                  team: team,
+                  statKeeper: team.isStatKeeper(uid),
+                ),
+            ],
           ),
-          if (viewModel.canSeeInvites &&
-              viewModel.pendingInvites.isNotEmpty) ...[
-            const SizedBox(height: 18),
-            _PendingInvites(viewModel: viewModel),
-          ],
-        ],
+        ),
       ),
     );
   }
@@ -312,32 +447,39 @@ class _MemberRoles extends StatelessWidget {
         ? team.roleLabel(tier)
         : '${team.roleLabel(tier)} · '
               '${preset?.id == 'statKeeper' ? 'Stats' : preset?.name ?? 'Custom'}';
-    // Staff tiers (owner, coach, captain) and members with permissions of
-    // their own stand out as a tag; a plain player or member is just text.
-    final Widget tierLabel = tier == TeamRole.player && own.isEmpty
-        ? Text(label)
-        : Tag(label);
-    if (roles.isEmpty) {
-      return Align(alignment: Alignment.centerLeft, child: tierLabel);
-    }
+    // Staff tiers and members with permissions of their own stand out as an
+    // accent pill; a plain player or member is a quiet neutral one.
+    final plain = tier == TeamRole.player && own.isEmpty;
     return Wrap(
-      spacing: 10,
-      runSpacing: 2,
+      spacing: AppSpace.sm,
+      runSpacing: AppSpace.xs,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        tierLabel,
-        for (final r in roles)
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              RoleDot(color: r.color, size: 9),
-              const SizedBox(width: 4),
-              Text(r.name),
-            ],
-          ),
+        StatusPill(label, tone: plain ? PillTone.neutral : PillTone.accent),
+        for (final r in roles) _RoleChip(role: r),
       ],
     );
   }
+}
+
+/// A custom role: its colour dot and name.
+class _RoleChip extends StatelessWidget {
+  const _RoleChip({required this.role});
+
+  final CustomRole role;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      RoleDot(color: role.color, size: 9),
+      const SizedBox(width: AppSpace.xs),
+      Text(
+        role.name,
+        style: AppText.caption.copyWith(color: AppColors.of(context).ink2),
+      ),
+    ],
+  );
 }
 
 /// Picks which custom roles [uid] has, up to [maxRolesPerMember].
@@ -521,119 +663,189 @@ class _MemberMenu extends StatelessWidget {
   }
 }
 
-/// What each tier and custom role can do, and, for the owner, a way to
-/// manage roles.
-class _RolesHelp extends StatelessWidget {
-  const _RolesHelp({required this.team, required this.isOwner});
+/// The Roles view: each tier and custom role with the people who hold it.
+/// Whoever sets roles (the owner) gets "Edit roles", which opens the roles
+/// and permissions editor in team settings.
+class _RolesView extends StatelessWidget {
+  const _RolesView({required this.viewModel, required this.team});
 
+  final TeamDetailViewModel viewModel;
   final Team team;
-  final bool isOwner;
 
-  TeamKind get kind => team.kind;
+  List<String> _holders(bool Function(String uid, TeamRole tier) test) => [
+    for (final e in team.members.entries)
+      if (test(e.key, e.value)) e.key,
+  ]..sort((a, b) => team.nameOf(a).compareTo(team.nameOf(b)));
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final c = AppColors.of(context);
+    final kind = team.kind;
+    final tiers = [
+      (
+        name: team.roleLabel(TeamRole.owner),
+        summary: TeamRole.owner.summaryFor(kind),
+        uids: _holders((_, t) => t == TeamRole.owner),
+        always: true,
+      ),
+      // Coach and captain are tiers from before custom roles: listed while
+      // someone still holds one.
+      for (final t in [TeamRole.coach, TeamRole.captain])
+        (
+          name: team.roleLabel(t),
+          summary: t.summaryFor(kind),
+          uids: _holders((_, tier) => tier == t),
+          always: false,
+        ),
+      if (!team.isCommunity)
+        (
+          name: 'Stats',
+          summary: 'Keep and manage stats',
+          uids: _holders(
+            (uid, tier) => tier == TeamRole.player && team.isStatKeeper(uid),
+          ),
+          always: true,
+        ),
+    ];
     final custom = team.sortedRoles;
-    return Card.outlined(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (viewModel.canSetRoles) ...[
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.icon(
+              onPressed: () =>
+                  pushTeamRoute(context, Routes.teamRoles(team.id)),
+              icon: const Icon(Icons.tune),
+              label: const Text('Edit roles'),
+            ),
+          ),
+          const SizedBox(height: AppSpace.lg),
+        ],
+        for (final t in tiers)
+          if (t.always || t.uids.isNotEmpty) ...[
+            _RoleCard(
+              team: team,
+              name: t.name,
+              summary: t.summary,
+              uids: t.uids,
+            ),
+            const SizedBox(height: AppSpace.md),
+          ],
+        if (custom.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(left: 2, bottom: AppSpace.sm),
+            child: Eyebrow('Custom roles · ${custom.length}'),
+          ),
+        for (final r in custom) ...[
+          _RoleCard(
+            team: team,
+            name: r.name,
+            dot: r.color,
+            summary: r.permissions.isEmpty
+                ? 'Chat rooms that let it in'
+                : [
+                    for (final p in TeamPermission.values)
+                      if (r.permissions.contains(p)) p.label,
+                  ].join(', '),
+            uids: _holders(
+              (uid, _) => team.rolesOf(uid).any((x) => x.id == r.id),
+            ),
+          ),
+          const SizedBox(height: AppSpace.md),
+        ],
+        if (custom.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpace.sm),
+            child: Text(
+              viewModel.canSetRoles
+                  ? 'No custom roles yet. Edit roles to make some, like '
+                        'Handlers or Organizers.'
+                  : 'No custom roles yet.',
+              style: AppText.secondary.copyWith(color: c.muted),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// One role: its name, what it can do, and the people who hold it.
+class _RoleCard extends StatelessWidget {
+  const _RoleCard({
+    required this.team,
+    required this.name,
+    required this.summary,
+    required this.uids,
+    this.dot,
+  });
+
+  final Team team;
+  final String name;
+  final String summary;
+  final List<String> uids;
+  final int? dot;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
-      child: ExpansionTile(
-        leading: const Icon(Icons.admin_panel_settings_outlined),
-        title: const Text('Roles'),
-        subtitle: Text(
-          custom.isEmpty
-              ? 'What each role can do'
-              : '${custom.length} custom '
-                    '${custom.length == 1 ? 'role' : 'roles'}',
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpace.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                if (dot != null) ...[
+                  RoleDot(color: dot!, size: 10),
+                  const SizedBox(width: AppSpace.sm),
+                ],
+                Expanded(
+                  child: Semantics(
+                    header: true,
+                    child: Text(
+                      name,
+                      style: AppText.bodyStrong.copyWith(color: c.ink),
+                    ),
+                  ),
+                ),
+                StatusPill('${uids.length}'),
+              ],
+            ),
+            const SizedBox(height: AppSpace.xs),
+            Text(summary, style: AppText.caption.copyWith(color: c.muted)),
+            const SizedBox(height: AppSpace.sm),
+            if (uids.isEmpty)
+              Text(
+                'Nobody yet',
+                style: AppText.secondary.copyWith(color: c.muted),
+              )
+            else
+              for (final uid in uids)
+                InkWell(
+                  onTap: () => context.push(Routes.player(uid)),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 48),
+                    child: Row(
+                      children: [
+                        PersonAvatar(name: team.nameOf(uid), radius: 14),
+                        const SizedBox(width: AppSpace.md),
+                        Expanded(
+                          child: Text(
+                            team.nameOf(uid),
+                            style: AppText.body.copyWith(color: c.ink),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+          ],
         ),
-        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        children: [
-          for (final r in custom)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(top: AppSpace.xs, right: 6),
-                    child: RoleDot(color: r.color, size: 10),
-                  ),
-                  SizedBox(
-                    width: 120,
-                    child: Text(
-                      r.name,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      r.permissions.isEmpty
-                          ? 'Chat rooms that let it in'
-                          : [
-                              for (final p in TeamPermission.values)
-                                if (r.permissions.contains(p)) p.label,
-                            ].join(', '),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          if (isOwner)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: () =>
-                    pushTeamRoute(context, Routes.teamRoles(team.id)),
-                icon: const Icon(Icons.tune),
-                label: const Text('Manage roles'),
-              ),
-            ),
-          for (final r in TeamRole.rolesFor(kind))
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: 84,
-                    child: Text(
-                      r.labelFor(kind),
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  Expanded(child: Text(r.summaryFor(kind))),
-                ],
-              ),
-            ),
-          if (kind == TeamKind.team)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: 72,
-                    child: Text(
-                      '+ Stats',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  const Expanded(
-                    child: Text(
-                      'Added to a player by the owner: keep and manage stats',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
       ),
     );
   }

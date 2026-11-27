@@ -1108,7 +1108,7 @@ class FakeTeamRepository implements TeamRepository {
   }
 
   @override
-  Future<Result<void>> savePlayer(String teamId, RosterPlayer player) async {
+  Future<Result<String>> savePlayer(String teamId, RosterPlayer player) async {
     final list = roster[teamId] ?? const <RosterPlayer>[];
     final saved = player.id.isEmpty
         ? RosterPlayer(
@@ -1127,7 +1127,7 @@ class FakeTeamRepository implements TeamRepository {
       saved,
     ];
     _rosterChanges.add(null);
-    return const Result.ok(null);
+    return Result.ok(saved.id);
   }
 
   @override

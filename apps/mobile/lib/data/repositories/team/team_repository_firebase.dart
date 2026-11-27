@@ -1084,7 +1084,7 @@ class TeamRepositoryFirebase implements TeamRepository {
   /// client picked, so a replay is a 409), `PUT .../:playerId` to save one;
   /// `paid` goes along (the server keeps it in the admin-only status).
   @override
-  Future<Result<void>> savePlayer(String teamId, RosterPlayer player) =>
+  Future<Result<String>> savePlayer(String teamId, RosterPlayer player) =>
       guard(() async {
         final api = _requireApi();
         final body = {
@@ -1107,9 +1107,10 @@ class TeamRepositoryFirebase implements TeamRepository {
             if (e.code != 'already_exists') rethrow;
           }
           _ids.done(id);
-        } else {
-          await api.put('$base/${Uri.encodeComponent(player.id)}', body);
+          return id;
         }
+        await api.put('$base/${Uri.encodeComponent(player.id)}', body);
+        return player.id;
       });
 
   /// The API, or an error saying it can't be reached (writes only it makes).

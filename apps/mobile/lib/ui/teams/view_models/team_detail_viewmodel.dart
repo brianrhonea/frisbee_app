@@ -39,9 +39,7 @@ class TeamDetailViewModel extends ChangeNotifier {
        _meetings = meetingRepository,
        _auth = authRepository,
        _clock = clock ?? DateTime.now {
-    savePlayer = Command1<void, RosterPlayer>(
-      (p) => _teams.savePlayer(teamId, p),
-    );
+    savePlayer = Command1<void, RosterPlayer>(_savePlayer);
     deletePlayer = Command1<void, String>(
       (id) => _teams.deletePlayer(teamId, id),
     );
@@ -353,6 +351,19 @@ class TeamDetailViewModel extends ChangeNotifier {
       notifyListeners();
     }
     return result;
+  }
+
+  /// Saves a roster spot, then links it to (or unlinks it from) a member
+  /// when its [RosterPlayer.userId] changed: the server only links through
+  /// the admin link call, not on create or edit.
+  Future<Result<void>> _savePlayer(RosterPlayer p) async {
+    final before = p.id.isEmpty
+        ? null
+        : _roster.where((r) => r.id == p.id).firstOrNull?.userId;
+    final saved = await _teams.savePlayer(teamId, p);
+    if (saved is! Ok<String>) return Result.error((saved as Error).error);
+    if (p.userId == before) return const Result.ok(null);
+    return _teams.linkPlayer(teamId, saved.value, p.userId);
   }
 
   /// Flips a player's Paid mark.
