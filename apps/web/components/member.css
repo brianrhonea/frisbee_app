@@ -154,16 +154,16 @@
 .messages .hub-list > .segmented { justify-self: stretch; display: flex; }
 .messages .hub-list > .segmented a { flex: 1; text-align: center; }
 .messages .hub-list > .search-input { border-radius: var(--radius-control); border-color: transparent; }
-.messages .conv-heading {
-  margin: 16px 10px 4px; font-size: 11px; font-weight: 800; letter-spacing: 0.1em; color: var(--muted);
-}
-/* .hub-items a would make the row a block; keep its avatar / text / time grid. */
-.messages .hub-items a.conv-row { display: grid; padding: 9px 10px; border-radius: var(--radius-control); }
-.messages .conv-row.active { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
-.messages .conv-row .avatar { border-radius: 50%; }
-.messages .conv-time { align-self: start; padding-top: 3px; }
-/* Unread: bold, with an amber dot (unread counts are amber). */
-.messages .conv-row .notice-dot { right: 12px; bottom: 12px; width: 10px; height: 10px; margin: 0; background: var(--disc); }
+.messages .conv-heading { margin: var(--space-lg) var(--space-sm) var(--space-xs); font-size: var(--text-caption-size); font-weight: 800; letter-spacing: 0.1em; color: var(--muted); }
+.messages .chat-filter { margin: var(--space-xs) 0; }
+.messages .conv-list { margin-top: var(--space-xs); }
+.messages .conv-list li { list-style: none; }
+/* Chat rows are ListRows (C3): no dividers between them, the picked one tinted. */
+.messages .ui-row { border-bottom: 0; padding: 0 var(--space-sm); border-radius: var(--radius-control); }
+.messages .ui-row:hover { background: var(--field); }
+.messages .hub-items a.ui-row-main { display: flex; padding: var(--space-sm) 0; }
+.messages .ui-row-selected { background: var(--accent-soft); }
+.messages .conv-mention { color: var(--accent); font-weight: 700; }
 .messages .thread { border-radius: var(--radius); box-shadow: none; }
 .messages .thread-head { padding: 14px 18px; }
 .messages .thread-body { background: var(--bg); gap: 4px; }

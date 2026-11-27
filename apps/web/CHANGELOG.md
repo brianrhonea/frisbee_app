@@ -4,6 +4,15 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.66.0 — 2026-11-27
+
+H7 Chats restyle with the filters the app has (UI-Q12). Same inbox, requests, archive, search, sending and unread rules.
+
+- All, Teams, Direct and Unread filter chips over the inbox; Unread shows how many are waiting (team chats with news plus unmuted direct conversations).
+- Team and direct chats are list rows (C3): avatar, name, last line, time and an unread dot; the open one is tinted with an accent edge. No dividers.
+- Empty states (C9) for no matches, nothing unread and no team chats.
+- Test note: the K5-B check that named the old .conv-row.active rule no longer applies (the rule is gone); the selected row now uses the shared .ui-row-selected, which has the accent edge.
+
 ## 0.65.0 — 2026-11-27
 
 H2 Schedule restyle, with the Week view the website adds (UI-Q12). Same calendars, filters, invites, add, edit and delete.
