@@ -30,6 +30,14 @@ import 'package:frisbee_app/data/repositories/post_comment/post_comment_reposito
 import 'package:frisbee_app/data/repositories/user_post/user_post_repository.dart';
 import 'package:frisbee_app/data/repositories/hosted_tournament/hosted_tournament_repository.dart';
 import 'package:frisbee_app/data/repositories/ranking/ranking_repository.dart';
+import 'package:frisbee_app/data/repositories/video/video_repository.dart';
+import 'package:frisbee_app/data/repositories/voice/voice_repository.dart';
+import 'package:frisbee_app/data/repositories/workout_recorder/workout_recorder.dart';
+import 'package:frisbee_app/data/services/location_service.dart';
+import '../data/workout_recorder_test.dart' show FakeLocationService;
+import 'package:frisbee_app/data/services/youtube_info_service.dart';
+import 'video_fakes.dart';
+import 'voice_fakes.dart';
 import 'fakes.dart';
 import 'hosted_tournament_fakes.dart';
 import 'group_tournament_fakes.dart';
@@ -38,15 +46,18 @@ import 'meeting_fakes.dart';
 import '../ui/explore_test.dart' show FakeRankingRepository;
 
 class AppFakes {
-  AppFakes(this.teams, this.events);
+  AppFakes(this.teams, this.events, this.auth);
   final FakeTeamRepository teams;
   final FakeEventRepository events;
+  final FakeAuthRepository auth;
 }
 
 Future<AppFakes> pumpFullApp(
   WidgetTester tester, {
   Size size = const Size(390, 844),
+  bool signedIn = true,
 }) async {
+  final location = FakeLocationService();
   late FakeUserPostRepository userPosts;
   late FakePostCommentRepository comments;
   late FakeDirectMessageRepository dms;
@@ -78,7 +89,7 @@ Future<AppFakes> pumpFullApp(
         startsAt: day.add(const Duration(hours: 1)),
       ),
     };
-  final auth = FakeAuthRepository(user: testUser);
+  final auth = FakeAuthRepository(user: signedIn ? testUser : null);
   await tester.pumpWidget(
     MultiProvider(
       providers: [
@@ -123,6 +134,15 @@ Future<AppFakes> pumpFullApp(
           value: hosted = FakeHostedTournamentRepository(),
         ),
         Provider<RankingRepository>.value(value: FakeRankingRepository()),
+        Provider<VideoRepository>.value(value: FakeVideoRepository()),
+        ChangeNotifierProvider<VoiceRepository>.value(
+          value: FakeVoiceRepository(),
+        ),
+        Provider<YouTubeInfoService>.value(value: FakeYouTubeInfoService()),
+        Provider<LocationService>.value(value: location),
+        ChangeNotifierProvider<WorkoutRecorder>(
+          create: (_) => WorkoutRecorder(location: location),
+        ),
       ],
       child: MaterialApp.router(
         theme: AppTheme.light,
@@ -135,6 +155,6 @@ Future<AppFakes> pumpFullApp(
     ),
   );
   await tester.pumpAndSettle();
-  expect(find.byType(HomeScreen), findsOneWidget);
-  return AppFakes(teams, events);
+  if (signedIn) expect(find.byType(HomeScreen), findsOneWidget);
+  return AppFakes(teams, events, auth);
 }

@@ -1,4 +1,5 @@
 import '../../../data/repositories/people/people_repository.dart';
+import '../../core/ui/list_row.dart';
 import '../../../data/repositories/draft/message_draft_repository.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -926,15 +927,21 @@ class _RoomRowState extends State<_RoomRow> {
           child: InkWell(
             onTap: widget.onTap,
             onLongPress: widget.onHold,
-            child: SizedBox(
-              height: 52,
-              child: Padding(
-                padding: EdgeInsets.only(left: 14, right: showMenu ? 2 : 14),
-                child: Row(
-                  children: [
-                    Expanded(child: row()),
-                    if (showMenu) widget.menu!,
-                  ],
+            // A minimum height, not a fixed one (ListRow.minHeight): the
+            // row grows with the text scale instead of clipping.
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: ListRow.minHeight),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                heightFactor: 1,
+                child: Padding(
+                  padding: EdgeInsets.only(left: 14, right: showMenu ? 2 : 14),
+                  child: Row(
+                    children: [
+                      Expanded(child: row()),
+                      if (showMenu) widget.menu!,
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -946,7 +953,7 @@ class _RoomRowState extends State<_RoomRow> {
       data: room,
       holdToDrag: false,
       feedback: Container(
-        height: 52,
+        height: ListRow.minHeight,
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
           color: c.card,
