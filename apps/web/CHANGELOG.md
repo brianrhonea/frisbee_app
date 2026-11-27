@@ -4,6 +4,14 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.65.0 — 2026-11-27
+
+H2 Schedule restyle, with the Week view the website adds (UI-Q12). Same calendars, filters, invites, add, edit and delete.
+
+- Views: Month, Week and List. Week is a seven-day strip with previous and next week and a count; Month keeps its grid. Both show the picked day's events under them (Month used to list the whole picked week). The choice is still remembered in this browser, and List stays the default.
+- Every row is an EventCard (C8): date badge, title, time range, team or calendar, place, your RSVP or Needs RSVP, and Repeats; actions (Delete, Edit, Add to calendar) sit under the card.
+- Calmer page: the schedule is no longer a bordered card with dividers; spacing and type separate the days.
+
 ## 0.64.0 — 2026-11-27
 
 H1 Home restyle (restyle only; same data, tabs, composer, drafts and refresh).
