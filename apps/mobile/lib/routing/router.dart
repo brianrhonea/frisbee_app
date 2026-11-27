@@ -736,20 +736,6 @@ GoRouter router(
             ),
           ],
         ),
-        // Schedule: the user's own calendar. Events to find are on
-        // Discover now; the old `?view=find` opens it.
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: Routes.schedule,
-              redirect: (_, state) =>
-                  state.uri.queryParameters['view'] == 'find'
-                  ? Routes.explore()
-                  : null,
-              builder: (_, _) => schedulePage(),
-            ),
-          ],
-        ),
         // Teams: the user's teams and communities, and every team page.
         StatefulShellBranch(
           routes: [
@@ -984,6 +970,20 @@ GoRouter router(
                   ],
                 ),
               ],
+            ),
+          ],
+        ),
+        // Schedule: the user's own calendar. Events to find are on
+        // Discover now; the old `?view=find` opens it.
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: Routes.schedule,
+              redirect: (_, state) =>
+                  state.uri.queryParameters['view'] == 'find'
+                  ? Routes.explore()
+                  : null,
+              builder: (_, _) => schedulePage(),
             ),
           ],
         ),

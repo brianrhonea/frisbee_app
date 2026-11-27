@@ -38,15 +38,15 @@ void main() {
     expect(links('/rankings'), [Routes.explorePath, null]);
   });
 
-  test('the tabs are Home, Discover, Schedule, Teams and Inbox', () {
+  test('the tabs are Home, Discover, Teams, Schedule and Chats', () {
     // The website's nav uses the same names, in the same order.
     expect(
       [for (final s in ShellSection.tabs) s.shortLabel],
-      ['Home', 'Discover', 'Schedule', 'Teams', 'Chats'],
+      ['Home', 'Discover', 'Teams', 'Schedule', 'Chats'],
     );
     expect(
       [for (final s in ShellSection.tabs) s.label],
-      ['Home', 'Discover', 'Schedule', 'Teams', 'Chats'],
+      ['Home', 'Discover', 'Teams', 'Schedule', 'Chats'],
     );
   });
 

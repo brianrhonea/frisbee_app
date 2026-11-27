@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.60  | 2026-11-26 | `sprint3/lane-b`                        |                     |
 | 0.0.59  | 2026-11-26 | `sprint2/c2-layout-fixes`               |                     |
 | 0.0.58  | 2026-11-26 | `sprint2/3a-callables`                |                     |
 | 0.0.57  | 2026-11-26 | `sprint2/lane-b-app`                    |                     |
@@ -72,6 +73,11 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.60 — Tab bar order and profile at the top right (S1)
+
+- Tabs are now Home, Discover, Teams, Schedule, Chats (Teams and Schedule swapped); routes and deep links unchanged.
+- The profile picture moved from the top left to the top right of each tab's app bar. Ctrl/Cmd+1..5 follow the new order.
 
 ## 0.0.59 — Layout fixes after the 48 px buttons (C2)
 

@@ -89,7 +89,6 @@ class _TeamsScreenState extends State<TeamsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: ProfileButton.leading(context),
         title: const Text('Teams'),
         actions: [
           ListenableBuilder(
@@ -100,6 +99,8 @@ class _TeamsScreenState extends State<TeamsScreen> {
               onPressed: vm.joinTeam.running ? null : _add,
             ),
           ),
+          ?ProfileButton.action(context),
+          const SizedBox(width: 4),
         ],
       ),
       body: ListenableBuilder(

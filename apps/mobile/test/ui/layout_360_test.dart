@@ -72,7 +72,7 @@ void main() {
         home: ScheduleScreen(
           viewModel: vm,
           // The shell's avatar, as on the Schedule tab.
-          leading: const Padding(
+          profile: const Padding(
             padding: EdgeInsets.all(8),
             child: CircleAvatar(child: Text('A')),
           ),

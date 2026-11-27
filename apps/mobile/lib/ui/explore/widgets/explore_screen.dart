@@ -152,9 +152,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
     return Scaffold(
       appBar: mobile
           ? AppBar(
-              leading: ProfileButton.leading(context),
               title: const Text('Discover'),
-              actions: [if (_hasEvents) host],
+              actions: [
+                if (_hasEvents) host,
+                ?ProfileButton.action(context),
+                const SizedBox(width: 4),
+              ],
             )
           : null,
       body: ListenableBuilder(

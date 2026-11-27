@@ -49,7 +49,6 @@ class InboxScreen extends StatelessWidget {
     if (size.isMobile) {
       return Scaffold(
         appBar: AppBar(
-          leading: ProfileButton.leading(context),
           title: const Text('Chats'),
           actions: [
             IconButton(
@@ -57,6 +56,8 @@ class InboxScreen extends StatelessWidget {
               onPressed: () => context.push(Routes.newMessage),
               icon: const Icon(Icons.edit_square),
             ),
+            ?ProfileButton.action(context),
+            const SizedBox(width: 4),
           ],
         ),
         body: InboxList(
