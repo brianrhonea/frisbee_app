@@ -10,6 +10,10 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.61
+
+- **Crash reports:** if the app crashes, a report is sent to the team so we can fix it. Nothing about you is added beyond the crash details.
+
 ## 0.0.60
 
 - **New tab order:** Home, Discover, Teams, Schedule, Chats. Your picture is now at the top right and opens your profile and settings.

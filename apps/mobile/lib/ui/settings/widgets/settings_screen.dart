@@ -15,7 +15,6 @@ import '../../../domain/models/player_profile.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
 import '../../core/themes/theme.dart';
-import '../../core/ui/brand.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/layout.dart' show PersonAvatar;
@@ -24,6 +23,7 @@ import '../../profile/widgets/delete_account_dialog.dart';
 import 'change_password_dialog.dart';
 import 'download_data_group.dart';
 import 'settings_widgets.dart';
+import 'version_label.dart';
 import '../../moderation/widgets/blocked_accounts_screen.dart';
 
 /// Names for the appearance choices.
@@ -209,14 +209,7 @@ class SettingsScreen extends StatelessWidget {
               ),
               Padding(
                 padding: const EdgeInsets.only(top: 24),
-                child: Text(
-                  '$appName v$appVersion',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.of(context).muted,
-                  ),
-                ),
+                child: const VersionLabel(),
               ),
             ],
           );

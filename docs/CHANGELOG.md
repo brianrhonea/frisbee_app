@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.61  | 2026-11-26 | `sprint3/lane-b`                        |                     |
 | 0.0.60  | 2026-11-26 | `sprint3/lane-b`                        |                     |
 | 0.0.59  | 2026-11-26 | `sprint2/c2-layout-fixes`               |                     |
 | 0.0.58  | 2026-11-26 | `sprint2/3a-callables`                |                     |
@@ -73,6 +74,12 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.61 — Crash reporting (R2, #7)
+
+- Added `firebase_crashlytics` (approved, Q15). `CrashReporting.init` runs after Firebase starts in `main`, hooks `FlutterError.onError` and `PlatformDispatcher.onError`, keeps collection off in debug builds and never blocks launch if it fails.
+- Hidden "Send test crash" (long-press the version at the foot of Settings), for Stall 10 staff and debug builds only.
+- iOS: an "Upload Crashlytics Symbols" build phase in the Runner target (owner steps in the hand-off notes).
 
 ## 0.0.60 — Tab bar order and profile at the top right (S1)
 
