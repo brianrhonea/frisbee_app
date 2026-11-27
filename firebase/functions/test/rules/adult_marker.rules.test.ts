@@ -161,6 +161,12 @@ describe("the marker is the server's", () => {
     await assertSucceeds(setDoc(doc(db("pat"), "profiles", "pat"), base));
   });
 
+  it("a fresh profile without the marker (onboarding) can be created and then edited by its owner", async () => {
+    await assertSucceeds(setDoc(doc(db("newbie"), "profiles", "newbie"), base));
+    await assertSucceeds(updateDoc(doc(db("newbie"), "profiles", "newbie"), { name: "New B", updatedAt: serverTimestamp() }));
+    await assertSucceeds(setDoc(doc(db("newbie"), "profiles", "newbie"), { name: "New C", updatedAt: serverTimestamp() }, { merge: true }));
+  });
+
   it("the owner can't set it on their own profile", async () => {
     await assertFails(updateDoc(doc(db(TOM), "profiles", TOM), { adult: true }));
     await assertFails(setDoc(doc(db(TOM), "profiles", TOM), { ...base, adult: true }));
