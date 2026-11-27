@@ -259,6 +259,8 @@ class _HomeScreenState extends State<HomeScreen> {
           // No page header: the composer below is where posts start.
           return PageScroll(
             onRefresh: vm.refreshFeed,
+            // The + button's height plus 16, so it never covers the last row.
+            bottomInset: 56 + 16,
             children: [
               // On bigger screens the top bar has the same box.
               if (mobile) ...[const SearchField(), const SizedBox(height: 12)],

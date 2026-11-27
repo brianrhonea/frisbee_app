@@ -13,7 +13,14 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
-| 0.0.77  | 2026-11-27 | `sprint3/17b`                           |                     |
+| 0.0.84  | 2026-11-27 | `sprint3/17b`                           |                     |
+| 0.0.83  | 2026-11-27 | `sprint3/lane-b`                        |                     |
+| 0.0.82  | 2026-11-27 | `sprint3/lane-b`                        |                     |
+| 0.0.81  | 2026-11-27 | `sprint3/lane-b`                        |                     |
+| 0.0.80  | 2026-11-27 | `sprint3/lane-b`                        |                     |
+| 0.0.79  | 2026-11-27 | `sprint3/lane-b`                        |                     |
+| 0.0.78  | 2026-11-27 | `sprint3/lane-b`                        |                     |
+| 0.0.77  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.76  | 2026-11-27 | `sprint3/17b`                           |                     |
 | 0.0.75  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.74  | 2026-11-27 | `sprint3/lane-b`                        |                     |
@@ -91,10 +98,38 @@ Plain-language notes for testers are in
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
 
-## 0.0.77 — 17-B review fixes (M1, L1)
+## 0.0.84 — 17-B review fixes (M1, L1)
 
 - M1: a recorded run (GPS route) posted with photos keeps its photos again (they upload to Storage on the direct path, for the immediate save and the outbox replay; a replay of a post that already landed uploads nothing).
 - L1: creating an event, a roster spot or a group chat again after a lost response reuses the same id for the same request, and a 409 counts as done, so no duplicate. Personal calendar events have no id in the API schema and are unchanged.
+
+## 0.0.83 — H9 fix: settings rows on the page, no outer card
+
+- Settings groups: rows sit on the page under their headings with hairlines between, no outer card. Rows stay list tiles, so behaviour and tests are unchanged. H6 member rows left as they are (tests depend on their list-tile and menu structure).
+
+## 0.0.82 — Screenshots: logo mark on every wide picture
+
+- The small red mark by the wordmark is the app logo; some pictures were taken before its image finished loading. The picture generators now wait for it, so every wide picture shows it. No app change.
+
+## 0.0.81 — Home: room under the list for the + button
+
+- Home: bottom padding of the + button's height plus 16, so it never covers the last row (`PageScroll.bottomInset`). Schedule has no floating button; its + is in the top bar.
+
+## 0.0.80 — H4 fix: team subtitle on one line
+
+- Teams list: the subtitle is one line with an ellipsis; the role pill keeps its width (the chevron shows only on rows without a pill). `ListRow` gained `subtitleMaxLines`.
+
+## 0.0.79 — Fix broken first breadcrumb in the top bar
+
+- Top bar breadcrumbs use the app font and type scale (the first link crumb showed as a solid block). H7/H8 chips confirmed 48 px tall by tests.
+
+## 0.0.78 — H7 fix: chip row scroll cue and chosen chip in view
+
+- Chats filters: a fade on the side with more chips shows the row scrolls, and the chosen chip scrolls into view. Chips keep 48 px tap targets (tested).
+
+## 0.0.77 — H3 fix: no empty cover band on events
+
+- Event page: the empty pale cover band is gone; the date badge and title sit on the page (events have no cover picture).
 
 ## 0.0.76 — Phase-1 writes through the API (17-B, app half)
 

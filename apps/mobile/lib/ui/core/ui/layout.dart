@@ -72,9 +72,14 @@ class PageScroll extends StatefulWidget {
     required this.children,
     this.controller,
     this.onRefresh,
+    this.bottomInset = 0,
   });
 
   final List<Widget> children;
+
+  /// Extra room under the content, e.g. a floating button's height plus 16,
+  /// so it never covers the last row.
+  final double bottomInset;
   final ScrollController? controller;
 
   /// Pull down to refresh, when given.
@@ -105,7 +110,9 @@ class _PageScrollState extends State<PageScroll> {
       physics: widget.onRefresh == null
           ? null
           : const AlwaysScrollableScrollPhysics(),
-      padding: pagePadding(size),
+      padding: pagePadding(
+        size,
+      ).add(EdgeInsets.only(bottom: widget.bottomInset)),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: maxPageWidth),

@@ -2,6 +2,7 @@
 // sidebar 900 and up, content capped at 1600.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frisbee_app/ui/core/themes/theme.dart' show appFont;
 import 'package:frisbee_app/ui/core/ui/layout.dart';
 import 'package:frisbee_app/ui/home/widgets/home_screen.dart';
 import 'package:go_router/go_router.dart';
@@ -68,6 +69,32 @@ void main() {
       expect(find.text(label), findsWidgets, reason: label);
     }
     expect(t.takeException(), isNull);
+  });
+
+  testWidgets('1024: a link crumb in the top bar is in the app font', (
+    t,
+  ) async {
+    await pumpFullApp(t, size: const Size(1024, 768));
+    GoRouter.of(t.element(find.byType(HomeScreen))).go('/rankings');
+    await t.pumpAndSettle();
+    final crumb = find.descendant(
+      of: find.byType(AppBar).evaluate().isEmpty
+          ? find.byType(Scaffold).first
+          : find.byType(AppBar),
+      matching: find.widgetWithText(TextButton, 'Discover'),
+    );
+    expect(crumb, findsWidgets);
+    final style = t
+        .widget<DefaultTextStyle>(
+          find
+              .descendant(
+                of: crumb.first,
+                matching: find.byType(DefaultTextStyle),
+              )
+              .first,
+        )
+        .style;
+    expect(style.fontFamily, appFont);
   });
 
   testWidgets('1440: sidebar and page, nothing overflows', (t) async {

@@ -71,6 +71,17 @@ void main() {
     expect(find.byIcon(Icons.circle), findsNWidgets(2));
   });
 
+  testWidgets('chips have 48 px tap targets', (tester) async {
+    await pumpInApp(tester, screen(feed), width: 390, height: 800);
+    await tester.pumpAndSettle();
+    for (final chip in tester.widgetList(find.byType(ChoiceChip))) {
+      expect(
+        tester.getSize(find.byWidget(chip)).height,
+        greaterThanOrEqualTo(48),
+      );
+    }
+  });
+
   testWidgets('Unread keeps only unread entries; All brings them back', (
     tester,
   ) async {

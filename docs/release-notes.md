@@ -10,9 +10,37 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
-## 0.0.77
+## 0.0.84
 
 - **Fixes:** photos on a recorded run post are kept again; retrying a new event, roster spot or group chat after a bad connection no longer makes a duplicate.
+
+## 0.0.83
+
+- **Settings:** a lighter, simpler look.
+
+## 0.0.82
+
+- **Internal:** no visible change.
+
+## 0.0.81
+
+- **Home:** the + button no longer covers the last item.
+
+## 0.0.80
+
+- **Teams:** each team row is one tidy line plus your role.
+
+## 0.0.79
+
+- **Navigation:** the breadcrumb at the top of wide screens reads correctly.
+
+## 0.0.78
+
+- **Chats:** the filter row shows when there are more filters.
+
+## 0.0.77
+
+- **Events:** a simpler event header.
 
 ## 0.0.76
 

@@ -291,6 +291,11 @@ void main() {
 
   Future<void> capture(WidgetTester tester, String name) async {
     await tester.pumpAndSettle();
+    // Let the logo image finish decoding, so every picture shows it.
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 150)),
+    );
+    await tester.pump();
     final boundary =
         shot.currentContext!.findRenderObject()! as RenderRepaintBoundary;
     await tester.runAsync(() async {

@@ -102,7 +102,7 @@ class SettingsFooter extends StatelessWidget {
   );
 }
 
-/// Rows under an optional small heading, on one card, with lines between.
+/// Rows under an optional small heading, on the page, with lines between.
 class SettingsGroup extends StatelessWidget {
   const SettingsGroup({
     super.key,
@@ -130,19 +130,20 @@ class SettingsGroup extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (title case final t?) SettingsHeading(t, trailing: titleTrailing),
-          Card(
-            // Rows (switches and radios too) in the settings type sizes.
-            child: ListTileTheme.merge(
-              titleTextStyle: AppText.bodyStrong.copyWith(color: c.ink),
-              subtitleTextStyle: AppText.caption.copyWith(color: c.muted),
-              child: Column(
-                children: [
-                  for (final (i, row) in children.indexed) ...[
-                    if (i > 0) const Divider(),
-                    row,
-                  ],
+          // No outer card: the rows sit on the page under their heading,
+          // with hairlines between, like the list rows elsewhere.
+          // Rows (switches and radios too) in the settings type sizes.
+          ListTileTheme.merge(
+            tileColor: Colors.transparent,
+            titleTextStyle: AppText.bodyStrong.copyWith(color: c.ink),
+            subtitleTextStyle: AppText.caption.copyWith(color: c.muted),
+            child: Column(
+              children: [
+                for (final (i, row) in children.indexed) ...[
+                  if (i > 0) const Divider(),
+                  row,
                 ],
-              ),
+              ],
             ),
           ),
           if (footer case final f?) SettingsFooter(f),

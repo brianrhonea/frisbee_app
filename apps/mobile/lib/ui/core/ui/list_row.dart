@@ -27,6 +27,7 @@ class ListRow extends StatelessWidget {
     this.muted = false,
     this.selected = false,
     this.subtitleStyle,
+    this.subtitleMaxLines = 2,
     this.onTap,
     this.onLongPress,
     this.onSecondaryTap,
@@ -47,6 +48,9 @@ class ListRow extends StatelessWidget {
 
   /// Changes how the subtitle looks (e.g. an italic "typing...").
   final TextStyle? subtitleStyle;
+
+  /// Lines the subtitle may take before it is cut with an ellipsis.
+  final int subtitleMaxLines;
 
   /// Shortest a row gets.
   static const minHeight = 56.0;
@@ -83,7 +87,7 @@ class ListRow extends StatelessWidget {
                 if (subtitle != null)
                   Text(
                     subtitle!,
-                    maxLines: 2,
+                    maxLines: subtitleMaxLines,
                     overflow: TextOverflow.ellipsis,
                     style: AppText.secondary
                         .copyWith(
