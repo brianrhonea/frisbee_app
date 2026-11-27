@@ -10,6 +10,10 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.82
+
+- **Internal:** no visible change.
+
 ## 0.0.81
 
 - **Home:** the + button no longer covers the last item.
