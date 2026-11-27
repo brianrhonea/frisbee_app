@@ -17,6 +17,7 @@ const pages = [
   ["learn", "/learn"],
   ["events", "/events"],
   ["sign-in", "/sign-in"],
+  ["about", "/about"],
 ] as const;
 // [showcase section, picture name]
 const showcases = [
@@ -25,6 +26,11 @@ const showcases = [
   ["tabs", "c3_tabs"],
   ["chips", "c3_chips"],
   ["avatar", "c4_avatar"],
+  ["cover", "c5_c6_cover_tiles"],
+  ["listrow", "c7_listrow"],
+  ["event", "c8_event"],
+  ["states", "c9_states"],
+  ["fields", "c10_fields"],
 ] as const;
 
 test.skip(!phase, "set REVIEW_PHASE=before|after to capture review pictures");
