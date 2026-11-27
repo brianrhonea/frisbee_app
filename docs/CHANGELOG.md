@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.75  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.74  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.73  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.72  | 2026-11-27 | `sprint3/lane-b`                        |                     |
@@ -87,6 +88,10 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.75 — H10 Sign in and sign up
+
+- Sign in and sign up: Sign in, Create account and Continue with Google use the shared `AppButton` (with its loading spinner); titles and links on the shared type scale. Google, Apple, email and username sign-in, forgot password, validation messages and the sign-up form are unchanged. The fields stay themed `TextFormField`s (same look as `AppTextField`) because the forms validate through `Form`.
 
 ## 0.0.74 — H9 Settings
 

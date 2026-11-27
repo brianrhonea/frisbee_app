@@ -5,6 +5,7 @@ import '../../../domain/models/person_name.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/password_policy.dart';
 import '../../core/themes/theme.dart';
+import '../../core/ui/app_button.dart';
 import '../../core/ui/error_message.dart';
 import '../view_models/sign_up_viewmodel.dart';
 import 'auth_layout.dart';
@@ -203,33 +204,24 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     validator: (v) =>
                         v == _password.text ? null : "Passwords don't match",
                   ),
-                  const SizedBox(height: 20),
-                  FilledButton(
+                  const SizedBox(height: 16),
+                  AppButton.primary(
+                    'Create account',
+                    expand: true,
+                    loading: busy,
                     onPressed: busy ? null : _submit,
-                    child: busy
-                        ? const SizedBox.square(
-                            dimension: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Create account'),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
                   TextButton(
                     onPressed: busy ? null : () => context.go(Routes.signIn),
                     child: Text.rich(
                       TextSpan(
                         text: 'Already have an account? ',
-                        style: TextStyle(
-                          color: c.muted,
-                          fontWeight: FontWeight.w400,
-                        ),
+                        style: AppText.body.copyWith(color: c.muted),
                         children: [
                           TextSpan(
                             text: 'Sign in',
-                            style: TextStyle(
-                              color: c.accent,
-                              fontWeight: FontWeight.w700,
-                            ),
+                            style: AppText.bodyStrong.copyWith(color: c.accent),
                           ),
                         ],
                       ),
