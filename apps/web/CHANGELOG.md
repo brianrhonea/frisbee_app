@@ -4,6 +4,13 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.73.0 — 2026-11-27
+
+H10 Sign-in and sign-up restyle. Every option stays: Google, Apple, email or username, password, Forgot your password, Log in, Create an account, and the sign-up details and terms.
+
+- Fields are the shared TextField (label above, hint, error tied to the input) and buttons the shared Button.
+- Forgot your password? sits under the password field instead of beside its label.
+
 ## 0.72.0 — 2026-11-27
 
 H9 Settings restyle. Same sections, forms, appearance, privacy and the delete-account flow.
