@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.86  | 2026-11-27 | `sprint4/fix-b`                             |                     |
 | 0.0.85  | 2026-11-27 | `sprint4/lane-b`, `sprint4/lane-b2`         |                     |
 | 0.0.84  | 2026-11-27 | `sprint3/17b`                           |                     |
 | 0.0.83  | 2026-11-27 | `sprint3/lane-b`                        |                     |
@@ -98,6 +99,14 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.86 — Sprint 4 fix round
+
+- Team page Message lists the owner, coaches and captains by tier (labelled by team kind); people without a shared account can't be messaged.
+- Schedule Month highlights the next day with events.
+- Add member shows for admins who can manage the roster.
+- Link to a member picker keeps a typed name.
+- Recorded-run route decoding is bounded (4000 points, malformed input ignored, off-globe points dropped).
 
 ## 0.0.85 — Sprint 4 owner feedback
 

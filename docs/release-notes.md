@@ -10,6 +10,12 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.86
+
+- **Teams:** Message on a team page lists the owner, coaches and captains. Admins who manage the roster can add members.
+- **Schedule:** Month view highlights the next day with events.
+- **Reliability:** safer handling of recorded-run routes.
+
 ## 0.0.85
 
 - **Schedule:** Month view shows the whole month as a list again; tap a day to jump to it.

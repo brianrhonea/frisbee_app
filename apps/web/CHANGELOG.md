@@ -4,6 +4,17 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.76.0 — 2026-11-27
+
+Sprint 4 fix round (parity with app 0.0.86).
+
+- New events (personal, shared and team calendars) send a client id; a retry or double-click can't make a duplicate (409 counts as saved).
+- Overlap warning checks every occurrence of a repeating series and skips the event's own series when editing.
+- Team header Message lists the owner, coaches and captains only; people the API doesn't share are left out.
+- Roles tab matches the app: empty tiers hidden, Edit roles for the owner only. "Ask to join" wording everywhere.
+- Own profile shows a Roster spots card with Unlink.
+- Phone team header wraps its actions so the Settings gear never overlaps Share.
+
 ## 0.75.0 — 2026-11-27
 
 Sprint 4 owner feedback (parity with app 0.0.85).
