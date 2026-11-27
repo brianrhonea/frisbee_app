@@ -10,6 +10,7 @@ import { getStorage } from "firebase-admin/storage";
 import { logger } from "firebase-functions";
 import { defineSecret } from "firebase-functions/params";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 
 import {
   attachmentFolder,
@@ -136,6 +137,90 @@ export async function deleteAccountFully(db: Firestore, uid: string, deps: Delet
   // A refused under-18 birth date, kept sealed so a different one can't be tried (account gate F3).
   await db.doc(`ageRefusals/${uid}`).delete();
 }
+
+/** How long a disabled under-13 account is kept after its refusal (owner decision D-U13). */
+export const under13RetentionMs = 30 * 24 * 3600_000;
+/** Most accounts one scheduled run deletes; the rest wait for the next run. */
+export const purgePerRun = 50;
+
+export interface PurgeDeps extends DeleteDeps {
+  /** The login's state: gone, disabled or enabled. */
+  authState(uid: string): Promise<"missing" | "disabled" | "enabled">;
+}
+
+const realPurgeDeps: PurgeDeps = {
+  ...realDeps,
+  authState: async (uid) => {
+    try {
+      return (await getAuth().getUser(uid)).disabled ? "disabled" : "enabled";
+    } catch (e) {
+      if ((e as { code?: string }).code === "auth/user-not-found") return "missing";
+      throw e;
+    }
+  },
+};
+
+export interface PurgeResult {
+  /** Marked refusals at least 30 days old whose account was deleted this run. */
+  deleted: number;
+  /** Marked and old enough, but the login is enabled: left alone. */
+  skippedEnabled: number;
+  /** Ones that threw; the next run retries them. */
+  failed: number;
+}
+
+/**
+ * Deletes under-13 accounts, and all their data, 30 days after the refusal
+ * (D-U13). The API marks such a refusal `under13: true` on ageRefusals/{uid};
+ * only marked records whose `refusedAt` is at least 30 days old are acted on
+ * (older records with no marker are never purged: an adult-only refusal
+ * isn't one). The login must be disabled, or already gone from a run that
+ * failed before it finished. It reuses the deleteAccount cascade, and the
+ * marker goes last, so a failed run is retried by the next. Idempotent. Logs
+ * uids and counts only.
+ */
+export async function purgeUnderThirteen(db: Firestore, now: number, deps: PurgeDeps = realPurgeDeps): Promise<PurgeResult> {
+  const result: PurgeResult = { deleted: 0, skippedEnabled: 0, failed: 0 };
+  const cutoff = now - under13RetentionMs;
+  // Single-field equality, so no composite index; the age is checked below.
+  let after: string | undefined;
+  for (;;) {
+    let q = db.collection("ageRefusals").where("under13", "==", true).orderBy(FieldPath.documentId()).limit(200);
+    if (after) q = q.startAfter(after);
+    const page = await q.get();
+    for (const d of page.docs) {
+      if (result.deleted + result.failed >= purgePerRun) break;
+      const refusedAt = d.get("refusedAt");
+      if (typeof refusedAt?.toMillis !== "function" || refusedAt.toMillis() > cutoff) continue;
+      const uid = d.id;
+      try {
+        if ((await deps.authState(uid)) === "enabled") {
+          result.skippedEnabled++;
+          logger.warn("Under-13 refusal on an enabled account, not purged", { uid });
+          continue;
+        }
+        await deleteAccountFully(db, uid, deps);
+        result.deleted++;
+      } catch (e) {
+        result.failed++;
+        logger.error("Under-13 purge failed for an account", { uid, error: String((e as { code?: string }).code ?? "error") });
+      }
+    }
+    if (page.size < 200 || result.deleted + result.failed >= purgePerRun) break;
+    after = page.docs[page.docs.length - 1]!.id;
+  }
+  logger.info("Under-13 purge", { ...result });
+  return result;
+}
+
+/** Daily at 08:30 UTC. Deploying the account group creates its Cloud Scheduler job (and needs the Cloud Scheduler API on). */
+export const purgeUnderThirteenDaily = onSchedule(
+  { schedule: "30 8 * * *", timeZone: "Etc/UTC", timeoutSeconds: 540, memory: "512MiB", retryCount: 1 },
+  async () => {
+    const r = await purgeUnderThirteen(getFirestore(), Date.now());
+    if (r.failed > 0) throw new Error(`Under-13 purge: ${r.failed} failed`);
+  },
+);
 
 /**
  * Everything but the login and the age-refusal record (deleteAccountFully

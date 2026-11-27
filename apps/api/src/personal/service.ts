@@ -157,7 +157,16 @@ export class PersonalService {
     await this.store.transact(async (tx) => {
       const [saved, refusal] = await Promise.all([tx.get(personalPath(uid)), tx.get(refusalPath(uid))]);
       await this.requireAllowedDate(uid, saved, refusal, birthDate);
-      if (!refusal) tx.set(refusalPath(uid), { ciphertext: sealed.ciphertext, key: sealed.key, format, refusedAt: serverTime });
+      // `under13` is a plain marker (no birth date in it) so the scheduled purge in the functions, which can't open the sealed date, knows which refusals to act on.
+      if (!refusal) {
+        tx.set(refusalPath(uid), {
+          ciphertext: sealed.ciphertext,
+          key: sealed.key,
+          format,
+          refusedAt: serverTime,
+          ...(message === tooYoungMessage && { under13: true }),
+        });
+      }
     });
     if (message === tooYoungMessage) await this.users.setDisabled?.(uid, true);
     throw new ApiError("failed_precondition", message, { birthDate: message });
