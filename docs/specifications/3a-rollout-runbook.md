@@ -73,3 +73,28 @@ firebase deploy --only functions:meetings,functions:tournaments --project frisbe
 ## Prod
 
 Not covered here. Prod needs its own stand-up (#9, Sprint 3), with `ACCOUNT_GATE_MODE` set explicitly.
+
+## Sprint 3 additions (API 0.53.2, functions, rules): dev order
+
+These come on top of the steps above, with the same rule: the owner runs every deploy. Order:
+
+1. **API 0.53.2**, still in report mode. The gate sync now also sets `profiles/{uid}.adult`.
+2. **Functions:**
+   - `firebase deploy --only functions:account --project frisbee-app-brianrhonea-dev`. This group covers:
+     - the deletion cascade;
+     - the under-13 purge, scheduled daily, which needs Cloud Scheduler;
+     - the `markAdultOnProfileCreate` trigger;
+     - M5 and L8.
+   - `firebase deploy --only functions:browse`. Set `ACCOUNT_GATE_MODE` on it, report first.
+   - `functions:follows`, `functions:notifications`, `functions:meetings` and `functions:rankings`. These carry the photo-trust changes and can follow later.
+3. **Backfills on dev.** For each script: dry run, then `--apply`, then a dry run that must show `changed: 0`.
+   - `backfill_claims.ts`, which now also sets `adult`. Check `adultNoProfile`.
+   - `backfill_under13.ts`. `unreadable` should be empty.
+4. **Apps:** the TestFlight build and the website with the `adult == true` search filters (17-B and lane C). Then raise `meta/flags.minBuild` to that build.
+5. **Enforce**, as in step 4 above.
+6. **Firestore rules** (the L1 device rule and the H1 adult marker), **only after step 4**. Older builds' profile searches are refused by the new rules.
+
+**Device checks:**
+- Sign up a new adult. `profiles/{uid}.adult` should appear within seconds.
+- Search for people in the app and on the website.
+- Try to DM an unmarked test account. It is refused with the same message as a "nobody" message policy.
