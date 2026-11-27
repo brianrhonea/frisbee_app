@@ -2714,7 +2714,10 @@ service cloud.firestore {
             'bio', 'pronouns', 'hometown', 'school', 'throwingHand',
             'playingSince', 'visibility',
             'teams', 'stats', 'teamStats', 'games', 'summaryUpdatedAt',
-            'username', 'private', 'headerUrl'])
+            'username', 'private', 'headerUrl',
+            // Server-only (D-1317): set by the API from the age claim. The
+            // create and update rules below keep clients from touching it.
+            'adult'])
           && p.get('private', false) is bool
           && p.name is string
           && p.name.size() > 0
@@ -2765,14 +2768,20 @@ service cloud.firestore {
       }
 
       allow get: if signedIn();
-      // Searches by keyword or tag, 40 at a time.
-      allow list: if signedIn() && capped(50);
+      // Searches by keyword or tag, 40 at a time. Accounts without the
+      // server-set `adult` marker (13 to 17, or never asked: D-1317) are
+      // left out, so a search must say where('adult', '==', true); the
+      // caller's own doc is always listable.
+      allow list: if signedIn() && capped(50)
+        && (resource.data.get('adult', false) == true || resource.id == uid());
       allow delete: if signedIn() && uid() == userId;
       allow create: if ageOk() && uid() == userId
+        && !('adult' in request.resource.data)
         && validProfile(request.resource.data)
         && (!('username' in request.resource.data)
             || usernameClaimed(request.resource.data.username));
       allow update: if ageOk() && uid() == userId
+        && request.resource.data.get('adult', null) == resource.data.get('adult', null)
         && validProfile(request.resource.data)
         && (request.resource.data.get('username', null)
               == resource.data.get('username', null)
@@ -2939,7 +2948,7 @@ service cloud.firestore {
                .affectedKeys().hasOnly([added])
           && validString(request.resource.data.names[added], 80)
           && !blockedWith(added)
-          && exists(/databases/$(database)/documents/profiles/$(added))
+          && adultProfile(added)
           && follows(added, uid())
           && messagePolicy(added) != 'nobody';
       }
@@ -2956,6 +2965,11 @@ service cloud.firestore {
           && (removed.hasOnly([uid()]) || resource.data.createdBy == uid());
       }
       function userDoc(u) { return /databases/$(database)/documents/users/$(u); }
+      // D-1317: only accounts the server marked as adults can be messaged or added.
+      function adultProfile(u) {
+        return exists(/databases/$(database)/documents/profiles/$(u))
+          && get(/databases/$(database)/documents/profiles/$(u)).data.get('adult', false) == true;
+      }
       function messagePolicy(u) {
         return exists(userDoc(u))
           ? get(userDoc(u)).data.get('messagePolicy', 'everyone')
@@ -2967,7 +2981,7 @@ service cloud.firestore {
       function allowedStart(d) {
         let other = d.participants[0] == uid() ? d.participants[1] : d.participants[0];
         let policy = messagePolicy(other);
-        return !blockedWith(other) && ((d.get('status', 'accepted') == 'accepted'
+        return !blockedWith(other) && adultProfile(other) && ((d.get('status', 'accepted') == 'accepted'
                  && d.get('requestedOf', null) == null
                  && policy != 'nobody'
                  && follows(other, uid()))
@@ -3063,7 +3077,7 @@ service cloud.firestore {
         allow read: if signedIn() && inConversation();
         allow create: if accountOk() && notMuted() && inConversation()
           && exists(convPath())
-          && (isGroup() || !blockedWith(otherPerson()))
+          && (isGroup() || (!blockedWith(otherPerson()) && adultProfile(otherPerson())))
           // Not by whoever a request waits on, until they accept it.
           && !(get(convPath()).data.get('status', 'accepted') == 'request'
                && get(convPath()).data.get('requestedOf', null) == uid())

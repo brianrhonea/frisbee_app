@@ -2582,7 +2582,8 @@ describe("custom roles", () => {
 describe("direct messages", () => {
   // OWNER < PLAYER alphabetically, so their conversation id is "owner_player".
   const CONV = `${OWNER}_${PLAYER}`;
-  const profile = (name = "Pat Player") => ({ name, keywords: ["pat"], photoUrl: null, updatedAt: serverTimestamp() });
+  // The server marks adults (D-1317); a client may re-send the marker unchanged but never set or clear it.
+  const profile = (name = "Pat Player") => ({ name, keywords: ["pat"], photoUrl: null, adult: true, updatedAt: serverTimestamp() });
   const newConv = (overrides: Record<string, unknown> = {}) => ({
     participants: [OWNER, PLAYER],
     names: { [OWNER]: "O", [PLAYER]: "P" },
@@ -2602,8 +2603,8 @@ describe("direct messages", () => {
   beforeEach(() =>
     env.withSecurityRulesDisabled(async (ctx) => {
       const fs = ctx.firestore();
-      await setDoc(doc(fs, "profiles", OWNER), { name: "Olive Owner", keywords: ["olive"], photoUrl: null });
-      await setDoc(doc(fs, "profiles", PLAYER), { name: "Pat Player", keywords: ["pat"], photoUrl: null });
+      await setDoc(doc(fs, "profiles", OWNER), { name: "Olive Owner", keywords: ["olive"], photoUrl: null, adult: true });
+      await setDoc(doc(fs, "profiles", PLAYER), { name: "Pat Player", keywords: ["pat"], photoUrl: null, adult: true });
     }),
   );
 
@@ -2961,7 +2962,7 @@ describe("direct messages", () => {
           lastMessage: "", lastMessageAt: null, lastSenderId: "", readAt: {}, createdAt: new Date(),
         });
         await setDoc(doc(ctx.firestore(), "tournaments", "t1", "chats", "captains"), { conversationId: CHAT, kind: "captains" });
-        await setDoc(doc(ctx.firestore(), "profiles", COACH), { name: "Cory", keywords: ["cory"], photoUrl: null });
+        await setDoc(doc(ctx.firestore(), "profiles", COACH), { name: "Cory", keywords: ["cory"], photoUrl: null, adult: true });
         await setDoc(doc(ctx.firestore(), "users", COACH, "follows", `user_${PLAYER}`), {
           key: `user_${PLAYER}`, type: "user", targetId: PLAYER, name: "P", notify: true, createdAt: new Date(),
         });
@@ -3032,8 +3033,8 @@ describe("direct messages", () => {
 
     beforeEach(() =>
       env.withSecurityRulesDisabled(async (ctx) => {
-        await setDoc(doc(ctx.firestore(), "profiles", COACH), { name: "Cory Coach", keywords: ["cory"], photoUrl: null });
-        await setDoc(doc(ctx.firestore(), "profiles", OUTSIDER), { name: "Oz", keywords: ["oz"], photoUrl: null });
+        await setDoc(doc(ctx.firestore(), "profiles", COACH), { name: "Cory Coach", keywords: ["cory"], photoUrl: null, adult: true });
+        await setDoc(doc(ctx.firestore(), "profiles", OUTSIDER), { name: "Oz", keywords: ["oz"], photoUrl: null, adult: true });
       }),
     );
 
@@ -4960,7 +4961,7 @@ describe("list caps (security review S4)", () => {
   beforeEach(async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
       const fs = ctx.firestore();
-      await setDoc(doc(fs, "profiles", OUTSIDER), { name: "Oz", keywords: ["oz"] });
+      await setDoc(doc(fs, "profiles", OUTSIDER), { name: "Oz", keywords: ["oz"], adult: true });
       await setDoc(doc(fs, "posts", "pub"), { kind: "text", body: "x", authorId: OUTSIDER, private: false });
       await setDoc(doc(fs, "posts", "pub", "comments", "c"), { body: "Hi", authorId: OUTSIDER });
       await setDoc(doc(fs, "teamDirectory", "t"), { name: "T", keywords: ["t"] });
@@ -4969,10 +4970,11 @@ describe("list caps (security review S4)", () => {
 
   // Each collection and its cap, at or above the largest page the app and
   // website ask for. Posts get theirs in phase B (posts_phase_b.rules.test.ts).
-  const caps: [string, (uid: string) => ReturnType<typeof collection>, number][] = [
-    ["profiles", (uid) => collection(db(uid), "profiles"), 50],
-    ["a post's comments", (uid) => collection(db(uid), "posts", "pub", "comments"), 100],
-    ["teamDirectory", (uid) => collection(db(uid), "teamDirectory"), 200],
+  const caps: [string, (uid: string) => ReturnType<typeof query>, number][] = [
+    // Profiles are listed only for adults (D-1317), so a list says so.
+    ["profiles", (uid) => query(collection(db(uid), "profiles"), where("adult", "==", true)), 50],
+    ["a post's comments", (uid) => query(collection(db(uid), "posts", "pub", "comments")), 100],
+    ["teamDirectory", (uid) => query(collection(db(uid), "teamDirectory")), 200],
   ];
   for (const [name, col, cap] of caps) {
     it(`lets anyone signed in list ${name} ${cap} at a time, never more or unlimited`, async () => {
@@ -4997,7 +4999,7 @@ describe("list caps (security review S4)", () => {
 
   it("keeps the searches the app makes working", async () => {
     await assertSucceeds(
-      getDocs(query(collection(db(PLAYER), "profiles"), where("keywords", "array-contains", "oz"), limit(40))),
+      getDocs(query(collection(db(PLAYER), "profiles"), where("keywords", "array-contains", "oz"), where("adult", "==", true), limit(40))),
     );
     await assertSucceeds(
       getDocs(
