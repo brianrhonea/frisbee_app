@@ -395,3 +395,20 @@ The owner approved the plan and took every recommendation:
 **Still open, for the owner to answer on the day:** Q-D (`.p12`), Q-K (Mac model and macOS), Q-P (Windows edition and UPS).
 
 **Preparation:** the release lane prepares the files in §4 and §10.7, apart from the runner workflows. The `codemagic.yaml` trigger change and the R3 bundle-ID change wait: the trigger change for the first Mac release, and R3 until lane B's iOS project changes are merged.
+
+## First Mac session, 2026-11-27: option 1 (owner choice)
+
+`development` doesn't contain the scripts yet, and `feature/jan-4-release` is not pushed. So the first session is a **local build only, with no upload**: it checks the toolchain and signing.
+
+1. Copy the `scripts/ios/` folder from the owner's PC to `~/hylite-tools/ios/` on the Mac (USB or AirDrop), then run `chmod +x ~/hylite-tools/ios/*.sh`.
+2. Clone the repo on the Mac and check out `development`, which is app 0.0.55. Leave the tree clean and don't push.
+3. Do plan §3, steps A to C. Then run:
+   - `~/hylite-tools/ios/mac-doctor.sh`
+   - `HYLITE_REPO=~/<clone> ~/hylite-tools/ios/release-ios.sh dev --dry-run`
+   - `HYLITE_REPO=~/<clone> ~/hylite-tools/ios/release-ios.sh dev` (**no `--upload`**)
+4. Check the printed bundle ID, version and build. The IPA and archive go to `~/hylite-releases/dev/…`.
+
+**Notes:**
+- TestFlight uploads from the Mac start after the owner's Sprint 3 merge to `development`.
+- The build-number lookup still contacts App Store Connect (read-only) during a local build.
+- `HYLITE_REPO` lets the scripts run from outside the clone; it was added for this session.

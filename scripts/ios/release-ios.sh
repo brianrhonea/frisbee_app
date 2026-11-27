@@ -46,7 +46,14 @@ done
 
 # ---------------------------------------------------------------- helpers
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# HYLITE_REPO lets the scripts live outside the clone (e.g. ~/hylite-tools/ios)
+# when the branch being built does not contain them yet.
+if [ -n "${HYLITE_REPO:-}" ]; then
+  REPO="$(cd "$HYLITE_REPO" && pwd)" || { printf '%s\n' "HYLITE_REPO is not a directory." >&2; exit 2; }
+  [ -d "$REPO/.git" ] || [ -f "$REPO/.git" ] || { printf '%s\n' "HYLITE_REPO is not a git clone." >&2; exit 2; }
+else
+  REPO="$(cd "$SCRIPT_DIR/../.." && pwd)"
+fi
 MOBILE="$REPO/apps/mobile"
 LOG="$(mktemp "${TMPDIR:-/tmp}/hylite-release.XXXXXX")"
 WORK=""                 # temp dir for the generated ExportOptions file
