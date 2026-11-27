@@ -141,7 +141,7 @@ class _InlineComposerState extends State<InlineComposer> {
         focusedBorder: InputBorder.none,
         filled: false,
         contentPadding: const EdgeInsets.symmetric(vertical: 8),
-        hintStyle: TextStyle(color: c.muted, fontSize: 13.5),
+        hintStyle: AppText.secondary.copyWith(color: c.muted),
       );
       // While posting nothing can change: the draft is cleared once it's
       // saved, so anything added meanwhile would be lost.
@@ -180,20 +180,14 @@ class _InlineComposerState extends State<InlineComposer> {
                             widget.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14.5,
-                            ),
+                            style: AppText.label,
                           ),
                           const SizedBox(height: 2),
                           Row(
                             children: [
                               Text(
                                 'Posting to ',
-                                style: TextStyle(
-                                  fontSize: 12.5,
-                                  color: c.muted,
-                                ),
+                                style: AppText.caption.copyWith(color: c.muted),
                               ),
                               if (vm.audiences.isNotEmpty)
                                 Flexible(
@@ -205,10 +199,9 @@ class _InlineComposerState extends State<InlineComposer> {
                                   ),
                                 )
                               else
-                                const Text(
+                                Text(
                                   'Everyone',
-                                  style: TextStyle(
-                                    fontSize: 12.5,
+                                  style: AppText.caption.copyWith(
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -324,9 +317,8 @@ class _InlineComposerState extends State<InlineComposer> {
                         padding: const EdgeInsets.only(top: 8),
                         child: Text(
                           errorMessage(error),
-                          style: TextStyle(
+                          style: AppText.secondary.copyWith(
                             color: Theme.of(context).colorScheme.error,
-                            fontSize: 13,
                           ),
                         ),
                       ),
@@ -345,8 +337,7 @@ class _InlineComposerState extends State<InlineComposer> {
                         padding: const EdgeInsets.only(right: 8),
                         child: Text(
                           '${vm.charactersLeft}',
-                          style: TextStyle(
-                            fontSize: 12,
+                          style: AppText.caption.copyWith(
                             color: vm.charactersLeft < 0
                                 ? Theme.of(context).colorScheme.error
                                 : c.muted,
@@ -381,21 +372,13 @@ class _InlineComposerState extends State<InlineComposer> {
     final compact = TextButton.styleFrom(
       padding: const EdgeInsets.symmetric(horizontal: 10),
       visualDensity: VisualDensity.compact,
-      textStyle: const TextStyle(
-        fontFamily: appFont,
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-      ),
+      textStyle: AppText.label,
     );
     final on = TextButton.styleFrom(
       padding: const EdgeInsets.symmetric(horizontal: 10),
       visualDensity: VisualDensity.compact,
       backgroundColor: AppColors.of(context).accentSoft,
-      textStyle: const TextStyle(
-        fontFamily: appFont,
-        fontSize: 13,
-        fontWeight: FontWeight.w700,
-      ),
+      textStyle: AppText.label.copyWith(fontWeight: FontWeight.w700),
     );
     return Wrap(
       crossAxisAlignment: WrapCrossAlignment.center,
@@ -538,10 +521,7 @@ class _AudienceChip extends StatelessWidget {
               child: Text(
                 selected?.name ?? 'Everyone',
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: AppText.caption.copyWith(fontWeight: FontWeight.w600),
               ),
             ),
             Icon(Icons.arrow_drop_down, size: 18, color: c.muted),

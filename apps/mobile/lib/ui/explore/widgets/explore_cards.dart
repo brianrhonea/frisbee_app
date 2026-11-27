@@ -48,7 +48,7 @@ class UpcomingTournamentsCard extends StatelessWidget {
                 Text(
                   'Nothing coming up yet. Communities and clubs host tournaments '
                   'and leagues from their Tournaments tab.',
-                  style: TextStyle(fontSize: 12.5, color: c.muted),
+                  style: AppText.secondary.copyWith(color: c.muted),
                 )
               else
                 for (final t in list)
@@ -89,11 +89,7 @@ class TournamentTile extends StatelessWidget {
           Flexible(
             child: Text(
               t.name,
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 15,
-                color: c.ink,
-              ),
+              style: AppText.label.copyWith(color: c.ink),
             ),
           ),
           if (t.hostOfficial) ...[
@@ -189,7 +185,7 @@ class _ResultBlock extends StatelessWidget {
               if (r.hostName.isNotEmpty) r.hostName,
               if (r.location.isNotEmpty) r.location,
             ].join(' · '),
-            style: TextStyle(fontSize: 12, color: c.muted),
+            style: AppText.caption.copyWith(color: c.muted),
           ),
           const SizedBox(height: 6),
           for (final d in r.divisions)
@@ -217,7 +213,7 @@ class _ResultBlock extends StatelessWidget {
                           ),
                         ],
                       ),
-                      style: const TextStyle(fontSize: 13),
+                      style: AppText.secondary,
                     ),
                   ),
                 ],
@@ -345,7 +341,7 @@ class RankingsEmptyNote extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Text(
     text,
-    style: TextStyle(fontSize: 12.5, color: AppColors.of(context).muted),
+    style: AppText.secondary.copyWith(color: AppColors.of(context).muted),
   );
 }
 
@@ -370,7 +366,6 @@ class PlayerRankingRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     final p = player;
-    const figures = [FontFeature.tabularFigures()];
     return Material(
       color: me ? c.accentSoft : Colors.transparent,
       borderRadius: BorderRadius.circular(8),
@@ -405,11 +400,7 @@ class PlayerRankingRow extends StatelessWidget {
                       Text(
                         '${p.goals} G · ${p.assists} A · ${p.blocks} D · '
                         '${p.turnovers} TO',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          color: c.muted,
-                          fontFeatures: figures,
-                        ),
+                        style: AppText.caption.copyWith(color: c.muted),
                       ),
                   ],
                 ),
@@ -417,11 +408,7 @@ class PlayerRankingRow extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 '${p.games} gp',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  color: c.muted,
-                  fontFeatures: figures,
-                ),
+                style: AppText.secondary.copyWith(color: c.muted),
               ),
               const SizedBox(width: 8),
               SizedBox(
@@ -518,11 +505,7 @@ class RankingRow extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 t.record,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  color: c.muted,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
+                style: AppText.secondary.copyWith(color: c.muted),
               ),
               SizedBox(
                 width: 56,
@@ -566,7 +549,7 @@ class PublicEventsCard extends StatelessWidget {
           else if (vm.loadPublic.error && list.isEmpty)
             Text(
               "Couldn't load events. Try again.",
-              style: TextStyle(fontSize: 12.5, color: c.muted),
+              style: AppText.secondary.copyWith(color: c.muted),
             )
           else if (list.isEmpty)
             Text(
@@ -574,7 +557,7 @@ class PublicEventsCard extends StatelessWidget {
                   ? 'No pickup games coming up yet. Pickup communities post '
                         'theirs here when they open them to everyone.'
                   : 'Nothing coming up.',
-              style: TextStyle(fontSize: 12.5, color: c.muted),
+              style: AppText.secondary.copyWith(color: c.muted),
             )
           else
             for (final e in list) PublicEventRow(event: e, viewModel: vm),
@@ -617,11 +600,7 @@ class PublicEventRow extends StatelessWidget {
         e.title.isEmpty ? 'Event' : e.title,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontWeight: FontWeight.w700,
-          fontSize: 15,
-          color: c.ink,
-        ),
+        style: AppText.label.copyWith(color: c.ink),
       ),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -654,11 +633,7 @@ class PublicEventRow extends StatelessWidget {
           ? null
           : Text(
               e.type!.label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: c.muted,
-              ),
+              style: AppText.caption.copyWith(fontWeight: FontWeight.w600, color: c.muted),
             ),
       onTap: () => context.push(
         viewModel.isMine(e.teamId)

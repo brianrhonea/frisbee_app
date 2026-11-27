@@ -25,6 +25,10 @@ import '../../core/ui/skeleton.dart';
 import '../../../domain/models/moderation.dart';
 import '../../moderation/widgets/report_sheet.dart';
 import '../../core/ui/app_segmented_button.dart';
+import '../../core/ui/avatar.dart';
+import '../../core/ui/cover_header.dart';
+import '../../core/ui/segmented_tabs.dart';
+import '../../core/ui/summary_tiles.dart';
 
 enum _Tab { overview, posts, stats, teams }
 
@@ -299,7 +303,7 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
                       'you.'
                 : 'No posts yet.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: c.muted),
+            style: AppText.secondary.copyWith(color: c.muted),
           ),
         )
       else
@@ -336,11 +340,7 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
             Expanded(
               child: Text(
                 vm.isMe ? 'From my sideline' : 'Recent games',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 15,
-                  color: c.ink,
-                ),
+                style: AppText.bodyStrong.copyWith(color: c.ink),
               ),
             ),
             if (vm.isMe && !vm.visibility.games) const _HiddenTag(),
@@ -350,7 +350,7 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
       if (games.isEmpty)
         Text(
           'Games show up here once a stat keeper tracks one you play in.',
-          style: TextStyle(fontSize: 12.5, color: c.muted),
+          style: AppText.secondary.copyWith(color: c.muted),
         ),
       for (final g in games) _GameCard(game: g),
     ];
@@ -379,35 +379,25 @@ class _Hero extends StatelessWidget {
     final mobile = ScreenSize.of(context).isMobile;
     final d = vm.details;
     final primary = vm.primaryTeam;
-    final number = primary?.number;
-    final button = vm.isMe
-        ? Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              FilledButton.icon(
-                onPressed: vm.saveDetails.running ? null : onEdit,
-                icon: const Icon(Icons.edit_outlined, size: 18),
-                label: const Text('Edit profile'),
-              ),
-              // On phones it's in the top bar.
-              if (!mobile) const SettingsButton(outlined: true),
-            ],
-          )
-        : Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              if (vm.follow case final follow?)
-                FollowControl(viewModel: follow),
-              FilledButton.icon(
-                onPressed: vm.message.running ? null : vm.message.execute,
-                icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                label: const Text('Message'),
-              ),
-            ],
-          );
+    // The buttons: beside the name on wide screens, under it on phones
+    // (where Settings is in the top bar).
+    final buttons = <Widget>[
+      if (vm.isMe) ...[
+        FilledButton.icon(
+          onPressed: vm.saveDetails.running ? null : onEdit,
+          icon: const Icon(Icons.edit_outlined, size: 18),
+          label: const Text('Edit profile'),
+        ),
+        if (!mobile) const SettingsButton(outlined: true),
+      ] else ...[
+        if (vm.follow case final follow?) FollowControl(viewModel: follow),
+        FilledButton.icon(
+          onPressed: vm.message.running ? null : vm.message.execute,
+          icon: const Icon(Icons.chat_bubble_outline, size: 18),
+          label: const Text('Message'),
+        ),
+      ],
+    ];
     final tabs = [
       _Tab.overview,
       if (vm.social) _Tab.posts,
@@ -419,205 +409,105 @@ class _Hero extends StatelessWidget {
       if (d.school.isNotEmpty) d.school,
       if (d.playingSince case final y?) 'Playing since $y',
     ];
-    return Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            height: mobile ? 92 : 112,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                _Banner(
-                  url: vm.headerUrl,
-                  // A soft turf band: navy is only for live or today, amber
-                  // only for what's the user's to do.
-                  fallback: Container(
-                    color: c.accentSoft,
-                    padding: EdgeInsets.symmetric(horizontal: mobile ? 16 : 24),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Eyebrow(
-                                'Chase the next point.',
-                                color: c.accentInk,
-                              ),
-                              const SizedBox(height: 6),
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  'ALWAYS IN PLAY.',
-                                  style: TextStyle(
-                                    fontFamily: scoreFont,
-                                    fontStyle: FontStyle.italic,
-                                    color: c.accentInk,
-                                    fontSize: mobile ? 28 : 36,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: -0.3,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (number != null)
-                          Text(
-                            '$number',
-                            style: TextStyle(
-                              fontFamily: scoreFont,
-                              color: c.accentInk.withValues(alpha: 0.25),
-                              fontSize: mobile ? 72 : 96,
-                              fontWeight: FontWeight.w800,
-                              height: 1,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+    final handle = [
+      if (vm.username case final u?) '@$u',
+      if (d.pronouns.isNotEmpty) d.pronouns,
+    ].join(' · ');
+    void openFollowing() => context.push(Routes.following);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        CoverHeader(
+          title: vm.name,
+          subtitle: handle.isEmpty ? null : handle,
+          coverUrl: vm.headerUrl,
+          avatar: Avatar(
+            name: vm.name,
+            imageUrl: vm.photoUrl,
+            size: 72,
+            decorative: true,
           ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(mobile ? 14 : 20, 16, 14, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          actions: mobile ? const [] : buttons,
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if ((primary != null && primary.number != null) ||
+                  primary?.role != null ||
+                  vm.isStaff ||
+                  vm.isPrivate) ...[
+                const SizedBox(height: AppSpace.md),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
                   children: [
-                    PersonAvatar(
-                      name: vm.name,
-                      photoUrl: vm.photoUrl,
-                      radius: mobile ? 26 : 30,
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            vm.name,
-                            style: TextStyle(
-                              fontSize: mobile ? 22 : 26,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.7,
-                              color: c.ink,
-                            ),
-                          ),
-                          if ([
-                                if (vm.username case final u?) '@$u',
-                                if (d.pronouns.isNotEmpty) d.pronouns,
-                              ].join(' · ')
-                              case final line when line.isNotEmpty)
-                            Text(
-                              line,
-                              style: TextStyle(fontSize: 12, color: c.muted),
-                            ),
-                          const SizedBox(height: 6),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 6,
-                            children: [
-                              if (primary != null && primary.number != null)
-                                Tag(
-                                  [
-                                    '#${primary.number}',
-                                    ?primary.position,
-                                  ].join(' · ').toUpperCase(),
-                                ),
-                              if (primary?.role case final role?)
-                                Tag(role.toUpperCase()),
-                              if (vm.isStaff) const StaffBadge(),
-                              if (vm.isPrivate) const Tag('PRIVATE'),
-                            ],
-                          ),
-                        ],
+                    if (primary != null && primary.number != null)
+                      Tag(
+                        [
+                          '#${primary.number}',
+                          ?primary.position,
+                        ].join(' · ').toUpperCase(),
                       ),
-                    ),
-                    if (!mobile) button,
+                    if (primary?.role case final role?) Tag(role.toUpperCase()),
+                    if (vm.isStaff) const StaffBadge(),
+                    if (vm.isPrivate) const Tag('PRIVATE'),
                   ],
                 ),
-                if (d.bio.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    d.bio,
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      height: 1.45,
-                      color: c.ink,
-                    ),
-                  ),
-                ],
-                if (meta.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    meta.join(' · '),
-                    style: TextStyle(fontSize: 12, color: c.muted),
-                  ),
-                ],
-                if (vm.social) ...[
-                  const SizedBox(height: 10),
-                  InkWell(
-                    onTap: vm.isMe
-                        ? () => context.push(Routes.following)
-                        : null,
-                    // The counts bold, the words muted.
-                    child: Text.rich(
-                      TextSpan(
-                        children: [
-                          TextSpan(
-                            text: '${vm.followers}',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: c.ink,
-                            ),
-                          ),
-                          TextSpan(
-                            text:
-                                ' ${vm.followers == 1 ? 'follower' : 'followers'}'
-                                ' · ',
-                          ),
-                          TextSpan(
-                            text: '${vm.following}',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: c.ink,
-                            ),
-                          ),
-                          const TextSpan(text: ' following'),
-                        ],
-                      ),
-                      style: TextStyle(fontSize: 13, color: c.muted),
-                    ),
-                  ),
-                ],
-                if (mobile) ...[
-                  const SizedBox(height: 12),
-                  SizedBox(width: double.infinity, child: button),
-                ],
-                const SizedBox(height: 8),
-                if (!vm.locked)
-                  UnderlineTabs(
-                    labels: [for (final t in tabs) t.label],
-                    selected: tabs.contains(tab) ? tabs.indexOf(tab) : 0,
-                    onSelect: (i) => onTab(tabs[i]),
-                  ),
               ],
-            ),
+              if (d.bio.isNotEmpty) ...[
+                const SizedBox(height: AppSpace.md),
+                Text(d.bio, style: AppText.body.copyWith(color: c.ink)),
+              ],
+              if (meta.isNotEmpty) ...[
+                const SizedBox(height: AppSpace.sm),
+                Text(
+                  meta.join(' · '),
+                  style: AppText.secondary.copyWith(color: c.muted),
+                ),
+              ],
+              if (vm.social) ...[
+                const SizedBox(height: AppSpace.md),
+                SummaryTiles(
+                  tiles: [
+                    SummaryTile(
+                      value: '${vm.followers}',
+                      label: vm.followers == 1 ? 'Follower' : 'Followers',
+                      onTap: vm.isMe ? openFollowing : null,
+                    ),
+                    SummaryTile(
+                      value: '${vm.following}',
+                      label: 'Following',
+                      onTap: vm.isMe ? openFollowing : null,
+                    ),
+                  ],
+                ),
+              ],
+              if (mobile) ...[
+                const SizedBox(height: AppSpace.md),
+                Wrap(
+                  spacing: AppSpace.sm,
+                  runSpacing: AppSpace.sm,
+                  children: buttons,
+                ),
+              ],
+              if (!vm.locked) ...[
+                const SizedBox(height: AppSpace.md),
+                SegmentedTabs(
+                  labels: [for (final t in tabs) t.label],
+                  selected: tabs.contains(tab) ? tabs.indexOf(tab) : 0,
+                  onSelect: (i) => onTab(tabs[i]),
+                ),
+              ],
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
-/// In place of a private profile's posts, stats and teams.
 /// The header photo, or [fallback] (the default banner) when there's none
 /// or it can't load.
 class _Banner extends StatelessWidget {
@@ -742,18 +632,14 @@ class _PrivateNotice extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             'This profile is private',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: c.ink,
-            ),
+            style: AppText.bodyStrong.copyWith(color: c.ink),
           ),
           const SizedBox(height: 6),
           Text(
             "Follow $name to see their posts, teams and stats. They'll "
             'get a request to accept.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: c.muted),
+            style: AppText.secondary.copyWith(color: c.muted),
           ),
         ],
       ),
@@ -787,7 +673,7 @@ class _HiddenTag extends StatelessWidget {
         const SizedBox(width: 4),
         Text(
           'Hidden',
-          style: TextStyle(fontSize: 11.5, color: AppColors.of(context).muted),
+          style: AppText.caption.copyWith(color: AppColors.of(context).muted),
         ),
       ],
     ),
@@ -822,9 +708,7 @@ class _NumbersCard extends StatelessWidget {
             .toSet(),
     };
     // The app font named: a dropdown's style replaces the theme's whole.
-    final menuStyle = TextStyle(
-      fontFamily: appFont,
-      fontSize: 12.5,
+    final menuStyle = AppText.caption.copyWith(
       fontWeight: FontWeight.w600,
       color: c.accent,
     );
@@ -881,7 +765,7 @@ class _NumbersCard extends StatelessWidget {
       child: !vm.showsStats
           ? Text(
               'Stats are private.',
-              style: TextStyle(fontSize: 12.5, color: c.muted),
+              style: AppText.secondary.copyWith(color: c.muted),
             )
           : t.isEmpty
           ? Text(
@@ -890,7 +774,7 @@ class _NumbersCard extends StatelessWidget {
                         'your roster spot, your numbers fill in as your team '
                         'tracks games.'
                   : 'No tracked games yet.',
-              style: TextStyle(fontSize: 12.5, color: c.muted),
+              style: AppText.secondary.copyWith(color: c.muted),
             )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -945,17 +829,14 @@ class _NumbersCard extends StatelessWidget {
                                   label,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(fontSize: 12, color: c.ink2),
+                                  style: AppText.caption.copyWith(color: c.ink2),
                                 ),
                                 if (note.isNotEmpty)
                                   Text(
                                     note,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      color: c.muted,
-                                    ),
+                                    style: AppText.caption.copyWith(color: c.muted),
                                   ),
                               ],
                             ),
@@ -971,7 +852,7 @@ class _NumbersCard extends StatelessWidget {
                     if (updated != null)
                       'Updated ${DateFormat.MMMd().format(updated)}',
                   ].join(' · '),
-                  style: TextStyle(fontSize: 11, color: c.muted),
+                  style: AppText.caption.copyWith(color: c.muted),
                 ),
               ],
             ),
@@ -1030,11 +911,7 @@ class _SeasonsCard extends StatelessWidget {
           dataRowMaxHeight: 40,
           horizontalMargin: 0,
           columnSpacing: 22,
-          headingTextStyle: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: c.muted,
-          ),
+          headingTextStyle: AppText.caption.copyWith(fontWeight: FontWeight.w700, color: c.muted),
           columns: [for (final h in columns) DataColumn(label: Text(h))],
           rows: [
             for (final r in rows)
@@ -1044,8 +921,7 @@ class _SeasonsCard extends StatelessWidget {
                     DataCell(
                       Text(
                         v,
-                        style: TextStyle(
-                          fontSize: 12.5,
+                        style: AppText.secondary.copyWith(
                           color: c.ink,
                           fontWeight: r.first == 'Career'
                               ? FontWeight.w700
@@ -1097,11 +973,7 @@ class _GameCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             '${g.teamName} vs. ${g.opponent}',
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 14.5,
-              color: c.ink,
-            ),
+            style: AppText.label.copyWith(color: c.ink),
           ),
           const SizedBox(height: 12),
           Row(
@@ -1113,7 +985,7 @@ class _GameCard extends StatelessWidget {
                 _pct(l.completionPct),
               ])
                 Expanded(
-                  child: Text(s, style: TextStyle(fontSize: 12, color: c.ink)),
+                  child: Text(s, style: AppText.caption.copyWith(color: c.ink)),
                 ),
             ],
           ),
@@ -1155,7 +1027,7 @@ class _OffTheSheet extends StatelessWidget {
       child: rows.isEmpty
           ? Text(
               'Nothing here yet.',
-              style: TextStyle(fontSize: 12.5, color: c.muted),
+              style: AppText.secondary.copyWith(color: c.muted),
             )
           : Column(
               children: [
@@ -1168,18 +1040,14 @@ class _OffTheSheet extends StatelessWidget {
                         const SizedBox(width: 8),
                         Text(
                           label,
-                          style: TextStyle(fontSize: 12, color: c.muted),
+                          style: AppText.caption.copyWith(color: c.muted),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             value,
                             textAlign: TextAlign.end,
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                              color: c.ink,
-                            ),
+                            style: AppText.label.copyWith(color: c.ink),
                           ),
                         ),
                       ],
@@ -1212,12 +1080,12 @@ class _TeamsCard extends StatelessWidget {
           if (!vm.showsTeams)
             Text(
               'Teams are private.',
-              style: TextStyle(fontSize: 12.5, color: c.muted),
+              style: AppText.secondary.copyWith(color: c.muted),
             )
           else if (teams.isEmpty)
             Text(
               'Not on a team yet.',
-              style: TextStyle(fontSize: 12.5, color: c.muted),
+              style: AppText.secondary.copyWith(color: c.muted),
             ),
           if (vm.showsTeams && vm.filtersTeams)
             Padding(
@@ -1254,11 +1122,7 @@ class _TeamsCard extends StatelessWidget {
                           children: [
                             Text(
                               t.name,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 13,
-                                color: c.ink,
-                              ),
+                              style: AppText.label.copyWith(color: c.ink),
                             ),
                             Text(
                               [
@@ -1268,7 +1132,7 @@ class _TeamsCard extends StatelessWidget {
                               ].join(' · '),
                               maxLines: wide ? 2 : 1,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 11.5, color: c.muted),
+                              style: AppText.caption.copyWith(color: c.muted),
                             ),
                           ],
                         ),
@@ -1481,7 +1345,7 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
               ),
               Text(
                 'Throwing hand',
-                style: TextStyle(fontSize: 12, color: c.muted),
+                style: AppText.caption.copyWith(color: c.muted),
               ),
               const SizedBox(height: 6),
               AppSegmentedButton<ThrowingHand?>(
@@ -1498,7 +1362,7 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
               Text(
                 'Choose who sees your stats, games and teams in Settings → '
                 'Privacy.',
-                style: TextStyle(fontSize: 11.5, color: c.muted),
+                style: AppText.caption.copyWith(color: c.muted),
               ),
             ],
           ),
@@ -1567,7 +1431,7 @@ class _EditImages extends StatelessWidget {
           ),
           Text(
             'Photo changes save right away.',
-            style: TextStyle(fontSize: 11.5, color: c.muted),
+            style: AppText.caption.copyWith(color: c.muted),
           ),
           const Divider(height: 24),
         ],
@@ -1617,10 +1481,8 @@ class StaffBadge extends StatelessWidget {
             const SizedBox(width: 4),
             Text(
               'STALL 10 STAFF',
-              style: TextStyle(
-                fontSize: 10.5,
+              style: AppText.caption.copyWith(
                 fontWeight: FontWeight.w700,
-                letterSpacing: 0.2,
                 color: c.onAccent,
               ),
             ),

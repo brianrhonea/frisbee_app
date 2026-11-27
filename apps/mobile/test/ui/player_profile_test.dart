@@ -635,7 +635,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       expect(find.text('By the numbers'), findsOneWidget);
-      expect(find.text('17'), findsOneWidget);
+      // The jersey number is in the header's tag now.
+      expect(find.textContaining('#17 ·'), findsOneWidget);
       await tester.tap(find.text('Stats'));
       await tester.pumpAndSettle();
       expect(find.text('Season by season'), findsOneWidget);

@@ -271,10 +271,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                   child: Text(
                                     'No comments yet. Be the first.',
                                     textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant,
+                                    style: AppText.secondary.copyWith(
+                                      color: AppColors.of(context).muted,
                                     ),
                                   ),
                                 )
@@ -320,7 +318,7 @@ class _CommentsHeading extends StatelessWidget {
     padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
     child: Text(
       count == null || count == 0 ? 'Comments' : 'Comments ($count)',
-      style: Theme.of(context).textTheme.titleSmall,
+      style: AppText.bodyStrong.copyWith(color: AppColors.of(context).ink),
     ),
   );
 }
@@ -354,7 +352,8 @@ class CommentTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final muted = theme.colorScheme.onSurfaceVariant;
+    final tokens = AppColors.of(context);
+    final muted = tokens.muted;
     final c = comment;
     // Nothing from someone blocked either way.
     if (watchBlocks(context).hides(c.authorId)) return const SizedBox.shrink();
@@ -364,31 +363,35 @@ class CommentTile extends StatelessWidget {
         ? 'Just now'
         : DateFormat.MMMd().add_jm().format(c.createdAt!);
     void openAuthor() => openPage(context, Routes.player(c.authorId));
-    final small = theme.textTheme.bodySmall?.copyWith(color: muted);
+    final small = AppText.caption.copyWith(color: muted);
+    // 48 px targets for Like, Reply, Edit and Report.
     final action = TextButton.styleFrom(
-      visualDensity: VisualDensity.compact,
-      minimumSize: const Size(0, 32),
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      minimumSize: const Size(48, 48),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm),
       foregroundColor: muted,
-      textStyle: theme.textTheme.labelMedium,
+      textStyle: AppText.caption.copyWith(fontWeight: FontWeight.w600),
     );
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // A 48 px target around the (smaller) picture.
           InkWell(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(AppRadius.pill),
             onTap: openAuthor,
-            child: UserAvatar(
-              uid: c.authorId,
-              name: c.authorName,
-              photoUrl: c.authorPhotoUrl,
-              radius: c.isReply ? 13 : 16,
+            child: SizedBox.square(
+              dimension: 48,
+              child: Center(
+                child: UserAvatar(
+                  uid: c.authorId,
+                  name: c.authorName,
+                  photoUrl: c.authorPhotoUrl,
+                  radius: c.isReply ? 13 : 16,
+                ),
+              ),
             ),
           ),
-          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -396,23 +399,21 @@ class CommentTile extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(14),
+                    color: tokens.field,
+                    borderRadius: BorderRadius.circular(AppRadius.card),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
+                          // The picture beside it opens the profile.
                           Flexible(
-                            child: InkWell(
-                              onTap: openAuthor,
-                              child: Text(
-                                name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.labelLarge,
-                              ),
+                            child: Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppText.label.copyWith(color: tokens.ink),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -424,12 +425,12 @@ class CommentTile extends StatelessWidget {
                       if (c.replyToName case final to?)
                         Text(
                           '@$to',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
+                          style: AppText.label.copyWith(color: tokens.accent),
                         ),
-                      LinkifiedText(c.body, style: theme.textTheme.bodyMedium),
+                      LinkifiedText(
+                        c.body,
+                        style: AppText.secondary.copyWith(color: tokens.ink),
+                      ),
                     ],
                   ),
                 ),
@@ -485,7 +486,6 @@ class CommentTile extends StatelessWidget {
           if (onDelete != null)
             IconButton(
               tooltip: 'Delete comment',
-              visualDensity: VisualDensity.compact,
               onPressed: onDelete,
               icon: const Icon(Icons.delete_outline, size: 20),
             ),
@@ -551,7 +551,9 @@ class _CommentBox extends StatelessWidget {
                               : 'Replying to $replyingTo',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall,
+                          style: AppText.caption.copyWith(
+                            color: AppColors.of(context).muted,
+                          ),
                         ),
                       ),
                       IconButton(
