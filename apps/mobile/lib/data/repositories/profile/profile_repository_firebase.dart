@@ -358,11 +358,17 @@ class ProfileRepositoryFirebase implements ProfileRepository {
         ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     }
     final snaps = await Future.wait([
+      // Adults only: the rules refuse a profiles list query without it (H1).
       _profiles
+          .where('adult', isEqualTo: true)
           .where('keywords', arrayContains: k)
           .limit(_searchLimit * 2)
           .get(),
-      _profiles.where('tags', arrayContains: k).limit(_searchLimit * 2).get(),
+      _profiles
+          .where('adult', isEqualTo: true)
+          .where('tags', arrayContains: k)
+          .limit(_searchLimit * 2)
+          .get(),
     ]);
     final byId = <String, PlayerProfile>{
       for (final s in snaps)

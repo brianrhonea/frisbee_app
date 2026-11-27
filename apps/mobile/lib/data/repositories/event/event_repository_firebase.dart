@@ -3,8 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../domain/models/recurrence.dart';
 import '../../../domain/models/team_event.dart';
 import '../../../utils/result.dart';
+import '../../services/api_client.dart';
 import '../../services/firestore_utils.dart';
 import '../../services/shared_streams.dart';
+import '../../services/time_zone.dart';
 import 'event_repository.dart';
 import '../../../domain/models/word_filter.dart';
 
@@ -12,8 +14,27 @@ class EventRepositoryFirebase implements EventRepository {
   EventRepositoryFirebase({
     FirebaseFirestore? firestore,
     SharedStreams? sharedStreams,
+    ApiClient? api,
+    Future<String> Function() timeZone = localTimeZone,
   }) : _db = firestore ?? FirebaseFirestore.instance,
-       _shared = sharedStreams ?? SharedStreams.instance;
+       _shared = sharedStreams ?? SharedStreams.instance,
+       _api = api,
+       _timeZone = timeZone;
+
+  /// The Stall 10 API: every event write goes through it
+  /// (`/v1/teams/:teamId/events`, `/v1/calendars/:id/events`); there's no
+  /// direct fallback.
+  final ApiClient? _api;
+
+  /// The device's time zone, sent with a repeat and with "this and
+  /// following" edits so the server keeps each event's wall-clock time
+  /// across clock changes.
+  final Future<String> Function() _timeZone;
+
+  static String _enc(String s) => Uri.encodeComponent(s);
+
+  static String _scope(SeriesScope scope) =>
+      scope == SeriesScope.following ? '?scope=following' : '';
 
   final FirebaseFirestore _db;
 
@@ -106,6 +127,24 @@ class EventRepositoryFirebase implements EventRepository {
     for (final e in events) e.copyWith(isPublic: true),
   ];
 
+  /// A team event as the API takes it (`saveTeamEventRequestSchema`).
+  static Map<String, Object?> _teamBody(TeamEvent e) => {
+    'title': cleanText(e.title),
+    'type': e.type.name,
+    'startsAt': e.startsAt.toUtc().toIso8601String(),
+    'endsAt': e.endsAt?.toUtc().toIso8601String(),
+    'location': cleanText(e.location),
+    'notes': cleanText(e.notes),
+    'poll': e.poll?.toMap(),
+    'public': e.isPublic,
+    if (e.audience.isNotEmpty) 'audience': e.audience.toList()..sort(),
+  };
+
+  /// New: `POST /v1/teams/:teamId/events` with an id the client picked (a
+  /// series' events are `{id}_{index}`; a replay is a 409). Edit: `PATCH`,
+  /// with `?scope=following` for this and the later events. The server
+  /// works out the series from `repeat` and `timeZone`, writes the public
+  /// copies, and starts the votes over when the poll changed.
   @override
   Future<Result<String>> saveEvent(
     String teamId,
@@ -115,177 +154,45 @@ class EventRepositoryFirebase implements EventRepository {
     Repeat? repeat,
     SeriesScope scope = SeriesScope.one,
   }) => guard(() async {
-    event = event.copyWith(
-      title: cleanText(event.title),
-      location: cleanText(event.location),
-      notes: cleanText(event.notes),
-    );
-    final col = _events(teamId);
-    final batch = _db.batch();
-    void public(String id, TeamEvent e, {required bool isNew}) {
-      final ref = _publicEvents(teamId).doc(id);
-      if (e.isPublic) {
-        batch.set(ref, {
-          ...e.toPublicMap(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-      } else if (!isNew) {
-        // Deleting a missing doc is fine, so no need to check it was public.
-        batch.delete(ref);
-      }
-    }
-
+    final api = _api.required;
+    final base = '/v1/teams/${_enc(teamId)}/events';
+    final zoned = repeat != null || scope == SeriesScope.following;
     if (event.isNew) {
-      final events = _occurrences(col.doc().id, event, repeat);
-      for (final e in events) {
-        batch.set(col.doc(e.id), {
-          ...e.toEditableMap(),
-          if (e.series case final series?) 'series': series.toMap(),
-          'public': e.isPublic,
-          'rsvps': <String, Object>{},
-          'reactions': <String, Object>{},
-          'votes': <String, Object>{},
-          'createdBy': uid,
-          'createdAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-        public(e.id, e, isNew: true);
+      if (repeat != null) {
+        final problem = repeatProblem(event.startsAt, repeat);
+        if (problem != null) throw ApiException('invalid_argument', problem);
       }
-      await batch.commit();
-      return events.first.id;
-    }
-    final later = scope == SeriesScope.following
-        ? await _later(col, event.id, event)
-        : const <TeamEvent>[];
-    // One id per bulk write, so the change notice goes out once.
-    final writeId = later.isEmpty ? null : col.doc().id;
-    void update(TeamEvent e, {required bool lead}) {
-      batch.update(col.doc(e.id), {
-        ...e.toEditableMap(),
-        'public': e.isPublic,
-        if (clearVotes) 'votes': <String, Object>{},
-        if (writeId != null) 'seriesWrite': {'id': writeId, 'lead': lead},
-        'updatedAt': FieldValue.serverTimestamp(),
+      final id = _events(teamId).doc().id;
+      final r = await api.post(base, {
+        ..._teamBody(event),
+        'id': id,
+        'repeat': ?repeat?.toJson(),
+        if (zoned) 'timeZone': await _timeZone(),
       });
-      public(e.id, e, isNew: false);
+      return r['id'] as String? ?? id;
     }
-
-    update(event, lead: true);
-    for (final e in later) {
-      update(e, lead: false);
-    }
-    await batch.commit();
+    await api.patch('$base/${_enc(event.id)}${_scope(scope)}', {
+      ..._teamBody(event),
+      if (zoned) 'timeZone': await _timeZone(),
+    });
     return event.id;
   });
-
-  /// [event] as one event, or with [repeat] as a series in [seriesId]:
-  /// one per occurrence, ids `${seriesId}_${index}`.
-  static List<TeamEvent> _occurrences(
-    String seriesId,
-    TeamEvent event,
-    Repeat? repeat,
-  ) {
-    if (repeat == null) return [event.copyWith(id: seriesId)];
-    final problem = repeatProblem(event.startsAt, repeat);
-    if (problem != null) throw ArgumentError(problem);
-    final times = seriesTimes(event.startsAt, event.endsAt, repeat);
-    return [
-      for (final (i, (start, end)) in times.indexed)
-        event.copyWith(
-          id: occurrenceId(seriesId, i),
-          startsAt: start,
-          endsAt: () => end,
-          series: () => EventSeries(
-            id: seriesId,
-            index: i,
-            count: times.length,
-            freq: repeat.freq,
-            until: repeat.until,
-          ),
-        ),
-    ];
-  }
-
-  /// The events after [id] in its series, as [edited] (its new details)
-  /// moved by the same change of date and time; ones already deleted are
-  /// skipped. Empty when it isn't in a series.
-  static Future<List<TeamEvent>> _later(
-    CollectionReference<Map<String, dynamic>> col,
-    String id,
-    TeamEvent edited,
-  ) async {
-    final current = _parseOne(await col.doc(id).get());
-    final series = current?.series;
-    if (current == null || series == null) return const [];
-    final move = moveLater(current.startsAt, edited.startsAt, edited.endsAt);
-    final docs = await Future.wait(
-      series.laterIds.map((l) => col.doc(l).get()),
-    );
-    return [
-      for (final d in docs)
-        if (_parseOne(d) case final stored?)
-          () {
-            final (start, end) = move(stored.startsAt);
-            return edited.copyWith(
-              id: stored.id,
-              startsAt: start,
-              endsAt: () => end,
-            );
-          }(),
-    ];
-  }
-
-  /// The ids of [id] and, for [SeriesScope.following], its series' later
-  /// events that still exist.
-  static Future<List<String>> _withLater(
-    CollectionReference<Map<String, dynamic>> col,
-    String id,
-    SeriesScope scope,
-  ) async {
-    if (scope == SeriesScope.one) return [id];
-    final series = _parseOne(await col.doc(id).get())?.series;
-    if (series == null) return [id];
-    final docs = await Future.wait(
-      series.laterIds.map((l) => col.doc(l).get()),
-    );
-    return [
-      id,
-      for (final d in docs)
-        if (d.exists) d.id,
-    ];
-  }
 
   @override
   Future<Result<void>> deleteEvent(
     String teamId,
     String eventId, {
     SeriesScope scope = SeriesScope.one,
-  }) => guard(() async {
-    final col = _events(teamId);
-    final ids = await _withLater(col, eventId, scope);
-    if (ids.length > 1) {
-      // Marked first, so the cancellation notice goes out once.
-      final writeId = col.doc().id;
-      final mark = _db.batch();
-      for (final id in ids) {
-        mark.update(col.doc(id), {
-          'seriesWrite': {'id': writeId, 'lead': id == eventId, 'delete': true},
-        });
-      }
-      await mark.commit();
-    }
-    final batch = _db.batch();
-    for (final id in ids) {
-      batch
-        ..delete(col.doc(id))
-        ..delete(_publicEvents(teamId).doc(id));
-    }
-    await batch.commit();
-  });
+  }) => guard(
+    () => _api.required.delete(
+      '/v1/teams/${_enc(teamId)}/events/${_enc(eventId)}${_scope(scope)}',
+    ),
+  );
 
-  // Responses use field-path updates so concurrent members never clobber
-  // each other's entries.
+  String _eventPath(String teamId, String eventId) =>
+      '/v1/teams/${_enc(teamId)}/events/${_enc(eventId)}';
 
+  /// `PUT .../rsvp`: the answer (null takes it back, and its note).
   @override
   Future<Result<void>> setRsvp(
     String teamId,
@@ -293,30 +200,34 @@ class EventRepositoryFirebase implements EventRepository {
     String uid,
     RsvpStatus? status,
   ) => guard(
-    () => _events(teamId).doc(eventId).update({
-      FieldPath(['rsvps', uid]): status?.name ?? FieldValue.delete(),
-      // The note goes with the answer (firestore.rules validRsvpNote).
-      if (status == null) FieldPath(['rsvpNotes', uid]): FieldValue.delete(),
-      if (status != RsvpStatus.going) ...{
-        FieldPath(['reactions', uid]): FieldValue.delete(),
-        FieldPath(['votes', uid]): FieldValue.delete(),
-      },
+    () => _api.required.put('${_eventPath(teamId, eventId)}/rsvp', {
+      'status': status?.name,
     }),
   );
 
+  /// `PUT .../rsvp` again with the answer already given, and the note
+  /// (empty removes it).
   @override
   Future<Result<void>> setRsvpNote(
     String teamId,
     String eventId,
     String uid,
     String note,
-  ) => guard(
-    () => _events(teamId).doc(eventId).update({
-      FieldPath(['rsvpNotes', uid]): note.isEmpty
-          ? FieldValue.delete()
-          : cleanText(note),
-    }),
-  );
+  ) => guard(() async {
+    final api = _api.required;
+    final current = (await _events(teamId).doc(eventId).get()).data();
+    final status = ((current?['rsvps'] as Map?) ?? const {})[uid];
+    if (status is! String) {
+      throw const ApiException(
+        'failed_precondition',
+        'Answer first, then add a note.',
+      );
+    }
+    await api.put('${_eventPath(teamId, eventId)}/rsvp', {
+      'status': status,
+      'note': note.isEmpty ? null : cleanText(note),
+    });
+  });
 
   @override
   Future<Result<void>> setReaction(
@@ -326,10 +237,9 @@ class EventRepositoryFirebase implements EventRepository {
     Reaction reaction, {
     required bool on,
   }) => guard(
-    () => _events(teamId).doc(eventId).update({
-      FieldPath(['reactions', uid]): on
-          ? FieldValue.arrayUnion([reaction.name])
-          : FieldValue.arrayRemove([reaction.name]),
+    () => _api.required.put('${_eventPath(teamId, eventId)}/reaction', {
+      'reaction': reaction.name,
+      'on': on,
     }),
   );
 
@@ -340,10 +250,8 @@ class EventRepositoryFirebase implements EventRepository {
     String uid,
     List<String> optionIds,
   ) => guard(
-    () => _events(teamId).doc(eventId).update({
-      FieldPath(['votes', uid]): optionIds.isEmpty
-          ? FieldValue.delete()
-          : optionIds,
+    () => _api.required.put('${_eventPath(teamId, eventId)}/votes', {
+      'optionIds': optionIds,
     }),
   );
 
@@ -361,6 +269,17 @@ class EventRepositoryFirebase implements EventRepository {
   Stream<TeamEvent?> watchMyEvent(String uid, String eventId) =>
       _myEvents(uid).doc(eventId).snapshots().map(_parseOne);
 
+  /// Personal events are "My calendar" (the caller's uid) in
+  /// `/v1/calendars/:id/events`.
+  static Map<String, Object?> _myBody(TeamEvent e) => {
+    'title': e.title,
+    'type': e.type.name,
+    'startsAt': e.startsAt.toUtc().toIso8601String(),
+    'endsAt': e.endsAt?.toUtc().toIso8601String(),
+    'location': e.location,
+    'notes': e.notes,
+  };
+
   @override
   Future<Result<String>> saveMyEvent(
     String uid,
@@ -368,35 +287,19 @@ class EventRepositoryFirebase implements EventRepository {
     Repeat? repeat,
     SeriesScope scope = SeriesScope.one,
   }) => guard(() async {
-    final col = _myEvents(uid);
-    Map<String, dynamic> data(TeamEvent e) => {
-      ...e.toEditableMap(),
-      'poll': null,
+    final api = _api.required;
+    final base = '/v1/calendars/${_enc(uid)}/events';
+    final zoned = repeat != null || scope == SeriesScope.following;
+    final body = {
+      ..._myBody(event),
+      if (event.isNew && repeat != null) 'repeat': repeat.toJson(),
+      if (zoned) 'timeZone': await _timeZone(),
     };
-    final batch = _db.batch();
     if (event.isNew) {
-      final events = _occurrences(col.doc().id, event, repeat);
-      for (final e in events) {
-        batch.set(col.doc(e.id), {
-          ...data(e),
-          if (e.series case final series?) 'series': series.toMap(),
-          'createdAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-      }
-      await batch.commit();
-      return events.first.id;
+      final r = await api.post(base, body);
+      return r['id'] as String? ?? '';
     }
-    final later = scope == SeriesScope.following
-        ? await _later(col, event.id, event)
-        : const <TeamEvent>[];
-    for (final e in [event, ...later]) {
-      batch.update(col.doc(e.id), {
-        ...data(e),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-    }
-    await batch.commit();
+    await api.patch('$base/${_enc(event.id)}${_scope(scope)}', body);
     return event.id;
   });
 
@@ -405,12 +308,9 @@ class EventRepositoryFirebase implements EventRepository {
     String uid,
     String eventId, {
     SeriesScope scope = SeriesScope.one,
-  }) => guard(() async {
-    final col = _myEvents(uid);
-    final batch = _db.batch();
-    for (final id in await _withLater(col, eventId, scope)) {
-      batch.delete(col.doc(id));
-    }
-    await batch.commit();
-  });
+  }) => guard(
+    () => _api.required.delete(
+      '/v1/calendars/${_enc(uid)}/events/${_enc(eventId)}${_scope(scope)}',
+    ),
+  );
 }

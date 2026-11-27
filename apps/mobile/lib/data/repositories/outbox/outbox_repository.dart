@@ -13,6 +13,7 @@ import '../../../utils/result.dart';
 import '../../services/api_client.dart';
 import '../../services/connectivity_service.dart';
 import '../../services/outbox_store.dart';
+import '../../services/upload_client.dart';
 import '../auth/auth_repository.dart';
 
 /// How one kind of queued item goes out, registered by the repository that
@@ -54,7 +55,7 @@ String _messageOf(Object e) => switch (e) {
 /// Each keeps the id it was given when the user sent it, so nothing is
 /// posted twice. Only items queued by the signed-in user are shown or
 /// sent.
-class OutboxRepository extends ChangeNotifier {
+class OutboxRepository extends ChangeNotifier implements UploadLedger {
   OutboxRepository({
     required OutboxStore store,
     required ConnectivityService connectivity,
@@ -75,6 +76,10 @@ class OutboxRepository extends ChangeNotifier {
   final DateTime Function() _now;
   final _handlers = <OutboxKind, OutboxHandler>{};
   final _queued = StreamController<OutboxJob>.broadcast();
+
+  /// Uploads made for an item that isn't queued (yet): its first try is
+  /// still going. They move onto the job if it's queued.
+  final _ready = <String, Map<int, ReadyUpload>>{};
   late final Future<void> _loaded;
   List<OutboxJob> _jobs = [];
   Future<void>? _running;
@@ -112,6 +117,24 @@ class OutboxRepository extends ChangeNotifier {
 
   /// Each item queued (for a "will send when you're back" notice).
   Stream<OutboxJob> get queued => _queued.stream;
+
+  @override
+  Map<int, ReadyUpload> readyFor(String jobId) => Map.of(
+    _jobs.where((j) => j.id == jobId).firstOrNull?.uploads ??
+        _ready[jobId] ??
+        const {},
+  );
+
+  @override
+  Future<void> markReady(String jobId, int index, ReadyUpload upload) async {
+    final job = _jobs.where((j) => j.id == jobId).firstOrNull;
+    if (job == null) {
+      (_ready[jobId] ??= {})[index] = upload;
+      return;
+    }
+    _replace(job.copyWith(uploads: {...job.uploads, index: upload}));
+    await _save();
+  }
 
   /// Called by the repository that makes [kind].
   void register(OutboxKind kind, OutboxHandler handler) {
@@ -159,6 +182,33 @@ class OutboxRepository extends ChangeNotifier {
     await _loaded;
     final uid = _uid;
     if (uid.isEmpty) return sendNow();
+    try {
+      return await _submit(
+        uid: uid,
+        kind: kind,
+        id: id,
+        target: target,
+        label: label,
+        payload: payload,
+        files: files,
+        sendNow: sendNow,
+      );
+    } finally {
+      // Queued, the uploads are on the job; otherwise they're done with.
+      _ready.remove(id);
+    }
+  }
+
+  Future<Result<void>> _submit({
+    required String uid,
+    required OutboxKind kind,
+    required String id,
+    required String target,
+    required String label,
+    required Map<String, Object?> payload,
+    required List<NewAttachment> files,
+    required Future<Result<void>> Function() sendNow,
+  }) async {
     Future<Result<void>> queue(OutboxFailure failure) => _enqueue(
       OutboxJob(
         id: id,
@@ -168,6 +218,7 @@ class OutboxRepository extends ChangeNotifier {
         target: target,
         label: label,
         payload: Map<String, Object?>.from(jsonSafe(payload) as Map),
+        uploads: Map.of(_ready[id] ?? const {}),
         // A server error waits before trying again.
         attempts: failure == OutboxFailure.retry ? 1 : 0,
         nextTryAt: failure == OutboxFailure.retry
@@ -237,6 +288,8 @@ class OutboxRepository extends ChangeNotifier {
         target: job.target,
         label: job.label,
         payload: job.payload,
+        uploads: job.uploads,
+        version: job.version,
         files: kept,
         attempts: job.attempts,
         nextTryAt: job.nextTryAt,
@@ -277,6 +330,9 @@ class OutboxRepository extends ChangeNotifier {
         state: OutboxState.waiting,
         nextTryAt: () => null,
         error: () => null,
+        // A try the server turned down may have refused its uploads (gone,
+        // or made for something else): upload afresh.
+        uploads: const {},
       ),
     );
     await _save();
@@ -368,7 +424,13 @@ class OutboxRepository extends ChangeNotifier {
       failure = outboxFailureFor(e);
       message = _messageOf(e);
     }
-    final next = afterTry(job, failure, _now(), message: message);
+    // The uploads noted while sending are on the saved copy.
+    final next = afterTry(
+      _jobs.where((j) => j.id == job.id).firstOrNull ?? job,
+      failure,
+      _now(),
+      message: message,
+    );
     if (next == null) {
       await _remove(job);
     } else {

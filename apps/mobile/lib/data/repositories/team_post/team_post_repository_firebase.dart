@@ -11,6 +11,8 @@ import '../../services/api_client.dart';
 import '../../services/attachment_storage.dart';
 import '../../services/firestore_utils.dart';
 import '../../services/shared_streams.dart';
+import '../../services/upload_client.dart';
+import '../outbox/outbox_payloads.dart';
 import '../outbox/outbox_repository.dart';
 import 'team_post_repository.dart';
 import '../../../domain/models/word_filter.dart';
@@ -26,32 +28,34 @@ class TeamPostRepositoryFirebase implements TeamPostRepository {
     SharedStreams? sharedStreams,
     OutboxRepository? outbox,
     ApiClient? api,
+    UploadClient? uploads,
   }) : _api = api,
        _files = attachments,
        _db = firestore ?? FirebaseFirestore.instance,
        _shared = sharedStreams ?? SharedStreams.instance,
+       _uploads = uploads ?? UploadClient(api: api),
        _outbox = outbox {
     outbox?.register(
       OutboxKind.teamPost,
       OutboxHandler(
-        send: (job, files, author) => _save(
-          job.target,
-          PostDraft(
-            post: TeamPost.fromMap(
-              '',
-              Map<String, dynamic>.from(
-                job.payload['post'] as Map? ?? const {},
+        send: (job, files, author) async {
+          final body = OutboxPayloads.teamPost(job);
+          if (body == null) {
+            return Result.error(
+              const ApiException(
+                'failed_precondition',
+                OutboxPayloads.unmappable,
               ),
-            ),
-            newImages: files,
-          ),
-          author,
-          newId: job.id,
-        ),
+            );
+          }
+          return _create(job.target, job.id, body, files, ledger: outbox);
+        },
         sent: (job) => existsOnServer(_posts(job.target).doc(job.id)),
       ),
     );
   }
+
+  final UploadClient _uploads;
 
   /// Holds new posts made offline until they can go out.
   final OutboxRepository? _outbox;
@@ -70,9 +74,6 @@ class TeamPostRepositoryFirebase implements TeamPostRepository {
 
   /// Each save's uploads get their own folder, so a new photo never
   /// overwrites a kept one with the same name.
-  static String imageFolder(String teamId, String postId) =>
-      'teams/$teamId/posts/$postId/${DateTime.now().millisecondsSinceEpoch}';
-
   @override
   Stream<List<TeamPost>> watchPosts(
     String teamId, {
@@ -155,83 +156,119 @@ class TeamPostRepositoryFirebase implements TeamPostRepository {
       ),
       newImages: draft.newImages,
     );
-    final outbox = _outbox;
-    // Only new posts wait offline; an edit needs the post as it stands.
-    if (outbox == null ||
-        !draft.post.isNew ||
-        draft.newImages.any((i) => i.tooLarge)) {
-      return _save(teamId, draft, author);
+    if (draft.newImages.where((i) => i.tooLarge).firstOrNull case final big?) {
+      return Future.value(
+        Result.error(
+          AttachmentTooLargeException(
+            big.name,
+            limit: maxBytesFor(big.contentType),
+          ),
+        ),
+      );
     }
+    // Only new posts wait offline; an edit needs the post as it stands, so
+    // offline it fails with a retry (contracts/phase1-writes.md D8).
+    if (!draft.post.isNew) return _edit(teamId, draft);
     final id = _posts(teamId).doc().id;
+    final outbox = _outbox;
+    final post = draft.post;
+    Future<Result<void>> now() {
+      final body = OutboxPayloads.teamPost(
+        OutboxJob(
+          id: id,
+          uid: author.uid,
+          kind: OutboxKind.teamPost,
+          createdAt: DateTime.now(),
+          target: teamId,
+          label: 'Team post',
+          payload: {'post': jsonSafe(post.toEditableMap())},
+          files: [
+            for (final (i, f) in draft.newImages.indexed)
+              OutboxFile(name: f.name, path: '$id/$i', size: f.size),
+          ],
+        ),
+      );
+      if (body == null) {
+        return Future.value(
+          Result.error(
+            const ApiException(
+              'invalid_argument',
+              'Write something or add a photo.',
+            ),
+          ),
+        );
+      }
+      return _create(teamId, id, body, draft.newImages, ledger: outbox);
+    }
+
+    if (outbox == null) return now();
     return outbox.submit(
       kind: OutboxKind.teamPost,
       id: id,
       target: teamId,
       label: 'Team post',
-      payload: {'post': draft.post.toEditableMap()},
+      payload: {'post': post.toEditableMap()},
       files: draft.newImages,
-      sendNow: () => _save(teamId, draft, author, newId: id),
+      sendNow: now,
     );
   }
 
-  /// Saves [draft]; a new post gets [newId] (the queue's) or a fresh id.
-  Future<Result<void>> _save(
+  /// `POST /v1/teams/:teamId/posts` for post [id]: uploads the photos first
+  /// (`teamImage`, for the team and post), then sends [body] with `id` and
+  /// `uploadIds`. A 409 is `already_exists`, which the queue counts as sent.
+  Future<Result<void>> _create(
     String teamId,
-    PostDraft draft,
-    AppUser author, {
-    String? newId,
+    String id,
+    Map<String, Object?> body,
+    List<NewAttachment> files, {
+    UploadLedger? ledger,
   }) => guard(() async {
+    final api = _api.required;
+    final ready = files.isEmpty
+        ? const <ReadyUpload>[]
+        : await _uploads.uploadAll(
+            purpose: UploadPurpose.teamImage,
+            itemId: id,
+            targetId: teamId,
+            files: files,
+            ledger: ledger,
+            ledgerKey: id,
+          );
+    await api.post('/v1/teams/${Uri.encodeComponent(teamId)}/posts', {
+      ...body,
+      'id': id,
+      'uploadIds': [for (final u in ready) u.id],
+    });
+  });
+
+  /// `PATCH /v1/teams/:teamId/posts/:postId`: the text, links, the photos
+  /// kept (`keepImages`) and new ones uploaded.
+  Future<Result<void>> _edit(String teamId, PostDraft draft) => guard(() async {
+    final api = _api.required;
     final post = draft.post;
-    final ref = post.isNew
-        ? _posts(teamId).doc(newId)
-        : _posts(teamId).doc(post.id);
-    final before = post.isNew
-        ? const <ChatAttachment>[]
-        : TeamPost.fromMap(ref.id, plainData((await ref.get()).data())).images;
-    final uploaded = draft.newImages.isEmpty
-        ? const <ChatAttachment>[]
-        : await _files.upload(imageFolder(teamId, ref.id), draft.newImages);
-    final saved = post.copyWith(images: [...post.images, ...uploaded]);
-    try {
-      if (post.isNew) {
-        await ref.set({
-          ...saved.toEditableMap(),
-          'authorId': author.uid,
-          'authorName': author.label,
-          'createdAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-      } else {
-        await ref.update({
-          ...saved.toEditableMap(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-      }
-    } catch (_) {
-      await _files
-          .delete(uploaded.map((i) => i.path))
-          .catchError((Object _) => <void>[]);
-      rethrow;
-    }
-    final kept = {for (final i in saved.images) i.path};
-    final removed = [
-      for (final i in before)
-        if (!kept.contains(i.path)) i.path,
-    ];
-    if (removed.isNotEmpty) await _files.delete(removed);
+    final ready = draft.newImages.isEmpty
+        ? const <ReadyUpload>[]
+        : await _uploads.uploadAll(
+            purpose: UploadPurpose.teamImage,
+            itemId: post.id,
+            targetId: teamId,
+            files: draft.newImages,
+          );
+    await api.patch(_postPath(teamId, post.id), {
+      'title': post.title.trim(),
+      'body': post.body,
+      'location': post.location.trim(),
+      'links': post.links,
+      'public': post.isPublic,
+      'keepImages': [for (final i in post.images) i.path],
+      'uploadIds': [for (final u in ready) u.id],
+      'tournamentKey': ?post.tournamentKey,
+    });
   });
 
   @override
   Future<Result<void>> deletePost(String teamId, String postId) =>
-      guard(() async {
-        final ref = _posts(teamId).doc(postId);
-        final images = TeamPost.fromMap(
-          postId,
-          plainData((await ref.get()).data()),
-        ).images;
-        await ref.delete();
-        await _files.delete(images.map((i) => i.path));
-      });
+      guard(() => _api.required.delete(_postPath(teamId, postId)));
 
   @override
   Future<Result<Uint8List>> downloadImage(ChatAttachment image) =>

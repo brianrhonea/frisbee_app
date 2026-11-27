@@ -7,17 +7,23 @@ import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/chat.dart';
 import 'package:frisbee_app/utils/result.dart';
 
-/// Team chat unread dots: senders stamp the room's lastAt (never the text)
-/// and their own read in one batch; members' reads are private docs.
+import '../testing/api_fakes.dart';
+
+/// Team chat unread dots: the server stamps the room's lastAt (never the
+/// text) and the sender's own read when a message is sent (the API route,
+/// contracts/phase1-writes.md §3.3); members' reads are private docs.
 void main() {
   late FakeFirebaseFirestore db;
   late ChatRepositoryFirebase repo;
+  late FakeApi api;
 
   setUp(() async {
     db = FakeFirebaseFirestore();
+    api = FakeApi();
     repo = ChatRepositoryFirebase(
       attachments: AttachmentStorage(),
       firestore: db,
+      api: api.client(),
     );
     await db.doc('teams/t1/chats/general').set({
       'name': 'General',
@@ -26,7 +32,7 @@ void main() {
     });
   });
 
-  test('sending stamps the room and marks it read for the sender', () async {
+  test('sending goes to the API, which stamps the room and the read', () async {
     final sent = await repo.sendMessage(
       't1',
       'general',
@@ -34,8 +40,23 @@ void main() {
       text: ' hi ',
     );
     expect(sent, isA<Ok<void>>());
-    final room = (await db.doc('teams/t1/chats/general').get()).data()!;
-    expect(room['lastAt'], isNotNull);
+    expect(
+      api.bodyOf('POST /v1/teams/t1/chats/general/messages')['text'],
+      'hi',
+    );
+    // The app no longer writes the room or the read itself.
+    var room = (await db.doc('teams/t1/chats/general').get()).data()!;
+    expect(room['lastAt'], isNull);
+    expect(await repo.watchReads('u1').first, isEmpty);
+    // What the server writes (hub/service.ts sendMessage): lastAt, and the
+    // sender's own read.
+    await db.doc('teams/t1/chats/general').update({
+      'lastAt': DateTime(2026, 11, 27, 12),
+    });
+    await db.doc('users/u1/chatReads/t1').set({
+      'rooms': {'general': DateTime(2026, 11, 27, 12)},
+    });
+    room = (await db.doc('teams/t1/chats/general').get()).data()!;
     expect(room.containsKey('lastMessage'), isFalse);
     final reads = await repo.watchReads('u1').first;
     final mine = reads['t1']!['general']!;

@@ -204,7 +204,10 @@ List<SingleChildWidget> get firebaseProviders => [
       flags: context.read<FeatureFlags>(),
     ),
   ),
-  Provider<EventRepository>(create: (_) => EventRepositoryFirebase()),
+  Provider<EventRepository>(
+    create: (context) =>
+        EventRepositoryFirebase(api: context.read<ApiClient?>()),
+  ),
   Provider<TeamPostRepository>(
     // Made at start (as are the other four the offline queue sends
     // through), so queued items go out without opening their screens.
@@ -225,8 +228,10 @@ List<SingleChildWidget> get firebaseProviders => [
   ),
   Provider<PostCommentRepository>(
     lazy: false,
-    create: (context) =>
-        PostCommentRepositoryFirebase(outbox: context.read<OutboxRepository>()),
+    create: (context) => PostCommentRepositoryFirebase(
+      api: context.read<ApiClient?>(),
+      outbox: context.read<OutboxRepository>(),
+    ),
   ),
   // Drafts belong to whoever is signed in, and go when they sign out.
   // Made at start (not lazily on the first chat), so it sees every sign-out.
@@ -245,7 +250,10 @@ List<SingleChildWidget> get firebaseProviders => [
   ),
   Provider(create: (_) => const DevicePermissions()),
   Provider(create: (_) => const DeviceCalendarService()),
-  Provider<FollowRepository>(create: (_) => FollowRepositoryFirebase()),
+  Provider<FollowRepository>(
+    create: (context) =>
+        FollowRepositoryFirebase(api: context.read<ApiClient?>()),
+  ),
   Provider<VideoRepository>(
     create: (context) =>
         VideoRepositoryFirebase(api: context.read<ApiClient?>()),
@@ -283,6 +291,7 @@ List<SingleChildWidget> get firebaseProviders => [
       attachments: context.read<AttachmentStorage>(),
       search: context.read<ApiSearch>(),
       outbox: context.read<OutboxRepository>(),
+      api: context.read<ApiClient?>(),
     ),
   ),
   Provider(

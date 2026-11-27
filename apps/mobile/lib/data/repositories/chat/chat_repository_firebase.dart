@@ -13,6 +13,8 @@ import '../../services/api_client.dart';
 import '../../services/attachment_storage.dart';
 import '../../services/firestore_utils.dart';
 import '../../services/shared_streams.dart';
+import '../../services/upload_client.dart';
+import '../outbox/outbox_payloads.dart';
 import '../outbox/outbox_repository.dart';
 import 'chat_repository.dart';
 import '../../../domain/models/word_filter.dart';
@@ -30,10 +32,12 @@ class ChatRepositoryFirebase implements ChatRepository {
     SharedStreams? sharedStreams,
     OutboxRepository? outbox,
     ApiClient? api,
+    UploadClient? uploads,
   }) : _api = api,
        _files = attachments,
        _db = firestore ?? FirebaseFirestore.instance,
        _shared = sharedStreams ?? SharedStreams.instance,
+       _uploads = uploads ?? UploadClient(api: api),
        _outbox = outbox {
     outbox?.register(
       OutboxKind.teamChat,
@@ -42,10 +46,9 @@ class ChatRepositoryFirebase implements ChatRepository {
           job.payload['teamId'] as String? ?? '',
           job.payload['roomId'] as String? ?? '',
           job.id,
-          author: author,
-          text: job.payload['text'] as String? ?? '',
+          message: OutboxPayloads.message(job),
           attachments: files,
-          replyTo: MessageReply.fromMap(job.payload['replyTo']),
+          ledger: outbox,
         ),
         sent: (job) => existsOnServer(
           _messages(
@@ -57,10 +60,14 @@ class ChatRepositoryFirebase implements ChatRepository {
     );
   }
 
+  final UploadClient _uploads;
+
   /// Holds messages sent offline until they can go out.
   final OutboxRepository? _outbox;
 
-  /// Pins and event cards; null in builds without `API_BASE_URL`.
+  /// The Stall 10 API: sending, reacting and deleting go through it
+  /// (`/v1/teams/:teamId/chats/:roomId/messages`), as do pins and event
+  /// cards. Null in builds without `API_BASE_URL`, which can't send.
   final ApiClient? _api;
 
   final AttachmentStorage _files;
@@ -364,16 +371,16 @@ class ChatRepositoryFirebase implements ChatRepository {
     text = maskSwearing(text);
     // The id is picked now and kept, so a retry can't post it twice.
     final messageId = _messages(teamId, roomId).doc().id;
+    final outbox = _outbox;
+    final message = {'text': text.trim(), 'replyTo': ?replyTo?.id};
     Future<Result<void>> now() => _send(
       teamId,
       roomId,
       messageId,
-      author: author,
-      text: text,
+      message: message,
       attachments: attachments,
-      replyTo: replyTo,
+      ledger: outbox,
     );
-    final outbox = _outbox;
     if (outbox == null || attachments.any((a) => a.tooLarge)) return now();
     return outbox.submit(
       kind: OutboxKind.teamChat,
@@ -391,55 +398,43 @@ class ChatRepositoryFirebase implements ChatRepository {
     );
   }
 
+  /// Uploads [attachments] (`/v1/uploads`, as `chat` files for this room
+  /// and message), then `POST .../messages` with the message's id and the
+  /// ready upload ids. A 409 is `already_exists`, which the queue counts as
+  /// sent. The server writes the author, time, quote and the room's lastAt.
   Future<Result<void>> _send(
     String teamId,
     String roomId,
     String messageId, {
-    required AppUser author,
-    required String text,
+    required Map<String, Object?> message,
     List<NewAttachment> attachments = const [],
-    MessageReply? replyTo,
-  }) => guard(
-    () => muteAware(_db, author.uid, () async {
-      for (final a in attachments) {
-        if (a.tooLarge) {
-          throw AttachmentTooLargeException(
-            a.name,
-            limit: maxBytesFor(a.contentType),
+    UploadLedger? ledger,
+  }) => guard(() async {
+    final api = _api.required;
+    for (final a in attachments) {
+      if (a.tooLarge) {
+        throw AttachmentTooLargeException(
+          a.name,
+          limit: maxBytesFor(a.contentType),
+        );
+      }
+    }
+    final ready = attachments.isEmpty
+        ? const <ReadyUpload>[]
+        : await _uploads.uploadAll(
+            purpose: UploadPurpose.chat,
+            itemId: messageId,
+            targetId: 'teams/$teamId/chats/$roomId',
+            files: attachments,
+            ledger: ledger,
+            ledgerKey: messageId,
           );
-        }
-      }
-      final ref = _messages(teamId, roomId).doc(messageId);
-      final uploaded = await _files.upload(
-        'teams/$teamId/chats/$roomId/${author.uid}/${ref.id}',
-        attachments,
-      );
-      try {
-        // One batch: the message, the room's lastAt (a time, never the
-        // text) for everyone's unread dots, and the author's own read.
-        await (_db.batch()
-              ..set(ref, {
-                'authorId': author.uid,
-                'authorName': author.label,
-                'text': text.trim(),
-                'attachments': [for (final a in uploaded) a.toMap()],
-                'createdAt': FieldValue.serverTimestamp(),
-                'replyTo': ?replyTo?.toMap(),
-              })
-              ..update(_rooms(teamId).doc(roomId), {
-                'lastAt': FieldValue.serverTimestamp(),
-              })
-              ..set(_reads(author.uid).doc(teamId), {
-                'rooms': {roomId: FieldValue.serverTimestamp()},
-              }, SetOptions(merge: true)))
-            .commit();
-      } catch (_) {
-        // Don't leave files behind for a message that was never posted.
-        await _files.delete(uploaded.map((a) => a.path));
-        rethrow;
-      }
-    }),
-  );
+    await api.post('${_roomPath(teamId, roomId)}/messages', {
+      ...message,
+      'id': messageId,
+      'uploadIds': [for (final u in ready) u.id],
+    });
+  });
 
   @override
   Future<Result<void>> setReaction(
@@ -449,10 +444,10 @@ class ChatRepositoryFirebase implements ChatRepository {
     String uid,
     String? emoji,
   ) => guard(
-    () => _messages(
-      teamId,
-      roomId,
-    ).doc(messageId).update({'reactions.$uid': emoji ?? FieldValue.delete()}),
+    () => _api.required.put(
+      '${_messagePath(teamId, roomId, messageId)}/reaction',
+      {'emoji': emoji},
+    ),
   );
 
   @override
@@ -460,10 +455,9 @@ class ChatRepositoryFirebase implements ChatRepository {
     String teamId,
     String roomId,
     ChatMessage message,
-  ) => guard(() async {
-    await _files.delete(message.attachments.map((a) => a.path));
-    await _messages(teamId, roomId).doc(message.id).delete();
-  });
+  ) => guard(
+    () => _api.required.delete(_messagePath(teamId, roomId, message.id)),
+  );
 
   static const _noApi =
       "Pins, event cards and polls aren't available in this version of "
