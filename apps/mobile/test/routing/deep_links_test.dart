@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/routing/open_link.dart';
 import 'package:frisbee_app/ui/home/widgets/home_screen.dart';
-import 'package:frisbee_app/ui/settings/widgets/settings_screen.dart';
 import 'package:frisbee_app/utils/invite_links.dart';
 import 'package:go_router/go_router.dart';
 

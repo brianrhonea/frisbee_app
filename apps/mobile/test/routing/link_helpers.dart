@@ -1,6 +1,5 @@
 // Shared by the link tests (N1, N6, N11): the page each kind of link must
 // open, and a way to open a link the way the app does from outside.
-import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/ui/calendar/widgets/calendars_screen.dart';
 import 'package:frisbee_app/ui/chat/widgets/chat_room_screen.dart';
