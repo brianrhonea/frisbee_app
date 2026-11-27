@@ -8,7 +8,10 @@ import 'package:frisbee_app/data/repositories/team/team_repository.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/roster_player.dart';
 import 'package:frisbee_app/domain/models/team.dart';
+import 'package:frisbee_app/data/services/api_client.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
+import 'package:frisbee_app/ui/core/ui/error_message.dart';
+import 'package:frisbee_app/utils/result.dart';
 import 'package:frisbee_app/ui/teams/view_models/team_detail_viewmodel.dart';
 import 'package:frisbee_app/ui/teams/widgets/invite_members_dialog.dart';
 import 'package:frisbee_app/ui/teams/widgets/members_tab.dart';
@@ -18,6 +21,18 @@ import 'package:provider/provider.dart';
 
 import '../testing/fakes.dart';
 import '../ui_harness/harness.dart';
+
+/// Refuses a create the way the API does for a member on another spot.
+class _TakenTeams extends FakeTeamRepository {
+  @override
+  Future<Result<String>> savePlayer(String teamId, RosterPlayer player) async =>
+      Result.error(
+        const ApiException(
+          'failed_precondition',
+          'That person is already linked to another spot on this team',
+        ),
+      );
+}
 
 void main() {
   late FakeTeamRepository teams;
@@ -30,13 +45,16 @@ void main() {
   );
 
   Team team({TeamKind kind = TeamKind.team}) =>
-      teamWith({
-        testUser.uid: TeamRole.owner,
-        'c1': TeamRole.captain,
-        'p1': TeamRole.player,
-        'p2': TeamRole.player,
-        'p3': TeamRole.player,
-      }, statKeepers: {'p2'}).copyWith(
+      teamWith(
+        {
+          testUser.uid: TeamRole.owner,
+          'c1': TeamRole.captain,
+          'p1': TeamRole.player,
+          'p2': TeamRole.player,
+          'p3': TeamRole.player,
+        },
+        statKeepers: {'p2'},
+      ).copyWith(
         memberNames: {
           testUser.uid: 'Alex',
           'c1': 'Cass',
@@ -52,7 +70,9 @@ void main() {
 
   void seed({required String me}) {
     teams = FakeTeamRepository();
-    auth = FakeAuthRepository(user: AppUser(uid: me, email: 'a@b.com', displayName: 'Alex'));
+    auth = FakeAuthRepository(
+      user: AppUser(uid: me, email: 'a@b.com', displayName: 'Alex'),
+    );
     final t = team();
     // Others see the same team; their role comes from the member map.
     teams.teams[t.id] = t;
@@ -93,10 +113,7 @@ void main() {
           value: FakeDirectMessageRepository(),
         ),
       ],
-      child: MaterialApp.router(
-        theme: AppTheme.light,
-        routerConfig: router,
-      ),
+      child: MaterialApp.router(theme: AppTheme.light, routerConfig: router),
     );
   }
 
@@ -240,22 +257,60 @@ void main() {
       );
       await tester.tap(find.text('Save'));
       await tester.pumpAndSettle();
-      // Created, then linked through the admin link call.
-      expect(teams.links, [('t1', 'p2', 'p3')]);
+      // Created with the member in one call: no separate link call.
+      expect(teams.links, isEmpty);
+      expect(teams.roster['t1']!.any((p) => p.userId == 'p3'), isTrue);
     });
   });
 
   group('saving a roster spot', () {
-    test('a new spot with a member is created then linked', () async {
+    test('a new spot with a member is one create call', () async {
       seed(me: testUser.uid);
       final vm = detailVm();
       await Future<void>.delayed(Duration.zero);
       await vm.savePlayer.execute(
         const RosterPlayer(id: '', name: 'Sam', userId: 'p2'),
       );
-      expect(teams.links, [('t1', 'p1', 'p2')]);
+      expect(teams.links, isEmpty);
+      expect(teams.roster['t1']!.single.userId, 'p2');
       expect(vm.savePlayer.error, isFalse);
     });
+
+    test('the 412 for a member on another spot is the error shown', () async {
+      seed(me: testUser.uid);
+      final repo = _TakenTeams()..teams['t1'] = teams.teams['t1']!;
+      final vm = TeamDetailViewModel(
+        teamId: 't1',
+        teamRepository: repo,
+        playRepository: FakePlayRepository(),
+        eventRepository: FakeEventRepository(),
+        authRepository: auth,
+      );
+      addTearDown(vm.dispose);
+      await vm.savePlayer.execute(
+        const RosterPlayer(id: '', name: 'Sam', userId: 'p2'),
+      );
+      expect(vm.savePlayer.error, isTrue);
+      expect(
+        errorMessage(vm.savePlayer.result),
+        'That person is already linked to another spot on this team',
+      );
+      expect(repo.links, isEmpty);
+    });
+
+    test(
+      'changing the member of an existing spot uses the link call',
+      () async {
+        seed(me: testUser.uid);
+        teams.roster['t1'] = [const RosterPlayer(id: 'a', name: 'Pat')];
+        final vm = detailVm();
+        await Future<void>.delayed(Duration.zero);
+        await vm.savePlayer.execute(
+          const RosterPlayer(id: 'a', name: 'Pat', userId: 'p1'),
+        );
+        expect(teams.links, [('t1', 'a', 'p1')]);
+      },
+    );
 
     test('a spot with no member is not linked', () async {
       seed(me: testUser.uid);
