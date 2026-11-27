@@ -8,6 +8,20 @@ import '../testing/fakes.dart';
 
 // The same cases as packages/shared/test/team_page.test.ts.
 void main() {
+  test('the Message sheet offers exactly owner, coach and captain', () {
+    expect(messageStaffTiers, {
+      TeamRole.owner,
+      TeamRole.coach,
+      TeamRole.captain,
+    });
+    for (final r in TeamRole.values) {
+      final staff = messageStaffOf([
+        (uid: 'u', name: 'N', tier: r),
+      ], TeamKind.team);
+      expect(staff.isNotEmpty, messageStaffTiers.contains(r), reason: '$r');
+    }
+  });
+
   test('More rows say what is there, as on the website', () {
     expect(teamMoreSubtitle('playbook'), 'Plays and whiteboards');
     expect(teamMoreSubtitle('manage'), 'Details, sections and visibility');

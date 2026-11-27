@@ -1176,8 +1176,8 @@ class TeamRepositoryFirebase implements TeamRepository {
     },
   );
 
-  /// `PUT .../roster-players/:playerId/link`: an admin links a member, or a
-  /// member claims (or lets go of) a spot for themselves.
+  /// `PUT .../roster-players/:playerId/link`: an admin links a member; a
+  /// member can only let go of their own spot (uid null).
   @override
   Future<Result<void>> linkPlayer(
     String teamId,

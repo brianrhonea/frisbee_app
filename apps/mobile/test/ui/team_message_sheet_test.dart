@@ -253,6 +253,15 @@ void main() {
       expect(inSheet(find.text('Cody')), findsOneWidget);
     });
 
+    testWidgets('a signed-out visitor sees no Message button', (tester) async {
+      add(team({'owner': TeamRole.owner, 'coach': TeamRole.coach}));
+      auth = FakeAuthRepository();
+      await pump(tester, homeVm());
+      expect(find.byType(TeamHomeScreen), findsOneWidget);
+      expect(headerMessage(), findsNothing);
+      expect(find.text('Message'), findsNothing);
+    });
+
     testWidgets("a refused message shows the server's error", (tester) async {
       add(team({'owner': TeamRole.owner, testUser.uid: TeamRole.player}));
       dms.policies['owner'] = MessagePolicy.nobody;
