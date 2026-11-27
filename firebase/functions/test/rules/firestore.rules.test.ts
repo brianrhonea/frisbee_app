@@ -3178,6 +3178,8 @@ describe("notifications", () => {
     await assertSucceeds(setDoc(device(PLAYER, "fid1"), { platform: "iOS", updatedAt: serverTimestamp() }));
     await assertFails(setDoc(device(PLAYER, "fid2"), { platform: "windows", updatedAt: serverTimestamp() }));
     await assertFails(setDoc(device(PLAYER, "fid3"), { platform: "android", token: "x" }));
+    // The device's time is the server's (the ownership trigger orders by it).
+    await assertFails(setDoc(device(PLAYER, "fid4"), { platform: "iOS", updatedAt: new Date(0) }));
     await assertFails(getDoc(doc(db(COACH), "users", PLAYER, "devices", "fid1")));
     await assertSucceeds(deleteDoc(device(PLAYER, "fid1")));
   });

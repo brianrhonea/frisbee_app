@@ -511,7 +511,10 @@ service cloud.firestore {
         allow create, update: if signedIn() && uid() == userId
           && fid.size() <= 300
           && request.resource.data.keys().hasOnly(['platform', 'updatedAt'])
-          && request.resource.data.platform in ['android', 'iOS', 'macOS'];
+          && request.resource.data.platform in ['android', 'iOS', 'macOS']
+          // The server's clock, so the deviceOwnership trigger can tell which
+          // of two accounts registered a device last (last writer wins).
+          && request.resource.data.updatedAt == request.time;
       }
 
       // What the user follows (Follow in lib/domain/models/follow.dart),

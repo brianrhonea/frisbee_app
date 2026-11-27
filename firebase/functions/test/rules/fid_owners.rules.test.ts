@@ -3,8 +3,8 @@
 // including the account the device belongs to and a complete account.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { assertFails, initializeTestEnvironment, type RulesTestEnvironment } from "@firebase/rules-unit-testing";
-import { collection, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc } from "firebase/firestore";
+import { assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestEnvironment } from "@firebase/rules-unit-testing";
+import { collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 
 let env: RulesTestEnvironment;
@@ -43,8 +43,27 @@ describe("fidOwners", () => {
     });
   }
 
-  it("is not reachable by changing a device document either: the device doc stays the client's own, the map is not", async () => {
-    const zed = env.authenticatedContext("zed", COMPLETE).firestore();
-    await assertFails(setDoc(doc(zed, "fidOwners", "fid1"), { uid: "zed", updatedAt: new Date() }));
+  describe("the device document, the client's own path to the map", () => {
+    const amy = () => env.authenticatedContext("amy", COMPLETE).firestore();
+    const device = (db: ReturnType<typeof amy>, uid = "amy") => doc(db, "users", uid, "devices", "fid1");
+
+    it("takes the server's clock, so the trigger's last-writer-wins order can't be forged", async () => {
+      await assertSucceeds(setDoc(device(amy()), { platform: "iOS", updatedAt: serverTimestamp() }));
+      await assertFails(setDoc(device(amy()), { platform: "iOS", updatedAt: new Date(0) }));
+      await assertFails(setDoc(device(amy()), { platform: "iOS", updatedAt: new Date(Date.now() + 86_400_000) }));
+      await assertFails(setDoc(device(amy()), { platform: "iOS" }));
+    });
+
+    it("can't carry an owner, a token or any other field", async () => {
+      await assertFails(setDoc(device(amy()), { platform: "iOS", updatedAt: serverTimestamp(), uid: "zed" }));
+      await assertFails(setDoc(device(amy()), { platform: "iOS", updatedAt: serverTimestamp(), token: "t" }));
+    });
+
+    it("is only ever written by its own account", async () => {
+      const zed = env.authenticatedContext("zed", COMPLETE).firestore();
+      await assertFails(setDoc(device(zed, "amy"), { platform: "iOS", updatedAt: serverTimestamp() }));
+      await assertFails(deleteDoc(device(zed, "amy")));
+      await assertFails(setDoc(doc(zed, "fidOwners", "fid1"), { uid: "zed", updatedAt: new Date() }));
+    });
   });
 });
