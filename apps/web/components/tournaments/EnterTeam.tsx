@@ -35,6 +35,7 @@ import { PayOnline } from "../payments/Payments";
 import { TeamMark } from "./TournamentGames";
 import { type MyTeam, type TournamentState, tournamentPath, useAction, useTournament } from "./useTournament";
 import "./tournaments.css";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 const maxCaptains = 4;
 
@@ -247,6 +248,7 @@ function RespondStep({
   onAnswered: (status: EntryStatus) => void;
   onDeclined: () => void;
 }) {
+  const askConfirm = useConfirm();
   const t = s.t!;
   const choices = fixedTeam ? [fixedTeam] : s.teamsToEnter;
   const team = choices.find((m) => m.id === teamId);
@@ -264,7 +266,7 @@ function RespondStep({
     if (r.ok) onAnswered(r.value?.status ?? (mode === "invite" ? "accepted" : "applied"));
   }
   async function decline() {
-    if (!team || !window.confirm(`Decline the invite to ${t.name}? The organizers will see your team isn't playing.`)) return;
+    if (!team || !(await askConfirm({ message: `Decline the invite to ${t.name}? The organizers will see your team isn't playing.`, confirmLabel: "Decline", destructive: true }))) return;
     const r = await run(`${entryPath}/status`, "PUT", { status: "withdrawn", reason: "declined" });
     if (r.ok) onDeclined();
   }

@@ -20,6 +20,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { callApi } from "@/lib/client";
 import { useAuth } from "../../AuthProvider";
 import { type FieldHit, PlayField } from "./PlayField";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 type Tool = "select" | PlayElementKind | "cut" | "throw_" | "erase";
 const tools: Array<[Tool, string, string]> = [
@@ -88,6 +89,7 @@ function usePlayback(play: Pick<PlayDoc, "elements" | "steps">) {
  * API (`/v1/teams/:id/plays`).
  */
 export function PlayEditor({ teamId, id, initial }: { teamId: string; id: string | null; initial?: PlayDoc }) {
+  const askConfirm = useConfirm();
   const { user } = useAuth();
   const router = useRouter();
   const [name, setName] = useState(initial?.name ?? "");
@@ -273,7 +275,7 @@ export function PlayEditor({ teamId, id, initial }: { teamId: string; id: string
     }
   }
   async function destroy() {
-    if (!user || !id || !window.confirm(`Delete ${name || "this play"}?`)) return;
+    if (!user || !id || !(await askConfirm({ message: `Delete ${name || "this play"}?`, confirmLabel: "Delete", destructive: true }))) return;
     setBusy(true);
     try {
       await callApi(user, `/v1/teams/${encodeURIComponent(teamId)}/plays/${encodeURIComponent(id)}`, { method: "DELETE" });
@@ -430,8 +432,8 @@ export function PlayEditor({ teamId, id, initial }: { teamId: string; id: string
             type="button"
             className="text-btn"
             disabled={play.elements.length === 0 && play.arrows.length === 0 && play.drawings.length === 0}
-            onClick={() => {
-              if (window.confirm("Clear the whole diagram?")) {
+            onClick={async () => {
+              if ((await askConfirm({ message: "Clear the whole diagram?", confirmLabel: "Clear", destructive: true }))) {
                 change({ elements: [], arrows: [], steps: [], drawings: [] });
                 setStep(0);
               }

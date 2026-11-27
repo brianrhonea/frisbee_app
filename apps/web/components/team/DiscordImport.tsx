@@ -35,10 +35,12 @@ import type { ManagedFolder, ManagedRoom } from "./ChatManager";
 import { useTeamHub } from "./TeamContext";
 import { permissionInfo } from "./TeamRoles";
 import "./discord_import.css";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 const permLabel = (p: TeamPermission) => permissionInfo[p]?.label ?? p;
 
 export function DiscordImport() {
+  const askConfirm = useConfirm();
   const { user } = useAuth();
   const { teamId, viewer } = useTeamHub();
   const member = viewer.state === "member" ? viewer : null;
@@ -111,9 +113,7 @@ export function DiscordImport() {
     if (!user || !plan || !view) return;
     if (
       view.moving.length > 0 &&
-      !window.confirm(
-        `Move ${view.moving.length} room${view.moving.length === 1 ? "" : "s"} to teams? These are in the community chat now and will be deleted there once their team has them, with any messages in them: ${view.moving.map((r) => `#${r.name}`).join(", ")}.`,
-      )
+      !(await askConfirm(`Move ${view.moving.length} room${view.moving.length === 1 ? "" : "s"} to teams? These are in the community chat now and will be deleted there once their team has them, with any messages in them: ${view.moving.map((r) => `#${r.name}`).join(", ")}.`))
     ) {
       return;
     }

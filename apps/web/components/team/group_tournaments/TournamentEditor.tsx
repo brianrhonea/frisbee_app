@@ -27,6 +27,7 @@ import type { TeamEventDoc } from "../TeamSchedule";
 import { gameTime, shortDay, slotLabel, tournamentDates, tournamentView, tournamentWhen } from "./format";
 import "./group_tournaments.css";
 import { formatDate, toLocalInput } from "@/lib/dates";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 /**
  * Sets a tournament up (/teams/:id/tournaments/new, or .../:id/edit):
@@ -115,6 +116,7 @@ function Editor({
   initialEventId: string | null;
   events: Array<Doc<TeamEventDoc>>;
 }) {
+  const askConfirm = useConfirm();
   const { user } = useAuth();
   const router = useRouter();
   const start = initial ? tournamentView(initial) : null;
@@ -260,12 +262,10 @@ function Editor({
     setTeams(teams.map((t) => (t.id === team ? { ...t, name: n.slice(0, groupTournamentLimits.teamName) } : t)));
   }
 
-  function assignTeams() {
+  async function assignTeams() {
     const each = Math.floor(allPlayers.length / teams.length);
     const sizes = allPlayers.length % teams.length === 0 ? `${each}` : `${each}–${each + 1}`;
-    const ok = window.confirm(
-      `All ${allPlayers.length} players are dealt at random into the ${teams.length} teams (${sizes} each), replacing who is on them now. Each team gets a random captain.`,
-    );
+    const ok = (await askConfirm(`All ${allPlayers.length} players are dealt at random into the ${teams.length} teams (${sizes} each), replacing who is on them now. Each team gets a random captain.`));
     if (!ok) return;
     setTeams(groupEngine.dealPlayers(allPlayers, teams));
     setBench([]);
@@ -368,7 +368,7 @@ function Editor({
 
   async function publish() {
     if (!user || problem) return;
-    if (published && !window.confirm("Publish a new schedule? This replaces every game, including scores already entered.")) return;
+    if (published && !(await askConfirm({ message: "Publish a new schedule? This replaces every game, including scores already entered.", confirmLabel: "Publish" }))) return;
     const first = !published;
     let p: GroupSchedulePlan;
     try {
@@ -385,7 +385,7 @@ function Editor({
       setPublishedTeams(teamsKey);
       setPlan(p);
       const page = `/teams/${encodeURIComponent(teamId)}/tournaments/${encodeURIComponent(saved)}`;
-      if (first && window.confirm(`Tell the community? Post ${name.trim()} to the community feed so people see it and sign up. You can edit the post first.`)) {
+      if (first && (await askConfirm({ message: `Tell the community? Post ${name.trim()} to the community feed so people see it and sign up. You can edit the post first.`, confirmLabel: "Yes" }))) {
         setAnnounce({ page, id: saved });
       } else router.push(page);
     } catch (e) {

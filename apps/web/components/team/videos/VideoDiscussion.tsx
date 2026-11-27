@@ -13,6 +13,7 @@ import { type TeamEventDoc, typeLabels } from "../TeamSchedule";
 import { videosApi } from "./model";
 import type { VideoSeeker } from "./VideoPlayer";
 import "./videos.css";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 // A video page's extras (redesign F4–F6), as the app's video_discussion.dart:
 // the event it's tagged to, its notes and clips (click one to play from
@@ -157,14 +158,15 @@ function EventPicker({ current, busy, onPick }: { current?: string; busy: boolea
 
 /** A note, clip or comment, with Delete for its author and the team's admins. */
 function CommentRow({ c, videoId, onPlay }: { c: Comment; videoId: string; onPlay?: () => void }) {
+  const askConfirm = useConfirm();
   const { teamId, viewer } = useTeamHub();
   const member = viewer.state === "member" ? viewer : null;
   const { busy, error, send } = useSend();
   const mine = !!member && c.authorId === member.uid;
   const canDelete = mine || (!!member && member.can("manageTeam"));
   const note = typeof c.atMs === "number";
-  function remove() {
-    if (!window.confirm(`Delete this ${note ? "note" : "comment"}? It will be removed for everyone on the team.`)) return;
+  async function remove() {
+    if (!(await askConfirm({ message: `Delete this ${note ? "note" : "comment"}? It will be removed for everyone on the team.`, confirmLabel: "Delete", destructive: true }))) return;
     void send(`${commentsApi(teamId, videoId)}/${encodeURIComponent(c.id)}`, { method: "DELETE" });
   }
   return (

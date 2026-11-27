@@ -42,6 +42,7 @@ import { Dialog } from "@/components/Dialog";
 import { dayKey, useRenderZone } from "@/lib/renderZone";
 import { type TournamentState, divisionPath, useAction } from "./useTournament";
 import { StatusPill } from "../ui/StatusPill";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 // In [zone] (useRenderZone: UTC while a server-rendered page hydrates), else the viewer's.
 const dayLabel = (d: Date, zone?: string) => d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: zone });
@@ -302,6 +303,7 @@ export function LivePill() {
  * opens the score form, filled in from it.
  */
 function LiveScoreDialog({ s, g: initial, onClose }: { s: TournamentState; g: EngineGame; onClose: () => void }) {
+  const askConfirm = useConfirm();
   // The game as the page has it now (its listener keeps it current).
   const g = s.games.find((x) => x.id === initial.id) ?? initial;
   const [finalMode, setFinalMode] = useState<"report" | "final" | null>(null);
@@ -321,7 +323,7 @@ function LiveScoreDialog({ s, g: initial, onClose }: { s: TournamentState; g: En
     setLive(g.id, teamA ? a + by : a, teamA ? b : b + by);
   };
   async function stop() {
-    if (!window.confirm("Stop the live score?\n\nThe running score comes off for everyone. Start again any time.")) return;
+    if (!(await askConfirm({ message: "Stop the live score?\n\nThe running score comes off for everyone. Start again any time.", confirmLabel: "Stop", destructive: true }))) return;
     await stopLive(g.id);
   }
   const whyNot = !hasTeams(g)
@@ -392,6 +394,7 @@ function LiveScoreDialog({ s, g: initial, onClose }: { s: TournamentState; g: En
 
 /** Generate and publish (or regenerate) the selected division's games. */
 function PublishCard({ s }: { s: TournamentState }) {
+  const askConfirm = useConfirm();
   const { plan, problem } = previewPlan(s);
   const { busy, error, run } = useAction();
   const d = s.division;
@@ -400,7 +403,7 @@ function PublishCard({ s }: { s: TournamentState }) {
   const played = s.games.some((g) => g.status !== "scheduled");
   async function publish() {
     if (!plan || !d) return;
-    if (s.published && !window.confirm(played ? "Regenerate the schedule? Scores already entered are lost: every game is regenerated from the current seeds." : "Regenerate the schedule? Every game is regenerated from the current seeds.")) return;
+    if (s.published && !(await askConfirm(played ? "Regenerate the schedule? Scores already entered are lost: every game is regenerated from the current seeds." : "Regenerate the schedule? Every game is regenerated from the current seeds."))) return;
     await run(`${divisionPath(s.id, d.id)}/schedule`, "PUT", {
       games: plan.games.map((g) => ({
         id: g.id,

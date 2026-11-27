@@ -4,6 +4,12 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.63.1 — 2026-11-26
+
+C10: the browser's `window.confirm` is replaced by the shared ConfirmDialog (`useConfirm()`) in 39 files, about 60 call sites: deletes, removals, withdrawals, unblock, publish and the rest. Deletes and removals use the destructive variant. Same questions, same outcomes; only the dialog is new.
+
+- Left on purpose: the two payment screens (`Payments.tsx`, `StaffPayments.tsx`, behaviour not touched without approval) and `StatsHome.tsx`, whose helper returns the answer synchronously. `tests/unit/noNativeConfirm.test.ts` fails if any other `confirm()` comes back.
+
 ## 0.63.0 — 2026-11-26
 
 Shared components C5-C10, the website halves (Sprint 3). Same names as the app's: CoverHeader, SummaryTiles, ListRow, EventCard, DateBadge, EmptyState, ErrorState, LoadingState, TextField, SearchField, ConfirmDialog. All in `components/ui/`, every state on the `/dev/ui` gallery. No business logic, routes or permissions change.

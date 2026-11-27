@@ -47,6 +47,7 @@ import "./member.css";
 import { Button } from "./ui/Button";
 import { SegmentedTabs } from "./ui/SegmentedTabs";
 import { FilterChips } from "./ui/FilterChips";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 const dayMs = 86_400_000;
 const canEdit = (c: CalendarInfo | undefined) => c?.role === "owner" || c?.role === "edit";
@@ -122,6 +123,7 @@ function TeamFeed({
  * member may change; team events on the team's page.
  */
 export function Schedule() {
+  const askConfirm = useConfirm();
   const { user } = useAuth();
   const [data, setData] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -366,7 +368,7 @@ export function Schedule() {
   /** Team events can be deleted from here by the team's event managers, as the app's swipe does. */
   async function removeTeamEvent(team: Doc<TeamDoc>, e: Doc<TeamEventDoc>) {
     // A repeating event: this one, or it and every later one.
-    const which = e.series ? await scope.ask(`Delete "${e.title || "Event"}"?`, "Delete") : window.confirm("Delete this event for everyone?") ? "one" : null;
+    const which = e.series ? await scope.ask(`Delete "${e.title || "Event"}"?`, "Delete") : (await askConfirm({ message: "Delete this event for everyone?", confirmLabel: "Delete", destructive: true })) ? "one" : null;
     if (!which) return;
     try {
       // The listener drops it once it's gone.
@@ -379,7 +381,7 @@ export function Schedule() {
   }
 
   async function remove(e: CalendarEvent) {
-    const which = e.series ? await scope.ask(`Delete "${e.title}"?`, "Delete") : window.confirm("Delete this event?") ? "one" : null;
+    const which = e.series ? await scope.ask(`Delete "${e.title}"?`, "Delete") : (await askConfirm({ message: "Delete this event?", confirmLabel: "Delete", destructive: true })) ? "one" : null;
     if (!which) return;
     try {
       await callApi(me, `/v1/calendars/${encodeURIComponent(e.calendarId)}/events/${encodeURIComponent(e.id)}${scopeQuery(which)}`, {

@@ -24,6 +24,7 @@ import {
   videosApi,
 } from "./model";
 import "./videos.css";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 const videosCap = 1000;
 const foldersCap = 200;
@@ -36,6 +37,7 @@ const same = (a: VideoFilter, b: VideoFilter) => a.kind === b.kind && (a.kind !=
  * add, edit, file and remove videos and manage folders.
  */
 export function TeamVideos() {
+  const askConfirm = useConfirm();
   const { teamId, viewer } = useTeamHub();
   const { user } = useAuth();
   const editor = viewer.state === "member" && viewer.can("manageTeam");
@@ -105,15 +107,15 @@ export function TeamVideos() {
     }
   }
 
-  function deleteFolder(f: Folder) {
+  async function deleteFolder(f: Folder) {
     const n = countIn({ kind: "folder", id: f.id });
     const message = n === 0 ? "It has no videos." : `Its ${n === 1 ? "video moves" : `${n} videos move`} to Unsorted; no videos are deleted.`;
-    if (!window.confirm(`Delete the "${f.name}" folder?\n\n${message}`)) return;
+    if (!(await askConfirm({ message: `Delete the "${f.name}" folder?\n\n${message}`, confirmLabel: "Delete", destructive: true }))) return;
     void run(`${foldersApi(teamId)}/${encodeURIComponent(f.id)}`, "DELETE").then((ok) => ok && setFilter({ kind: "all" }));
   }
 
-  function remove(v: Video) {
-    if (!window.confirm(`Remove "${v.title}"?\n\n${removeMessage(v)}`)) return;
+  async function remove(v: Video) {
+    if (!(await askConfirm({ message: `Remove "${v.title}"?\n\n${removeMessage(v)}`, confirmLabel: "Remove", destructive: true }))) return;
     void run(`${videosApi(teamId)}/${encodeURIComponent(v.id)}`, "DELETE");
   }
 

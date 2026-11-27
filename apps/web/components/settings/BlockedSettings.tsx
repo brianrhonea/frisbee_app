@@ -5,9 +5,11 @@ import { problem } from "@/lib/client";
 import { unblockPerson, useBlocks } from "@/lib/moderation";
 import { useAuth } from "../AuthProvider";
 import { Avatar } from "../Avatar";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 /** Settings › Blocked accounts: who the member blocked, each with Unblock (the app's BlockedAccountsScreen). */
 export function BlockedSettings() {
+  const askConfirm = useConfirm();
   const { user } = useAuth();
   const blocks = useBlocks(user);
   const [busy, setBusy] = useState<string | null>(null);
@@ -16,7 +18,7 @@ export function BlockedSettings() {
   const me = user;
 
   async function unblock(uid: string, name: string) {
-    if (!window.confirm(`Unblock ${name}? You'll see each other's posts and can follow and message again.`)) return;
+    if (!(await askConfirm(`Unblock ${name}? You'll see each other's posts and can follow and message again.`))) return;
     setBusy(uid);
     setError(null);
     try {

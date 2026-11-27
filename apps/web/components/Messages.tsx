@@ -26,6 +26,7 @@ import { useMutedRooms } from "./useUnreadChats";
 import { type Conversation, describe, isGroup, type Mine, ms } from "./conversations";
 import "./member.css";
 import { Button } from "./ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 interface Message {
   authorId?: string;
@@ -454,6 +455,7 @@ function ConversationView({
   me: string;
   onClose: () => void;
 }) {
+  const askConfirm = useConfirm();
   const { user } = useAuth();
   const base = `/v1/conversations/${encodeURIComponent(conv.id)}`;
   const hiddenBefore = ms(mine?.clearedAt);
@@ -524,8 +526,8 @@ function ConversationView({
           <button
             type="button"
             className="text-btn danger"
-            onClick={() => {
-              if (window.confirm("Delete this conversation for you? The others keep their copy.")) void act("/clear", "POST", undefined, onClose);
+            onClick={async () => {
+              if ((await askConfirm({ message: "Delete this conversation for you? The others keep their copy.", confirmLabel: "Delete", destructive: true }))) void act("/clear", "POST", undefined, onClose);
             }}
           >
             Delete
@@ -622,8 +624,8 @@ function ConversationView({
                 <button
                   type="button"
                   className="btn"
-                  onClick={() => {
-                    if (user && window.confirm(`Unblock ${info.title}? You'll see each other's posts and can message again.`)) {
+                  onClick={async () => {
+                    if (user && (await askConfirm(`Unblock ${info.title}? You'll see each other's posts and can message again.`))) {
                       void unblockPerson(user, other).catch((e) => setError((e as Error).message));
                     }
                   }}

@@ -38,6 +38,7 @@ import {
   useSignups,
   useTournamentBase,
 } from "./data";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 type Fee = NonNullable<TournamentDoc["bidFee"]>;
 
@@ -85,6 +86,7 @@ export function PlayerSignups({ tournamentId, divisionId: initial }: { tournamen
 // ---- The player's own signup (PlayerSignupCard) ---------------------------------------
 
 function MySignup({ user, tournamentId, tournament: t, divisions }: { user: User; tournamentId: string; tournament: TournamentDoc; divisions: Doc<DivisionDoc>[] }) {
+  const askConfirm = useConfirm();
   const mine = useMySignup(tournamentId, user.uid).data;
   const payment = useMyPayment(tournamentId, user.uid).data;
   const accepted = mine?.status === "accepted" ? mine.divisionId : null;
@@ -107,7 +109,7 @@ function MySignup({ user, tournamentId, tournament: t, divisions }: { user: User
 
   async function withdraw() {
     const message = t.status === "registration" ? "You can sign up again while registration is open." : "Registration has closed, so you may not be able to sign up again.";
-    if (!window.confirm(`Withdraw from ${t.name ?? "this event"}? ${message}`)) return;
+    if (!(await askConfirm({ message: `Withdraw from ${t.name ?? "this event"}? ${message}`, confirmLabel: "Withdraw", destructive: true }))) return;
     await attempt(setBusy, setError, () => draftApi.setStatus(user, tournamentId, user.uid, "withdrawn"));
   }
 
@@ -341,6 +343,7 @@ function SignupForm(props: {
 // ---- The division's teams (PlayersTab._teams) --------------------------------------------
 
 function DraftedTeams({ user, tournamentId, tournament: t, division: d, manager }: { user: User; tournamentId: string; tournament: TournamentDoc; division: Doc<DivisionDoc>; manager: boolean }) {
+  const askConfirm = useConfirm();
   const signups = useSignups(tournamentId, manager).data ?? [];
   const hasGames = useHasGames(tournamentId, manager ? d.id : null);
   const [busy, setBusy] = useState(false);
@@ -354,7 +357,7 @@ function DraftedTeams({ user, tournamentId, tournament: t, division: d, manager 
   const label = teams.length === 0 ? (captains ? "Captains' draft" : "Draft teams") : created ? "View teams" : "Edit teams";
 
   async function createTeams() {
-    if (!window.confirm(`Create ${teams.length} teams? Each team is created with its captain as owner and the other players as members. You won't be able to redraft afterwards; rosters are managed on each team.`)) return;
+    if (!(await askConfirm({ message: `Create ${teams.length} teams? Each team is created with its captain as owner and the other players as members. You won't be able to redraft afterwards; rosters are managed on each team.`, confirmLabel: "Create" }))) return;
     await attempt(setBusy, setError, () => draftApi.createLeagueTeams(user, tournamentId, d.id));
   }
 

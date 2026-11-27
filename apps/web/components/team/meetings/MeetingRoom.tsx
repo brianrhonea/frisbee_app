@@ -18,6 +18,7 @@ import { WatchTogether } from "./WatchTogether";
 import "./meetings.css";
 import "./devices.css";
 import { SegmentedTabs } from "../../ui/SegmentedTabs";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 /** What the lobby offers right now (LobbyState). */
 type Lobby = "loading" | "unavailable" | "ended" | "canStart" | "waitingToStart" | "canAsk" | "waitingForApproval" | "canJoin";
@@ -30,6 +31,7 @@ type Stage = "lobby" | "joining" | "inCall" | "left";
  * never before.
  */
 export function MeetingRoom({ meetingId }: { meetingId: string }) {
+  const askConfirm = useConfirm();
   const { user } = useAuth();
   const { teamId, viewer } = useTeamHub();
   const member = viewer.state === "member" ? viewer : null;
@@ -260,8 +262,8 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
       await api(`/requests/${encodeURIComponent(member!.uid)}`, "DELETE");
       setWantsIn(false);
     });
-  const end = () => {
-    if (!window.confirm("End the meeting for everyone?")) return;
+  const end = async () => {
+    if (!(await askConfirm({ message: "End the meeting for everyone?", confirmLabel: "End", destructive: true }))) return;
     void run(async () => {
       await api("/end", "POST");
       await hangUp("You ended the meeting.");

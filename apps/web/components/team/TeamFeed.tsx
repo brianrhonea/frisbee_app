@@ -28,6 +28,7 @@ import { useTournamentDays } from "../tournaments/useTournamentDays";
 import { ReportButton } from "../Report";
 import { TeamShare } from "./TeamShare";
 import { TournamentInvites } from "./TournamentInvites";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 const postLimit = 30;
 const leads = new Set(["owner", "coach", "captain"]);
@@ -257,6 +258,7 @@ function PostAdminActions({
   pinned: Array<TeamPostView & { id: string }>;
   onEdit: () => void;
 }) {
+  const askConfirm = useConfirm();
   const postId = post.id;
   const { user } = useAuth();
   const [busy, setBusy] = useState(false);
@@ -279,7 +281,7 @@ function PostAdminActions({
     }
   }
   async function remove() {
-    if (!user || !window.confirm("Delete this post? This can't be undone.")) return;
+    if (!user || !(await askConfirm({ message: "Delete this post? This can't be undone.", confirmLabel: "Delete", destructive: true }))) return;
     setBusy(true);
     try {
       await callApi(user, `/v1/teams/${encodeURIComponent(teamId)}/posts/${encodeURIComponent(postId)}`, { method: "DELETE" });

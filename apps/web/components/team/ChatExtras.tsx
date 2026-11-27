@@ -32,6 +32,7 @@ import { DateTile } from "./DateTile";
 import type { TeamViewer } from "./TeamContext";
 import { type TeamEventDoc, useTeamEvents } from "./TeamSchedule";
 import "./chat_extras.css";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 /** A team room message as the pins and cards need it. */
 export interface ExtrasMessage {
@@ -392,6 +393,7 @@ export function ChatPollCard({
   canManage: boolean;
   nameOf: (uid: string) => string;
 }) {
+  const askConfirm = useConfirm();
   const { user } = useAuth();
   const live = useLiveDoc<{ poll?: ChatPoll }>(`teams/${teamId}/chats/${roomId}/messages/${messageId}`);
   const [sending, setSending] = useState<number[] | null>(null);
@@ -432,8 +434,8 @@ export function ChatPollCard({
       if (!ok) setSending(null);
     });
   }
-  function close() {
-    if (!user || !window.confirm("Close this poll? Nobody can vote or change their vote after.")) return;
+  async function close() {
+    if (!user || !(await askConfirm({ message: "Close this poll? Nobody can vote or change their vote after.", confirmLabel: "Close", destructive: true }))) return;
     void run(() => callApi(user, `${path}/close-poll`, { method: "POST", body: {} }));
   }
   const votersOf = (i: number) =>

@@ -14,12 +14,14 @@ import { byName, bytesUsed, type Folder, removeMessage, type Video, videosApi, v
 import { useVideoComments, VideoComments, VideoEventTag, VideoNotes } from "./VideoDiscussion";
 import { VideoPlayer, type VideoSeeker } from "./VideoPlayer";
 import "./videos.css";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 /**
  * One video (/teams/:id/videos/:videoId; the app's VideoScreen): the player, who shared it, and for admins edit and
  * remove; the event it's tagged to, its notes (click one to play from there) and comments (F4–F6).
  */
 export function VideoPage({ videoId }: { videoId: string }) {
+  const askConfirm = useConfirm();
   const { teamId, viewer } = useTeamHub();
   const { user } = useAuth();
   const router = useRouter();
@@ -49,7 +51,7 @@ export function VideoPage({ videoId }: { videoId: string }) {
   const video = live.data as Video;
 
   async function remove() {
-    if (!user || !window.confirm(`Remove this video?\n\n${removeMessage(video)}`)) return;
+    if (!user || !(await askConfirm({ message: `Remove this video?\n\n${removeMessage(video)}`, confirmLabel: "Remove", destructive: true }))) return;
     setBusy(true);
     setError(null);
     try {

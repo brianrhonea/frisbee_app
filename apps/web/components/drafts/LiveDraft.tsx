@@ -17,6 +17,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "../AuthProvider";
 import { attempt, divisionLabel, draftApi, draftHrefs, teamsOf, useDraftDetails, useLiveDraft, useSignups, useTournamentBase } from "./data";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 const pickTimes: Array<[number, string]> = [
   [0, "No limit"],
@@ -150,6 +151,7 @@ function Setup({ user, tournamentId, divisionId, locked }: { user: User; tournam
 // ---- The board ---------------------------------------------------------------------
 
 function Board(props: { user: User; tournamentId: string; divisionId: string; draft: LiveDraftDoc; manager: boolean; locked: boolean }) {
+  const askConfirm = useConfirm();
   const { user, tournamentId, divisionId, draft, manager, locked } = props;
   const isCaptain = draft.captains.some((c) => c.uid === user.uid);
   const details = useDraftDetails(tournamentId, divisionId, manager || isCaptain).data?.players ?? null;
@@ -178,14 +180,14 @@ function Board(props: { user: User; tournamentId: string; divisionId: string; dr
   const act = (fn: () => Promise<unknown>) => attempt(setBusy, setError, fn);
   const control = (a: DraftControlAction) => act(() => draftApi.control(user, tournamentId, divisionId, a));
 
-  function cancel() {
-    if (window.confirm("Cancel the draft? Every pick is thrown away. You can then choose captains and start again.")) control("cancel");
+  async function cancel() {
+    if ((await askConfirm({ message: "Cancel the draft? Every pick is thrown away. You can then choose captains and start again.", confirmLabel: "Cancel it", destructive: true }))) control("cancel");
   }
-  function finish() {
+  async function finish() {
     const message = remaining === 0
       ? "This saves each captain's picks as the division's teams."
       : `${remaining} players have not been picked and will be left off the teams. You can still add them on the teams screen.`;
-    if (window.confirm(`Finish the draft? ${message}`)) act(() => draftApi.finish(user, tournamentId, divisionId));
+    if ((await askConfirm({ message: `Finish the draft? ${message}`, confirmLabel: "Yes" }))) act(() => draftApi.finish(user, tournamentId, divisionId));
   }
 
   const clockText = running && left !== null ? `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}` : null;

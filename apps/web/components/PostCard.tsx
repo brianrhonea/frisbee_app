@@ -14,6 +14,7 @@ import { useBlocks } from "@/lib/moderation";
 import { BlockButton, ReportDialog } from "./Report";
 import "./member.css";
 import { LinkedText } from "./LinkedText";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 function workoutLine(w: NonNullable<PublicPost["workout"]>): string {
   const parts: string[] = [];
@@ -216,6 +217,7 @@ function OthersMenu({ onReport, block }: { onReport: () => void; block: { uid: s
  * it in place; members like, repost and comment (PostActions, Comments).
  */
 export function PostCard({ post: initial, standalone = false }: { post: PublicPost; standalone?: boolean }) {
+  const askConfirm = useConfirm();
   const { user } = useAuth();
   const [post, setPost] = useState(initial);
   const [editing, setEditing] = useState(false);
@@ -238,7 +240,7 @@ export function PostCard({ post: initial, standalone = false }: { post: PublicPo
   if (blocks.hides(post.authorId) || blocks.hides(target?.authorId)) return null;
 
   async function remove() {
-    if (!user || !confirm(post.repostOf ? "Take back this repost?" : "Delete this post? This can't be undone.")) return;
+    if (!user || !(await askConfirm(post.repostOf ? "Take back this repost?" : "Delete this post? This can't be undone."))) return;
     setError(null);
     try {
       await callApi(user, `/v1/posts/${encodeURIComponent(post.id)}`, { method: "DELETE" });

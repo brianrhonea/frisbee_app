@@ -13,6 +13,7 @@ import { callApi, problem } from "@/lib/client";
 import { blockPerson, loadBlocks } from "@/lib/moderation";
 import { useAuth } from "./AuthProvider";
 import { Dialog } from "./Dialog";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 /** What the report is about, as the dialog names it. */
 const noun: Record<ReportTarget["kind"], string> = {
@@ -168,14 +169,13 @@ export function BlockButton({
   label?: string;
   onDone?: () => void;
 }) {
+  const askConfirm = useConfirm();
   const { user } = useAuth();
   const [busy, setBusy] = useState(false);
   async function block() {
     if (!user) return;
     if (
-      !confirm(
-        `Block ${name}? You won't see each other's posts, comments or messages, and neither of you can follow or message the other. Teams you share still work. They aren't told.`,
-      )
+      !(await askConfirm(`Block ${name}? You won't see each other's posts, comments or messages, and neither of you can follow or message the other. Teams you share still work. They aren't told.`))
     )
       return;
     setBusy(true);

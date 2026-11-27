@@ -12,6 +12,7 @@ import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
 import { LocalTime } from "./LocalTime";
 import { ReportButton } from "./Report";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 /** A comment as stored (PostComment in the app). */
 interface Comment {
@@ -111,6 +112,7 @@ function CommentRow({
   reply?: boolean;
   onReply: () => void;
 }) {
+  const askConfirm = useConfirm();
   const { user } = useAuth();
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -192,8 +194,8 @@ function CommentRow({
             <button
               type="button"
               disabled={busy}
-              onClick={() => {
-                if (confirm("Delete this comment?")) void run(() => callApi(me, path, { method: "DELETE" }));
+              onClick={async () => {
+                if ((await askConfirm({ message: "Delete this comment?", confirmLabel: "Delete", destructive: true }))) void run(() => callApi(me, path, { method: "DELETE" }));
               }}
             >
               Delete

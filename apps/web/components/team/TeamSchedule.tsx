@@ -23,6 +23,7 @@ import "./team_schedule_meetings.css";
 import { startOfToday } from "@/lib/dates";
 import { validId } from "@/lib/text";
 import { EmptyState, Loading } from "../StatusViews";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 /** A team event as members read it (TeamEvent in the app). */
 export interface TeamEventDoc extends PublicEvent {
@@ -348,6 +349,7 @@ function RsvpLine({ event, uid, past }: { event: TeamEventDoc; uid: string; past
 }
 
 function EventDetail({ event, onEdit }: { event: Doc<TeamEventDoc>; onEdit?: () => void }) {
+  const askConfirm = useConfirm();
   const { viewer, teamId } = useTeamHub();
   const { user } = useAuth();
   const [busy, setBusy] = useState(false);
@@ -407,11 +409,11 @@ function EventDetail({ event, onEdit }: { event: Doc<TeamEventDoc>; onEdit?: () 
               type="button"
               className="btn btn-small btn-quiet"
               disabled={busy}
-              onClick={() => {
+              onClick={async () => {
                 // A repeating event: this one, or it and every later one.
                 if (event.series) {
                   void scope.ask(`Delete "${event.title || "Event"}"?`, "Delete").then((which) => which && void send(scopeQuery(which), "DELETE"));
-                } else if (window.confirm("Delete this event for everyone?")) void send("", "DELETE");
+                } else if ((await askConfirm({ message: "Delete this event for everyone?", confirmLabel: "Delete", destructive: true }))) void send("", "DELETE");
               }}
             >
               Delete

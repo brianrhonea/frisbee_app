@@ -7,6 +7,7 @@ import { useTeamHub } from "../TeamContext";
 import { apiUrl, statsAccess, useStatsPlayers } from "./data";
 import { BackToStats, StatsGate } from "./SeasonStatsPage";
 import "./stats.css";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 const positions = [
   ["handler", "Handler"],
@@ -40,6 +41,7 @@ const draftOf = (p?: StatsPlayer, userId: string | null = null, name = ""): Draf
 });
 
 function RosterPlayers() {
+  const askConfirm = useConfirm();
   const { teamId, viewer } = useTeamHub();
   const { user } = useAuth();
   const access = statsAccess(viewer);
@@ -97,8 +99,8 @@ function RosterPlayers() {
   const link = (p: StatsPlayer, userId: string | null) =>
     run(() => callApi(user!, apiUrl(teamId, `/roster-players/${encodeURIComponent(p.id)}/link`), { method: "PUT", body: { userId } }));
 
-  const remove = (p: StatsPlayer) => {
-    if (!window.confirm(`Remove ${p.name}?\n\nThey will be removed from the roster.`)) return;
+  const remove = async (p: StatsPlayer) => {
+    if (!(await askConfirm({ message: `Remove ${p.name}?\n\nThey will be removed from the roster.`, confirmLabel: "Remove", destructive: true }))) return;
     void run(() => callApi(user!, apiUrl(teamId, `/roster-players/${encodeURIComponent(p.id)}`), { method: "DELETE" }));
   };
 

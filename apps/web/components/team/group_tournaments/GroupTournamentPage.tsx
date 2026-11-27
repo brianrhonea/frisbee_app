@@ -41,6 +41,7 @@ import { ScoreStepper } from "../../tournaments/TournamentGames";
 import "../../tournaments/tournaments.css";
 import "./group_tournaments.css";
 import { SegmentedTabs } from "../../ui/SegmentedTabs";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 type Tab = "schedule" | "standings" | "bracket" | "teams";
 /** What a captain can do with a game (GameAction in the app). */
@@ -54,6 +55,7 @@ type Action = "report" | "confirm" | "awaiting";
  * (GroupTournamentScreen in the app).
  */
 export function GroupTournamentPage({ tournamentId, publicListing }: { tournamentId: string; publicListing?: PublicGroupTournament | null }) {
+  const askConfirm = useConfirm();
   const { teamId, viewer } = useTeamHub();
   const { user } = useAuth();
   const router = useRouter();
@@ -199,8 +201,8 @@ export function GroupTournamentPage({ tournamentId, publicListing }: { tournamen
                 type="button"
                 className="btn btn-small"
                 disabled={busy}
-                onClick={() => {
-                  if (!user || !window.confirm(`Delete ${t.name || "this tournament"}? Its teams, schedule and scores are deleted for everyone.`)) return;
+                onClick={async () => {
+                  if (!user || !(await askConfirm({ message: `Delete ${t.name || "this tournament"}? Its teams, schedule and scores are deleted for everyone.`, confirmLabel: "Delete", destructive: true }))) return;
                   void run(() => callApi(user, api, { method: "DELETE" })).then((ok) => ok && router.push(`/teams/${encodeURIComponent(teamId)}/tournaments`));
                 }}
               >
