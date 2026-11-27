@@ -10,6 +10,10 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.74
+
+- **Settings:** the same settings with consistent type.
+
 ## 0.0.73
 
 - **Notifications:** quick All and Unread filters and a cleaner list.
