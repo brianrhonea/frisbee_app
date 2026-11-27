@@ -1687,6 +1687,27 @@ void main() {
       expect(find.text('See you at practice'), findsOneWidget);
     });
 
+    testWidgets('chips are 48 px targets; the row scrolls and keeps the '
+        'chosen chip in view', (tester) async {
+      final vm = both();
+      await pumpInApp(tester, screen(vm), width: 360, height: 800);
+      final chip = find.ancestor(
+        of: find.text('Teams'),
+        matching: find.byType(InkWell),
+      );
+      expect(tester.getSize(chip.first).height, greaterThanOrEqualTo(48));
+      // Archived starts off the right edge.
+      expect(tester.getTopLeft(find.text('Archived')).dx, greaterThan(360));
+      await tester.drag(find.text('Teams'), const Offset(-500, 0));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Archived'));
+      await tester.pumpAndSettle();
+      final box = tester.getRect(find.text('Archived'));
+      expect(box.left, greaterThanOrEqualTo(0));
+      expect(box.right, lessThanOrEqualTo(360));
+      expect(find.text('Nothing archived'), findsOneWidget);
+    });
+
     testWidgets('an empty filter says so in words', (tester) async {
       final vm = both();
       dms.conversations.clear();

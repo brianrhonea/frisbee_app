@@ -520,7 +520,7 @@ class _InboxListState extends State<InboxList> {
 /// one line, scrolling sideways if they don't fit. Teams, Direct and
 /// Unread show how many have news (amber: it's the user's to read);
 /// Requests' count is turf. Each chip is a 48 px tap target.
-class _FilterBar extends StatelessWidget {
+class _FilterBar extends StatefulWidget {
   const _FilterBar({
     required this.selected,
     required this.unread,
@@ -538,6 +538,71 @@ class _FilterBar extends StatelessWidget {
   final ValueChanged<InboxFilter> onSelect;
 
   @override
+  State<_FilterBar> createState() => _FilterBarState();
+}
+
+class _FilterBarState extends State<_FilterBar> {
+  final _scroll = ScrollController();
+  final _keys = {for (final f in InboxFilter.values) f: GlobalKey()};
+  bool _more = false; // chips hidden past the right edge
+  bool _before = false; // and past the left
+
+  InboxFilter get selected => widget.selected;
+  int get unread => widget.unread;
+  int get unreadTeams => widget.unreadTeams;
+  int get unreadDirect => widget.unreadDirect;
+  int get requests => widget.requests;
+  ValueChanged<InboxFilter> get onSelect => widget.onSelect;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_measure);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _measure();
+      _reveal();
+    });
+  }
+
+  @override
+  void didUpdateWidget(_FilterBar old) {
+    super.didUpdateWidget(old);
+    if (old.selected != widget.selected) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
+    }
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _measure() {
+    if (!_scroll.hasClients) return;
+    final p = _scroll.position;
+    final more = p.pixels < p.maxScrollExtent - 1;
+    final before = p.pixels > 1;
+    if (more != _more || before != _before) {
+      setState(() {
+        _more = more;
+        _before = before;
+      });
+    }
+  }
+
+  /// Scrolls the chosen chip into view.
+  void _reveal() {
+    final ctx = _keys[selected]?.currentContext;
+    if (!mounted || ctx == null) return;
+    Scrollable.ensureVisible(
+      ctx,
+      alignment: 0.5,
+      duration: AppMotion.of(context, AppMotion.base),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     final filters = [
@@ -548,13 +613,15 @@ class _FilterBar extends StatelessWidget {
       (InboxFilter.requests, 'Requests', requests),
       (InboxFilter.archived, 'Archived', 0),
     ];
-    return SingleChildScrollView(
+    final row = SingleChildScrollView(
+      controller: _scroll,
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
           for (final (filter, label, count) in filters) ...[
             if (filter != InboxFilter.all) const SizedBox(width: AppSpace.sm),
             Semantics(
+              key: _keys[filter],
               button: true,
               selected: filter == selected,
               label: count > 0 ? '$label, $count' : label,
@@ -616,6 +683,21 @@ class _FilterBar extends StatelessWidget {
           ],
         ],
       ),
+    );
+    // A fade on the side with more chips: the cue that the row scrolls.
+    if (!_more && !_before) return row;
+    return ShaderMask(
+      blendMode: BlendMode.dstIn,
+      shaderCallback: (rect) => LinearGradient(
+        colors: [
+          _before ? const Color(0x00000000) : const Color(0xFF000000),
+          const Color(0xFF000000),
+          const Color(0xFF000000),
+          _more ? const Color(0x00000000) : const Color(0xFF000000),
+        ],
+        stops: const [0, 0.08, 0.92, 1],
+      ).createShader(rect),
+      child: row,
     );
   }
 }

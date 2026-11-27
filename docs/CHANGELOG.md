@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.78  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.77  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.76  | 2026-11-27 | `sprint3/17b`                           |                     |
 | 0.0.75  | 2026-11-27 | `sprint3/lane-b`                        |                     |
@@ -90,6 +91,10 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.78 — H7 fix: chip row scroll cue and chosen chip in view
+
+- Chats filters: a fade on the side with more chips shows the row scrolls, and the chosen chip scrolls into view. Chips keep 48 px tap targets (tested).
 
 ## 0.0.77 — H3 fix: no empty cover band on events
 

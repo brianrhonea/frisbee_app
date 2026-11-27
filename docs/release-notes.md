@@ -10,6 +10,10 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.78
+
+- **Chats:** the filter row shows when there are more filters.
+
 ## 0.0.77
 
 - **Events:** a simpler event header.
