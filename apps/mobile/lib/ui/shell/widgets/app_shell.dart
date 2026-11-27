@@ -28,8 +28,8 @@ abstract final class HomeRefresh {
 enum ShellSection {
   community('Home', 'Home', Icons.home_outlined, Icons.home_rounded),
   explore('Discover', 'Discover', Icons.explore_outlined, Icons.explore),
-  events('Schedule', 'Schedule', Icons.event_outlined, Icons.event),
   team('Teams', 'Teams', Icons.groups_outlined, Icons.groups_rounded),
+  events('Schedule', 'Schedule', Icons.event_outlined, Icons.event),
   messages(
     'Chats',
     'Chats',
@@ -65,6 +65,7 @@ class AppShell extends StatelessWidget {
     required this.viewModel,
     required this.navigationShell,
     required this.location,
+    this.contextPanel,
   });
 
   final ShellViewModel viewModel;
@@ -72,6 +73,13 @@ class AppShell extends StatelessWidget {
 
   /// The current path, for the breadcrumbs.
   final String location;
+
+  /// A panel beside the page when the window is [ScreenSize.panelWidth] or
+  /// wider (the guide's context panel); nothing yet, pages opt in later.
+  final Widget? contextPanel;
+
+  /// Width of [contextPanel].
+  static const contextPanelWidth = 320.0;
 
   ShellSection get _section =>
       ShellSection.values[navigationShell.currentIndex];
@@ -139,6 +147,9 @@ class AppShell extends StatelessWidget {
             ),
           );
         }
+        final showPanel =
+            contextPanel != null &&
+            MediaQuery.sizeOf(context).width >= ScreenSize.panelWidth;
         return Scaffold(
           body: Row(
             children: [
@@ -161,7 +172,27 @@ class AppShell extends StatelessWidget {
                       viewModel: viewModel,
                       crumbs: breadcrumbs(location, viewModel.teamName),
                     ),
-                    Expanded(child: navigationShell),
+                    Expanded(
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            maxWidth: ScreenSize.maxShellWidth,
+                          ),
+                          child: showPanel
+                              ? Row(
+                                  children: [
+                                    Expanded(child: navigationShell),
+                                    VerticalDivider(width: 1, color: c.border),
+                                    SizedBox(
+                                      width: contextPanelWidth,
+                                      child: contextPanel,
+                                    ),
+                                  ],
+                                )
+                              : navigationShell,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -779,13 +810,12 @@ class MobileTopBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     final unread = maybeShellViewModel(context)?.unreadNotifications ?? 0;
-    final avatar = ProfileButton.leading(context);
+    final avatar = ProfileButton.action(context);
     return AppBar(
       backgroundColor: c.sidebar,
       foregroundColor: c.onSidebar,
       automaticallyImplyLeading: false,
-      leading: avatar,
-      titleSpacing: avatar == null ? 16 : 0,
+      titleSpacing: 16,
       title: InkWell(
         onTap: () => context.go(Routes.home),
         child: AppWordmark(size: 28, color: c.onSidebar, logo: false),
@@ -798,22 +828,23 @@ class MobileTopBar extends StatelessWidget implements PreferredSizeWidget {
             icon: Icon(Icons.search, color: c.onSidebar),
           ),
         NotificationsButton(count: unread, color: c.onSidebar),
+        ?avatar,
         const SizedBox(width: 4),
       ],
     );
   }
 }
 
-/// The user's avatar at the top left of a tab's first page on phones: it
+/// The user's avatar at the top right of a tab's first page on phones: it
 /// opens their profile and settings, which have no tab of their own.
 /// Nothing on larger screens, where the top bar has the avatar, or outside
 /// the app frame.
 class ProfileButton extends StatelessWidget {
   const ProfileButton({super.key});
 
-  /// [ProfileButton] as an app bar's leading widget, or null where it shows
-  /// nothing (so the bar keeps its default back button).
-  static Widget? leading(BuildContext context) =>
+  /// [ProfileButton] as the last of an app bar's actions, or null where it
+  /// shows nothing.
+  static Widget? action(BuildContext context) =>
       ScreenSize.of(context).isMobile && maybeShellViewModel(context) != null
       ? const ProfileButton()
       : null;

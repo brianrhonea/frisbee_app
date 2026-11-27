@@ -154,8 +154,8 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
       if (animate) {
         _scroll.animateTo(
           to,
-          duration: const Duration(milliseconds: 280),
-          curve: Curves.easeOutCubic,
+          duration: AppMotion.of(context, AppMotion.sheet),
+          curve: AppMotion.easing,
         );
       } else {
         _scroll.jumpTo(to);
@@ -179,6 +179,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
     unawaited(
       showDialog<void>(
         context: context,
+        animationStyle: AppMotion.dialogStyle(context),
         useRootNavigator: true,
         barrierDismissible: false,
         builder: (_) => PopScope(
@@ -239,6 +240,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
   Future<void> _join() async {
     final code = await showDialog<String>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (_) => const JoinTeamDialog(),
     );
     if (code != null) vm.joinTeam.execute(code);
@@ -253,6 +255,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
       case _MenuAction.edit:
         final updated = await showDialog<NewTeam>(
           context: context,
+          animationStyle: AppMotion.dialogStyle(context),
           builder: (context) => AlertDialog(
             title: Text('Edit ${team.kind.noun}'),
             content: SizedBox(
@@ -311,6 +314,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
         final others = team.members.length - 1;
         final goToMembers = await showDialog<bool>(
           context: context,
+          animationStyle: AppMotion.dialogStyle(context),
           builder: (context) => AlertDialog(
             title: Text("Can't delete ${team.name} yet"),
             content: Text(
@@ -341,6 +345,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
         // As on the website: they type the name to confirm.
         final typed = await showDialog<String>(
           context: context,
+          animationStyle: AppMotion.dialogStyle(context),
           builder: (_) => _DeleteTeamDialog(team: team),
         );
         if (typed != null && mounted) {
@@ -353,6 +358,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
   Future<void> _editPost([TeamPost? post]) async {
     final draft = await showDialog<PostDraft>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (_) => PostEditorDialog(
         initial: post,
         pickImages: vm.pickImages,
@@ -371,6 +377,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
     if (pinned.length >= TeamPost.pinsMax) {
       unpin = await showDialog<String>(
         context: context,
+        animationStyle: AppMotion.dialogStyle(context),
         builder: (_) => UnpinPostDialog(pinned: pinned),
       );
       if (unpin == null) return;
@@ -380,6 +387,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
 
   Future<void> _openComments(TeamPost post) => showModalBottomSheet<void>(
     context: context,
+    sheetAnimationStyle: AppMotion.sheetStyle(context),
     isScrollControlled: true,
     showDragHandle: true,
     useSafeArea: true,
@@ -407,6 +415,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
     } else {
       showModalBottomSheet<void>(
         context: context,
+        sheetAnimationStyle: AppMotion.sheetStyle(context),
         showDragHandle: true,
         builder: (_) => _PublicEventSheet(event: e),
       );
@@ -435,8 +444,8 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
           return Scaffold(
             appBar: AppBar(leading: leading),
             body: !vm.loaded
-                ? const LoadingView()
-                : const EmptyView(
+                ? const LoadingState()
+                : const EmptyState(
                     icon: Icons.group_off_outlined,
                     title: 'Team not available',
                     message: 'It may have been deleted or you were removed.',
@@ -580,9 +589,9 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
     builder: (_, detail) => ListenableBuilder(
       listenable: detail,
       builder: (context, _) => !detail.loaded
-          ? const LoadingView()
+          ? const LoadingState()
           : detail.team == null
-          ? ErrorView(error: detail.error)
+          ? ErrorState(error: detail.error)
           : TeamSectionBody(
               key: ValueKey(section),
               viewModel: detail,
@@ -711,7 +720,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
               ),
               SliverFillRemaining(
                 child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 180),
+                  duration: AppMotion.of(context, AppMotion.base),
                   child: KeyedSubtree(
                     key: ValueKey(section ?? tab),
                     child: body,

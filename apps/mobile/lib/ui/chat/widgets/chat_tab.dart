@@ -1,4 +1,5 @@
 import '../../../data/repositories/people/people_repository.dart';
+import '../../core/ui/list_row.dart';
 import '../../../data/repositories/draft/message_draft_repository.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -106,7 +107,7 @@ class _RoomListState extends State<RoomList> {
     listenable: widget.viewModel,
     builder: (context, _) {
       final vm = widget.viewModel;
-      if (!vm.loaded) return const LoadingView();
+      if (!vm.loaded) return const LoadingState();
       final groups = vm.groups;
       final hasUnfiled = groups.isNotEmpty && groups.first.folder == null;
       final drag = _DragHooks(
@@ -154,9 +155,9 @@ class _RoomListState extends State<RoomList> {
             ),
           Expanded(
             child: groups.isEmpty && vm.error != null
-                ? ErrorView(error: vm.error)
+                ? ErrorState(error: vm.error)
                 : groups.isEmpty
-                ? EmptyView(
+                ? EmptyState(
                     icon: Icons.forum_outlined,
                     title: 'No channels yet',
                     message: vm.canManage
@@ -419,6 +420,7 @@ Future<void> _editFolder(
 ) async {
   final edited = await showDialog<ChatFolder>(
     context: context,
+    animationStyle: AppMotion.dialogStyle(context),
     builder: (_) => _FolderDialog(
       folder: folder ?? const ChatFolder(id: '', name: ''),
       audiences: vm.audiences,
@@ -749,6 +751,7 @@ Future<void> showRoomSheet(
   if (actions.isEmpty) return;
   final picked = await showModalBottomSheet<_RoomAction>(
     context: context,
+    sheetAnimationStyle: AppMotion.sheetStyle(context),
     showDragHandle: true,
     builder: (context) => SafeArea(
       child: Column(
@@ -926,15 +929,21 @@ class _RoomRowState extends State<_RoomRow> {
           child: InkWell(
             onTap: widget.onTap,
             onLongPress: widget.onHold,
-            child: SizedBox(
-              height: 52,
-              child: Padding(
-                padding: EdgeInsets.only(left: 14, right: showMenu ? 2 : 14),
-                child: Row(
-                  children: [
-                    Expanded(child: row()),
-                    if (showMenu) widget.menu!,
-                  ],
+            // A minimum height, not a fixed one (ListRow.minHeight): the
+            // row grows with the text scale instead of clipping.
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: ListRow.minHeight),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                heightFactor: 1,
+                child: Padding(
+                  padding: EdgeInsets.only(left: 14, right: showMenu ? 2 : 14),
+                  child: Row(
+                    children: [
+                      Expanded(child: row()),
+                      if (showMenu) widget.menu!,
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -946,7 +955,7 @@ class _RoomRowState extends State<_RoomRow> {
       data: room,
       holdToDrag: false,
       feedback: Container(
-        height: 52,
+        height: ListRow.minHeight,
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
           color: c.card,

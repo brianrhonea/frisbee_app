@@ -321,6 +321,7 @@ Future<void> showCalendarEventSheet(
   final router = GoRouter.maybeOf(context);
   return showModalBottomSheet<void>(
     context: context,
+    sheetAnimationStyle: AppMotion.sheetStyle(context),
     showDragHandle: true,
     builder: (context) {
       final c = AppColors.of(context);
@@ -423,6 +424,7 @@ Future<SeriesScope?> askSeriesScope(
   required String action,
 }) => showModalBottomSheet<SeriesScope>(
   context: context,
+  sheetAnimationStyle: AppMotion.sheetStyle(context),
   showDragHandle: true,
   builder: (context) => SafeArea(
     child: Padding(

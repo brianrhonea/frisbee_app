@@ -81,7 +81,7 @@ class _PlaybookTabState extends State<PlaybookTab> {
       return [
         SliverFillRemaining(
           hasScrollBody: false,
-          child: EmptyView(
+          child: EmptyState(
             icon: Icons.draw_outlined,
             title: 'No plays yet',
             message: canEdit

@@ -201,7 +201,8 @@ class ApiClient {
     if (error is Map && error['message'] is String) {
       final fields = error['fields'];
       throw ApiException(
-        error['code'] as String? ?? 'internal',
+        // A non-string code is the server's mistake, not ours to throw on.
+        error['code'] is String ? error['code'] as String : 'internal',
         error['message'] as String,
         fields: fields is Map
             ? {for (final e in fields.entries) '${e.key}': '${e.value}'}

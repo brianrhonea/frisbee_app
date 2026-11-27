@@ -21,6 +21,7 @@ Future<LineChoice?> showLinePicker(
   Side? defaultSide,
 }) => showModalBottomSheet<LineChoice>(
   context: context,
+  sheetAnimationStyle: AppMotion.sheetStyle(context),
   isScrollControlled: true,
   useSafeArea: true,
   showDragHandle: true,

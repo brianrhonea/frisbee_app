@@ -114,6 +114,7 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
   Future<void> _edit() async {
     final details = await showDialog<ProfileDetails>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (_) => EditProfileDialog(
         initial: vm.details,
         images: vm.canEditImages ? vm : null,
@@ -178,11 +179,11 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
       body: ListenableBuilder(
         listenable: Listenable.merge([vm, vm.saveDetails, vm.message]),
         builder: (context, _) {
-          if (!vm.loaded) return const LoadingView();
+          if (!vm.loaded) return const LoadingState();
           // Blocked either way: only their name, and Unblock for the blocker.
           if (!vm.isMe && blocks.hides(vm.uid)) {
             final mine = blocks.blockedByMe(vm.uid);
-            return EmptyView(
+            return EmptyState(
               icon: Icons.block,
               title: mine ? 'You blocked ${vm.name}' : vm.name,
               message: mine
@@ -199,8 +200,8 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
           }
           if (!vm.isMe && vm.profile == null) {
             return vm.error != null
-                ? ErrorView(error: vm.error)
-                : const EmptyView(
+                ? ErrorState(error: vm.error)
+                : const EmptyState(
                     icon: Icons.person_off_outlined,
                     title: 'Profile not available',
                   );
@@ -290,7 +291,7 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
       if (!vm.postsLoaded)
         const Skeleton(child: SkeletonPost())
       else if (vm.postsError != null)
-        ErrorView(error: vm.postsError)
+        ErrorState(error: vm.postsError)
       else if (vm.posts.isEmpty)
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 24),
@@ -1363,6 +1364,7 @@ class _ClaimCard extends StatelessWidget {
                     : () async {
                         final picked = await showDialog<String>(
                           context: context,
+                          animationStyle: AppMotion.dialogStyle(context),
                           builder: (context) => SimpleDialog(
                             title: Text('You on ${claim.team.name}'),
                             children: [

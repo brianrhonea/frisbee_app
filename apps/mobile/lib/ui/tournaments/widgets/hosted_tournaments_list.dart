@@ -124,9 +124,9 @@ class HostedTournamentsSection extends StatelessWidget {
             : null;
         final Widget body;
         if (!vm.loaded) {
-          body = const LoadingView();
+          body = const LoadingState();
         } else if (vm.error != null) {
-          body = ErrorView(error: vm.error);
+          body = ErrorState(error: vm.error);
         } else {
           body = ConstrainedContent(
             child: ListView(
@@ -204,8 +204,8 @@ class FindTournamentsScreen extends StatelessWidget {
       body: ListenableBuilder(
         listenable: vm,
         builder: (context, _) {
-          if (!vm.loaded) return const LoadingView();
-          if (vm.error != null) return ErrorView(error: vm.error);
+          if (!vm.loaded) return const LoadingState();
+          if (vm.error != null) return ErrorState(error: vm.error);
           return ConstrainedContent(
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 48),
@@ -240,7 +240,7 @@ class FindTournamentsScreen extends StatelessWidget {
                   ),
                 if (vm.filtersByStatus) HostedStatusFilterBar(viewModel: vm),
                 if (vm.tournaments.isEmpty)
-                  EmptyView(
+                  EmptyState(
                     icon: Icons.emoji_events_outlined,
                     title: 'No upcoming events',
                     message:

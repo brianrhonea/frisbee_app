@@ -43,9 +43,9 @@ class RespondScreen extends StatelessWidget {
             title: Text(vm.loaded ? title : ''),
           ),
           body: !vm.loaded
-              ? const LoadingView()
+              ? const LoadingState()
               : vm.error != null
-              ? ErrorView(error: vm.error)
+              ? ErrorState(error: vm.error)
               : Align(
                   alignment: Alignment.topCenter,
                   child: ConstrainedBox(

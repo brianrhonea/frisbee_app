@@ -148,7 +148,7 @@ class _Lobby extends StatelessWidget {
         title: const Text('Meeting room'),
       ),
       body: state == LobbyState.loading
-          ? const LoadingView()
+          ? const LoadingState()
           : LayoutBuilder(
               builder: (context, c) {
                 if (c.maxWidth >= 840) {
@@ -320,13 +320,13 @@ class _GetIn extends StatelessWidget {
       case LobbyState.loading:
         return const Center(child: CircularProgressIndicator());
       case LobbyState.unavailable:
-        return const EmptyView(
+        return const EmptyState(
           icon: Icons.videocam_off_outlined,
           title: "You can't join this meeting",
           message: "It may have been deleted, or you weren't invited.",
         );
       case LobbyState.ended:
-        return const EmptyView(
+        return const EmptyState(
           icon: Icons.check_circle_outline,
           title: 'This meeting has ended',
         );
@@ -422,7 +422,7 @@ class _LeftView extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              EmptyView(
+              EmptyState(
                 icon: ended ? Icons.check_circle_outline : Icons.logout,
                 title: vm.endNotice ?? 'You left the meeting',
               ),

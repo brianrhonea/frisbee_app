@@ -67,6 +67,7 @@ class _TeamShareCardState extends State<TeamShareCard> {
   Future<void> _stop(TeamShareViewModel vm) async {
     final ok = await showDialog<bool>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (context) => AlertDialog(
         title: const Text('Stop splitting the fee?'),
         content: const Text("Everyone's paid marks are cleared too."),

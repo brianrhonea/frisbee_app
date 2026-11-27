@@ -30,6 +30,7 @@ class TournamentScreen extends StatelessWidget {
     final last = vm.games.lastOrNull;
     final game = await showDialog<NewTournamentGame>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (_) => _AddGameDialog(
         gameTo: last?.gameTo ?? 15,
         timeouts: last?.timeoutsPerHalf ?? 2,
@@ -66,14 +67,14 @@ class TournamentScreen extends StatelessWidget {
       final vm = viewModel;
       final t = vm.tournament;
       if (!vm.loaded) {
-        return Scaffold(appBar: AppBar(), body: const LoadingView());
+        return Scaffold(appBar: AppBar(), body: const LoadingState());
       }
       if (t == null) {
         return Scaffold(
           appBar: AppBar(),
           body: vm.error != null
-              ? ErrorView(error: vm.error)
-              : const EmptyView(
+              ? ErrorState(error: vm.error)
+              : const EmptyState(
                   icon: Icons.folder_off_outlined,
                   title: 'Tournament not found',
                 ),
@@ -124,7 +125,7 @@ class TournamentScreen extends StatelessWidget {
           body: TabBarView(
             children: [
               vm.games.isEmpty
-                  ? const EmptyView(
+                  ? const EmptyState(
                       icon: Icons.description_outlined,
                       title: 'No games yet',
                       message: 'Add a game to start tracking stats.',
@@ -249,6 +250,7 @@ class _RosterAndLines extends StatelessWidget {
     final vm = viewModel;
     final picked = await showDialog<List<String>>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (_) => _RosterDialog(
         players: vm.allPlayers,
         initial: vm.tournament!.roster.toSet(),

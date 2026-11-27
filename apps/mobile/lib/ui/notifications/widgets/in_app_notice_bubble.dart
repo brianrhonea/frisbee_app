@@ -1,3 +1,4 @@
+import '../../core/themes/theme.dart';
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/notification.dart';
@@ -36,9 +37,9 @@ class InAppNoticeBubble extends StatelessWidget {
               builder: (context, _) {
                 final n = viewModel.current;
                 return AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 220),
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeInCubic,
+                  duration: AppMotion.of(context, AppMotion.base),
+                  switchInCurve: AppMotion.easing,
+                  switchOutCurve: AppMotion.easing,
                   transitionBuilder: (child, animation) => FadeTransition(
                     opacity: animation,
                     child: SlideTransition(

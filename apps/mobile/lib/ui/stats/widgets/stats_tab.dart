@@ -29,6 +29,7 @@ class StatsTab extends StatelessWidget {
     final vm = viewModel;
     final kind = await showModalBottomSheet<EventType>(
       context: context,
+      sheetAnimationStyle: AppMotion.sheetStyle(context),
       showDragHandle: true,
       builder: (context) => SafeArea(
         child: Column(
@@ -56,6 +57,7 @@ class StatsTab extends StatelessWidget {
     if (kind == null || !context.mounted) return;
     final draft = await showDialog<_Draft>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (_) => _NewDialog(
         tournament: kind == EventType.tournament,
         events: vm.linkableEvents(kind),
@@ -108,8 +110,8 @@ class StatsTab extends StatelessWidget {
     listenable: viewModel,
     builder: (context, _) {
       final vm = viewModel;
-      if (!vm.loaded) return const LoadingView();
-      if (vm.error != null) return ErrorView(error: vm.error);
+      if (!vm.loaded) return const LoadingState();
+      if (vm.error != null) return ErrorState(error: vm.error);
       final empty = TextStyle(
         fontSize: 13.5,
         color: AppColors.of(context).muted,
@@ -568,6 +570,7 @@ class _NewDialogState extends State<_NewDialog> {
   Future<void> _newEvent() async {
     final draft = await showDialog<NewEvent>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (_) => _NewEventDialog(
         tournament: widget.tournament,
         title: widget.tournament ? _name.text.trim() : '',
@@ -841,7 +844,7 @@ class SeasonStatsScreen extends StatelessWidget {
               sheet: viewModel.seasonSheet,
               nameOf: viewModel.nameOf,
             )
-          : const LoadingView(),
+          : const LoadingState(),
     ),
   );
 }

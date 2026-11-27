@@ -105,6 +105,7 @@ class _WhiteboardScreenState extends State<WhiteboardScreen> {
       case _SaveAs.play:
         final details = await showDialog<PlayDetails>(
           context: context,
+          animationStyle: AppMotion.dialogStyle(context),
           builder: (_) => _SaveAsPlayDialog(initialName: vm.name),
         );
         if (details != null) vm.saveAsPlay.execute(details);
@@ -116,6 +117,7 @@ class _WhiteboardScreenState extends State<WhiteboardScreen> {
         }
         final name = await showDialog<String>(
           context: context,
+          animationStyle: AppMotion.dialogStyle(context),
           builder: (_) => _NameDialog(
             initialName:
                 'Whiteboard ${DateFormat.MMMd().format(DateTime.now())}',
@@ -136,12 +138,12 @@ class _WhiteboardScreenState extends State<WhiteboardScreen> {
       ]),
       builder: (context, _) {
         if (vm.load.running) {
-          return Scaffold(appBar: AppBar(), body: const LoadingView());
+          return Scaffold(appBar: AppBar(), body: const LoadingState());
         }
         if (vm.load.error) {
           return Scaffold(
             appBar: AppBar(),
-            body: ErrorView(error: vm.load.result, onRetry: vm.load.execute),
+            body: ErrorState(error: vm.load.result, onRetry: vm.load.execute),
           );
         }
         final c = AppColors.of(context);

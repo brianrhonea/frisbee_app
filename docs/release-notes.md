@@ -10,6 +10,26 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.64
+
+- **Smoother, consistent motion:** pages, sheets and dialogs now open and close at the same speed everywhere, and don't animate if you have Reduce Motion on.
+
+## 0.0.63
+
+- **Tidier building blocks** under the hood (headers, rows, event cards, empty and error screens, dialogs) so every screen matches. Confirm dialogs for deleting now use the red destructive button.
+
+## 0.0.62
+
+- **Wider windows:** the side navigation now switches at the same widths as the website (600 and 900 px).
+
+## 0.0.61
+
+- **Crash reports:** if the app crashes, a report is sent to the team so we can fix it. Nothing about you is added beyond the crash details.
+
+## 0.0.60
+
+- **New tab order:** Home, Discover, Teams, Schedule, Chats. Your picture is now at the top right and opens your profile and settings.
+
 ## 0.0.59
 
 - **Tidier rows on small phones:** the Schedule title is no longer cut off

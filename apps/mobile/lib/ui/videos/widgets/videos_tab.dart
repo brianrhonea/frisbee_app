@@ -78,6 +78,7 @@ class _VideosTabState extends State<VideosTab> {
   Future<void> _move(TeamVideo v) async {
     final folderId = await showDialog<String>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (context) => SimpleDialog(
         title: Text('Move "${v.title}" to'),
         children: [
@@ -192,7 +193,7 @@ class _VideosTabState extends State<VideosTab> {
     final videos = vm.visibleVideos;
     if (videos.isNotEmpty) return _list(context, videos);
     if (vm.videos.isEmpty) {
-      return EmptyView(
+      return EmptyState(
         icon: Icons.video_library_outlined,
         title: 'No videos yet',
         message: vm.canEdit
@@ -201,7 +202,7 @@ class _VideosTabState extends State<VideosTab> {
                   'here.',
       );
     }
-    return EmptyView(
+    return EmptyState(
       icon: Icons.folder_open_outlined,
       title: switch (vm.filter) {
         UnsortedVideos() => 'Every video is in a folder',
@@ -214,9 +215,9 @@ class _VideosTabState extends State<VideosTab> {
   }
 
   Widget _body(BuildContext context) {
-    if (!vm.loaded) return const LoadingView();
+    if (!vm.loaded) return const LoadingState();
     if (vm.error != null && vm.videos.isEmpty) {
-      return ErrorView(error: vm.error);
+      return ErrorState(error: vm.error);
     }
     final current = vm.currentFolder;
     return Column(
@@ -270,6 +271,7 @@ Future<String?> _folderName(
   String confirmLabel = 'Create',
 }) => showDialog<String>(
   context: context,
+  animationStyle: AppMotion.dialogStyle(context),
   builder: (_) => _FolderNameDialog(
     title: title,
     initial: initial,

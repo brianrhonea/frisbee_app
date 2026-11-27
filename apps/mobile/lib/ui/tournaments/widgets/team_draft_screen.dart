@@ -63,6 +63,7 @@ class _TeamDraftScreenState extends State<TeamDraftScreen> {
     final controller = TextEditingController(text: team.name);
     final name = await showDialog<String>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (context) => AlertDialog(
         title: const Text('Team name'),
         content: TextField(
@@ -94,15 +95,15 @@ class _TeamDraftScreenState extends State<TeamDraftScreen> {
       listenable: vm,
       builder: (context, _) {
         if (!vm.loaded) {
-          return Scaffold(appBar: AppBar(), body: const LoadingView());
+          return Scaffold(appBar: AppBar(), body: const LoadingState());
         }
         final d = vm.division;
         if (d == null) {
           return Scaffold(
             appBar: AppBar(),
             body: vm.error != null
-                ? ErrorView(error: vm.error)
-                : const EmptyView(
+                ? ErrorState(error: vm.error)
+                : const EmptyState(
                     icon: Icons.groups_outlined,
                     title: 'Division not found',
                     message: 'It may have been removed.',

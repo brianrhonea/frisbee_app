@@ -25,6 +25,7 @@ class VideoEventTag extends StatelessWidget {
     final current = vm.video?.eventId ?? '';
     final picked = await showModalBottomSheet<String>(
       context: context,
+      sheetAnimationStyle: AppMotion.sheetStyle(context),
       showDragHandle: true,
       isScrollControlled: true,
       builder: (context) => _EventPicker(viewModel: vm, current: current),

@@ -17,6 +17,7 @@ Future<GroupLocation?> pickGroupLocation(
   GroupLocation? initial,
 }) => showDialog<GroupLocation>(
   context: context,
+  animationStyle: AppMotion.dialogStyle(context),
   builder: (_) => ViewModelHost(
     create: (c) =>
         LocationPickerViewModel(geocoding: c.read(), initial: initial),

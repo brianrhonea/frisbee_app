@@ -19,6 +19,7 @@ import 'data/repositories/notification/notification_repository.dart';
 import 'data/repositories/theme/theme_repository.dart';
 import 'data/repositories/theme/theme_repository_prefs.dart';
 import 'data/services/app_check.dart';
+import 'data/services/crash_reporting.dart';
 import 'data/services/shared_preferences_service.dart';
 import 'firebase_options.dart';
 import 'routing/router.dart';
@@ -71,6 +72,14 @@ Future<void> main() async {
 
   DefaultFirebaseOptions.ensureConfigured();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // Crash reports (Crashlytics), off in debug builds. Right after Firebase
+  // starts so the rest of startup is covered; never blocks the launch.
+  await CrashReporting.init(
+    FirebaseCrashReporter.new,
+    debug: kDebugMode,
+    previousFlutterHandler: FlutterError.onError,
+    dispatcher: PlatformDispatcher.instance,
+  );
   // Before anything talks to Firebase, so every request carries a token.
   await AppCheck.activate();
   // Offline, uploads would otherwise retry for 10 minutes before failing;

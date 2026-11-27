@@ -249,7 +249,7 @@ void main() {
     await pump(
       ScheduleScreen(
         viewModel: schedule,
-        leading: const Padding(
+        profile: const Padding(
           padding: EdgeInsets.all(10),
           child: CircleAvatar(child: Text('A')),
         ),

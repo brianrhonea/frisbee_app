@@ -38,22 +38,23 @@ void main() {
     expect(links('/rankings'), [Routes.explorePath, null]);
   });
 
-  test('the tabs are Home, Discover, Schedule, Teams and Inbox', () {
+  test('the tabs are Home, Discover, Teams, Schedule and Chats', () {
     // The website's nav uses the same names, in the same order.
     expect(
       [for (final s in ShellSection.tabs) s.shortLabel],
-      ['Home', 'Discover', 'Schedule', 'Teams', 'Chats'],
+      ['Home', 'Discover', 'Teams', 'Schedule', 'Chats'],
     );
     expect(
       [for (final s in ShellSection.tabs) s.label],
-      ['Home', 'Discover', 'Schedule', 'Teams', 'Chats'],
+      ['Home', 'Discover', 'Teams', 'Schedule', 'Chats'],
     );
   });
 
   test('screen sizes follow the phone, tablet and desktop breakpoints', () {
     expect(ScreenSize.forWidth(390), ScreenSize.mobile);
-    expect(ScreenSize.forWidth(800), ScreenSize.tablet);
+    expect(ScreenSize.forWidth(700), ScreenSize.tablet);
     expect(ScreenSize.forWidth(1440), ScreenSize.desktop);
+    expect(ScreenSize.forWidth(900), ScreenSize.desktop);
   });
 
   test('the shell lists the user\'s teams and counts unread', () async {

@@ -13,6 +13,11 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.64  | 2026-11-26 | `sprint3/lane-b`                        |                     |
+| 0.0.63  | 2026-11-26 | `sprint3/lane-b`                        |                     |
+| 0.0.62  | 2026-11-26 | `sprint3/lane-b`                        |                     |
+| 0.0.61  | 2026-11-26 | `sprint3/lane-b`                        |                     |
+| 0.0.60  | 2026-11-26 | `sprint3/lane-b`                        |                     |
 | 0.0.59  | 2026-11-26 | `sprint2/c2-layout-fixes`               |                     |
 | 0.0.58  | 2026-11-26 | `sprint2/3a-callables`                |                     |
 | 0.0.57  | 2026-11-26 | `sprint2/lane-b-app`                    |                     |
@@ -72,6 +77,33 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.64 — Navigation motion on AppMotion (N13)
+
+- Slide-over and chat pages: 300 ms in, 200 ms out on the (0.2, 0, 0, 1) easing (were 280/220 and 280/240 on easeOutCubic/easeInCubic); no slide when animations are off. Reaction popover: fast (120 ms) on the easing, was 160 ms easeOutBack.
+- Every bottom sheet (41) and dialog (63 call sites) takes its timing from `AppMotion.sheetStyle` / `dialogStyle`, and opens instantly with reduce motion.
+- Inline outliers moved onto AppMotion tokens (message thread, voice, team page, in-app notice, skeleton image fade, schedule scroll). Tab switches were already instant (indexed stack); iOS back-swipe and Android predictive back untouched.
+
+## 0.0.63 — Shared components C5-C10 (app half)
+
+- New in `lib/ui/core/ui/`: `CoverHeader` (C5), `SummaryTiles` (C6), `ListRow` (C7), `EventCard` and `DateBadge` with a cancelled state (C8, DateBadge moved to `date_badge.dart`, still exported from `layout.dart`), `EmptyState`/`ErrorState`/`LoadingState` (C9, renamed from EmptyView/ErrorView/LoadingView; Retry is now an AppButton), `AppTextField` and `ConfirmDialog` (C10).
+- `confirmDialog(destructive: true)` now uses the destructive AppButton (filled error) instead of solid ink.
+- D9: tournament-status and team-kind tags were already neutral (registration green, live red, all else grey); a test pins it.
+
+## 0.0.62 — Shell at the guide's widths (S2)
+
+- Breakpoints are now 600 (rail), 900 (sidebar) and 1200 (room for a context panel; AppShell.contextPanel, none yet). Shell content is capped at 1600 px. Phones under 600 are unchanged.
+
+## 0.0.61 — Crash reporting (R2, #7)
+
+- Added `firebase_crashlytics` (approved, Q15). `CrashReporting.init` runs after Firebase starts in `main`, hooks `FlutterError.onError` and `PlatformDispatcher.onError`, keeps collection off in debug builds and never blocks launch if it fails.
+- Hidden "Send test crash" (long-press the version at the foot of Settings), for Stall 10 staff and debug builds only.
+- iOS: an "Upload Crashlytics Symbols" build phase in the Runner target (owner steps in the hand-off notes).
+
+## 0.0.60 — Tab bar order and profile at the top right (S1)
+
+- Tabs are now Home, Discover, Teams, Schedule, Chats (Teams and Schedule swapped); routes and deep links unchanged.
+- The profile picture moved from the top left to the top right of each tab's app bar. Ctrl/Cmd+1..5 follow the new order.
 
 ## 0.0.59 — Layout fixes after the 48 px buttons (C2)
 

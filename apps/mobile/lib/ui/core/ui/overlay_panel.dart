@@ -16,6 +16,7 @@ Future<T?> showOverlayPanel<T>(
   if (ScreenSize.of(context).isMobile) {
     return showModalBottomSheet<T>(
       context: context,
+      sheetAnimationStyle: AppMotion.sheetStyle(context),
       isScrollControlled: true,
       useSafeArea: true,
       // Dragging would close it without asking; the close button and the
@@ -30,6 +31,7 @@ Future<T?> showOverlayPanel<T>(
   }
   return showDialog<T>(
     context: context,
+    animationStyle: AppMotion.dialogStyle(context),
     builder: (context) => OverlayCard(child: builder(context, true)),
   );
 }

@@ -330,15 +330,15 @@ class TeamSectionScreen extends StatelessWidget {
         if (!vm.loaded) {
           return Scaffold(
             appBar: AppBar(leading: leading),
-            body: const LoadingView(),
+            body: const LoadingState(),
           );
         }
         if (team == null) {
           return Scaffold(
             appBar: AppBar(leading: leading),
             body: vm.error != null
-                ? ErrorView(error: vm.error)
-                : const EmptyView(
+                ? ErrorState(error: vm.error)
+                : const EmptyState(
                     icon: Icons.group_off_outlined,
                     title: 'Team not available',
                     message: 'It may have been deleted or you were removed.',
@@ -356,7 +356,7 @@ class TeamSectionScreen extends StatelessWidget {
               ).contains(section);
           return Scaffold(
             appBar: AppBar(leading: leading),
-            body: EmptyView(
+            body: EmptyState(
               icon: section.icon,
               title: off ? '${section.label} is off' : 'Not here',
               message: off

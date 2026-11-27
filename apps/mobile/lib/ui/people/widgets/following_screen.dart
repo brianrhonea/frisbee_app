@@ -105,11 +105,11 @@ class _FollowingScreenState extends State<FollowingScreen> {
           ],
         ),
         body: !vm.loaded
-            ? const LoadingView()
+            ? const LoadingState()
             : vm.error != null
-            ? ErrorView(error: vm.error)
+            ? ErrorState(error: vm.error)
             : vm.follows.isEmpty
-            ? EmptyView(
+            ? EmptyState(
                 icon: Icons.people_outline,
                 title: 'Not following anyone yet',
                 message:

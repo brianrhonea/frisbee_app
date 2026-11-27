@@ -203,11 +203,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       return Scaffold(
         appBar: AppBar(title: const Text('Post')),
         body: !vm.loaded
-            ? const LoadingView()
+            ? const LoadingState()
             : vm.error != null
-            ? ErrorView(error: vm.error)
+            ? ErrorState(error: vm.error)
             : post == null
-            ? const EmptyView(
+            ? const EmptyState(
                 icon: Icons.article_outlined,
                 title: 'Post not found',
                 message: 'It may have been deleted.',

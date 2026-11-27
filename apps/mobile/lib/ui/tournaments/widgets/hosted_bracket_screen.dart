@@ -77,14 +77,14 @@ class _HostedBracketScreenState extends State<HostedBracketScreen> {
       builder: (context, _) {
         final t = vm.tournament;
         if (!vm.loaded) {
-          return Scaffold(appBar: AppBar(), body: const LoadingView());
+          return Scaffold(appBar: AppBar(), body: const LoadingState());
         }
         if (t == null) {
           return Scaffold(
             appBar: AppBar(),
             body: vm.error != null
-                ? ErrorView(error: vm.error)
-                : const EmptyView(
+                ? ErrorState(error: vm.error)
+                : const EmptyState(
                     icon: Icons.emoji_events_outlined,
                     title: 'Tournament not available',
                     message: 'It may have been deleted or not published yet.',
@@ -137,7 +137,7 @@ class _HostedBracketScreenState extends State<HostedBracketScreen> {
                   ),
                 ),
               if (vm.bracketGames.isEmpty)
-                const EmptyView(
+                const EmptyState(
                   icon: Icons.account_tree_outlined,
                   title: 'No bracket yet',
                   message:

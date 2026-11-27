@@ -23,15 +23,16 @@ class ScheduleScreen extends StatefulWidget {
     super.key,
     required this.viewModel,
     this.title = 'Schedule',
-    this.leading,
+    this.profile,
     this.bottom,
   });
 
   final ScheduleViewModel viewModel;
 
-  /// The app bar's title, leading widget and bottom (the Events tabs).
+  /// The app bar's title, the profile button (last of the actions, at the
+  /// top right) and bottom (the Events tabs).
   final String title;
-  final Widget? leading;
+  final Widget? profile;
   final PreferredSizeWidget? bottom;
 
   @override
@@ -102,8 +103,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     if (target != null) {
       Scrollable.ensureVisible(
         target,
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOut,
+        duration: AppMotion.of(context, AppMotion.base),
+        curve: AppMotion.easing,
       );
     }
   }
@@ -121,7 +122,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: widget.leading,
         title: Text(widget.title),
         bottom: widget.bottom,
         actions: [
@@ -155,7 +155,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           // Icon-only on phones, so the title keeps its room next to the
           // avatar and the other actions.
           Padding(
-            padding: const EdgeInsets.only(left: AppSpace.xs, right: 12),
+            padding: EdgeInsets.only(
+              left: AppSpace.xs,
+              right: widget.profile == null ? 12 : AppSpace.xs,
+            ),
             child: MediaQuery.sizeOf(context).width < _wideHeader
                 ? IconButton.filled(
                     tooltip: 'New event',
@@ -176,12 +179,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                     label: const Text('New event'),
                   ),
           ),
+          if (widget.profile case final profile?) ...[
+            profile,
+            const SizedBox(width: 4),
+          ],
         ],
       ),
       body: ListenableBuilder(
         listenable: vm,
         builder: (context, _) {
-          if (!vm.loaded) return const LoadingView();
+          if (!vm.loaded) return const LoadingState();
           final month = vm.view == ScheduleView.month;
           return ConstrainedContent(
             maxWidth: 720,

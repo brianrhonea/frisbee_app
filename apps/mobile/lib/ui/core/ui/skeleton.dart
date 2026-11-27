@@ -194,8 +194,8 @@ Widget fadeInImageFrame(
   return AnimatedOpacity(
     opacity: frame == null ? 0 : 1,
     alwaysIncludeSemantics: true,
-    duration: const Duration(milliseconds: 250),
-    curve: Curves.easeOut,
+    duration: AppMotion.of(context, AppMotion.base),
+    curve: AppMotion.easing,
     child: child,
   );
 }

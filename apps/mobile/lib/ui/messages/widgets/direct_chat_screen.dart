@@ -193,6 +193,7 @@ class _DirectChatViewState extends State<DirectChatView> {
   Future<void> _rename() async {
     final name = await showDialog<String>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (_) => _RenameDialog(initial: vm.conversation?.name ?? ''),
     );
     if (name != null) vm.rename.execute(name);
@@ -200,6 +201,7 @@ class _DirectChatViewState extends State<DirectChatView> {
 
   void _members() => showModalBottomSheet<void>(
     context: context,
+    sheetAnimationStyle: AppMotion.sheetStyle(context),
     showDragHandle: true,
     isScrollControlled: true,
     builder: (_) => _MembersSheet(
@@ -237,11 +239,11 @@ class _DirectChatViewState extends State<DirectChatView> {
             : null;
         final Widget body;
         if (!vm.loaded) {
-          body = const LoadingView();
+          body = const LoadingState();
         } else if (vm.conversation == null) {
           body = vm.error != null
-              ? ErrorView(error: vm.error)
-              : const EmptyView(
+              ? ErrorState(error: vm.error)
+              : const EmptyState(
                   icon: Icons.chat_bubble_outline,
                   title: 'Conversation not available',
                 );

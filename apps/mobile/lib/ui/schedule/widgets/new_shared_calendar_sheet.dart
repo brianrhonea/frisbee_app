@@ -19,6 +19,7 @@ Future<NewSharedCalendar?> showNewSharedCalendarSheet(
   required Future<List<PlayerProfile>> Function(String query) search,
 }) => showModalBottomSheet<NewSharedCalendar>(
   context: context,
+  sheetAnimationStyle: AppMotion.sheetStyle(context),
   isScrollControlled: true,
   showDragHandle: true,
   useSafeArea: true,

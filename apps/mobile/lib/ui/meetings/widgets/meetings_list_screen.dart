@@ -40,17 +40,17 @@ class MeetingsListScreen extends StatelessWidget {
       );
       final Widget body;
       if (!vm.loaded) {
-        body = const LoadingView();
+        body = const LoadingState();
       } else if (vm.error != null) {
-        body = ErrorView(error: vm.error);
+        body = ErrorState(error: vm.error);
       } else if (!vm.isMember) {
-        body = const EmptyView(
+        body = const EmptyState(
           icon: Icons.lock_outline,
           title: 'Members only',
           message: "Only the team's members see its meetings.",
         );
       } else if (!vm.meetingsOn) {
-        body = const EmptyView(
+        body = const EmptyState(
           icon: Icons.videocam_off_outlined,
           title: 'Meetings are off',
           message: 'The owner can turn them on in Settings › Sections.',
@@ -111,7 +111,7 @@ class _List extends StatelessWidget {
           if (shown.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
-              child: EmptyView(
+              child: EmptyState(
                 icon: Icons.videocam_outlined,
                 title: vm.showPast
                     ? 'No past meetings'

@@ -79,15 +79,15 @@ class _MyEventDetailScreenState extends State<MyEventDetailScreen> {
       if (!vm.loaded) {
         return Scaffold(
           appBar: AppBar(leading: backOr(context, Routes.schedule)),
-          body: const LoadingView(),
+          body: const LoadingState(),
         );
       }
       if (e == null) {
         return Scaffold(
           appBar: AppBar(leading: backOr(context, Routes.schedule)),
           body: vm.error != null
-              ? ErrorView(error: vm.error)
-              : const EmptyView(
+              ? ErrorState(error: vm.error)
+              : const EmptyState(
                   icon: Icons.event_busy_outlined,
                   title: 'Event not available',
                   message: 'It may have been deleted.',

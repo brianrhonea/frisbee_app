@@ -192,6 +192,7 @@ class _HostedTournamentScreenState extends State<HostedTournamentScreen> {
       if (!mounted) return;
       showModalBottomSheet<void>(
         context: context,
+        sheetAnimationStyle: AppMotion.sheetStyle(context),
         showDragHandle: true,
         isScrollControlled: true,
         builder: (_) => _GameSheet(viewModel: vm, gameId: id),
@@ -239,7 +240,7 @@ class _HostedTournamentScreenState extends State<HostedTournamentScreen> {
       listenable: vm,
       builder: (context, _) {
         if (!vm.loaded) {
-          return Scaffold(appBar: AppBar(), body: const LoadingView());
+          return Scaffold(appBar: AppBar(), body: const LoadingState());
         }
         final t = vm.tournament;
         final fallback = widget.fallbackHostId;
@@ -251,14 +252,14 @@ class _HostedTournamentScreenState extends State<HostedTournamentScreen> {
               );
             }
           });
-          return Scaffold(appBar: AppBar(), body: const LoadingView());
+          return Scaffold(appBar: AppBar(), body: const LoadingState());
         }
         if (t == null) {
           return Scaffold(
             appBar: AppBar(),
             body: vm.error != null
-                ? ErrorView(error: vm.error)
-                : const EmptyView(
+                ? ErrorState(error: vm.error)
+                : const EmptyState(
                     icon: Icons.emoji_events_outlined,
                     title: 'Tournament not available',
                     message: 'It may have been deleted or not published yet.',
@@ -485,7 +486,7 @@ class _DivisionPicker extends StatelessWidget {
   }
 }
 
-Widget _noDivisions(HostedTournamentViewModel vm) => EmptyView(
+Widget _noDivisions(HostedTournamentViewModel vm) => EmptyState(
   icon: Icons.category_outlined,
   title: 'No divisions yet',
   message: vm.isManager
@@ -2128,6 +2129,7 @@ class _YourGameCard extends StatelessWidget {
 void _openGame(BuildContext context, HostedTournamentViewModel vm, String id) =>
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: AppMotion.sheetStyle(context),
       showDragHandle: true,
       isScrollControlled: true,
       builder: (_) => _GameSheet(viewModel: vm, gameId: id),
@@ -2818,6 +2820,7 @@ class _NewsTab extends StatelessWidget {
     final body = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (context) => AlertDialog(
         title: const Text('Post an update'),
         content: SizedBox(
@@ -2878,7 +2881,7 @@ class _NewsTab extends StatelessWidget {
     return Scaffold(
       floatingActionButton: fab,
       body: news.isEmpty
-          ? EmptyView(
+          ? EmptyState(
               icon: Icons.campaign_outlined,
               title: 'No news yet',
               message: vm.canPostNews

@@ -77,7 +77,7 @@ class _NotificationSettingsScreenState
       body: ListenableBuilder(
         listenable: vm,
         builder: (context, _) {
-          if (!vm.loaded) return const LoadingView();
+          if (!vm.loaded) return const LoadingState();
           final prefs = vm.prefs;
           final off = vm.pushOff;
           // Messages first, as in the mockups; each heading once, in order.

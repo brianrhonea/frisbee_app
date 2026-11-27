@@ -19,6 +19,7 @@ class RosterTab extends StatelessWidget {
   Future<void> _edit(BuildContext context, [RosterPlayer? player]) async {
     final result = await showDialog<RosterPlayer>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (_) => PlayerDialog(
         initial: player,
         members: _members(),
@@ -105,7 +106,7 @@ class RosterTab extends StatelessWidget {
             if (viewModel.canEditLines && viewModel.roster.isNotEmpty)
               _LinesBar(viewModel: viewModel),
             if (viewModel.roster.isEmpty)
-              EmptyView(
+              EmptyState(
                 icon: Icons.badge_outlined,
                 title: 'No players on the roster',
                 message: canEdit ? 'Add players one by one.' : null,

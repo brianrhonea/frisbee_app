@@ -30,14 +30,14 @@ class GameScreen extends StatelessWidget {
       final vm = viewModel;
       final game = vm.game;
       if (!vm.loaded) {
-        return Scaffold(appBar: AppBar(), body: const LoadingView());
+        return Scaffold(appBar: AppBar(), body: const LoadingState());
       }
       if (game == null) {
         return Scaffold(
           appBar: AppBar(),
           body: vm.error != null
-              ? ErrorView(error: vm.error)
-              : const EmptyView(
+              ? ErrorState(error: vm.error)
+              : const EmptyState(
                   icon: Icons.sports_score,
                   title: 'Game not found',
                 ),
@@ -210,6 +210,7 @@ String _halfName(int half) => half == 1 ? '1st half' : '2nd half';
 Future<void> openTimeouts(BuildContext context, GameTrackerViewModel vm) =>
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: AppMotion.sheetStyle(context),
       showDragHandle: true,
       isScrollControlled: true,
       builder: (_) => ListenableBuilder(
@@ -227,6 +228,7 @@ Future<void> editGameTo(BuildContext context, GameTrackerViewModel vm) async {
   ].reduce((a, b) => a > b ? a : b);
   final picked = await showDialog<int>(
     context: context,
+    animationStyle: AppMotion.dialogStyle(context),
     builder: (context) => SimpleDialog(
       title: const Text('Game to'),
       children: [
@@ -836,6 +838,7 @@ class _LineBar extends StatelessWidget {
     final vm = viewModel;
     final swap = await showModalBottomSheet<(String, String)>(
       context: context,
+      sheetAnimationStyle: AppMotion.sheetStyle(context),
       showDragHandle: true,
       isScrollControlled: true,
       useSafeArea: true,
@@ -1472,7 +1475,7 @@ class _PointLog extends StatelessWidget {
     final game = vm.game!;
     final points = vm.points;
     if (points.isEmpty && vm.timeouts.isEmpty) {
-      return const EmptyView(
+      return const EmptyState(
         icon: Icons.list_alt_outlined,
         title: 'No points yet',
         message: 'Each point is logged here as you track it.',
@@ -1859,6 +1862,7 @@ class _LinesTab extends StatelessWidget {
     final event = vm.game?.eventId;
     final source = await showModalBottomSheet<LineSource>(
       context: context,
+      sheetAnimationStyle: AppMotion.sheetStyle(context),
       showDragHandle: true,
       isScrollControlled: true,
       builder: (context) => SafeArea(
@@ -1956,7 +1960,7 @@ class _LinesTab extends StatelessWidget {
             ],
             const SizedBox(height: 12),
             if (lines.isEmpty)
-              const EmptyView(
+              const EmptyState(
                 icon: Icons.groups_outlined,
                 title: 'No lines yet',
                 message:

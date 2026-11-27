@@ -128,6 +128,7 @@ class _PlayEditorScreenState extends State<PlayEditorScreen>
   Future<void> _editDetails() async {
     await showDialog<void>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (_) => _PlayDetailsDialog(viewModel: vm),
     );
   }
@@ -146,12 +147,12 @@ class _PlayEditorScreenState extends State<PlayEditorScreen>
       listenable: Listenable.merge([vm, vm.load, vm.save]),
       builder: (context, _) {
         if (vm.load.running) {
-          return Scaffold(appBar: AppBar(), body: const LoadingView());
+          return Scaffold(appBar: AppBar(), body: const LoadingState());
         }
         if (vm.load.error) {
           return Scaffold(
             appBar: AppBar(),
-            body: ErrorView(error: vm.load.result, onRetry: vm.load.execute),
+            body: ErrorState(error: vm.load.result, onRetry: vm.load.execute),
           );
         }
         // A saved whiteboard (an old link or notification) opens on the
@@ -163,7 +164,7 @@ class _PlayEditorScreenState extends State<PlayEditorScreen>
               context.replace(Routes.whiteboard(vm.teamId, vm.play.id));
             }
           });
-          return Scaffold(appBar: AppBar(), body: const LoadingView());
+          return Scaffold(appBar: AppBar(), body: const LoadingState());
         }
         final editable = vm.canEdit;
         return PopScope(
@@ -209,6 +210,7 @@ class _PlayEditorScreenState extends State<PlayEditorScreen>
                             ? _editDetails
                             : () => showDialog<void>(
                                 context: context,
+                                animationStyle: AppMotion.dialogStyle(context),
                                 builder: (_) => _NotesDialog(play: vm.play),
                               ),
                       ),

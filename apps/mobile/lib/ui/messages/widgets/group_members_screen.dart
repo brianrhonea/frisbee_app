@@ -179,10 +179,10 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
   }
 
   Widget _results(AppColors c) {
-    if (vm.search.running) return const LoadingView();
-    if (vm.search.error) return ErrorView(error: vm.search.result);
+    if (vm.search.running) return const LoadingState();
+    if (vm.search.error) return ErrorState(error: vm.search.result);
     if (vm.noMatches) {
-      return const EmptyView(
+      return const EmptyState(
         icon: Icons.person_search_outlined,
         title: 'No one found',
         message: 'Try their first or last name.',

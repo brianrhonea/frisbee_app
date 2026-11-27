@@ -7,14 +7,14 @@ import 'package:frisbee_app/ui/core/ui/status_views.dart';
 import 'harness.dart';
 
 void main() {
-  Widget empty() => const EmptyView(
+  Widget empty() => const EmptyState(
     icon: Icons.event_outlined,
     title: 'Nothing scheduled',
     message: 'Practices and games you RSVP to show up here.',
   );
 
   Widget error({VoidCallback? onRetry}) =>
-      ErrorView(error: 'Could not load the schedule.', onRetry: onRetry);
+      ErrorState(error: 'Could not load the schedule.', onRetry: onRetry);
 
   group('goldens', () {
     testWidgets(

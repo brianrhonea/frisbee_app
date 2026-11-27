@@ -324,5 +324,5 @@ Widget schedulePage() => ViewModelHost(
     settingsRepository: c.read<ScheduleSettingsRepository?>(),
   ),
   builder: (context, vm) =>
-      ScheduleScreen(viewModel: vm, leading: ProfileButton.leading(context)),
+      ScheduleScreen(viewModel: vm, profile: ProfileButton.action(context)),
 );

@@ -123,6 +123,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _join() async {
     final code = await showDialog<String>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (_) => const JoinTeamDialog(),
     );
     if (code != null) vm.joinTeam.execute(code);
@@ -131,6 +132,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _edit(TeamPostItem p) async {
     final draft = await showDialog<PostDraft>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (_) => PostEditorDialog(
         initial: p.post,
         pickImages: vm.pickImages,
@@ -418,6 +420,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _newOrJoin() async {
     final choice = await showDialog<String>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (context) => SimpleDialog(
         title: const Text('Create or join'),
         children: [

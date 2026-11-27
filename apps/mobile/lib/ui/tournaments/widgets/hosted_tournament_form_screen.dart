@@ -481,12 +481,12 @@ class _HostedTournamentFormScreenState
       listenable: Listenable.merge([vm, vm.save, vm.publish]),
       builder: (context, _) {
         if (!vm.loaded) {
-          return Scaffold(appBar: AppBar(), body: const LoadingView());
+          return Scaffold(appBar: AppBar(), body: const LoadingState());
         }
         if (vm.error != null) {
           return Scaffold(
             appBar: AppBar(),
-            body: ErrorView(error: vm.error),
+            body: ErrorState(error: vm.error),
           );
         }
         _fill();

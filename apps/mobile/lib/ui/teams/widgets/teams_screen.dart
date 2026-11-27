@@ -80,6 +80,7 @@ class _TeamsScreenState extends State<TeamsScreen> {
   Future<void> _join() async {
     final code = await showDialog<String>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (_) => const JoinTeamDialog(),
     );
     if (code != null) vm.joinTeam.execute(code);
@@ -89,7 +90,6 @@ class _TeamsScreenState extends State<TeamsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: ProfileButton.leading(context),
         title: const Text('Teams'),
         actions: [
           ListenableBuilder(
@@ -100,14 +100,16 @@ class _TeamsScreenState extends State<TeamsScreen> {
               onPressed: vm.joinTeam.running ? null : _add,
             ),
           ),
+          ?ProfileButton.action(context),
+          const SizedBox(width: 4),
         ],
       ),
       body: ListenableBuilder(
         listenable: Listenable.merge([vm, vm.acceptInvite, vm.declineInvite]),
         builder: (context, _) {
-          if (vm.loading) return const LoadingView();
+          if (vm.loading) return const LoadingState();
           if (vm.error != null) {
-            return ErrorView(error: vm.error, onRetry: vm.retry);
+            return ErrorState(error: vm.error, onRetry: vm.retry);
           }
           final invites = [
             for (final i in vm.invites)
@@ -123,7 +125,7 @@ class _TeamsScreenState extends State<TeamsScreen> {
               ),
           ];
           if (vm.all.isEmpty && invites.isEmpty) {
-            return EmptyView(
+            return EmptyState(
               icon: Icons.groups_outlined,
               title: 'No teams or communities yet',
               message:
@@ -207,6 +209,7 @@ class _TeamsScreenState extends State<TeamsScreen> {
   Future<void> _add() async {
     final choice = await showModalBottomSheet<String>(
       context: context,
+      sheetAnimationStyle: AppMotion.sheetStyle(context),
       showDragHandle: true,
       builder: (context) => SafeArea(
         child: Column(
@@ -250,6 +253,7 @@ class _TeamsScreenState extends State<TeamsScreen> {
   Future<void> _create() async {
     final kind = await showModalBottomSheet<TeamKind>(
       context: context,
+      sheetAnimationStyle: AppMotion.sheetStyle(context),
       showDragHandle: true,
       builder: (context) => SafeArea(
         child: Column(

@@ -107,6 +107,7 @@ class _TournamentEditorScreenState extends State<TournamentEditorScreen> {
     if (!post || !mounted) return;
     final draft = await showDialog<PostDraft>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (_) => PostEditorDialog(
         initial: vm.announcement,
         suggested: true,
@@ -163,8 +164,8 @@ class _TournamentEditorScreenState extends State<TournamentEditorScreen> {
             ],
           ),
           body: switch (vm.load) {
-            final l when l.running || l.result == null => const LoadingView(),
-            final l when l.error => ErrorView(error: l.result),
+            final l when l.running || l.result == null => const LoadingState(),
+            final l when l.error => ErrorState(error: l.result),
             _ => ConstrainedContent(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
@@ -637,6 +638,7 @@ class _Teams extends StatelessWidget {
     final others = vm.otherMembers;
     final picked = await showDialog<TournamentPlayer>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (context) => SimpleDialog(
         title: const Text('Add a member'),
         children: [
@@ -660,6 +662,7 @@ class _Teams extends StatelessWidget {
     final c = TextEditingController(text: team.name);
     final name = await showDialog<String>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (context) => AlertDialog(
         title: const Text('Team name'),
         content: TextField(

@@ -151,7 +151,7 @@ class _StatSheetTableState extends State<StatSheetTable> {
   @override
   Widget build(BuildContext context) {
     if (widget.sheet.players.isEmpty) {
-      return const EmptyView(
+      return const EmptyState(
         icon: Icons.bar_chart_outlined,
         title: 'No stats yet',
         message: 'Stats appear once points are tracked.',

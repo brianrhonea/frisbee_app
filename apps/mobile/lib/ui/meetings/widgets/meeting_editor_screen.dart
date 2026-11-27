@@ -70,9 +70,9 @@ class _MeetingEditorScreenState extends State<MeetingEditorScreen> {
         title: Text(vm.isNew ? 'New meeting' : 'Edit meeting'),
       ),
       body: vm.load.running
-          ? const LoadingView()
+          ? const LoadingState()
           : vm.load.error
-          ? ErrorView(error: vm.load.result, onRetry: vm.load.execute)
+          ? ErrorState(error: vm.load.result, onRetry: vm.load.execute)
           : Align(
               alignment: Alignment.topCenter,
               child: ConstrainedBox(
