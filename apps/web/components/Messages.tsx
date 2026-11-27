@@ -192,20 +192,6 @@ export function Messages() {
             New group
           </Button>
         </div>
-        <div className="segmented" role="tablist" aria-label="Show">
-          {(["inbox", "requests", "archived"] as const).map((v) => (
-            <Link
-              key={v}
-              role="tab"
-              aria-selected={view === v}
-              className={view === v ? "on" : ""}
-              href={`${pathname}?view=${v}`}
-              scroll={false}
-            >
-              {v === "inbox" ? "Chats" : v === "requests" ? `Requests${requests ? ` (${requests})` : ""}` : "Archived"}
-            </Link>
-          ))}
-        </div>
         <input
           className="search-input"
           type="search"
@@ -214,20 +200,26 @@ export function Messages() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        {view === "inbox" && (
-          <FilterChips
-            className="chat-filter"
-            label="Show"
-            items={[
-              { id: "all", label: "All" },
-              { id: "teams", label: "Teams" },
-              { id: "direct", label: "Direct" },
-              { id: "unread", label: unreadTeams + unreadDirect > 0 ? `Unread (${unreadTeams + unreadDirect})` : "Unread" },
-            ]}
-            value={filter}
-            onChange={(f) => setFilter(f as ChatFilter)}
-          />
-        )}
+        <FilterChips
+          className="chat-filter"
+          label="Show"
+          items={[
+            { id: "all", label: "All" },
+            { id: "teams", label: "Teams" },
+            { id: "direct", label: "Direct" },
+            { id: "unread", label: unreadTeams + unreadDirect > 0 ? `Unread (${unreadTeams + unreadDirect})` : "Unread" },
+            { id: "requests", label: requests ? `Requests (${requests})` : "Requests" },
+            { id: "archived", label: "Archived" },
+          ]}
+          value={view === "inbox" ? filter : view}
+          onChange={(f) => {
+            if (f === "requests" || f === "archived") router.push(`${pathname}?view=${f}`, { scroll: false });
+            else {
+              setFilter(f as ChatFilter);
+              if (view !== "inbox") router.push(pathname, { scroll: false });
+            }
+          }}
+        />
         {shownTeams.length > 0 && (
           <>
             {headed && heading("teams", "Team chats", shownTeams.length)}

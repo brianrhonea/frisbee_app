@@ -155,13 +155,15 @@ function StartOrJoin() {
         <Link className="btn btn-primary btn-small" href="/teams/new">
           Create a team
         </Link>
-        <Link className="btn btn-small" href="/teams/new?kind=community">
+      </div>
+      <div className="home-actions teams-secondary">
+        <Link className="btn btn-small btn-quiet" href="/teams/new?kind=community">
           Start a group
         </Link>
-        <Link className="btn btn-small" href="/teams/new?kind=organization">
+        <Link className="btn btn-small btn-quiet" href="/teams/new?kind=organization">
           Start a school or club
         </Link>
-        <button type="button" className="btn btn-small" onClick={() => setJoining(!joining)} aria-expanded={joining}>
+        <button type="button" className="btn btn-small btn-quiet" onClick={() => setJoining(!joining)} aria-expanded={joining}>
           Join with a code
         </button>
       </div>

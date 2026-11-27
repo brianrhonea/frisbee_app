@@ -300,13 +300,6 @@ export function Schedule() {
             needsRsvp={needsRsvp(answer, e.startsAt, e.endsAt)}
             recurring={!!e.series}
           />
-          {memberViewer(x.team, me.uid).can("manageEvents") && (
-            <span className="event-actions">
-              <button type="button" className="text-btn danger" onClick={() => void removeTeamEvent(x.team, e)}>
-                Delete
-              </button>
-            </span>
-          )}
         </li>
       );
     }
@@ -362,21 +355,6 @@ export function Schedule() {
       </li>
     );
   }
-  /** Team events can be deleted from here by the team's event managers, as the app's swipe does. */
-  async function removeTeamEvent(team: Doc<TeamDoc>, e: Doc<TeamEventDoc>) {
-    // A repeating event: this one, or it and every later one.
-    const which = e.series ? await scope.ask(`Delete "${e.title || "Event"}"?`, "Delete") : (await askConfirm({ message: "Delete this event for everyone?", confirmLabel: "Delete", destructive: true })) ? "one" : null;
-    if (!which) return;
-    try {
-      // The listener drops it once it's gone.
-      await callApi(me, `/v1/teams/${encodeURIComponent(team.id)}/events/${encodeURIComponent(e.id)}${scopeQuery(which)}`, {
-        method: "DELETE",
-      });
-    } catch (err) {
-      window.alert(problem(err));
-    }
-  }
-
   async function remove(e: CalendarEvent) {
     const which = e.series ? await scope.ask(`Delete "${e.title}"?`, "Delete") : (await askConfirm({ message: "Delete this event?", confirmLabel: "Delete", destructive: true })) ? "one" : null;
     if (!which) return;

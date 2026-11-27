@@ -16,8 +16,9 @@
   display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; margin: 3px 0 0;
   color: var(--muted); font-size: 0.9rem;
 }
+.team-hub .team-meta { column-gap: 12px; }
 .team-hub .team-meta > * + *::before { content: "·"; margin: 0 7px; color: var(--muted); font-weight: 400; }
-.team-hub .team-meta > .pill::before { content: none; }
+.team-hub .team-meta > .pill::before, .team-hub .team-meta > .ui-pill::before, .team-hub .team-meta > .member-count::before { content: none; margin: 0; }
 .team-hub .team-meta > .pill { margin: 0 0 0 10px; padding: 2px 9px; font-size: 0.74rem; }
 .team-hub .team-meta > .ui-pill { padding: 2px 9px; font-size: 0.74rem; }
 .team-hub .team-meta .member-count { color: var(--muted); font-weight: 500; font-size: inherit; gap: 6px; }
@@ -512,3 +513,16 @@
 .team-hub .roster-rows { list-style: none; margin: 0; padding: 0; }
 .team-hub .roster-rows .ui-row-trailing .member-roles { display: inline-flex; flex-wrap: wrap; gap: var(--space-xs); justify-content: flex-end; }
 .team-hub .toolbar { align-items: center; }
+
+/* A phone: a compact header. The cover is a thin band, the logo sits beside the name, the actions run in one row. */
+@media (max-width: 560px) {
+  .team-hub .team-head .ui-cover-photo { height: 0; }
+  .team-hub .team-head .ui-cover-body { grid-template-columns: auto minmax(0, 1fr); column-gap: var(--space-md); padding: 0 var(--space-md) var(--space-md); }
+  .team-hub .team-head .ui-cover-avatar { margin-top: var(--space-md); grid-row: 1 / span 2; }
+  .team-hub .team-head .ui-logo { width: 64px !important; height: 64px !important; font-size: 26px !important; }
+  .team-hub .team-head .ui-cover-text { grid-column: 2; grid-row: 1; margin-top: var(--space-md); }
+  .team-hub .team-head .ui-cover-extra { grid-column: 2; grid-row: 2; margin-top: 2px; }
+  .team-hub .team-head .ui-cover-actions { grid-column: 1 / -1; grid-row: 3; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; justify-content: flex-start; justify-self: stretch; padding-top: var(--space-sm); min-height: 0; mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+  .team-hub .team-head .ui-cover-actions > * { flex: none; }
+  .team-hub .team-head .ui-cover-title { font-size: 1.3rem; }
+}
