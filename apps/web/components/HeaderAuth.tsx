@@ -23,8 +23,9 @@ export function HeaderAuth() {
     const name = user.displayName || "Your account";
     return (
       <details className="account-menu" ref={menu}>
-        <summary aria-label="Your account">
+        <summary>
           <Avatar name={name} url={user.photoURL ?? undefined} size={36} />
+          <span className="sr-only">Your account: </span>
           <span className="account-name">{name}</span>
         </summary>
         <div className="account-list">

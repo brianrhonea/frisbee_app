@@ -4,6 +4,16 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.64.0 — 2026-11-27
+
+H1 Home restyle (restyle only; same data, tabs, composer, drafts and refresh).
+
+- Greeting with the date under it, then SummaryTiles (C6): Teams, Upcoming and To answer, from the data Home already loads, linking to Teams and Schedule.
+- Upcoming events are EventCards (C8) in the right column (four) and on phones (three, under "Coming up"), replacing the tinted next-event box and the boxed date list.
+- More space between the parts; the upcoming events sit on the page instead of in a card.
+- Accessibility found by the new signed-in axe run: the notifications bell and the account menu no longer have an accessible name that differs from their visible text.
+- Tests: signed-in browser tests for Home and axe (light and dark) for it.
+
 ## 0.63.8 — 2026-11-27
 
 Signed-in browser fixtures (emulators only, synthetic data) and the profile directory's adult filter.

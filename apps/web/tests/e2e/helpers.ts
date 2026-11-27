@@ -76,7 +76,7 @@ export async function axeViolations(page: Page) {
 
 /** One line per violation, for readable failures and baselines. */
 export function describeViolations(v: Awaited<ReturnType<typeof axeViolations>>) {
-  return v.map((x) => `${x.impact ?? "?"} ${x.id}: ${x.nodes.length} element(s)`);
+  return v.map((x) => `${x.impact ?? "?"} ${x.id}: ${x.nodes.length} element(s) ${x.nodes.slice(0, 3).map((n) => n.target.join(" ")).join(" | ")}`);
 }
 
 /** Screenshot of the page in light and dark, compared with the stored ones. */

@@ -43,9 +43,17 @@
 .post-page .back-link a:hover { color: var(--ink); text-decoration: underline; }
 
 /* --- Home (Dashboard): greeting, Needs you, the feed, Coming up ------------ */
-.huddle .huddle-head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 16px; flex-wrap: wrap; }
+.huddle .huddle-head { display: grid; gap: var(--space-xs); }
 .huddle .huddle-greeting { font-size: clamp(1.5rem, 3vw, 1.9rem); letter-spacing: -0.03em; font-weight: 800; }
-.huddle .huddle-date { color: var(--muted); font-size: 0.9rem; font-weight: 600; }
+.huddle .huddle-date { color: var(--muted); font-size: var(--text-secondary-size); font-weight: 500; }
+/* Home is calm: more air between its parts, and the upcoming events sit on the page, not in a box. */
+.huddle .huddle-main { gap: var(--space-xl); }
+.huddle .home-upcoming { display: grid; gap: var(--space-md); min-width: 0; }
+.huddle .home-upcoming-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-md); }
+.huddle .home-upcoming-head h2 { margin: 0; font-size: var(--text-section-size); }
+.huddle .home-upcoming-list { display: grid; gap: var(--space-sm); }
+.huddle .huddle-side .ui-event { background: var(--card); border-radius: var(--radius-control); padding: var(--space-md); }
+.huddle .huddle-phone .ui-event { background: var(--card); border-radius: var(--radius-control); padding: var(--space-md); }
 
 /* The feed's tabs: Your teams / Following / Everyone. */
 .huddle .feed-tabs { margin-top: 2px; }

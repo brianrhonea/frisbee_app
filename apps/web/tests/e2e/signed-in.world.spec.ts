@@ -9,7 +9,7 @@ test("Ada is signed in and sees her home", async ({ page }) => {
   await expect(page.locator("main").first()).toBeVisible();
   // Her name is in the account menu, and the unread counts the seed gave her are on the shell.
   await expect(page.locator("a:visible", { hasText: "Chats" }).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: /Notifications \(\d+ new\)/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Notifications.*new/ })).toBeVisible();
 });
 
 test("the world is on the API: Ada's team, its events and a direct thread", async () => {

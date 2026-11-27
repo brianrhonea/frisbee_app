@@ -259,9 +259,11 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
           )}
           <ThemeToggle />
           {user && (
-            <Link href="/notifications" className="icon-btn icon-wrap" aria-label={`Notifications${unread ? ` (${unread} new)` : ""}`}>
+            <Link href="/notifications" className="icon-btn icon-wrap">
               <NavIcon name="bell" size={22} />
+              <span className="sr-only">Notifications</span>
               {badge}
+              {unread > 0 && <span className="sr-only"> new</span>}
             </Link>
           )}
           {user && <span className="top-divider" aria-hidden="true" />}
