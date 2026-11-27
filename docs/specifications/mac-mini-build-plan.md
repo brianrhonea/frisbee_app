@@ -372,3 +372,26 @@ The rules tests need Java. Playwright needs its browsers installed.
 3. An always-on runner gives an attacker a lasting way in if the repo or a pull request is compromised. That's why runners are deferred and pull-request triggers are banned.
 4. The Windows edition is unknown.
 5. An internet or power outage takes the PC offline. The Ubuntu CI stays as the baseline.
+
+## Approval (owner, 2026-11-26)
+
+The owner approved the plan and took every recommendation:
+- **Q-A:** dev keeps the current bundle ID.
+- **Q-B:** option (a).
+- **Q-C:** FileVault on.
+- **Q-E:** a new API key.
+- **Q-F:** `~/hylite-releases/`, plus a backup.
+- **Q-G:** Codemagic goes manual-only at the first Mac release.
+- **Q-H:** decided after two releases.
+- **Q-I:** commit `Podfile.lock`.
+- **Q-J:** golden tests stay on Windows.
+- **Q-L:** dev only until #9.
+- **Q-M:** later decisions.
+- **Q-N:** the Mac plus the laptop for January.
+- **Q-O:** the PC starts as a test machine run by hand.
+- **Q-Q:** decided when #10 starts.
+- **Q-R:** only if the baseline matches.
+
+**Still open, for the owner to answer on the day:** Q-D (`.p12`), Q-K (Mac model and macOS), Q-P (Windows edition and UPS).
+
+**Preparation:** the release lane prepares the files in §4 and §10.7, apart from the runner workflows. The `codemagic.yaml` trigger change and the R3 bundle-ID change wait: the trigger change for the first Mac release, and R3 until lane B's iOS project changes are merged.
