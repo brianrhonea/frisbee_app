@@ -100,24 +100,61 @@ export const deleteAccount = onCall({ timeoutSeconds: 540, memory: "512MiB", enf
   }
   const db = getFirestore();
   logger.info("Deleting account", { uid });
-  await deleteUserData(db, uid);
-  try {
-    await getAuth().deleteUser(uid);
-  } catch (e) {
-    if ((e as { code?: string }).code !== "auth/user-not-found") throw e;
-  }
+  await deleteAccountFully(db, uid, realDeps);
   logger.info("Deleted account", { uid });
   return { deleted: true };
 });
 
-/** Everything but the login itself. Safe to run again if it fails part way. */
-async function deleteUserData(db: Firestore, uid: string): Promise<void> {
+/** The two outside services the cascade uses, so tests can stand in for them. */
+export interface DeleteDeps {
+  /** Deletes every Storage file under [prefix]. */
+  deleteFolder(prefix: string): Promise<void>;
+  /** Deletes the login; an account that is already gone is fine. */
+  deleteAuthUser(uid: string): Promise<void>;
+}
+
+export const realDeps: DeleteDeps = {
+  deleteFolder: (prefix) => getStorage().bucket().deleteFiles({ prefix, force: true }),
+  deleteAuthUser: async (uid) => {
+    try {
+      await getAuth().deleteUser(uid);
+    } catch (e) {
+      if ((e as { code?: string }).code !== "auth/user-not-found") throw e;
+    }
+  },
+};
+
+/**
+ * The whole deletion: the data, then the login, then the age-refusal record.
+ * That record goes last on purpose: for an under-13 account the scheduled
+ * purge (account-purgeUnderThirteen) finds it by that record, so it stays
+ * until nothing else is left to retry. Safe to run again at any point.
+ */
+export async function deleteAccountFully(db: Firestore, uid: string, deps: DeleteDeps): Promise<void> {
+  await deleteUserData(db, uid, deps);
+  await deps.deleteAuthUser(uid);
+  // A refused under-18 birth date, kept sealed so a different one can't be tried (account gate F3).
+  await db.doc(`ageRefusals/${uid}`).delete();
+}
+
+/**
+ * Everything but the login and the age-refusal record (deleteAccountFully
+ * does those last). Safe to run again if it fails part way.
+ *
+ * Kept on purpose, for accounting and moderation: the payment ledger
+ * (tournaments/{t}/payments, charges, stripePayments, payerCharges,
+ * paymentIssues) and `reports`.
+ */
+export async function deleteUserData(db: Firestore, uid: string, deps: Pick<DeleteDeps, "deleteFolder"> = realDeps): Promise<void> {
   // Content first, while team membership still says where things are.
-  await deleteAuthored(db, uid);
+  await deleteAuthored(db, uid, deps);
   await unlinkRosterSpots(db, uid);
   await leaveConversations(db, uid);
-  await leaveTeams(db, uid);
+  await leaveTeams(db, uid, deps);
   await deleteJoinRequests(db, uid);
+  await removeReactions(db, uid);
+  await deleteFollowRequestsSent(db, uid);
+  await anonymiseSignups(db, uid);
   // Before users/{uid}, whose calendarInvites say which calendars to tidy.
   await leaveCalendars(db, uid);
   // Blocks are kept for both people (apps/api/src/moderation): take the
@@ -130,10 +167,66 @@ async function deleteUserData(db: Firestore, uid: string): Promise<void> {
   await db.recursiveDelete(db.doc(`profiles/${uid}`));
   // Encrypted personal details (apps/api/src/personal).
   await db.doc(`personalDetails/${uid}`).delete();
-  // A refused under-18 birth date, kept sealed so a different one can't be tried (account gate F3).
-  await db.doc(`ageRefusals/${uid}`).delete();
+  // Rate-limit, export-time and suspension record, and the push-device owner map.
+  await db.doc(`limits/${uid}`).delete();
+  const devices = await db.collection("fidOwners").where("uid", "==", uid).get();
+  await Promise.all(devices.docs.map((d) => d.ref.delete()));
+  // Their follow counts (the followCount function skips a deleted profile, so nothing writes this back).
+  await db.doc(`followCounts/user_${uid}`).delete();
   // Their profile and header photos, and any post photos left behind.
-  await deleteFolder(userFolder(uid));
+  await deps.deleteFolder(userFolder(uid));
+}
+
+/**
+ * Their likes and reposts on other people's posts (posts/{id}.likedBy and
+ * .repostedBy). The counts are those lists' lengths, so they follow. Their
+ * own repost documents go with their posts. Collection-scope array-contains
+ * queries, so no extra index. (Likes on comments need a collection-group
+ * index and are not removed here.)
+ */
+async function removeReactions(db: Firestore, uid: string): Promise<void> {
+  for (const field of ["likedBy", "repostedBy"] as const) {
+    for (let round = 0; round < 1000; round++) {
+      const snap = await db.collection("posts").where(field, "array-contains", uid).select().limit(500).get();
+      if (snap.empty) break;
+      const writer = db.bulkWriter();
+      for (const d of snap.docs) void writer.update(d.ref, field, FieldValue.arrayRemove(uid));
+      await writer.close();
+    }
+  }
+}
+
+/**
+ * Requests they made to follow private profiles (profiles/{owner}/followRequests/{uid}).
+ * Requests made to them go with profiles/{uid}. The request has no field
+ * naming the requester, so look at each private profile, as deleteJoinRequests does.
+ */
+async function deleteFollowRequestsSent(db: Firestore, uid: string): Promise<void> {
+  const owners = await db.collection("profiles").where("private", "==", true).select().get();
+  const writer = db.bulkWriter();
+  for (let i = 0; i < owners.docs.length; i += 300) {
+    const refs = owners.docs.slice(i, i + 300).map((o) => o.ref.collection("followRequests").doc(uid));
+    for (const r of await db.getAll(...refs)) if (r.exists) void writer.delete(r.ref);
+  }
+  await writer.close();
+}
+
+/**
+ * Their sign-ups to tournaments (tournaments/{t}/signups/{uid}) keep the
+ * division, status and skill so a host's lists and counts stay right, but
+ * lose their name and gender. The ledger rows (tournaments/{t}/payments)
+ * are kept for accounting. No field names the person, so each tournament is looked at.
+ */
+async function anonymiseSignups(db: Firestore, uid: string): Promise<void> {
+  const tournaments = await db.collection("tournaments").select().get();
+  const writer = db.bulkWriter();
+  for (let i = 0; i < tournaments.docs.length; i += 300) {
+    const refs = tournaments.docs.slice(i, i + 300).map((t) => t.ref.collection("signups").doc(uid));
+    for (const r of await db.getAll(...refs)) {
+      if (r.exists && r.get("name") !== deletedUserName) void writer.update(r.ref, { name: deletedUserName, gender: null });
+    }
+  }
+  await writer.close();
 }
 
 /** The copies of [uid]'s blocks the other people hold (users/{other}/blocks/{uid}). */
@@ -142,14 +235,8 @@ async function removeBlocks(db: Firestore, uid: string): Promise<void> {
   await Promise.all(mine.docs.map((d) => db.doc(`users/${d.id}/blocks/${uid}`).delete()));
 }
 
-const bucket = () => getStorage().bucket();
-
-async function deleteFolder(prefix: string): Promise<void> {
-  await bucket().deleteFiles({ prefix, force: true });
-}
-
 /** Posts, comments and messages (team chats, meeting chats, direct messages). */
-async function deleteAuthored(db: Firestore, uid: string): Promise<void> {
+async function deleteAuthored(db: Firestore, uid: string, { deleteFolder }: Pick<DeleteDeps, "deleteFolder">): Promise<void> {
   const writer = db.bulkWriter();
   const posts = await db.collectionGroup("posts").where("authorId", "==", uid).get();
   for (const d of posts.docs) {
@@ -231,14 +318,14 @@ export async function leaveCalendars(db: Firestore, uid: string): Promise<void> 
   await feed.ref.delete();
 }
 
-async function leaveTeams(db: Firestore, uid: string): Promise<void> {
+async function leaveTeams(db: Firestore, uid: string, deps: Pick<DeleteDeps, "deleteFolder">): Promise<void> {
   const teams = await db.collection("teams").where("memberIds", "array-contains", uid).get();
   for (const team of teams.docs) {
     const data = team.data() as TeamMembers & Data;
     const owner = data.ownerId === uid;
     const heir = owner ? nextOwner(data, uid) : undefined;
     if (owner && !heir) {
-      await deleteTeam(db, team.id);
+      await deleteTeam(db, team.id, deps);
       continue;
     }
     await scrubTeam(db, team.id, uid);
@@ -251,6 +338,7 @@ async function leaveTeams(db: Firestore, uid: string): Promise<void> {
       [new FieldPath("memberPerms", uid), FieldValue.delete()],
       [new FieldPath("memberGrants", uid), FieldValue.delete()],
     ];
+    if (Array.isArray(data.orgMembers)) update.push(["orgMembers", FieldValue.arrayRemove(uid)]);
     if (heir) {
       update.push(["ownerId", heir], [new FieldPath("members", heir), "owner"]);
       logger.info("Handed team to next admin", { teamId: team.id, heir });
@@ -301,7 +389,7 @@ async function scrubTeam(db: Firestore, teamId: string, uid: string): Promise<vo
 }
 
 /** A team nobody else is on: everything in it, its files and invite codes. */
-async function deleteTeam(db: Firestore, teamId: string): Promise<void> {
+async function deleteTeam(db: Firestore, teamId: string, { deleteFolder }: Pick<DeleteDeps, "deleteFolder">): Promise<void> {
   const ref = db.doc(`teams/${teamId}`);
   // Tells the notification functions not to announce the cascade.
   await ref.update({ deletingAt: FieldValue.serverTimestamp() });

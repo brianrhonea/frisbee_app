@@ -297,6 +297,15 @@ export class ExportService {
       this.repo.ownCollection(`users/${uid}/blocks`, L.blocks),
       this.repo.reportsBy(uid, L.reports),
     ]);
+    const [likes, sentRequests, receivedRequests, signupDocs, calendarDocs, invites, names] = await Promise.all([
+      this.repo.likedPosts(uid, L.likedPosts),
+      this.repo.followRequestsSent(uid, L.followRequests),
+      this.repo.ownCollection(`profiles/${uid}/followRequests`, L.followRequests),
+      this.repo.signupsOf(uid, L.signups),
+      this.repo.calendarsOf(uid, L.calendars),
+      this.repo.ownCollection(`users/${uid}/calendarInvites`, L.calendarInvites),
+      this.repo.usernamesOf(uid, L.usernames),
+    ]);
     const own = (d: PathDoc) => ({ id: d.id, ...withoutSecrets(d.data) });
     return {
       format: "stall10-data-export",
@@ -339,6 +348,50 @@ export class ExportService {
         })),
         L.reports,
       ),
+      // Never `ageRefusals`: it only holds a sealed refused birth date, and is left out on purpose.
+      likedPosts: section(likes.map((d) => ({ postId: d.id })), L.likedPosts),
+      followRequests: {
+        sent: section(
+          sentRequests.map((d) => ({
+            ownerId: d.path.split("/")[1] ?? "",
+            ...(str(d.owner.name) && { ownerName: str(d.owner.name) }),
+            createdAt: isoOf(d.data.createdAt) ?? null,
+          })),
+          L.followRequests,
+        ),
+        received: section(
+          receivedRequests.map((d) => ({
+            requesterId: d.id,
+            ...(str(d.data.name) && { name: str(d.data.name) }),
+            ...(d.data.username !== undefined && { username: str(d.data.username) ?? null }),
+            createdAt: isoOf(d.data.createdAt) ?? null,
+          })),
+          L.followRequests,
+        ),
+      },
+      signups: section(
+        signupDocs.map((d) => ({
+          tournamentId: d.path.split("/")[1] ?? "",
+          tournamentName: str(d.tournament.name) ?? "",
+          ...(str(d.data.name) && { name: str(d.data.name) }),
+          ...(str(d.data.divisionId) && { divisionId: str(d.data.divisionId) }),
+          ...(typeof d.data.skill === "number" && { skill: d.data.skill }),
+          ...(d.data.gender !== undefined && { gender: str(d.data.gender) ?? null }),
+          ...(str(d.data.status) && { status: str(d.data.status) }),
+          createdAt: isoOf(d.data.createdAt) ?? null,
+        })),
+        L.signups,
+      ),
+      calendars: section(
+        calendarDocs.map((d) => ({
+          id: d.id,
+          name: str(d.data.name) ?? "",
+          role: d.data.ownerId === uid ? "owner" : (str(mapOf(d.data.members)[uid]) ?? "view"),
+        })),
+        L.calendars,
+      ),
+      calendarInvites: section(invites.map(own), L.calendarInvites),
+      usernames: section(names.map((d) => ({ username: d.id })), L.usernames),
     };
   }
 }
