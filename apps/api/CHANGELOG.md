@@ -7,6 +7,14 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.54.0 - 2026-11-27
+
+Sprint 4 owner feedback.
+
+- **Calendar events:** `POST /v1/calendars/:id/events` takes an optional client `id` (`^[A-Za-z0-9]{1,40}$`); a replay on the same calendar is 409 `already_exists`, so a retry never makes a duplicate. PATCH refuses a changed id.
+- **Recorded runs:** `POST /v1/posts` takes `workout.durationSeconds` and `workout.route` (encoded polyline, 2 to 4000 points, checked coordinates, bounded splits and elevation, 120 km/h pace cap). The route's body limit is 192 KB.
+- **Roster links:** only team admins link a spot to an account; a member can still unlink their own spot. One account, one spot per team (412 `failed_precondition`).
+
 ## 0.53.3 - 2026-11-27
 
 Two fixes from the 17-B security review.
