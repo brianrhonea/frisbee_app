@@ -100,6 +100,39 @@ class OutboxFile {
   );
 }
 
+/// A file of a queued item that's uploaded and ready (`/v1/uploads`), kept
+/// with the job so sending it again doesn't upload it again.
+class ReadyUpload {
+  const ReadyUpload({
+    required this.id,
+    required this.name,
+    required this.contentType,
+    required this.size,
+  });
+
+  final String id;
+  final String name;
+  final String contentType;
+  final int size;
+
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'name': name,
+    'contentType': contentType,
+    'size': size,
+  };
+
+  static ReadyUpload? fromJson(Object? j) {
+    if (j is! Map || j['id'] is! String) return null;
+    return ReadyUpload(
+      id: j['id'] as String,
+      name: j['name'] as String? ?? 'file',
+      contentType: j['contentType'] as String? ?? 'application/octet-stream',
+      size: (j['size'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
 /// One queued item. [id] is the id the message, post or comment gets, the
 /// same on every try, so a send that went through but whose answer was
 /// lost can't make a second copy.
@@ -113,11 +146,19 @@ class OutboxJob {
     required this.label,
     required this.payload,
     this.files = const [],
+    this.uploads = const {},
+    this.version = currentVersion,
     this.state = OutboxState.waiting,
     this.attempts = 0,
     this.nextTryAt,
     this.error,
   });
+
+  /// The payload layout new jobs are written in. Version 1 (no `version`
+  /// saved) is what builds before the API switch queued: a comment's
+  /// `parentId`, chat `replyTo` objects, a post's editable map.
+  /// [OutboxPayloads] maps those to today's request bodies.
+  static const currentVersion = 2;
 
   final String id;
 
@@ -136,6 +177,12 @@ class OutboxJob {
   /// What's needed to send it again (the repository's own fields).
   final Map<String, Object?> payload;
   final List<OutboxFile> files;
+
+  /// Files already uploaded and ready, by index into [files].
+  final Map<int, ReadyUpload> uploads;
+
+  /// The payload layout ([currentVersion] for new jobs).
+  final int version;
   final OutboxState state;
   final int attempts;
   final DateTime? nextTryAt;
@@ -152,6 +199,7 @@ class OutboxJob {
   int get bytes => files.fold(0, (n, f) => n + f.size);
 
   OutboxJob copyWith({
+    Map<int, ReadyUpload>? uploads,
     OutboxState? state,
     int? attempts,
     DateTime? Function()? nextTryAt,
@@ -165,6 +213,8 @@ class OutboxJob {
     label: label,
     payload: payload,
     files: files,
+    uploads: uploads ?? this.uploads,
+    version: version,
     state: state ?? this.state,
     attempts: attempts ?? this.attempts,
     nextTryAt: nextTryAt != null ? nextTryAt() : this.nextTryAt,
@@ -180,6 +230,8 @@ class OutboxJob {
     'label': label,
     'payload': payload,
     'files': [for (final f in files) f.toJson()],
+    'uploads': {for (final e in uploads.entries) '${e.key}': e.value.toJson()},
+    'version': version,
     'state': state.name,
     'attempts': attempts,
     'nextTryAt': nextTryAt?.toIso8601String(),
@@ -210,6 +262,13 @@ class OutboxJob {
         for (final f in (j['files'] as List?) ?? const [])
           if (f is Map) OutboxFile.fromJson(Map<String, Object?>.from(f)),
       ],
+      uploads: {
+        for (final e in ((j['uploads'] as Map?) ?? const {}).entries)
+          if (int.tryParse('${e.key}') case final i?)
+            if (ReadyUpload.fromJson(e.value) case final u?) i: u,
+      },
+      // A job saved before versions existed is version 1.
+      version: (j['version'] as num?)?.toInt() ?? 1,
       state: state ?? OutboxState.waiting,
       attempts: (j['attempts'] as num?)?.toInt() ?? 0,
       nextTryAt: DateTime.tryParse(j['nextTryAt'] as String? ?? ''),
