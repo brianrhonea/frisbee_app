@@ -56,9 +56,9 @@ class _JoinLinkScreenState extends State<JoinLinkScreen> {
     body: ListenableBuilder(
       listenable: Listenable.merge([vm, vm.join]),
       builder: (context, _) {
-        if (!vm.loaded) return const LoadingView();
+        if (!vm.loaded) return const LoadingState();
         if (vm.error != null) {
-          return EmptyView(
+          return EmptyState(
             icon: Icons.link_off,
             title: "This invite link doesn't work anymore",
             message:

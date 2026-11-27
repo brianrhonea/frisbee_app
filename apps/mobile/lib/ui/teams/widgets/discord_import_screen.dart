@@ -83,10 +83,10 @@ class _DiscordImportScreenState extends State<DiscordImportScreen> {
         appBar: AppBar(title: const Text('Import from Discord')),
         body: !vm.loaded
             ? (vm.error != null
-                  ? ErrorView(error: vm.error)
-                  : const LoadingView())
+                  ? ErrorState(error: vm.error)
+                  : const LoadingState())
             : !vm.isOwner
-            ? const EmptyView(
+            ? const EmptyState(
                 icon: Icons.lock_outline,
                 title: 'Owner only',
                 message: 'Only the owner can import from Discord.',

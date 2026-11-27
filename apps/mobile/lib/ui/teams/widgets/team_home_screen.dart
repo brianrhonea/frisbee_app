@@ -435,8 +435,8 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
           return Scaffold(
             appBar: AppBar(leading: leading),
             body: !vm.loaded
-                ? const LoadingView()
-                : const EmptyView(
+                ? const LoadingState()
+                : const EmptyState(
                     icon: Icons.group_off_outlined,
                     title: 'Team not available',
                     message: 'It may have been deleted or you were removed.',
@@ -580,9 +580,9 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
     builder: (_, detail) => ListenableBuilder(
       listenable: detail,
       builder: (context, _) => !detail.loaded
-          ? const LoadingView()
+          ? const LoadingState()
           : detail.team == null
-          ? ErrorView(error: detail.error)
+          ? ErrorState(error: detail.error)
           : TeamSectionBody(
               key: ValueKey(section),
               viewModel: detail,

@@ -60,7 +60,7 @@ class PinnedMessagesScreen extends StatelessWidget {
             ),
           ),
           body: pins.isEmpty
-              ? EmptyView(
+              ? EmptyState(
                   icon: Icons.push_pin_outlined,
                   title: 'Nothing pinned yet',
                   message: vm.canPin

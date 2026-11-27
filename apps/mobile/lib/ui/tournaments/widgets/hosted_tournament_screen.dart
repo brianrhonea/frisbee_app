@@ -239,7 +239,7 @@ class _HostedTournamentScreenState extends State<HostedTournamentScreen> {
       listenable: vm,
       builder: (context, _) {
         if (!vm.loaded) {
-          return Scaffold(appBar: AppBar(), body: const LoadingView());
+          return Scaffold(appBar: AppBar(), body: const LoadingState());
         }
         final t = vm.tournament;
         final fallback = widget.fallbackHostId;
@@ -251,14 +251,14 @@ class _HostedTournamentScreenState extends State<HostedTournamentScreen> {
               );
             }
           });
-          return Scaffold(appBar: AppBar(), body: const LoadingView());
+          return Scaffold(appBar: AppBar(), body: const LoadingState());
         }
         if (t == null) {
           return Scaffold(
             appBar: AppBar(),
             body: vm.error != null
-                ? ErrorView(error: vm.error)
-                : const EmptyView(
+                ? ErrorState(error: vm.error)
+                : const EmptyState(
                     icon: Icons.emoji_events_outlined,
                     title: 'Tournament not available',
                     message: 'It may have been deleted or not published yet.',
@@ -485,7 +485,7 @@ class _DivisionPicker extends StatelessWidget {
   }
 }
 
-Widget _noDivisions(HostedTournamentViewModel vm) => EmptyView(
+Widget _noDivisions(HostedTournamentViewModel vm) => EmptyState(
   icon: Icons.category_outlined,
   title: 'No divisions yet',
   message: vm.isManager
@@ -2878,7 +2878,7 @@ class _NewsTab extends StatelessWidget {
     return Scaffold(
       floatingActionButton: fab,
       body: news.isEmpty
-          ? EmptyView(
+          ? EmptyState(
               icon: Icons.campaign_outlined,
               title: 'No news yet',
               message: vm.canPostNews

@@ -48,12 +48,12 @@ class _VoiceChannelViewState extends State<VoiceChannelView> {
     listenable: vm,
     builder: (context, _) {
       final c = AppColors.of(context);
-      if (!vm.loaded) return const LoadingView();
+      if (!vm.loaded) return const LoadingState();
       final room = vm.room;
       if (room == null || !vm.access.canRead) {
         return room == null && vm.error != null
-            ? ErrorView(error: vm.error)
-            : EmptyView(
+            ? ErrorState(error: vm.error)
+            : EmptyState(
                 icon: Icons.lock_outline,
                 title: room == null
                     ? 'Channel not available'

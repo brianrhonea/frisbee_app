@@ -25,7 +25,7 @@ class BlockedAccountsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Blocked accounts')),
       body: blocked.isEmpty
-          ? const EmptyView(
+          ? const EmptyState(
               icon: Icons.block,
               title: 'Nobody blocked',
               message:

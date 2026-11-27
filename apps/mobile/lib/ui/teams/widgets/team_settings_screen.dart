@@ -112,12 +112,12 @@ class _TeamSettingsScreenState extends State<TeamSettingsScreen> {
           vm.setAllowJoinRequests,
         ]),
         builder: (context, _) {
-          if (!vm.loaded) return const LoadingView();
+          if (!vm.loaded) return const LoadingState();
           final team = vm.team;
           if (team == null) {
             return vm.error != null
-                ? ErrorView(error: vm.error)
-                : const EmptyView(
+                ? ErrorState(error: vm.error)
+                : const EmptyState(
                     icon: Icons.group_off_outlined,
                     title: 'Team not available',
                     message: 'It may have been deleted or you were removed.',

@@ -9,6 +9,8 @@ import 'balanced_text.dart';
 import 'scroll_to_top.dart';
 import 'status_pill.dart';
 
+export 'date_badge.dart';
+
 /// The three layouts the app is designed for (the guide's breakpoints:
 /// 600, 900 and 1200).
 enum ScreenSize {
@@ -471,55 +473,6 @@ class StatBlock extends StatelessWidget {
         const SizedBox(height: 2),
         Eyebrow(label),
       ],
-    );
-  }
-}
-
-/// Month over day, e.g. "NOV / 02", for event rows.
-class DateBadge extends StatelessWidget {
-  const DateBadge({super.key, required this.date, this.size = 40});
-
-  final DateTime date;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    return Container(
-      width: size,
-      height: size + 4,
-      decoration: BoxDecoration(
-        color: c.accentSoft,
-        borderRadius: BorderRadius.circular(size * 0.25),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            DateFormat.MMM().format(date).toUpperCase(),
-            softWrap: false,
-            overflow: TextOverflow.clip,
-            style: TextStyle(
-              fontSize: size * 0.2,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.5,
-              color: c.accentInk,
-            ),
-          ),
-          Text(
-            DateFormat('dd').format(date),
-            softWrap: false,
-            overflow: TextOverflow.clip,
-            style: TextStyle(
-              fontFamily: scoreFont,
-              fontSize: size * 0.5,
-              height: 1.0,
-              fontWeight: FontWeight.w800,
-              color: c.accentInk,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

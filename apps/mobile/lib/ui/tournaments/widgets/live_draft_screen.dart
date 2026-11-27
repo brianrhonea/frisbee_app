@@ -64,14 +64,14 @@ class _LiveDraftScreenState extends State<LiveDraftScreen> {
         final d = vm.division;
         final title = d == null ? "Captains' draft" : "Draft · ${d.label}";
         if (!vm.loaded) {
-          return Scaffold(appBar: AppBar(), body: const LoadingView());
+          return Scaffold(appBar: AppBar(), body: const LoadingState());
         }
         if (d == null) {
           return Scaffold(
             appBar: AppBar(),
             body: vm.error != null
-                ? ErrorView(error: vm.error)
-                : const EmptyView(
+                ? ErrorState(error: vm.error)
+                : const EmptyState(
                     icon: Icons.groups_outlined,
                     title: 'Division not found',
                     message: 'It may have been removed.',
@@ -124,7 +124,7 @@ class _LiveDraftScreenState extends State<LiveDraftScreen> {
     final c = AppColors.of(context);
     if (!vm.isManager) {
       return [
-        const EmptyView(
+        const EmptyState(
           icon: Icons.how_to_reg_outlined,
           title: "The draft hasn't started",
           message: 'You can watch it here once the host starts it.',

@@ -100,9 +100,9 @@ class _RolesScreenState extends State<RolesScreen> {
               )
             : null,
         body: !vm.loaded
-            ? const LoadingView()
+            ? const LoadingState()
             : team == null
-            ? ErrorView(error: vm.error)
+            ? ErrorState(error: vm.error)
             : ConstrainedContent(
                 maxWidth: 720,
                 child: ListView(
@@ -119,7 +119,7 @@ class _RolesScreenState extends State<RolesScreen> {
                     ),
                     const SizedBox(height: 16),
                     if (vm.roles.isEmpty)
-                      const EmptyView(
+                      const EmptyState(
                         icon: Icons.label_outline,
                         title: 'No roles yet',
                         message:

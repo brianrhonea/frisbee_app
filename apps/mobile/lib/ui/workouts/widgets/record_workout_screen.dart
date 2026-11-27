@@ -127,13 +127,13 @@ class _RecordWorkoutScreenState extends State<RecordWorkoutScreen> {
 
   Widget _body(BuildContext context) {
     if (vm.prepare.running && vm.state == RecorderState.idle) {
-      return const LoadingView();
+      return const LoadingState();
     }
     if (vm.prepare.result case Error(:final error)) {
-      return ErrorView(error: error);
+      return ErrorState(error: error);
     }
     if (vm.blocked case final why?) {
-      return EmptyView(
+      return EmptyState(
         icon: Icons.location_off_outlined,
         title: why == LocationAccess.serviceOff
             ? 'Location is off'

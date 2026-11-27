@@ -311,7 +311,7 @@ class _InboxListState extends State<InboxList> {
       final selectedKey = widget.selectedKey;
       final onOpen = widget.onOpen;
       final c = AppColors.of(context);
-      if (!vm.loaded) return const LoadingView();
+      if (!vm.loaded) return const LoadingState();
       // Requests from someone blocked either way aren't shown.
       final blocks = watchBlocks(context);
       final items = [
@@ -401,8 +401,8 @@ class _InboxListState extends State<InboxList> {
           Expanded(
             child: allItems.isEmpty && allTeamChats.isEmpty
                 ? vm.error != null
-                      ? ErrorView(error: vm.error)
-                      : EmptyView(
+                      ? ErrorState(error: vm.error)
+                      : EmptyState(
                           icon: Icons.chat_bubble_outline,
                           title: switch (vm.filter) {
                             InboxFilter.requests => 'No message requests',

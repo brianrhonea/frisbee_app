@@ -106,7 +106,7 @@ class _RoomListState extends State<RoomList> {
     listenable: widget.viewModel,
     builder: (context, _) {
       final vm = widget.viewModel;
-      if (!vm.loaded) return const LoadingView();
+      if (!vm.loaded) return const LoadingState();
       final groups = vm.groups;
       final hasUnfiled = groups.isNotEmpty && groups.first.folder == null;
       final drag = _DragHooks(
@@ -154,9 +154,9 @@ class _RoomListState extends State<RoomList> {
             ),
           Expanded(
             child: groups.isEmpty && vm.error != null
-                ? ErrorView(error: vm.error)
+                ? ErrorState(error: vm.error)
                 : groups.isEmpty
-                ? EmptyView(
+                ? EmptyState(
                     icon: Icons.forum_outlined,
                     title: 'No channels yet',
                     message: vm.canManage

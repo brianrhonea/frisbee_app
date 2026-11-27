@@ -209,12 +209,12 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
       final title = vm.isNew ? 'New event' : 'Edit event';
       Widget body(bool fit) {
         if (vm.load.running) {
-          return PanelFrame.status(fit, const LoadingView());
+          return PanelFrame.status(fit, const LoadingState());
         }
         if (vm.load.error) {
           return PanelFrame.status(
             fit,
-            ErrorView(error: vm.load.result, onRetry: vm.load.execute),
+            ErrorState(error: vm.load.result, onRetry: vm.load.execute),
           );
         }
         final form = _EventForm(

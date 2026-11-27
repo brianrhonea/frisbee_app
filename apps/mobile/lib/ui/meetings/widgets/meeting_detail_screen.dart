@@ -93,15 +93,15 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
       if (!vm.loaded) {
         return Scaffold(
           appBar: AppBar(leading: back),
-          body: const LoadingView(),
+          body: const LoadingState(),
         );
       }
       if (m == null) {
         return Scaffold(
           appBar: AppBar(leading: back),
           body: vm.error != null
-              ? ErrorView(error: vm.error)
-              : const EmptyView(
+              ? ErrorState(error: vm.error)
+              : const EmptyState(
                   icon: Icons.videocam_off_outlined,
                   title: 'Meeting not available',
                   message: "It may have been deleted, or you weren't invited.",

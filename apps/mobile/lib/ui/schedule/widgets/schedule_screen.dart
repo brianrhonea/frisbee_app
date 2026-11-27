@@ -188,7 +188,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       body: ListenableBuilder(
         listenable: vm,
         builder: (context, _) {
-          if (!vm.loaded) return const LoadingView();
+          if (!vm.loaded) return const LoadingState();
           final month = vm.view == ScheduleView.month;
           return ConstrainedContent(
             maxWidth: 720,

@@ -122,7 +122,7 @@ class _GroupTournamentScreenState extends State<GroupTournamentScreen> {
       builder: (context, _) {
         final t = vm.tournament;
         if (!vm.loaded) {
-          return Scaffold(appBar: AppBar(), body: const LoadingView());
+          return Scaffold(appBar: AppBar(), body: const LoadingState());
         }
         final follow = vm.follow;
         final listing = vm.listing;
@@ -140,8 +140,8 @@ class _GroupTournamentScreenState extends State<GroupTournamentScreen> {
           return Scaffold(
             appBar: AppBar(),
             body: vm.error != null
-                ? ErrorView(error: vm.error)
-                : const EmptyView(
+                ? ErrorState(error: vm.error)
+                : const EmptyState(
                     icon: Icons.emoji_events_outlined,
                     title: 'Tournament not available',
                     message:

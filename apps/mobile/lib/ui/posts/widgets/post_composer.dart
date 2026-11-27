@@ -305,7 +305,7 @@ class _PostComposerState extends State<PostComposer> {
         return PanelFrame(
           fitContent: widget.fitContent,
           close: close,
-          body: (_) => _status(const LoadingView()),
+          body: (_) => _status(const LoadingState()),
         );
       }
       if (vm.loadError != null || !vm.canEdit) {
@@ -314,12 +314,12 @@ class _PostComposerState extends State<PostComposer> {
           close: close,
           body: (_) => _status(
             vm.loadError == null
-                ? const EmptyView(
+                ? const EmptyState(
                     icon: Icons.edit_off_outlined,
                     title: "Can't edit this post",
                     message: "It's been deleted, or it isn't yours.",
                   )
-                : ErrorView(error: vm.loadError),
+                : ErrorState(error: vm.loadError),
           ),
         );
       }

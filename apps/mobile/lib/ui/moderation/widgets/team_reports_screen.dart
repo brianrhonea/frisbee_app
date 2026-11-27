@@ -74,12 +74,12 @@ class _TeamReportsScreenState extends State<TeamReportsScreen> {
     body: ListenableBuilder(
       listenable: vm,
       builder: (context, _) {
-        if (!vm.loaded) return const LoadingView();
+        if (!vm.loaded) return const LoadingState();
         if (vm.load.result case Error(:final error) when vm.reports.isEmpty) {
-          return ErrorView(error: error);
+          return ErrorState(error: error);
         }
         if (vm.reports.isEmpty) {
-          return const EmptyView(
+          return const EmptyState(
             icon: Icons.verified_user_outlined,
             title: 'No open reports',
             message:

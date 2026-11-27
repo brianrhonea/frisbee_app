@@ -145,15 +145,15 @@ class _VideoScreenState extends State<VideoScreen> {
       if (!vm.loaded) {
         return Scaffold(
           appBar: AppBar(leading: leading),
-          body: const LoadingView(),
+          body: const LoadingState(),
         );
       }
       if (video == null) {
         return Scaffold(
           appBar: AppBar(leading: leading),
           body: vm.error != null
-              ? ErrorView(error: vm.error)
-              : const EmptyView(
+              ? ErrorState(error: vm.error)
+              : const EmptyState(
                   icon: Icons.videocam_off_outlined,
                   title: 'Video not available',
                   message: 'It may have been removed.',

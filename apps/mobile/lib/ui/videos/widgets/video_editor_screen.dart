@@ -72,9 +72,9 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
         title: Text(vm.isNew ? 'Add video' : 'Edit video'),
       ),
       body: vm.load.running
-          ? const LoadingView()
+          ? const LoadingState()
           : vm.load.error
-          ? ErrorView(error: vm.load.result, onRetry: vm.load.execute)
+          ? ErrorState(error: vm.load.result, onRetry: vm.load.execute)
           : Align(
               alignment: Alignment.topCenter,
               child: ConstrainedBox(

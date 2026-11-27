@@ -299,12 +299,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       builder: (context, _) {
         final e = vm.event;
         final Widget? missing = !vm.loaded
-            ? const LoadingView()
+            ? const LoadingState()
             : e != null
             ? null
             : vm.error != null
-            ? ErrorView(error: vm.error)
-            : const EmptyView(
+            ? ErrorState(error: vm.error)
+            : const EmptyState(
                 icon: Icons.event_busy_outlined,
                 title: 'Event not available',
                 message: 'It may have been deleted.',

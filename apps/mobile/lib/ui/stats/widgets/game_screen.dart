@@ -30,14 +30,14 @@ class GameScreen extends StatelessWidget {
       final vm = viewModel;
       final game = vm.game;
       if (!vm.loaded) {
-        return Scaffold(appBar: AppBar(), body: const LoadingView());
+        return Scaffold(appBar: AppBar(), body: const LoadingState());
       }
       if (game == null) {
         return Scaffold(
           appBar: AppBar(),
           body: vm.error != null
-              ? ErrorView(error: vm.error)
-              : const EmptyView(
+              ? ErrorState(error: vm.error)
+              : const EmptyState(
                   icon: Icons.sports_score,
                   title: 'Game not found',
                 ),
@@ -1472,7 +1472,7 @@ class _PointLog extends StatelessWidget {
     final game = vm.game!;
     final points = vm.points;
     if (points.isEmpty && vm.timeouts.isEmpty) {
-      return const EmptyView(
+      return const EmptyState(
         icon: Icons.list_alt_outlined,
         title: 'No points yet',
         message: 'Each point is logged here as you track it.',
@@ -1956,7 +1956,7 @@ class _LinesTab extends StatelessWidget {
             ],
             const SizedBox(height: 12),
             if (lines.isEmpty)
-              const EmptyView(
+              const EmptyState(
                 icon: Icons.groups_outlined,
                 title: 'No lines yet',
                 message:

@@ -437,7 +437,7 @@ class _EventPicker extends StatelessWidget {
                 child: Center(child: CircularProgressIndicator()),
               )
             else if (vm.error != null)
-              ErrorView(error: vm.error)
+              ErrorState(error: vm.error)
             else if (events.isEmpty)
               Padding(
                 padding: const EdgeInsets.all(AppSpace.xl),

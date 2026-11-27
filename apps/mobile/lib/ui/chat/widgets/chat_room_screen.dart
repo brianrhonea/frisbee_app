@@ -202,11 +202,11 @@ class ChatRoomView extends StatelessWidget {
         );
         final Widget body;
         if (!vm.loaded) {
-          body = const LoadingView();
+          body = const LoadingState();
         } else if (room == null || !vm.access.canRead) {
           body = room == null && vm.error != null
-              ? ErrorView(error: vm.error)
-              : EmptyView(
+              ? ErrorState(error: vm.error)
+              : EmptyState(
                   icon: Icons.lock_outline,
                   title: room == null
                       ? 'Room not available'

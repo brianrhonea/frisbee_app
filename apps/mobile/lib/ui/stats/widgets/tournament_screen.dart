@@ -66,14 +66,14 @@ class TournamentScreen extends StatelessWidget {
       final vm = viewModel;
       final t = vm.tournament;
       if (!vm.loaded) {
-        return Scaffold(appBar: AppBar(), body: const LoadingView());
+        return Scaffold(appBar: AppBar(), body: const LoadingState());
       }
       if (t == null) {
         return Scaffold(
           appBar: AppBar(),
           body: vm.error != null
-              ? ErrorView(error: vm.error)
-              : const EmptyView(
+              ? ErrorState(error: vm.error)
+              : const EmptyState(
                   icon: Icons.folder_off_outlined,
                   title: 'Tournament not found',
                 ),
@@ -124,7 +124,7 @@ class TournamentScreen extends StatelessWidget {
           body: TabBarView(
             children: [
               vm.games.isEmpty
-                  ? const EmptyView(
+                  ? const EmptyState(
                       icon: Icons.description_outlined,
                       title: 'No games yet',
                       message: 'Add a game to start tracking stats.',

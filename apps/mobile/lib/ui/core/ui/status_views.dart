@@ -1,20 +1,28 @@
 import 'package:flutter/material.dart';
 
+import 'app_button.dart';
 import 'error_message.dart';
 import 'skeleton.dart';
 import '../themes/theme.dart';
 
-/// A page or list on the way: placeholder rows, not a spinner.
-class LoadingView extends StatelessWidget {
-  const LoadingView({super.key});
+/// A page or list on the way: placeholder rows, not a spinner (C9). Read
+/// as "Loading" (see [Skeleton]).
+///
+/// Website counterpart: `LoadingState` (apps/web).
+class LoadingState extends StatelessWidget {
+  const LoadingState({super.key});
 
   @override
   Widget build(BuildContext context) =>
       const Align(alignment: Alignment.topCenter, child: SkeletonList());
 }
 
-class ErrorView extends StatelessWidget {
-  const ErrorView({super.key, required this.error, this.onRetry});
+/// Something failed (C9): the reason in words, with a Retry button when
+/// [onRetry] is given. Announced to screen readers as it appears.
+///
+/// Website counterpart: `ErrorState` (apps/web).
+class ErrorState extends StatelessWidget {
+  const ErrorState({super.key, required this.error, this.onRetry});
 
   final Object? error;
   final VoidCallback? onRetry;
@@ -23,28 +31,40 @@ class ErrorView extends StatelessWidget {
   Widget build(BuildContext context) => Center(
     child: Padding(
       padding: const EdgeInsets.all(AppSpace.xl),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.error_outline,
-            size: 48,
-            color: Theme.of(context).colorScheme.error,
-          ),
-          const SizedBox(height: 12),
-          Text(errorMessage(error), textAlign: TextAlign.center),
-          if (onRetry != null) ...[
+      child: Semantics(
+        liveRegion: true,
+        container: true,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 48,
+              color: Theme.of(context).colorScheme.error,
+            ),
             const SizedBox(height: 12),
-            FilledButton.tonal(onPressed: onRetry, child: const Text('Retry')),
+            Text(errorMessage(error), textAlign: TextAlign.center),
+            if (onRetry != null) ...[
+              const SizedBox(height: 12),
+              AppButton.secondary(
+                'Retry',
+                icon: Icons.refresh,
+                onPressed: onRetry,
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     ),
   );
 }
 
-class EmptyView extends StatelessWidget {
-  const EmptyView({
+/// Nothing here yet (C9): an icon (or [art]), a [title], a [message] that
+/// says what to do next, and an optional [action] button.
+///
+/// Website counterpart: `EmptyState` (apps/web).
+class EmptyState extends StatelessWidget {
+  const EmptyState({
     super.key,
     this.icon,
     this.art,

@@ -108,8 +108,8 @@ class StatsTab extends StatelessWidget {
     listenable: viewModel,
     builder: (context, _) {
       final vm = viewModel;
-      if (!vm.loaded) return const LoadingView();
-      if (vm.error != null) return ErrorView(error: vm.error);
+      if (!vm.loaded) return const LoadingState();
+      if (vm.error != null) return ErrorState(error: vm.error);
       final empty = TextStyle(
         fontSize: 13.5,
         color: AppColors.of(context).muted,
@@ -841,7 +841,7 @@ class SeasonStatsScreen extends StatelessWidget {
               sheet: viewModel.seasonSheet,
               nameOf: viewModel.nameOf,
             )
-          : const LoadingView(),
+          : const LoadingState(),
     ),
   );
 }

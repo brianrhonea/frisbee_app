@@ -711,7 +711,7 @@ class _MessageList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final vm = viewModel;
-    if (!vm.messagesLoaded) return const LoadingView();
+    if (!vm.messagesLoaded) return const LoadingState();
     final hide = hideAuthor;
     final messages = hide == null
         ? vm.messages
@@ -721,8 +721,8 @@ class _MessageList extends StatelessWidget {
           ];
     if (messages.isEmpty) {
       return vm.messageError != null
-          ? ErrorView(error: vm.messageError)
-          : EmptyView(
+          ? ErrorState(error: vm.messageError)
+          : EmptyState(
               icon: Icons.chat_bubble_outline,
               title: 'No messages yet',
               message: vm.canWrite ? emptyMessage : null,
@@ -2085,7 +2085,7 @@ class _VideoDialogState extends State<_VideoDialog> {
               Ok(:final value) => widget.player(value),
               Error(:final error) => AspectRatio(
                 aspectRatio: 16 / 9,
-                child: ErrorView(
+                child: ErrorState(
                   error: error,
                   onRetry: () => setState(
                     () => _url = widget.viewModel.videoUrl(widget.attachment),

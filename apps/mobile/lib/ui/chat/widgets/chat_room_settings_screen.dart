@@ -85,14 +85,14 @@ class _ChatRoomSettingsScreenState extends State<ChatRoomSettingsScreen> {
       builder: (context, _) {
         final room = vm.room;
         if (!vm.loaded) {
-          return Scaffold(appBar: AppBar(), body: const LoadingView());
+          return Scaffold(appBar: AppBar(), body: const LoadingState());
         }
         if (room == null || !vm.canManage) {
           return Scaffold(
             appBar: AppBar(),
             body: vm.error != null
-                ? ErrorView(error: vm.error)
-                : EmptyView(
+                ? ErrorState(error: vm.error)
+                : EmptyState(
                     icon: Icons.lock_outline,
                     title: room == null
                         ? 'Room not available'

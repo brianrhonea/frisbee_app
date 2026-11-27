@@ -125,7 +125,7 @@ GoRouter router(
   routes: [
     GoRoute(
       path: splashPath,
-      builder: (_, _) => const Scaffold(body: LoadingView()),
+      builder: (_, _) => const Scaffold(body: LoadingState()),
     ),
     GoRoute(path: Routes.signIn, builder: (_, _) => signInPage()),
     GoRoute(

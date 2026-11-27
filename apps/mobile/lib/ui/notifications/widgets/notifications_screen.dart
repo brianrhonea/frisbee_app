@@ -159,7 +159,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Widget _body() {
-    if (!vm.loaded) return const LoadingView();
+    if (!vm.loaded) return const LoadingState();
     final items = vm.items;
     final requests = vm.showsFollowRequests
         ? _FollowRequestsTile(
@@ -234,8 +234,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Widget _empty() {
-    if (vm.error != null) return ErrorView(error: vm.error);
-    return EmptyView(
+    if (vm.error != null) return ErrorState(error: vm.error);
+    return EmptyState(
       art: const DiscIcon(),
       title: 'No notifications',
       message:

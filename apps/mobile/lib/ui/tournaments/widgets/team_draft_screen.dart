@@ -94,15 +94,15 @@ class _TeamDraftScreenState extends State<TeamDraftScreen> {
       listenable: vm,
       builder: (context, _) {
         if (!vm.loaded) {
-          return Scaffold(appBar: AppBar(), body: const LoadingView());
+          return Scaffold(appBar: AppBar(), body: const LoadingState());
         }
         final d = vm.division;
         if (d == null) {
           return Scaffold(
             appBar: AppBar(),
             body: vm.error != null
-                ? ErrorView(error: vm.error)
-                : const EmptyView(
+                ? ErrorState(error: vm.error)
+                : const EmptyState(
                     icon: Icons.groups_outlined,
                     title: 'Division not found',
                     message: 'It may have been removed.',

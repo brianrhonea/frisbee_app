@@ -163,8 +163,8 @@ class _TournamentEditorScreenState extends State<TournamentEditorScreen> {
             ],
           ),
           body: switch (vm.load) {
-            final l when l.running || l.result == null => const LoadingView(),
-            final l when l.error => ErrorView(error: l.result),
+            final l when l.running || l.result == null => const LoadingState(),
+            final l when l.error => ErrorState(error: l.result),
             _ => ConstrainedContent(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),

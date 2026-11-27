@@ -75,11 +75,11 @@ class RankingsScreen extends StatelessWidget {
       return const [SkeletonList(count: 8, padding: EdgeInsets.zero)];
     }
     if (vm.error != null && ranking == null) {
-      return [ErrorView(error: vm.error)];
+      return [ErrorState(error: vm.error)];
     }
     if (ranking == null) {
       return const [
-        EmptyView(
+        EmptyState(
           icon: Icons.leaderboard_outlined,
           title: 'No team rankings yet',
           message:
@@ -127,7 +127,7 @@ class RankingsScreen extends StatelessWidget {
     }
     if (ranking.players.isEmpty) {
       return const [
-        EmptyView(
+        EmptyState(
           icon: Icons.person_search_outlined,
           title: 'No player ratings yet',
           message:

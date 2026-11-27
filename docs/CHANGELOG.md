@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.63  | 2026-11-26 | `sprint3/lane-b`                        |                     |
 | 0.0.62  | 2026-11-26 | `sprint3/lane-b`                        |                     |
 | 0.0.61  | 2026-11-26 | `sprint3/lane-b`                        |                     |
 | 0.0.60  | 2026-11-26 | `sprint3/lane-b`                        |                     |
@@ -75,6 +76,12 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.63 — Shared components C5-C10 (app half)
+
+- New in `lib/ui/core/ui/`: `CoverHeader` (C5), `SummaryTiles` (C6), `ListRow` (C7), `EventCard` and `DateBadge` with a cancelled state (C8, DateBadge moved to `date_badge.dart`, still exported from `layout.dart`), `EmptyState`/`ErrorState`/`LoadingState` (C9, renamed from EmptyView/ErrorView/LoadingView; Retry is now an AppButton), `AppTextField` and `ConfirmDialog` (C10).
+- `confirmDialog(destructive: true)` now uses the destructive AppButton (filled error) instead of solid ink.
+- D9: tournament-status and team-kind tags were already neutral (registration green, live red, all else grey); a test pins it.
 
 ## 0.0.62 — Shell at the guide's widths (S2)
 

@@ -10,6 +10,10 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.63
+
+- **Tidier building blocks** under the hood (headers, rows, event cards, empty and error screens, dialogs) so every screen matches. Confirm dialogs for deleting now use the red destructive button.
+
 ## 0.0.62
 
 - **Wider windows:** the side navigation now switches at the same widths as the website (600 and 900 px).

@@ -126,9 +126,9 @@ class _CommunityTeamsTabState extends State<CommunityTeamsTab> {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: Listenable.merge([vm, vm.createTeam]),
     builder: (context, _) {
-      if (!vm.loaded) return const LoadingView();
+      if (!vm.loaded) return const LoadingState();
       final org = vm.org;
-      if (org == null) return ErrorView(error: vm.error);
+      if (org == null) return ErrorState(error: vm.error);
       final theme = Theme.of(context);
       final teams = vm.teams;
       return ConstrainedContent(
@@ -168,7 +168,7 @@ class _CommunityTeamsTabState extends State<CommunityTeamsTab> {
             ],
             const SizedBox(height: 16),
             if (teams.isEmpty)
-              EmptyView(
+              EmptyState(
                 icon: Icons.shield_outlined,
                 title: 'No teams yet',
                 message: vm.canManage

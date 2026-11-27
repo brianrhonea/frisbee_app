@@ -237,11 +237,11 @@ class _DirectChatViewState extends State<DirectChatView> {
             : null;
         final Widget body;
         if (!vm.loaded) {
-          body = const LoadingView();
+          body = const LoadingState();
         } else if (vm.conversation == null) {
           body = vm.error != null
-              ? ErrorView(error: vm.error)
-              : const EmptyView(
+              ? ErrorState(error: vm.error)
+              : const EmptyState(
                   icon: Icons.chat_bubble_outline,
                   title: 'Conversation not available',
                 );

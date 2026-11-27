@@ -141,7 +141,7 @@ class _TeamEventsTabState extends State<TeamEventsTab> {
               if (upcoming.isEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 24),
-                  child: EmptyView(
+                  child: EmptyState(
                     icon: Icons.event_available_outlined,
                     title: 'Nothing scheduled',
                     message: vm.canEdit

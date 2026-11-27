@@ -368,9 +368,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
       if (running && nothing)
         const SkeletonList(count: 4, padding: EdgeInsets.zero)
       else if (failed != null && nothing)
-        ErrorView(error: failed)
+        ErrorState(error: failed)
       else if (noMatches)
-        const EmptyView(
+        const EmptyState(
           icon: Icons.search_off,
           title: 'Nothing found',
           message:
@@ -569,7 +569,7 @@ class _ComingUp extends StatelessWidget {
           if (!vm.loaded)
             const SkeletonList(count: 3, padding: EdgeInsets.zero)
           else if (vm.error != null)
-            ErrorView(error: vm.error)
+            ErrorState(error: vm.error)
           else ...[
             if (vm.filtersByStatus) HostedStatusFilterBar(viewModel: vm),
             if (list.isEmpty && list.length < vm.tournaments.length)
@@ -581,7 +581,7 @@ class _ComingUp extends StatelessWidget {
                 ),
               )
             else if (list.isEmpty)
-              EmptyView(
+              EmptyState(
                 icon: Icons.emoji_events_outlined,
                 title: 'No upcoming events',
                 message:

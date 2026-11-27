@@ -106,9 +106,9 @@ class _TeamsScreenState extends State<TeamsScreen> {
       body: ListenableBuilder(
         listenable: Listenable.merge([vm, vm.acceptInvite, vm.declineInvite]),
         builder: (context, _) {
-          if (vm.loading) return const LoadingView();
+          if (vm.loading) return const LoadingState();
           if (vm.error != null) {
-            return ErrorView(error: vm.error, onRetry: vm.retry);
+            return ErrorState(error: vm.error, onRetry: vm.retry);
           }
           final invites = [
             for (final i in vm.invites)
@@ -124,7 +124,7 @@ class _TeamsScreenState extends State<TeamsScreen> {
               ),
           ];
           if (vm.all.isEmpty && invites.isEmpty) {
-            return EmptyView(
+            return EmptyState(
               icon: Icons.groups_outlined,
               title: 'No teams or communities yet',
               message:
