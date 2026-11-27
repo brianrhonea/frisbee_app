@@ -225,8 +225,10 @@ List<SingleChildWidget> get firebaseProviders => [
   ),
   Provider<PostCommentRepository>(
     lazy: false,
-    create: (context) =>
-        PostCommentRepositoryFirebase(outbox: context.read<OutboxRepository>()),
+    create: (context) => PostCommentRepositoryFirebase(
+      api: context.read<ApiClient?>(),
+      outbox: context.read<OutboxRepository>(),
+    ),
   ),
   // Drafts belong to whoever is signed in, and go when they sign out.
   // Made at start (not lazily on the first chat), so it sees every sign-out.
@@ -245,7 +247,10 @@ List<SingleChildWidget> get firebaseProviders => [
   ),
   Provider(create: (_) => const DevicePermissions()),
   Provider(create: (_) => const DeviceCalendarService()),
-  Provider<FollowRepository>(create: (_) => FollowRepositoryFirebase()),
+  Provider<FollowRepository>(
+    create: (context) =>
+        FollowRepositoryFirebase(api: context.read<ApiClient?>()),
+  ),
   Provider<VideoRepository>(
     create: (context) =>
         VideoRepositoryFirebase(api: context.read<ApiClient?>()),
