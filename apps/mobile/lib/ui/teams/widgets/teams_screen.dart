@@ -385,16 +385,13 @@ class _Row extends StatelessWidget {
       leading: TeamInitials(name: name, kind: kind),
       title: name,
       subtitle: meta.isEmpty ? null : meta,
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (role case final r?) ...[
-            _RolePill(r, kind),
-            const SizedBox(width: AppSpace.sm),
-          ],
-          Icon(Icons.chevron_right, size: 20, color: c.muted),
-        ],
-      ),
+      // One line, cut with an ellipsis: the pill keeps its width. The
+      // chevron only shows when there is no pill to make room for.
+      subtitleMaxLines: 1,
+      trailing: switch (role) {
+        final r? => _RolePill(r, kind),
+        null => Icon(Icons.chevron_right, size: 20, color: c.muted),
+      },
       onTap: onTap,
     );
   }

@@ -58,6 +58,16 @@ void main() {
     expect(find.widgetWithText(StatusPill, 'Player'), findsOneWidget);
   });
 
+  testWidgets('the subtitle stays on one line beside the role pill', (
+    tester,
+  ) async {
+    await pumpInApp(tester, screen(), width: 360, height: 800);
+    await tester.pumpAndSettle();
+    final subtitle = tester.widget<Text>(find.textContaining('Mixed · Club'));
+    expect(subtitle.maxLines, 1);
+    expect(subtitle.overflow, TextOverflow.ellipsis);
+  });
+
   for (final theme in GoldenTheme.values) {
     testWidgets('meets accessibility guidelines, ${theme.name}', (
       tester,
