@@ -126,3 +126,13 @@ Totals:
 - L1–L3 and new features from the boards.
 - The legal pages (#15) wait on the lawyer.
 - Multi-select chips in the app, and turning legacy danger buttons red.
+
+## Owner answers on resume (2026-11-26)
+
+The owner accepted every recommendation:
+- **D-U13 signal:** a non-secret marker on the `ageRefusals/{uid}` document records an under-13 refusal, and only those accounts are deleted after 30 days. This is approved as a small schema change.
+- **Data export:** new additive keys on `DataExport` for liked posts, follow requests (both directions), tournament sign-ups, calendars and invites, and usernames. `ageRefusals` stays out.
+- **Scheduler:** the first scheduled function goes in the `account` group. The owner does any Cloud Scheduler setup.
+- **D-1317:** hiding uses the `ageOk` claim. The #3a backfill must run before enforcement, so adults aren't hidden.
+- **Website Learn:** stays a bottom tab for signed-out visitors. Members reach it under Discover.
+- **The #17 contract** (`contracts/phase1-writes.md`) is approved. 17-A goes to lane A after its current items.
