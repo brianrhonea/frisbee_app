@@ -5,7 +5,7 @@
 // deleted from the client.
 
 import { getAuth } from "firebase-admin/auth";
-import { FieldPath, FieldValue, type Firestore, getFirestore } from "firebase-admin/firestore";
+import { FieldPath, FieldValue, type Firestore, getFirestore, Timestamp } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { logger } from "firebase-functions";
 import { defineSecret } from "firebase-functions/params";
@@ -140,8 +140,12 @@ export async function deleteAccountFully(db: Firestore, uid: string, deps: Delet
 
 /** How long a disabled under-13 account is kept after its refusal (owner decision D-U13). */
 export const under13RetentionMs = 30 * 24 * 3600_000;
-/** Most accounts one scheduled run deletes; the rest wait for the next run. */
+/** Most accounts one scheduled run deletes; the rest wait for the next run. Failures don't count toward it. */
 export const purgePerRun = 50;
+/** Most failed attempts in one run, to bound its time when something is broken. */
+export const purgeFailuresPerRun = 50;
+/** A record that failed is left alone this long, so failing ones can't starve the rest (the daily run is 24 h). */
+export const purgeRetryAfterMs = 20 * 3600_000;
 
 export interface PurgeDeps extends DeleteDeps {
   /** The login's state: gone, disabled or enabled. */
@@ -181,6 +185,7 @@ export interface PurgeResult {
  */
 export async function purgeUnderThirteen(db: Firestore, now: number, deps: PurgeDeps = realPurgeDeps): Promise<PurgeResult> {
   const result: PurgeResult = { deleted: 0, skippedEnabled: 0, failed: 0 };
+  let waiting = 0;
   const cutoff = now - under13RetentionMs;
   // Single-field equality, so no composite index; the age is checked below.
   let after: string | undefined;
@@ -189,9 +194,14 @@ export async function purgeUnderThirteen(db: Firestore, now: number, deps: Purge
     if (after) q = q.startAfter(after);
     const page = await q.get();
     for (const d of page.docs) {
-      if (result.deleted + result.failed >= purgePerRun) break;
+      if (result.deleted >= purgePerRun || result.failed >= purgeFailuresPerRun) break;
       const refusedAt = d.get("refusedAt");
       if (typeof refusedAt?.toMillis !== "function" || refusedAt.toMillis() > cutoff) continue;
+      const failedAt = d.get("purgeFailedAt");
+      if (typeof failedAt?.toMillis === "function" && now - failedAt.toMillis() < purgeRetryAfterMs) {
+        waiting++;
+        continue;
+      }
       const uid = d.id;
       try {
         if ((await deps.authState(uid)) === "enabled") {
@@ -204,12 +214,14 @@ export async function purgeUnderThirteen(db: Firestore, now: number, deps: Purge
       } catch (e) {
         result.failed++;
         logger.error("Under-13 purge failed for an account", { uid, error: String((e as { code?: string }).code ?? "error") });
+        // Server-only marker (ageRefusals has no client access): skip it for a while.
+        await d.ref.set({ purgeFailedAt: Timestamp.fromMillis(now) }, { merge: true }).catch(() => undefined);
       }
     }
-    if (page.size < 200 || result.deleted + result.failed >= purgePerRun) break;
+    if (page.size < 200 || result.deleted >= purgePerRun || result.failed >= purgeFailuresPerRun) break;
     after = page.docs[page.docs.length - 1]!.id;
   }
-  logger.info("Under-13 purge", { ...result });
+  logger.info("Under-13 purge", { ...result, waitingAfterFailure: waiting });
   return result;
 }
 
@@ -239,7 +251,9 @@ export async function deleteUserData(db: Firestore, uid: string, deps: Pick<Dele
   await deleteJoinRequests(db, uid);
   await removeReactions(db, uid);
   await deleteFollowRequestsSent(db, uid);
+  await removeFollowsOfThem(db, uid);
   await anonymiseSignups(db, uid);
+  await scrubDraftPools(db, uid);
   // Before users/{uid}, whose calendarInvites say which calendars to tidy.
   await leaveCalendars(db, uid);
   // Blocks are kept for both people (apps/api/src/moderation): take the
@@ -309,6 +323,47 @@ async function anonymiseSignups(db: Firestore, uid: string): Promise<void> {
     const refs = tournaments.docs.slice(i, i + 300).map((t) => t.ref.collection("signups").doc(uid));
     for (const r of await db.getAll(...refs)) {
       if (r.exists && r.get("name") !== deletedUserName) void writer.update(r.ref, { name: deletedUserName, gender: null });
+    }
+  }
+  await writer.close();
+}
+
+/**
+ * Other people's follows of this account (users/{x}/follows/user_{uid}).
+ * Collection-group equality on `key`, which the existing `follows.key`
+ * field override already serves (no new index). The followCount trigger
+ * skips the decrement once the profile is gone.
+ *
+ * Left as they are, on purpose: conversations keep [uid] in `participants`
+ * and `createdBy` (the other people's history stays readable; the name and
+ * photo copies go with the messages they authored).
+ */
+async function removeFollowsOfThem(db: Firestore, uid: string): Promise<void> {
+  for (let round = 0; round < 1000; round++) {
+    const snap = await db.collectionGroup("follows").where("key", "==", `user_${uid}`).select().limit(450).get();
+    if (snap.empty) return;
+    const writer = db.bulkWriter();
+    for (const d of snap.docs) void writer.delete(d.ref);
+    await writer.close();
+  }
+}
+
+/**
+ * Their skill and gender in the captains' draft pools
+ * (tournaments/{t}/drafts/{d}/details/pool, `players` map, server-only).
+ * Looked up per tournament, so no collection-group index.
+ */
+async function scrubDraftPools(db: Firestore, uid: string): Promise<void> {
+  const tournaments = await db.collection("tournaments").select().get();
+  const writer = db.bulkWriter();
+  for (const t of tournaments.docs) {
+    const drafts = await t.ref.collection("drafts").select().get();
+    if (drafts.empty) continue;
+    const pools = await db.getAll(...drafts.docs.map((d) => d.ref.collection("details").doc("pool")));
+    for (const pool of pools) {
+      if (pool.exists && (pool.get(new FieldPath("players", uid)) !== undefined)) {
+        void writer.update(pool.ref, new FieldPath("players", uid), FieldValue.delete());
+      }
     }
   }
   await writer.close();
