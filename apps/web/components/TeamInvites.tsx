@@ -9,6 +9,7 @@ import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
 import { useIsClubTeam } from "./ClubAge";
 import "./team_invites.css";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** users/{uid}/teamInvites/{teamId} (TeamInvite in the app). */
 interface TeamInvite {
@@ -85,9 +86,9 @@ export function TeamInvites() {
         })}
       </ul>
       {error && (
-        <p className="form-error" role="alert">
+        <ErrorNote>
           {error}
-        </p>
+        </ErrorNote>
       )}
     </section>
   );

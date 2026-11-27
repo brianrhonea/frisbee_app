@@ -5,6 +5,7 @@
 import { sendEmailVerification, signOut, type User } from "firebase/auth";
 import { useState } from "react";
 import { firebaseAuth } from "@/lib/firebase";
+import { ErrorNote } from "@/components/StatusViews";
 
 export const verifyEmailCopy = {
   title: "Verify your email",
@@ -63,9 +64,9 @@ export function VerifyEmail({ user, onVerified }: { user: User; onVerified: () =
           </p>
         </header>
         {error && (
-          <p className="form-error" role="alert">
+          <ErrorNote>
             {error}
-          </p>
+          </ErrorNote>
         )}
         {notice && (
           <p className="form-notice" role="status">

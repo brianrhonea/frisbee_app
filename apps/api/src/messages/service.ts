@@ -18,6 +18,7 @@ import {
   sendChatMessageRequestSchema,
 } from "@stall10/shared";
 import type { Caller, UserLookup } from "../auth.js";
+import type { AdultVisibility } from "../account/adult_visibility.js";
 import { ApiError, parseBody } from "../errors.js";
 import { deleteFilesUnder, filesOf, uploadedFiles } from "../hub/uploads.js";
 import { docIdParam } from "../ids.js";
@@ -84,7 +85,13 @@ export class ConversationService {
     private readonly users: UserLookup,
     private readonly media: MediaStorage | undefined,
     private readonly now: () => number = Date.now,
+    /** D-1317: no direct messages to accounts without `ageOk` when enforcing. */
+    private readonly adults?: AdultVisibility,
   ) {}
+
+  private async refuseHidden(uid: string) {
+    if (await this.adults?.isHidden(uid)) throw new ApiError("permission_denied", "You can't message this person.");
+  }
 
   private async name(caller: Caller) {
     return (await authorOf(this.store, this.users, caller)).name;
@@ -106,6 +113,7 @@ export class ConversationService {
     const existing = await this.store.get(p.conv(id));
     if (existing) return { id, status: (existing.status as OpenConversationResult["status"]) ?? "accepted" };
     await checkNotBlocked(this.store, caller.uid, other);
+    await this.refuseHidden(other);
     const [profile, user, theyFollowMe, iFollowThem] = await Promise.all([
       this.store.get(p.profile(other)),
       this.store.get(p.user(other)),
@@ -146,7 +154,7 @@ export class ConversationService {
   async createGroup(caller: Caller, body: unknown): Promise<GroupAddedResult> {
     const req = parseBody(createGroupRequestSchema, body);
     await checkNotMuted(this.store, caller.uid, this.now());
-    const id = `g-${randomBytes(15).toString("base64").replace(/[^A-Za-z0-9]/g, "").slice(0, 20) || "x"}`;
+    const id = req.id ?? `g-${randomBytes(15).toString("base64").replace(/[^A-Za-z0-9]/g, "").slice(0, 20) || "x"}`;
     const me = await this.name(caller);
     await this.store.transact(async (tx) => {
       tx.create(p.conv(id), {
@@ -183,7 +191,7 @@ export class ConversationService {
         this.store.get(p.follow(uid, caller.uid)),
       ]);
       const name = clip(typeof profile?.name === "string" && profile.name ? profile.name : "Player", 80);
-      if (!profile || !follows || policyOf(user) === "nobody" || (await blockedBetween(this.store, caller.uid, uid))) {
+      if (!profile || !follows || policyOf(user) === "nobody" || (await blockedBetween(this.store, caller.uid, uid)) || (await this.adults?.isHidden(uid))) {
         notAdded.push(name);
         continue;
       }
@@ -239,6 +247,7 @@ export class ConversationService {
     if (!isGroupId(id)) {
       const other = id.split("_").find((u) => u !== caller.uid);
       if (other) await checkNotBlocked(this.store, caller.uid, other);
+      if (other) await this.refuseHidden(other);
     }
     const messageId = req.id ?? this.store.newId(`conversations/${id}/messages`);
     const attachments = await uploadedFiles(this.store, caller, req.uploadIds, {

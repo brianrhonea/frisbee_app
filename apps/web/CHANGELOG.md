@@ -4,6 +4,63 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.63.6 — 2026-11-26
+
+Navigation motion onto the K7 tokens (N13). Motion polish only; no routing changes.
+
+- Dialogs open over the sheet time (`--dur-sheet`, 300 ms, `--ease`) with a short rise and a backdrop fade; both are 0 under reduced motion.
+- The username check spinner stops under reduced motion; the pinned-message highlight fade uses `--dur-base` instead of a fixed 0.4 s.
+- Tests: reduced-motion and token checks, and a width-change check (the page is not reloaded, URL and scroll place stay). Opt-in video recordings of the main journeys at 375 and 1440 px, light and dark (`E2E_MOTION=1`, projects `motion-*`), saved untracked under `review/web/motion/`.
+
+## 0.63.5 — 2026-11-26
+
+UI review fixes for the shell and components (Sprint 3 lane C). No routes, logic or permissions change.
+
+- Blocker: an EmptyState's primary button was invisible (`.empty a` set the accent colour on an accent fill); it is now `.empty a:not(.btn)`.
+- Confirm dialogs have their own title and confirm label for unblock, block, delete post, take back repost, leave team or community, make owner, cancel request, move Discord rooms, deal players, regenerate or replace the schedule, the staff actions, finish and cancel draft ("Keep draft" / "Cancel draft"), and "Tell the community?" ("Post it" / "Not now"). Destructive: delete post, block, make owner, move rooms, deal teams, regenerate and replace schedule.
+- Phone: `--tabbar-h` is on `:root`; focused fields scroll above the tab bar (`scroll-padding-bottom`); the floating Post button hides where the stats dock or tournament bar shows; tab and rail labels are 11 px and ellipsise.
+- Sidebar links are 48 px high; the search clear button has a 48 px hit area and the WebKit cancel button is hidden; summary-tile labels wrap and tiles go two across under 360 px.
+- Second confirm question answers the first with no; a ReactNode message is not wrapped in a paragraph; ErrorState drops the old `form-error error-note` classes; SearchField's `role="search"` is opt-in (`landmark`); "Your sideline" is a paragraph and the sidebar a plain `div`.
+- Tests: CRLF-safe CSS reads, new unit and browser checks for each fix, and `E2E_PORT` to run the browser tests on another port.
+
+## 0.63.4 — 2026-11-26
+
+Browser-test setup only: the route check (N8) is its own Playwright project that runs after the width projects (it starts a stub API on port 8787, which must not run beside them), and the shell width test has a longer timeout for first-visit compiles.
+
+## 0.63.3 — 2026-11-26
+
+Browser tests only (Sprint 3 N8 and N10): every page in `app/**/page.tsx` opens signed out (77 checks, with a stub API answering 404 so server-rendered pages do not need a real one), and the shell works by keyboard (skip link, reading order, focus rings, only the visible navigation is reachable, arrows on chips and tabs). The review-picture spec also captures the new gallery sections.
+
+## 0.63.2 — 2026-11-26
+
+C9: 168 plain `<p className="form-error">` messages in 84 files are now the shared ErrorNote (ErrorState): the same words in a soft red box, announced as an alert (`role="alert"`), the same colours in light and dark. Messages that sit in a form row keep their place; nothing about when an error shows has changed.
+
+## 0.63.1 — 2026-11-26
+
+C10: the browser's `window.confirm` is replaced by the shared ConfirmDialog (`useConfirm()`) in 39 files, about 60 call sites: deletes, removals, withdrawals, unblock, publish and the rest. Deletes and removals use the destructive variant. Same questions, same outcomes; only the dialog is new.
+
+- Left on purpose: the two payment screens (`Payments.tsx`, `StaffPayments.tsx`, behaviour not touched without approval) and `StatsHome.tsx`, whose helper returns the answer synchronously. `tests/unit/noNativeConfirm.test.ts` fails if any other `confirm()` comes back.
+
+## 0.63.0 — 2026-11-26
+
+Shared components C5-C10, the website halves (Sprint 3). Same names as the app's: CoverHeader, SummaryTiles, ListRow, EventCard, DateBadge, EmptyState, ErrorState, LoadingState, TextField, SearchField, ConfirmDialog. All in `components/ui/`, every state on the `/dev/ui` gallery. No business logic, routes or permissions change.
+
+- New: CoverHeader, SummaryTiles, ListRow, EventCard (RSVP chip, Cancelled, Repeats), DateBadge, TextField, TextArea, SearchField, ConfirmDialog, and `useConfirm()` with a `ConfirmProvider` in the layout (destructive variant; Esc cancels; focus returns to the opener; messages keep their line breaks).
+- `StatusViews.tsx` (`Loading`, `EmptyState`, `ErrorNote`) now renders the shared LoadingState, EmptyState and ErrorState (a soft red box, `role="alert"`, a 48 px Try again button).
+- `DateTile` and the event list's date badge are the shared DateBadge.
+- `Dialog` keeps Tab inside the dialog (it wraps at the ends), so every modal has a focus trap.
+- `Button` accepts `ref`.
+
+## 0.62.0 — 2026-11-26
+
+Website shell matching the boards (Sprint 3 S3, UI-Q5 and UI-Q11). No route changes.
+
+- Sidebar from 900 px; an icon rail from 600 to 899 px; the tabs as a bar fixed to the bottom under 600 px (it was a row under the top bar). The right panel shows from 1200 px, and the whole shell is capped at 1600 px.
+- Members' tab order is Home, Discover, Teams, Schedule, Chats. Learn is no longer a member tab: it opens under Discover (highlighted there, a "Learn to play" link in the sidebar, and a card on Discover). Signed-out visitors keep Learn as a tab.
+- Bottom-fixed elements (floating Post, voice bar, game and stats docks, whiteboard toast) sit above the bottom bar, with the safe-area inset.
+- A "Skip to content" link; the icon rail's create button has a name.
+- Tests: tests/e2e/shell.spec.ts (N9) and tests/unit/AppFrame.test.tsx.
+
 ## 0.61.0 — 2026-11-26
 
 Release-branch merge of #3a (account gate, web 0.60.0/0.60.1 on hold/3a-account-gate) with C1-C4 (0.59.9-0.59.14).

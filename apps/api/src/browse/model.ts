@@ -94,18 +94,35 @@ export function isPrivateProfile(profile: Data | undefined): boolean {
   return !profile || profile.private === true;
 }
 
+let imageBuckets: readonly string[] | null = null;
+
 /**
- * A picture URL visitors' browsers may load: Firebase Storage or Google's
- * profile photos only, so a profile can't make every visitor fetch from a
- * server of its owner's choosing (the rules let owners store any string).
+ * The Storage buckets imageUrl trusts. Set once at startup; until then (or
+ * with an empty list) any bucket's Storage URL passes, but Google photos
+ * are still limited to lh3.
+ */
+export function configureImageBuckets(buckets: readonly string[]): void {
+  imageBuckets = buckets.length > 0 ? buckets : null;
+}
+
+/**
+ * A picture URL visitors' browsers may load: this app's Firebase Storage
+ * buckets (see configureImageBuckets) or Google account photos
+ * (lh3.googleusercontent.com) only, over https, so a profile can't make
+ * every visitor fetch from a server (or a bucket) of its owner's choosing
+ * (the rules let owners store any string).
  */
 export function imageUrl(v: unknown): string | undefined {
   if (typeof v !== "string" || v.length > 2000) return undefined;
   try {
     const u = new URL(v);
-    if (u.protocol !== "https:") return undefined;
-    const ok = u.hostname === "firebasestorage.googleapis.com" || u.hostname === "storage.googleapis.com" || u.hostname.endsWith(".googleusercontent.com");
-    return ok ? v : undefined;
+    if (u.protocol !== "https:" || u.username || u.password || u.port) return undefined;
+    if (u.hostname === "lh3.googleusercontent.com") return v;
+    let bucket: string | undefined;
+    if (u.hostname === "firebasestorage.googleapis.com") bucket = /^\/v0\/b\/([^/]+)\/o\//.exec(u.pathname)?.[1];
+    else if (u.hostname === "storage.googleapis.com") bucket = /^\/([^/]+)\//.exec(u.pathname)?.[1];
+    else return undefined;
+    return bucket && (!imageBuckets || imageBuckets.includes(bucket)) ? v : undefined;
   } catch {
     return undefined;
   }

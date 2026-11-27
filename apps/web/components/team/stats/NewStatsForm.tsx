@@ -18,6 +18,7 @@ import { callApi, problem } from "@/lib/client";
 import { useAuth } from "../../AuthProvider";
 import { apiUrl, gameUrl, type LinkableEvent, shortDate, tournamentUrl } from "./data";
 import "./stats.css";
+import { ErrorNote } from "@/components/StatusViews";
 
 const typeLabel: Record<string, string> = {
   practice: "Practice",
@@ -175,7 +176,7 @@ export function NewStatsForm({
         <input type="date" value={dayOf(date)} onChange={(e) => e.target.value && setDate(atDay(e.target.value))} />
       </label>
       {!tournament && <GameSettings gameTo={gameTo} timeouts={timeouts} onGameTo={setGameTo} onTimeouts={setTimeouts} />}
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       <div className="form-actions">
         <button type="button" className="btn btn-small" onClick={onClose}>
           Cancel
@@ -300,7 +301,7 @@ function NewEvent({
           <input type="time" value={time} onChange={(e) => e.target.value && setTime(e.target.value)} />
         </label>
       </div>
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       <div className="form-actions">
         <button type="button" className="btn btn-small" onClick={() => onDone(null)}>
           Cancel

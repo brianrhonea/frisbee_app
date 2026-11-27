@@ -24,6 +24,8 @@ import {
   videosApi,
 } from "./model";
 import "./videos.css";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 const videosCap = 1000;
 const foldersCap = 200;
@@ -36,6 +38,7 @@ const same = (a: VideoFilter, b: VideoFilter) => a.kind === b.kind && (a.kind !=
  * add, edit, file and remove videos and manage folders.
  */
 export function TeamVideos() {
+  const askConfirm = useConfirm();
   const { teamId, viewer } = useTeamHub();
   const { user } = useAuth();
   const editor = viewer.state === "member" && viewer.can("manageTeam");
@@ -57,9 +60,9 @@ export function TeamVideos() {
     if (filter.kind === "folder" && foldersLive.data && !foldersLive.data.some((f) => f.id === filter.id)) setFilter({ kind: "all" });
   }, [filter, foldersLive.data]);
 
-  if (videosLive.error) return <p className="form-error">{videosLive.error}</p>;
+  if (videosLive.error) return <ErrorNote>{videosLive.error}</ErrorNote>;
   // Folders load before the editor opens, so editing never unfiles a video.
-  if (foldersLive.error) return <p className="form-error">{foldersLive.error}</p>;
+  if (foldersLive.error) return <ErrorNote>{foldersLive.error}</ErrorNote>;
   if (!videosLive.data || !foldersLive.data) return <p className="muted" aria-busy="true">Loading…</p>;
 
   const current = filter.kind === "folder" ? folders.find((f) => f.id === filter.id) : undefined;
@@ -105,15 +108,15 @@ export function TeamVideos() {
     }
   }
 
-  function deleteFolder(f: Folder) {
+  async function deleteFolder(f: Folder) {
     const n = countIn({ kind: "folder", id: f.id });
     const message = n === 0 ? "It has no videos." : `Its ${n === 1 ? "video moves" : `${n} videos move`} to Unsorted; no videos are deleted.`;
-    if (!window.confirm(`Delete the "${f.name}" folder?\n\n${message}`)) return;
+    if (!(await askConfirm({ message: `Delete the "${f.name}" folder?\n\n${message}`, confirmLabel: "Delete", destructive: true }))) return;
     void run(`${foldersApi(teamId)}/${encodeURIComponent(f.id)}`, "DELETE").then((ok) => ok && setFilter({ kind: "all" }));
   }
 
-  function remove(v: Video) {
-    if (!window.confirm(`Remove "${v.title}"?\n\n${removeMessage(v)}`)) return;
+  async function remove(v: Video) {
+    if (!(await askConfirm({ message: `Remove "${v.title}"?\n\n${removeMessage(v)}`, confirmLabel: "Remove", destructive: true }))) return;
     void run(`${videosApi(teamId)}/${encodeURIComponent(v.id)}`, "DELETE");
   }
 
@@ -209,9 +212,9 @@ export function TeamVideos() {
         </form>
       )}
       {error && (
-        <p className="form-error" role="alert">
+        <ErrorNote>
           {error}
-        </p>
+        </ErrorNote>
       )}
       {visible.length === 0 ? (
         videos.length === 0 ? (

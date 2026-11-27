@@ -5,6 +5,8 @@ import { callApi, problem } from "@/lib/client";
 import { useAuth } from "../AuthProvider";
 import { ReportCard } from "../ReportQueue";
 import { useTeamHub } from "./TeamContext";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 /**
  * Settings › Reports, for the team's admins and moderators: reports on its
@@ -13,6 +15,7 @@ import { useTeamHub } from "./TeamContext";
  * this one. Reporters stay anonymous here.
  */
 export function TeamReports() {
+  const askConfirm = useConfirm();
   const { user } = useAuth();
   const { teamId } = useTeamHub();
   const [reports, setReports] = useState<ReportInfo[] | null>(null);
@@ -34,7 +37,7 @@ export function TeamReports() {
 
   async function act(r: ReportInfo, action: "remove" | "dismiss") {
     if (!user) return;
-    if (action === "remove" && !window.confirm("Remove it for everyone? This can't be undone.")) return;
+    if (action === "remove" && !(await askConfirm({ message: "Remove it for everyone? This can't be undone.", confirmLabel: "Remove", destructive: true }))) return;
     setBusy(r.id);
     setError(null);
     try {
@@ -51,7 +54,7 @@ export function TeamReports() {
     <section className="card" id="reports">
       <h2 className="card-title">Reports</h2>
       <p className="muted small">What members reported in this team&apos;s chat and posts. Stall 10&apos;s staff see these reports too.</p>
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       {reports === null ? (
         !error && <p className="muted">Loading…</p>
       ) : reports.length === 0 ? (

@@ -5,6 +5,7 @@ import { adultOnlyMessage } from "@stall10/shared";
 import { signOut } from "firebase/auth";
 import { useState } from "react";
 import { deleteOwnAccount, firebaseAuth } from "@/lib/firebase";
+import { ErrorNote } from "@/components/StatusViews";
 
 export const adultOnlyCopy = {
   title: "Stall 10 is for players 18 and older",
@@ -35,7 +36,7 @@ export function AdultOnly() {
       <div className="auth-card" role="alert">
         <h1>{adultOnlyCopy.title}</h1>
         <p>{adultOnlyCopy.body}</p>
-        {error && <p className="form-error">{error}</p>}
+        {error && <ErrorNote>{error}</ErrorNote>}
         {confirming ? (
           <>
             <p>{adultOnlyCopy.deletePrompt}</p>

@@ -12,7 +12,7 @@
   color: var(--muted); margin: 0; padding: 22px 18px; text-align: center;
   border: 1px dashed var(--line-2); border-radius: var(--radius); background: var(--card);
 }
-.empty a { color: var(--accent); font-weight: 600; }
+.empty a:not(.btn) { color: var(--accent); font-weight: 600; }
 .stack { display: grid; gap: 14px; }
 
 .avatar {
@@ -208,6 +208,7 @@
   border: 2px solid var(--line); border-top-color: var(--accent); animation: spin 0.8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .username-spin { animation: none; } }
 .username-field small.form-ok, .username-field small.form-error { font-size: 0.8rem; }
 .username-field { display: grid; gap: 6px; font-size: 0.88rem; font-weight: 600; color: var(--ink-soft); }
 .username-step-form { display: grid; gap: var(--space-lg); }
@@ -239,6 +240,11 @@ dialog.dialog {
   width: min(100% - 32px, 480px); max-width: none; max-height: calc(100vh - 32px); overflow: visible;
 }
 dialog.dialog::backdrop { background: rgb(0 0 0 / 0.45); }
+/* Opening: the sheet timing (N13). Closing is instant. The tokens are 0 under reduced motion. */
+dialog.dialog[open] { animation: dialog-in var(--dur-sheet) var(--ease); }
+dialog.dialog[open]::backdrop { animation: dialog-fade var(--dur-sheet) var(--ease); }
+@keyframes dialog-in { from { opacity: 0; transform: translateY(8px); } }
+@keyframes dialog-fade { from { opacity: 0; } }
 dialog.dialog > * { max-height: calc(100vh - 32px); overflow-y: auto; }
 .small { font-size: 0.88rem; }
 .pill {
@@ -421,8 +427,10 @@ dialog.dialog > * { max-height: calc(100vh - 32px); overflow-y: auto; }
   grid-template-areas: "top top" "side main";
   grid-template-rows: auto 1fr;
   min-height: 100vh;
-  /* The sidebar's column, white to the bottom of the page and flush with
-     the browser's left edge. */
+  /* The whole shell (sidebar, page and right panel) is capped at 1600 px and centred. */
+  max-width: 1600px; margin-inline: auto;
+  /* The sidebar's column, filled to the bottom of the page: the left edge of the
+     shell, which is centred in the window above 1600 px. */
   --side-w: 236px;
   background: linear-gradient(to right, var(--card) var(--side-w), var(--line) var(--side-w) calc(var(--side-w) + 1px), transparent 0);
 }
@@ -431,6 +439,14 @@ dialog.dialog > * { max-height: calc(100vh - 32px); overflow-y: auto; }
   grid-template-areas: "top top top" "side main aside";
 }
 .frame-main { grid-area: main; min-width: 0; display: flex; flex-direction: column; }
+.frame-main > main:focus { outline: none; }
+/* First stop for the keyboard: jumps past the bars to the page. */
+.skip-link {
+  position: absolute; left: var(--space-md); top: -100px; z-index: 100; padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-control); background: var(--card); color: var(--ink); font-weight: 700; text-decoration: none;
+  border: 2px solid var(--accent);
+}
+.skip-link:focus { top: var(--space-md); }
 .frame-main > main { flex: 1; }
 .frame .wrap { width: min(var(--wrap), 100% - 40px); }
 
@@ -489,9 +505,16 @@ dialog.dialog > * { max-height: calc(100vh - 32px); overflow-y: auto; }
 .side-tabs { display: grid; gap: 2px; }
 .nav-item {
   position: relative; display: flex; align-items: center; gap: var(--space-md); padding: 10px var(--space-md); border-radius: var(--radius-control);
-  color: var(--ink-soft); text-decoration: none; font-weight: 600; font-size: 14.5px;
+  color: var(--ink-soft); text-decoration: none; font-weight: 600; font-size: 14.5px; min-height: 48px;
 }
 .nav-item svg { width: 20px; height: 20px; flex: none; }
+/* Learn to play, under Discover: indented, no icon. The icon rail hides it. */
+.nav-item-sub {
+  display: flex; align-items: center; min-height: 48px; padding: 8px var(--space-md) 8px 44px; border-radius: var(--radius-control);
+  color: var(--ink-soft); text-decoration: none; font-weight: 600; font-size: 13.5px;
+}
+.nav-item-sub:hover { background: var(--field); color: var(--ink); }
+.nav-item-sub.active { color: var(--accent-ink); font-weight: 700; }
 .nav-item:hover { background: var(--field); color: var(--ink); }
 /* Selected: turf, with a turf bar at the leading edge. */
 .nav-item.active { color: var(--accent-ink); font-weight: 700; background: var(--accent-soft); }
@@ -560,21 +583,23 @@ dialog.dialog > * { max-height: calc(100vh - 32px); overflow-y: auto; }
 
 .tab-bar { display: none; }
 
-@media (max-width: 1200px) {
+/* The right column shows from 1200 px; below it the page has the room. */
+@media (max-width: 1199px) {
   .frame.with-aside { grid-template-columns: 236px minmax(0, 1fr); grid-template-areas: "top top" "side main"; }
   .frame-aside { display: none; }
   .top-tagline { display: none; }
 }
 
-/* Tablets: an icon rail, labels under the icons. */
-@media (max-width: 1000px) {
+/* Tablets, 600 to 899 px: an icon rail, labels under the icons. */
+@media (max-width: 899px) {
   .frame, .frame.with-aside { grid-template-columns: 76px minmax(0, 1fr); --side-w: 76px; }
   .side-nav { align-items: center; padding: 14px var(--space-sm); gap: var(--space-lg); }
-  .side-nav .side-label, .side-create span, .side-nav .side-teams, .side-foot, .account-name { display: none; }
+  .side-nav .side-label, .side-create span, .side-nav .side-teams, .side-foot, .account-name, .nav-item-sub { display: none; }
   .nav-item {
     flex-direction: column; gap: var(--space-xs); width: 60px; padding: var(--space-sm) 2px;
-    font-size: 10.5px; font-weight: 600; text-align: center;
+    font-size: 11px; font-weight: 600; text-align: center; justify-content: center;
   }
+  .nav-item span { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .nav-item.active { font-weight: 700; }
   .nav-item.active::before { left: -8px; }
   .side-create { width: 44px; height: 44px; min-height: 0; padding: 0; border-radius: var(--radius-control); }
@@ -582,8 +607,14 @@ dialog.dialog > * { max-height: calc(100vh - 32px); overflow-y: auto; }
   .top-bar .account-menu summary { padding: 2px; }
 }
 
-/* Phones: a slimmer top bar, and the tabs in a row under it. */
-@media (max-width: 640px) {
+/* Phones, under 600 px: a slimmer top bar, and the tabs as a bar fixed to the
+   bottom of the screen (the page itself scrolls, so Back and scroll restoration
+   keep working). --tabbar-h is the bar's height without the home-indicator inset. */
+@media (max-width: 599px) {
+  /* On :root so everything below, and the focus scrolling, can use it. */
+  :root { --tabbar-h: 66px; }
+  /* A focused field scrolls into view above the tab bar, not under it. */
+  html { scroll-padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 16px); }
   .frame, .frame.with-aside { display: block; background: none; }
   .side-nav { display: none; }
   .top-bar { height: 56px; padding: 0 var(--space-md) 0 var(--space-lg); grid-template-columns: auto 1fr; column-gap: var(--space-sm); }
@@ -592,22 +623,24 @@ dialog.dialog > * { max-height: calc(100vh - 32px); overflow-y: auto; }
   .top-bar .header-actions { grid-column: 2; gap: var(--space-xs); }
   .top-bar .top-search-icon { display: inline-grid; }
   .top-bar .btn-small { padding: 7px var(--space-md); }
+  .frame-main { padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px)); }
   .tab-bar {
-    position: sticky; top: 56px; z-index: 20;
-    /* As many equal columns as tabs: six for members, five for visitors. */
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    /* As many equal columns as tabs: five for members, five for visitors. */
     display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px;
-    padding: 6px 6px var(--space-sm); background: var(--card); border-bottom: 1px solid var(--line);
+    padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px)); background: var(--card); border-top: 1px solid var(--line);
   }
   .tab-item {
-    display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0 var(--space-xs); border-radius: 10px;
-    color: var(--muted); text-decoration: none; font-size: 10.5px; font-weight: 600;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 52px; padding: 4px 0;
+    border-radius: 10px; color: var(--muted); text-decoration: none; font-size: 11px; font-weight: 600; min-width: 0;
   }
-  .tab-item svg { width: 20px; height: 20px; }
-  .tab-item.active { color: var(--accent-ink); background: var(--accent-soft); box-shadow: inset 0 -3px 0 var(--accent); }
+  .tab-item span { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tab-item svg { width: 22px; height: 22px; }
+  .tab-item.active { color: var(--accent-ink); font-weight: 700; background: var(--accent-soft); box-shadow: inset 0 -3px 0 var(--accent); }
   .tab-item.active svg { color: var(--accent); }
 }
 /* Visitors' Log in beside Join free, where the phone has room for it. */
-@media (min-width: 380px) and (max-width: 640px) {
+@media (min-width: 380px) and (max-width: 599px) {
   .top-bar .header-actions .link { display: inline-block; padding: 0 var(--space-xs); }
 }
 
@@ -876,9 +909,9 @@ dialog.dialog > * { max-height: calc(100vh - 32px); overflow-y: auto; }
 .team-back { margin: 0 0 10px; font-size: 0.9rem; }
 .team-back a { color: var(--muted); font-weight: 600; text-decoration: none; }
 .team-back a:hover { color: var(--ink); text-decoration: underline; }
-@media (max-width: 640px) {
-  /* The 56px top bar plus the phone tab bar under it (.tab-bar). */
-  .team-hub { --hub-sticky-top: 116px; }
+@media (max-width: 599px) {
+  /* The 56px top bar (the tabs are at the foot of the screen). */
+  .team-hub { --hub-sticky-top: 56px; }
 }
 .team-tabs-bar {
   display: flex; align-items: center; gap: var(--space-xs); margin-bottom: 18px;
@@ -1567,7 +1600,7 @@ dialog.dialog:has(.invite-dialog) { width: min(100% - 32px, 560px); }
 /* The team strip under the composer. */
 .team-strip { margin: -4px 0 0; min-width: 0; }
 /* Wide screens list the teams in the sidebar (SideTeams), with Create or join. */
-@media (min-width: 1001px) { .huddle .team-strip { display: none; } }
+@media (min-width: 900px) { .huddle .team-strip { display: none; } }
 .team-strip ul {
   list-style: none; margin: 0; padding: 2px 2px 6px; display: flex; gap: var(--space-sm);
   overflow-x: auto; scrollbar-width: thin; scroll-snap-type: x proximity;
@@ -1641,17 +1674,22 @@ dialog.dialog:has(.invite-dialog) { width: min(100% - 32px, 560px); }
 
 /* The floating Post button, where the side nav is hidden. */
 .fab-post { display: none; }
-@media (max-width: 640px) {
+@media (max-width: 599px) {
   .fab-post {
-    position: fixed; z-index: 30; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    position: fixed; z-index: 30; right: 16px; bottom: calc(var(--tabbar-h) + 16px + env(safe-area-inset-bottom, 0px));
     display: inline-flex; align-items: center; gap: 6px; padding: var(--space-md) 18px; border: 0; border-radius: var(--radius-pill);
     background: var(--accent); color: var(--on-accent); font: inherit; font-weight: 800; cursor: pointer;
     box-shadow: 0 6px 18px rgb(0 0 0 / 0.22);
   }
   .fab-post:hover { filter: brightness(1.05); }
   /* Above the voice bar (sticky at the foot) while in a call. */
-  .frame:has(.voice-bar) .fab-post { bottom: calc(88px + env(safe-area-inset-bottom, 0px)); }
-  .frame.has-fab .frame-main { padding-bottom: 72px; }
+  .frame:has(.voice-bar) .fab-post { bottom: calc(var(--tabbar-h) + 72px + env(safe-area-inset-bottom, 0px)); }
+  .frame.has-fab .frame-main { padding-bottom: calc(var(--tabbar-h) + 72px + env(safe-area-inset-bottom, 0px)); }
+  /* Pages with their own docked bar (stats game, tournament editor) have no floating Post button. */
+  .frame:has(.st-dock, .gt-bar) .fab-post { display: none; }
+  /* Sticky bars at the foot sit above the tab bar. */
+  .frame .voice-bar, .frame .gt-bar, .frame .st-dock { bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px)); }
+  .frame .team-hub .wb-toast { bottom: calc(var(--tabbar-h) + 16px + env(safe-area-inset-bottom, 0px)); }
 }
 /* ==== end Home: social feed ============================================ */
 

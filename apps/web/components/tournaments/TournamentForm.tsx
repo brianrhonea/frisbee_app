@@ -59,6 +59,7 @@ import { canOn, tournamentPath, useAction } from "./useTournament";
 import "./tournaments.css";
 import { formatDate } from "@/lib/dates";
 import { StatusPill } from "../ui/StatusPill";
+import { ErrorNote } from "@/components/StatusViews";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const dayValue = (d: Date | null) => (d ? `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` : "");
@@ -298,7 +299,7 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
   );
 
   if (!isNew && existing.data === null) return <p className="empty">That tournament doesn&apos;t exist or you can&apos;t see it.</p>;
-  if (existing.error || host.error) return <p className="form-error">{existing.error ?? host.error}</p>;
+  if (existing.error || host.error) return <ErrorNote>{existing.error ?? host.error}</ErrorNote>;
   if (!form || host.data === undefined) return <p className="muted" aria-busy="true">Loading…</p>;
   const canHost = canOn(host.data, user?.uid, "manageEvents");
   if (!canHost) return <p className="empty">Only members who manage events can host tournaments.</p>;
@@ -821,7 +822,7 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
       )}
       {step === lastStep && problem && <p className="hosted-form-problem">{problem}</p>}
       {step === lastStep && isDraft && !problem && tooEarly && <p className="hosted-form-problem">{tooEarly}</p>}
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       <div className="home-actions hosted-form-nav">
         {step > 0 && (
           <button type="button" className="btn" onClick={() => setStep(step - 1)}>

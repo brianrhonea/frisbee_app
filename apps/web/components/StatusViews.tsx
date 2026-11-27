@@ -1,41 +1,20 @@
 import type { ReactNode } from "react";
+import { EmptyState, ErrorState, LoadingState } from "./ui/States";
 
 /**
  * The site's three "not the content yet" states, in one style everywhere:
  * still loading, nothing there (with an optional next step), and an error
- * (with an optional retry).
+ * (with an optional retry). These are the shared LoadingState, EmptyState
+ * and ErrorState (components/ui/States.tsx) under the names the pages use.
  */
-export function Loading({ label = "Loading…" }: { label?: string }) {
-  return (
-    <p className="muted status-loading" role="status" aria-busy="true">
-      {label}
-    </p>
-  );
-}
+export { EmptyState };
 
-export function EmptyState({ children, action }: { children: ReactNode; action?: ReactNode }) {
-  return (
-    <div className="empty empty-state">
-      <p>{children}</p>
-      {action && <div className="empty-action">{action}</div>}
-    </div>
-  );
+export function Loading({ label = "Loading…" }: { label?: string }) {
+  return <LoadingState label={label} />;
 }
 
 export function ErrorNote({ children, onRetry }: { children: ReactNode; onRetry?: () => void }) {
-  return (
-    <p className="form-error error-note" role="alert">
-      {children}
-      {onRetry && (
-        <>
-          {" "}
-          <button type="button" className="text-btn" onClick={onRetry}>
-            Try again
-          </button>
-        </>
-      )}
-    </p>
-  );
+  return <ErrorState onRetry={onRetry}>{children}</ErrorState>;
 }
 
 /**

@@ -11,6 +11,8 @@ import { MembersOnlySection } from "../TeamNav";
 import { NoteQuote, RsvpNoteField } from "../../RsvpNote";
 import { audienceLine, canSee, inviteTier, isEditorTier, type MeetingData, meetingApi, meetingHref, meetingsHref, needsApproval, roomHref, whenLine } from "./model";
 import "./meetings.css";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** Members of [team] who can see [m] (TeamMeeting.invitees). */
 function invitees(team: TeamDoc, m: MeetingData): string[] {
@@ -28,6 +30,7 @@ function invitees(team: TeamDoc, m: MeetingData): string[] {
  * delete it.
  */
 export function MeetingPage({ meetingId }: { meetingId: string }) {
+  const askConfirm = useConfirm();
   const { user } = useAuth();
   const router = useRouter();
   const { teamId, viewer } = useTeamHub();
@@ -78,9 +81,9 @@ export function MeetingPage({ meetingId }: { meetingId: string }) {
   }
   const answer = (a: MeetingRsvp | null) =>
     run(() => callApi(user!, `${meetingApi(teamId, meetingId)}/rsvp`, { method: "PUT", body: { answer: a } }));
-  const remove = () => {
+  const remove = async () => {
     const warning = m.status === "live" ? "The meeting is live. Everyone in it will be disconnected." : "RSVPs and the meeting chat will be lost.";
-    if (!window.confirm(`Delete "${m.title || "Meeting"}"? ${warning}`)) return;
+    if (!(await askConfirm({ message: `Delete "${m.title || "Meeting"}"? ${warning}`, confirmLabel: "Delete", destructive: true }))) return;
     void run(async () => {
       await callApi(user!, meetingApi(teamId, meetingId), { method: "DELETE" });
       router.push(meetingsHref(teamId));
@@ -156,9 +159,9 @@ export function MeetingPage({ meetingId }: { meetingId: string }) {
         </section>
       )}
       {error && (
-        <p className="form-error" role="alert">
+        <ErrorNote>
           {error}
-        </p>
+        </ErrorNote>
       )}
       <section className="card">
         <h2 className="card-title">Invited ({invited.length})</h2>

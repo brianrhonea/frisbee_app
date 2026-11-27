@@ -18,6 +18,8 @@ import { useAuth } from "../AuthProvider";
 import { Dialog } from "../Dialog";
 import { useTeamHub } from "./TeamContext";
 import { StatusPill } from "../ui/StatusPill";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 const money = (cents: number) => `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}`;
 /** Cents from what someone typed ("40", "$40.50"), or null. */
@@ -29,6 +31,7 @@ function centsOf(typed: string): number | null {
 }
 
 export function TeamShare() {
+  const askConfirm = useConfirm();
   const { teamId, kind, viewer } = useTeamHub();
   const { user } = useAuth();
   const [view, setView] = useState<TeamShareView | null>(null);
@@ -119,8 +122,8 @@ export function TeamShare() {
               type="button"
               className="text-btn small"
               disabled={busy}
-              onClick={() => {
-                if (window.confirm("Stop splitting the fee? Everyone's paid marks are cleared too.")) void run(teamSharePath(teamId), "DELETE");
+              onClick={async () => {
+                if ((await askConfirm({ message: "Stop splitting the fee? Everyone's paid marks are cleared too.", confirmLabel: "Stop", destructive: true }))) void run(teamSharePath(teamId), "DELETE");
               }}
             >
               Stop
@@ -157,7 +160,7 @@ export function TeamShare() {
           </ul>
         </>
       )}
-      {error && !editing && <p className="form-error">{error}</p>}
+      {error && !editing && <ErrorNote>{error}</ErrorNote>}
       {dialog}
     </div>
   );
@@ -223,7 +226,7 @@ function ShareDialog({
             onChange={(e) => setNote(e.target.value)}
           />
         </label>
-        {(problem ?? error) && <p className="form-error">{problem ?? error}</p>}
+        {(problem ?? error) && <ErrorNote>{problem ?? error}</ErrorNote>}
         <div className="form-actions">
           <button type="button" className="btn" onClick={onClose}>
             Cancel

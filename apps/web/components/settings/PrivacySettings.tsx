@@ -5,6 +5,7 @@ import { useAuth } from "../AuthProvider";
 import { MessagePolicySettings } from "./MessagePolicySettings";
 import { ReadReceiptsSetting } from "./ReadReceiptsSetting";
 import { searchTagsFor, useMyProfile } from "./useMyProfile";
+import { ErrorNote } from "@/components/StatusViews";
 
 const sections = [
   ["stats", "Stats", "Your season totals and career table"],
@@ -19,7 +20,7 @@ export function PrivacySettings() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   if (!user) return null;
-  if (loadError) return <p className="form-error">{loadError}</p>;
+  if (loadError) return <ErrorNote>{loadError}</ErrorNote>;
   if (!profile) return <p className="muted">Loading…</p>;
   const me = user;
   const visibility = { stats: true, teams: true, games: true, ...profile.visibility };
@@ -82,7 +83,7 @@ export function PrivacySettings() {
         ))}
         <p className="muted small">Hidden sections come back the next time the app updates your profile.</p>
       </div>
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
     </div>
   );
 }

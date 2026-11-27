@@ -23,6 +23,8 @@ import { useAuth } from "../AuthProvider";
 import { Avatar } from "../Avatar";
 import { PersonPicker } from "../PersonPicker";
 import { Invites } from "../Schedule";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 const colorName = (c: CalendarColor) => c[0]!.toUpperCase() + c.slice(1);
 
@@ -36,6 +38,7 @@ type Call = (path: string, init?: { method?: string; body?: unknown }) => Promis
  * nothing until they accept.
  */
 export function CalendarSettings() {
+  const askConfirm = useConfirm();
   const { user } = useAuth();
   const [calendars, setCalendars] = useState<CalendarInfo[] | null>(null);
   const [invites, setInvites] = useState<CalendarInvitesResponse["invites"]>([]);
@@ -85,9 +88,9 @@ export function CalendarSettings() {
     <div className="stack">
       {invites.length > 0 && <Invites invites={invites} onAnswered={load} />}
       {error && (
-        <p className="form-error" role="alert">
+        <ErrorNote>
           {error}
-        </p>
+        </ErrorNote>
       )}
       {calendars === null ? (
         !error && <p className="muted">Loading…</p>
@@ -115,8 +118,8 @@ export function CalendarSettings() {
                       type="button"
                       className="btn btn-small"
                       disabled={busy}
-                      onClick={() => {
-                        if (!window.confirm(`Leave "${c.name}"? You'll need a new invite to see it again.`)) return;
+                      onClick={async () => {
+                        if (!(await askConfirm({ message: `Leave "${c.name}"? You'll need a new invite to see it again.`, confirmLabel: "Leave", destructive: true }))) return;
                         void run(`/v1/calendars/${encodeURIComponent(c.id)}/members/${encodeURIComponent(me.uid)}`, {
                           method: "DELETE",
                         });
@@ -161,6 +164,7 @@ export function ColorPicker({ value, onChange, disabled }: { value: CalendarColo
 }
 
 function OwnedCalendar({ calendar: c, busy, run }: { calendar: CalendarInfo; busy: boolean; run: Call }) {
+  const askConfirm = useConfirm();
   const [name, setName] = useState(c.name);
   const [role, setRole] = useState<ShareRole>("view");
   const path = `/v1/calendars/${encodeURIComponent(c.id)}`;
@@ -185,8 +189,8 @@ function OwnedCalendar({ calendar: c, busy, run }: { calendar: CalendarInfo; bus
             type="button"
             className="btn btn-small"
             disabled={busy}
-            onClick={() => {
-              if (!window.confirm(`Delete "${c.name}" and all its events? Everyone on it loses it.`)) return;
+            onClick={async () => {
+              if (!(await askConfirm({ message: `Delete "${c.name}" and all its events? Everyone on it loses it.`, confirmLabel: "Delete", destructive: true }))) return;
               void run(path, { method: "DELETE" });
             }}
           >
@@ -334,6 +338,7 @@ function NewCalendar({ busy, run }: { busy: boolean; run: Call }) {
 
 /** The private subscription link (every calendar the member is on, as iCalendar). */
 function Subscribe() {
+  const askConfirm = useConfirm();
   const { user } = useAuth();
   const [feed, setFeed] = useState<CalendarFeedResponse | null>(null);
   const [busy, setBusy] = useState(false);
@@ -422,8 +427,8 @@ function Subscribe() {
               type="button"
               className="text-btn"
               disabled={busy}
-              onClick={() => {
-                if (window.confirm("Make a new link? The old one stops working, so re-subscribe with the new one.")) {
+              onClick={async () => {
+                if ((await askConfirm({ message: "Make a new link? The old one stops working, so re-subscribe with the new one.", confirmLabel: "Make new link", destructive: true }))) {
                   void change("POST");
                 }
               }}
@@ -435,8 +440,8 @@ function Subscribe() {
               type="button"
               className="text-btn"
               disabled={busy}
-              onClick={() => {
-                if (window.confirm("Turn the link off? Calendars subscribed to it stop updating.")) void change("DELETE");
+              onClick={async () => {
+                if ((await askConfirm({ message: "Turn the link off? Calendars subscribed to it stop updating.", confirmLabel: "Turn off", destructive: true }))) void change("DELETE");
               }}
             >
               Turn off
@@ -450,7 +455,7 @@ function Subscribe() {
           </button>
         )
       )}
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
     </div>
   );
 }

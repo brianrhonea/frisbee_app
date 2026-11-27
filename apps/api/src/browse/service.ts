@@ -12,6 +12,7 @@ import type {
   TeamSearchPage,
 } from "@stall10/shared";
 import { arrangeTeamFeed, publicPageOn, searchWords } from "@stall10/shared";
+import type { AdultVisibility } from "../account/adult_visibility.js";
 import { ApiError } from "../errors.js";
 import { searchKey } from "../limits/model.js";
 import {
@@ -60,7 +61,14 @@ export class BrowseService {
     private readonly now: () => number = Date.now,
     /** The Storage buckets profile photos may come from (visibility.ts photoBuckets). */
     private readonly buckets: readonly string[] = [],
+    /** D-1317: accounts without `ageOk` are left out when enforcing (account/adult_visibility.ts). */
+    private readonly adults?: AdultVisibility,
   ) {}
+
+  /** Of [uids], those D-1317 leaves out (no `ageOk`, when enforcing). */
+  private async hiddenAdults(uids: string[]): Promise<Set<string>> {
+    return this.adults ? this.adults.hidden(uids) : new Set();
+  }
 
   /** [view]'s photo and header, dropped unless pinnedImageUrl allows them. */
   private pinPhotos(view: Data): Data {
@@ -116,8 +124,9 @@ export class BrowseService {
    * once that's deleted.
    */
   private async publicPosts(docs: Doc[]): Promise<PublicPost[]> {
-    const people = await this.repo.profiles(docs.flatMap((d) => postAuthors(d.data)));
-    const shown = docs.filter((d) => postAuthors(d.data).every((id) => !isPrivateProfile(people.get(id))));
+    const authors = docs.flatMap((d) => postAuthors(d.data));
+    const [people, hidden] = await Promise.all([this.repo.profiles(authors), this.hiddenAdults(authors)]);
+    const shown = docs.filter((d) => postAuthors(d.data).every((id) => !isPrivateProfile(people.get(id)) && !hidden.has(id)));
     const originals = await originalsOf(shown, (id) => this.repo.post(id));
     return shown.map((d) => withOriginal(this.post(d), d, originals, (o) => this.post(o)));
   }
@@ -157,7 +166,7 @@ export class BrowseService {
   async profile(uid: unknown): Promise<ProfilePage> {
     if (!validId(uid)) throw new ApiError("not_found", "No such player.");
     const data = (await this.repo.profiles([uid])).get(uid);
-    if (!data) throw new ApiError("not_found", "No such player.");
+    if (!data || (await this.hiddenAdults([uid])).has(uid)) throw new ApiError("not_found", "No such player.");
     const profile = { ...this.pinPhotos(profileView(data)), id: uid } as PublicProfile;
     if (data.private === true) return { profile, posts: [], next: null };
     const docs = await this.repo.posts(null, uid);
@@ -191,7 +200,8 @@ export class BrowseService {
     );
     const shown = [...pinned, ...rest];
     const authorOf = (d: Doc) => (typeof d.data.authorId === "string" && d.data.authorId ? d.data.authorId : null);
-    const people = await this.repo.profiles(shown.flatMap((d) => authorOf(d) ?? []));
+    const authors = shown.flatMap((d) => authorOf(d) ?? []);
+    const [people, hidden] = await Promise.all([this.repo.profiles(authors), this.hiddenAdults(authors)]);
     return {
       team,
       posts: shown.map((d) => {
@@ -199,7 +209,7 @@ export class BrowseService {
         delete view.public;
         delete view.authorId;
         const author = authorOf(d);
-        if (!author || isPrivateProfile(people.get(author))) delete view.authorName;
+        if (!author || isPrivateProfile(people.get(author)) || hidden.has(author)) delete view.authorName;
         return { ...view, id: d.id, images: this.images(view.images) } as TeamPage["posts"][number];
       }),
       events: events.map((d) => ({ ...eventView(d.data), id: d.id })),
@@ -238,7 +248,9 @@ export class BrowseService {
   async search(query: unknown): Promise<SearchPage> {
     const key = queryKey(query);
     if (!key) return { players: [], teams: [] };
-    const [profiles, listings] = await Promise.all([this.repo.searchProfiles(key), this.repo.searchListings(key)]);
+    const [found, listings] = await Promise.all([this.repo.searchProfiles(key), this.repo.searchListings(key)]);
+    const hidden = await this.hiddenAdults(found.map((d) => d.id));
+    const profiles = found.filter((d) => !hidden.has(d.id));
     return {
       players: profiles.map((d) => ({ ...this.pinPhotos(searchProfileView(d.data)), id: d.id }) as PublicProfile),
       teams: listings.map((d) => ({ ...listingView(d.data), id: d.id }) as PublicListing),

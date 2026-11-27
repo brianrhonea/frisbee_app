@@ -67,6 +67,30 @@ describe("FirestoreExportRepository", () => {
     expect(e.data).toEqual({ title: "Practice", startsAt: new Date(0).toISOString(), rsvps: { [me]: "going" } });
   });
 
+  it("finds liked posts, calendars, usernames, sign-ups and follow requests without new indexes", async () => {
+    const b = db.batch();
+    b.set(db.doc("posts/exportLiked"), { authorId: "someone", likedBy: [me, "x"] });
+    b.set(db.doc("calendars/exportCal"), { ownerId: "someone", name: "Cal", members: { [me]: "edit" }, memberIds: ["someone", me] });
+    b.set(db.doc("usernames/exportname"), { uid: me });
+    b.set(db.doc("tournaments/exportT"), { name: "Export Open" });
+    b.set(db.doc(`tournaments/exportT/signups/${me}`), { name: "Me", status: "applied" });
+    b.set(db.doc("profiles/exportPrivate"), { name: "Priv", private: true });
+    b.set(db.doc(`profiles/exportPrivate/followRequests/${me}`), { name: "Me" });
+    await b.commit();
+    expect((await repo.likedPosts(me, 10)).map((d) => d.id)).toEqual(["exportLiked"]);
+    expect((await repo.calendarsOf(me, 10)).map((d) => d.id)).toEqual(["exportCal"]);
+    expect((await repo.usernamesOf(me, 10)).map((d) => d.id)).toEqual(["exportname"]);
+    const [signup] = await repo.signupsOf(me, 10);
+    expect(signup.path).toBe(`tournaments/exportT/signups/${me}`);
+    expect(signup.tournament.name).toBe("Export Open");
+    const [sent] = await repo.followRequestsSent(me, 10);
+    expect(sent.path).toBe(`profiles/exportPrivate/followRequests/${me}`);
+    expect(sent.owner.name).toBe("Priv");
+    for (const path of ["posts/exportLiked", "calendars/exportCal", "usernames/exportname", "tournaments/exportT", "profiles/exportPrivate"]) {
+      await db.recursiveDelete(db.doc(path));
+    }
+  });
+
   it("finds the caller's teams", async () => {
     expect((await repo.teamsOf(me, 10)).map((d) => d.id)).toContain(team);
   });

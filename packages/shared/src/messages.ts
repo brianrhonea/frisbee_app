@@ -52,6 +52,11 @@ export interface OpenConversationResult {
 
 /** `POST /v1/conversations/groups`. */
 export const createGroupRequestSchema = z.strictObject({
+  /** The group's id (`g-` and letters or digits); a replay of the same id is a 409. The server mints one when absent. */
+  id: z
+    .string()
+    .regex(/^g-[A-Za-z0-9]{1,40}$/, "Invalid id.")
+    .optional(),
   name: clean(z.string().trim().min(1, "Name the group.").max(groupNameMax, `Keep the name under ${groupNameMax} characters.`)),
   members: z.array(z.string().min(1).max(128)).max(groupSizeMax - 1).default([]),
 });

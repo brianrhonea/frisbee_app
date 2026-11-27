@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { callApi } from "@/lib/client";
 import { useAuth } from "../../AuthProvider";
 import { type Folder, type Video, videosApi } from "./model";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** Whether a pasted link points at a video the team can watch (LinkCheck). */
 type LinkCheck =
@@ -197,9 +198,9 @@ export function VideoEditor({
         </button>
       </div>
       {error && (
-        <p className="form-error" role="alert">
+        <ErrorNote>
           {error}
-        </p>
+        </ErrorNote>
       )}
     </form>
   );

@@ -14,6 +14,8 @@ import { unblockPerson, useBlocks } from "@/lib/moderation";
 import { BlockButton, ReportButton } from "./Report";
 import { PostCard } from "./PostCard";
 import { DashboardLayout, ProfileCard, StatTiles, TeamList } from "./ProfileDashboard";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 const statColumns: Array<[keyof StatTotals, string]> = [
   ["games", "Games"],
@@ -102,7 +104,7 @@ export function LivePlayer({ uid }: { uid: string }) {
       </div>
     ) : failed ? (
       <div className="page">
-        <p className="form-error">{failed.text}</p>
+        <ErrorNote>{failed.text}</ErrorNote>
         <button
           type="button"
           className="btn btn-small"
@@ -124,6 +126,7 @@ export function LivePlayer({ uid }: { uid: string }) {
 }
 
 function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePage; locked: boolean }) {
+  const askConfirm = useConfirm();
   const { profile, posts } = page;
   const name = profile.name || "Player";
   const first = name.split(" ")[0];
@@ -186,8 +189,8 @@ function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePage; loc
                 <button
                   type="button"
                   className="btn btn-small"
-                  onClick={() => {
-                    if (window.confirm(`Unblock ${first}? You'll see each other's posts and can follow and message again.`)) {
+                  onClick={async () => {
+                    if ((await askConfirm({ title: `Unblock ${first}?`, message: "You'll see each other's posts and can follow and message again.", confirmLabel: "Unblock" }))) {
                       void unblockPerson(user, uid).catch((e) => alert((e as Error).message));
                     }
                   }}

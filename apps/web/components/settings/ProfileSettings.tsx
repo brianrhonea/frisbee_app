@@ -5,6 +5,7 @@ import { callApi, problem } from "@/lib/client";
 import { useAuth } from "../AuthProvider";
 import { IdentitySettings } from "./IdentitySettings";
 import { searchTagsFor, useMyProfile } from "./useMyProfile";
+import { ErrorNote } from "@/components/StatusViews";
 
 const thisYear = new Date().getFullYear();
 const handLabels: Record<(typeof throwingHands)[number], string> = { right: "Right", left: "Left", both: "Both" };
@@ -40,7 +41,7 @@ export function ProfileSettings() {
   }, [profile, loaded]);
 
   if (!user) return null;
-  if (loadError) return <p className="form-error">{loadError}</p>;
+  if (loadError) return <ErrorNote>{loadError}</ErrorNote>;
   if (!profile) return <p className="muted">Loading…</p>;
   const me = user;
 

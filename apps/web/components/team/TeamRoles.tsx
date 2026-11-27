@@ -5,6 +5,8 @@ import { callApi } from "@/lib/client";
 import { useAuth } from "../AuthProvider";
 import { type CustomRoleDoc, useTeamHub } from "./TeamContext";
 import { EmptyState } from "../StatusViews";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** What each permission lets a role do (TeamPermission in the app). */
 export const permissionInfo: Record<TeamPermission, { label: string; summary: string }> = {
@@ -40,6 +42,7 @@ type Draft = { id: string; name: string; color: number; perms: TeamPermission[];
  * owner only). Roles also pick chat room and event audiences.
  */
 export function TeamRoles() {
+  const askConfirm = useConfirm();
   const { teamId, kind, viewer } = useTeamHub();
   const { user } = useAuth();
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -98,7 +101,7 @@ export function TeamRoles() {
   }
 
   async function remove(id: string) {
-    if (!window.confirm(`Delete the ${roles[id]?.name ?? ""} role? Members keep their other roles.`)) return;
+    if (!(await askConfirm({ message: `Delete the ${roles[id]?.name ?? ""} role? Members keep their other roles.`, confirmLabel: "Delete", destructive: true }))) return;
     const next = { ...roles };
     delete next[id];
     await write(next, withHolders(id, null));
@@ -224,7 +227,7 @@ export function TeamRoles() {
           </div>
         </form>
       )}
-      {error && <p className="form-error" role="alert">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
     </section>
   );
 }

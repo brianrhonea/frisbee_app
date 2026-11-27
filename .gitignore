@@ -65,6 +65,12 @@ GoogleService-Info*.plist
 *.p8
 *.p12
 *.mobileprovision
+# Mac release: a generated ExportOptions plist (the .template stays tracked),
+# a filled-in release env file (the .example stays tracked), review output
+ExportOptions*.plist
+*.env
+!*.env.example
+review/
 **/lib/firebase_options.generated.dart
 
 # Android Gradle build output

@@ -5,6 +5,7 @@ import { callApi } from "@/lib/client";
 import { useAuth } from "../AuthProvider";
 import { rolesInOrder, type TeamDoc } from "./TeamContext";
 import { permissionInfo } from "./TeamRoles";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** A member's own permissions (memberGrants), with stats access counted as Keep stats (Team.ownPermissionsOf in the app). */
 export function ownPermissionsOf(team: TeamDoc, uid: string): TeamPermission[] {
@@ -124,9 +125,9 @@ export function MemberPermissions({
         </button>
       </div>
       {error && (
-        <p className="form-error" role="alert">
+        <ErrorNote>
           {error}
-        </p>
+        </ErrorNote>
       )}
     </div>
   );

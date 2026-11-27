@@ -95,3 +95,115 @@ img.ui-logo { background: var(--field); }
   border: 2px solid var(--card); background: var(--field); color: var(--ink-soft); font-weight: 800; line-height: 1; white-space: nowrap;
 }
 .avatar svg { display: block; }
+
+/* --- DateBadge (outside the team hub, whose own .date-tile rules still win) -- */
+.ui-date.date-tile {
+  display: grid; place-items: center; align-content: center; gap: 1px; flex: none; width: 48px; height: 50px;
+  border-radius: var(--radius-control); background: var(--accent-soft); color: var(--accent-ink); line-height: 1;
+}
+.ui-date.date-tile small { font-size: 0.66rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.ui-date.date-tile b { font-family: var(--font-score); font-weight: 800; font-size: 1.55rem; letter-spacing: -0.01em; }
+
+/* --- EventCard ------------------------------------------------------------ */
+.ui-event {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); flex-wrap: wrap;
+  padding: var(--space-md) var(--space-lg); border: 1px solid var(--line); border-radius: var(--radius); background: var(--card);
+}
+.ui-event-main { display: flex; align-items: center; gap: var(--space-md); flex: 1 1 220px; min-width: 0; min-height: 48px; color: inherit; text-decoration: none; }
+a.ui-event-main:hover .ui-event-title { text-decoration: underline; }
+.ui-event-body { display: grid; gap: 2px; min-width: 0; }
+.ui-event-title { font-size: var(--text-body-size); overflow-wrap: anywhere; }
+.ui-event-meta { color: var(--muted); font-size: var(--text-secondary-size); }
+.ui-event-pills { display: inline-flex; align-items: center; gap: var(--space-sm); flex-wrap: wrap; }
+.ui-event-cancelled .ui-event-title { text-decoration: line-through; color: var(--muted); }
+
+/* --- CoverHeader ------------------------------------------------------------ */
+.ui-cover { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.ui-cover-photo { height: 140px; background: linear-gradient(135deg, var(--accent-soft), var(--field)); }
+.ui-cover-photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.ui-cover-body {
+  display: grid; grid-template-columns: auto 1fr; column-gap: var(--space-lg); padding: 0 var(--space-lg) var(--space-lg);
+}
+.ui-cover-avatar { grid-row: 1 / span 2; margin-top: -44px; align-self: start; padding: 4px; border-radius: 50%; background: var(--card); width: fit-content; }
+.ui-cover-actions { grid-column: 2; justify-self: end; display: flex; gap: var(--space-sm); padding-top: var(--space-md); min-height: 48px; }
+.ui-cover-text { grid-column: 1 / -1; margin-top: var(--space-sm); min-width: 0; }
+.ui-cover-title { margin: 0; font-size: var(--text-heading3-size); font-weight: 800; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+.ui-cover-sub { margin: 2px 0 0; color: var(--muted); font-size: var(--text-secondary-size); }
+.ui-cover-extra { grid-column: 1 / -1; margin-top: var(--space-md); }
+@media (min-width: 900px) { .ui-cover-photo { height: 200px; } }
+
+/* --- SummaryTiles ------------------------------------------------------------- */
+.ui-tiles { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-md); }
+.ui-tile-face {
+  display: grid; justify-items: center; align-content: center; gap: 2px; min-height: 72px; padding: var(--space-md) var(--space-sm);
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); color: var(--ink); text-decoration: none; text-align: center;
+}
+a.ui-tile-face:hover { border-color: var(--line-2); }
+.ui-tile-value { font-family: var(--font-score); font-weight: 800; font-size: var(--text-heading3-size); line-height: 1; font-variant-numeric: tabular-nums; }
+.ui-tile-label { color: var(--muted); font-size: var(--text-secondary-size); overflow-wrap: anywhere; min-width: 0; }
+.ui-tile-face { min-width: 0; }
+/* Under about 360 px three tiles no longer fit side by side. */
+@media (max-width: 360px) { .ui-tiles { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* --- ListRow ------------------------------------------------------------------ */
+.ui-row { display: flex; align-items: center; gap: var(--space-md); min-height: 56px; border-bottom: 1px solid var(--line); }
+.ui-row-main { display: flex; align-items: center; gap: var(--space-md); flex: 1; min-width: 0; min-height: 56px; padding: var(--space-sm) 0; color: inherit; text-decoration: none; text-align: left; font: inherit; background: none; border: 0; }
+.ui-row-action { cursor: pointer; }
+.ui-row-action:hover .ui-row-title { text-decoration: underline; }
+.ui-row-lead { flex: none; display: inline-flex; }
+.ui-row-text { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.ui-row-title { font-weight: 600; overflow-wrap: anywhere; }
+.ui-row-sub { color: var(--muted); font-size: var(--text-secondary-size); overflow-wrap: anywhere; }
+.ui-row-meta { flex: none; color: var(--muted); font-size: var(--text-caption-size); }
+.ui-row-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.ui-row-unread .ui-row-title { font-weight: 800; }
+.ui-row-muted .ui-row-title { color: var(--muted); }
+.ui-row-selected { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.ui-row-trailing { flex: none; display: inline-flex; align-items: center; gap: var(--space-sm); }
+.ui-row-main:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* --- EmptyState, ErrorState, LoadingState ---------------------------------------- */
+.ui-empty { display: grid; gap: var(--space-sm); justify-items: center; }
+.ui-empty-title { color: var(--ink); font-size: var(--text-body-size); }
+.ui-loading { display: flex; align-items: center; gap: var(--space-sm); }
+.ui-spinner { width: 16px; height: 16px; flex: none; border-radius: 50%; border: 2px solid var(--line-2); border-top-color: var(--accent); animation: btn-spin 0.8s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .ui-spinner { animation: none; border-top-color: var(--line-2); } }
+.ui-error {
+  display: flex; align-items: center; gap: var(--space-md); flex-wrap: wrap; padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-control); background: var(--error-soft); color: var(--error); font-size: var(--text-secondary-size);
+}
+.ui-error-icon { flex: none; }
+.ui-error-text { display: grid; gap: 2px; flex: 1 1 200px; min-width: 0; }
+.ui-error .btn { background: var(--card); color: var(--ink); }
+
+/* --- TextField, SearchField ------------------------------------------------------- */
+.ui-field { display: grid; gap: var(--space-xs); }
+.ui-field > label { font-weight: 600; font-size: var(--text-secondary-size); }
+.ui-field-hint { color: var(--muted); font-size: var(--text-caption-size); }
+.ui-field input, .ui-field textarea {
+  width: 100%; box-sizing: border-box; min-height: 48px; padding: 10px var(--space-md); border: 1px solid var(--line-2); border-radius: var(--radius-control);
+  background: var(--card); color: var(--ink); font: inherit;
+}
+.ui-field textarea { min-height: 96px; resize: vertical; }
+.ui-field input:focus-visible, .ui-field textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+.ui-field-error input, .ui-field-error textarea { border-color: var(--error); }
+.ui-field-error-text { margin: 0; color: var(--error); font-size: var(--text-secondary-size); }
+.ui-search {
+  display: flex; align-items: center; gap: var(--space-sm); min-height: 48px; padding: 0 var(--space-md); border: 1px solid var(--line-2);
+  border-radius: var(--radius-pill); background: var(--card); color: var(--muted);
+}
+.ui-search:focus-within { border-color: var(--accent); outline: 2px solid var(--accent); outline-offset: 1px; }
+.ui-search input { flex: 1; min-width: 0; min-height: 44px; border: 0; background: none; color: var(--ink); font: inherit; }
+.ui-search input:focus { outline: none; }
+.ui-search-clear { position: relative; display: inline-grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 50%; background: none; color: var(--muted); cursor: pointer; }
+/* A 48 px hit area around the 36 px button. */
+.ui-search-clear::after { content: ""; position: absolute; inset: -6px; }
+.ui-search input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; display: none; }
+.ui-search-clear:hover { background: var(--field); color: var(--ink); }
+.ui-search-clear:focus-visible { outline: 2px solid var(--accent); }
+
+/* --- ConfirmDialog -------------------------------------------------------------------- */
+.confirm-dialog { display: grid; gap: var(--space-md); }
+.confirm-message { white-space: pre-line; color: var(--ink-soft); }
+.confirm-message p { margin: 0; }
+.confirm-actions { display: flex; justify-content: flex-end; gap: var(--space-sm); flex-wrap: wrap; }

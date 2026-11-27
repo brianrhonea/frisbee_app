@@ -7,6 +7,8 @@ import { useAuth } from "../../AuthProvider";
 import { LocalTime } from "../../LocalTime";
 import { loadAtTop, OlderMessages } from "../../OlderMessages";
 import { meetingApi } from "./model";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 interface Message {
   authorId?: string;
@@ -23,6 +25,7 @@ const pageSize = 50;
  * the call. Authors delete their own; admins any.
  */
 export function MeetingChat({ teamId, meetingId, canModerate }: { teamId: string; meetingId: string; canModerate: boolean }) {
+  const askConfirm = useConfirm();
   const { user } = useAuth();
   const messages = usePagedMessages<Message>(`teams/${teamId}/meetings/${meetingId}/messages`, pageSize);
   const [text, setText] = useState("");
@@ -52,7 +55,7 @@ export function MeetingChat({ teamId, meetingId, canModerate }: { teamId: string
       <div className="call-chat-body" ref={body} aria-live="polite" onScroll={loadAtTop(messages)}>
         <OlderMessages paged={messages} />
         {messages.error ? (
-          <p className="form-error">{messages.error}</p>
+          <ErrorNote>{messages.error}</ErrorNote>
         ) : !messages.list ? (
           <p className="muted small">Loading…</p>
         ) : list.length === 0 ? (
@@ -66,8 +69,8 @@ export function MeetingChat({ teamId, meetingId, canModerate }: { teamId: string
                   <button
                     type="button"
                     className="text-btn"
-                    onClick={() => {
-                      if (user && window.confirm("Delete this message?")) {
+                    onClick={async () => {
+                      if (user && (await askConfirm({ message: "Delete this message?", confirmLabel: "Delete", destructive: true }))) {
                         void callApi(user, `${meetingApi(teamId, meetingId)}/messages/${encodeURIComponent(m.id)}`, { method: "DELETE" }).then(
                           () => messages.removed(m.id),
                           (err: Error) => setError(err.message),
@@ -91,9 +94,9 @@ export function MeetingChat({ teamId, meetingId, canModerate }: { teamId: string
         </button>
       </form>
       {error && (
-        <p className="form-error" role="alert">
+        <ErrorNote>
           {error}
-        </p>
+        </ErrorNote>
       )}
     </div>
   );

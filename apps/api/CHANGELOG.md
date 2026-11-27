@@ -7,6 +7,33 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.53.0 - 2026-11-26
+
+Sprint 3 lane A: account deletion cascade, under-13 purge, legacy-minor hiding, photo trust,
+and the phase-1 write contract (17-A).
+
+- **#27 export:** `GET /v1/me/export` gains `likedPosts`, `followRequests` (`sent`, `received`),
+  `signups`, `calendars`, `calendarInvites` and `usernames` (additive keys on `DataExport`;
+  `ageRefusals` is never exported). The matching deletion cascade is in `firebase/functions`
+  (`account-deleteAccount`).
+- **D-U13:** an under-13 refusal now also stores a plain `under13: true` marker on
+  `ageRefusals/{uid}` (approved schema change). The daily `account-purgeUnderThirteenDaily`
+  function uses it.
+- **D-1317:** with `ACCOUNT_GATE_MODE=enforce`, accounts without the `ageOk` claim are left out of
+  public search, public profiles (404) and public posts, and DMs to them are refused (open, send,
+  group add). Report mode only logs. Uses a batched, cached `getUsers` claim lookup
+  (`UserLookup.ageOkOf`). Run the claim backfill before enforcing.
+- **3a-F:** calendar people, pending invites, roster cards, meeting tokens, ranking cards and
+  notification profiles pass on a profile photo only when trusted; `imageUrl` (the browse copy)
+  allows our buckets and `lh3.googleusercontent.com` only; a refusal whose date can't be read keeps an
+  account disabled; lifting a suspension re-checks after re-enabling (4.1b).
+- **17-A (phase1-writes.md section 6):** optional `id` on `POST /v1/teams/:teamId/events` (a series'
+  events are `{id}_{index}`), `POST /v1/conversations/groups` (`g-` plus letters or digits) and
+  `POST /v1/teams/:teamId/roster-players`. A replayed id is a 409 `already_exists`; any create of
+  a chosen id that already exists is now a 409 instead of a 500. An edit naming a different id is
+  a 400. New rate limits: `POST /v1/posts` 10 a minute and 200 a day, comments 30 a minute,
+  reposts 20 a minute, `PUT /v1/follows` 30 a minute and 300 a day.
+
 ## 0.52.2 — 2026-11-26
 
 Hardening from the independent #3a security review (all Low).

@@ -11,6 +11,7 @@ import { MembersOnlySection } from "../TeamNav";
 import { inviteTier, isEditorTier, type MeetingData, meetingApi, meetingHref, meetingsApi, meetingsHref } from "./model";
 import "./meetings.css";
 import { fromLocalInput, toLocalInput } from "@/lib/dates";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** 7 PM today, after practice (MeetingEditorViewModel._defaultStart). */
 function defaultStart() {
@@ -33,7 +34,7 @@ export function MeetingEditorPage({ meetingId }: { meetingId: string | null }) {
   if (!member) return <MembersOnlySection what="meetings" />;
   if (!member.can("manageEvents")) return <p className="empty">Only admins can schedule meetings. {back}</p>;
   if (meetingId) {
-    if (live.error) return <p className="form-error">{live.error}</p>;
+    if (live.error) return <ErrorNote>{live.error}</ErrorNote>;
     if (live.data === undefined) return <p className="muted" aria-busy="true">Loading…</p>;
     if (live.data === null) return <p className="empty">Meeting not found. {back}</p>;
   }

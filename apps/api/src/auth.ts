@@ -67,6 +67,12 @@ export interface UserLookup {
   setClaims?(uid: string, claims: Record<string, unknown>): Promise<void>;
   /** Disables or enables sign-in (suspension), and signs a disabled account out. */
   setDisabled?(uid: string, disabled: boolean): Promise<void>;
+  /**
+   * Which of [uids] carry the `ageOk` claim (batched; unknown accounts are
+   * left out). Absent where claims can't be read. Used to keep accounts
+   * without it out of public results (account/adult_visibility.ts).
+   */
+  ageOkOf?(uids: string[]): Promise<Set<string>>;
 }
 
 /**

@@ -30,8 +30,17 @@ beforeEach(() => {
   s.store.put("teams/t1/roster/a", { name: "Pat Public", number: 7, position: "handler", userId: "pat" });
   s.store.put("teams/t1/roster/b", { name: "Sam Sub", position: "cutter" });
   s.store.put("teams/t1/rosterStatus/a", { paid: true });
-  s.store.put("profiles/pat", { name: "Pat Public", username: "pat", photoUrl: "https://img/p.jpg" });
+  s.store.put("profiles/pat", { name: "Pat Public", username: "pat", photoUrl: "https://lh3.googleusercontent.com/a/p" });
   s.store.put("profiles/quinn", { name: "Quinn Quiet", private: true });
+});
+
+describe("roster photos (3a-F)", () => {
+  it("drops a profile photo that isn't ours or Google's, on players and members", async () => {
+    s.store.put("profiles/pat", { name: "Pat Public", username: "pat", photoUrl: "https://tracker.example/p.gif" });
+    const body = (await s.get("/v1/teams/t1/roster")).json();
+    expect(body.players[0].person).toEqual({ uid: "pat", name: "Pat Public", username: "pat" });
+    expect(JSON.stringify(body)).not.toContain("tracker.example");
+  });
 });
 
 describe("roster", () => {
@@ -46,13 +55,13 @@ describe("roster", () => {
           name: "Pat Public",
           number: 7,
           position: "handler",
-          person: { uid: "pat", name: "Pat Public", username: "pat", photoUrl: "https://img/p.jpg" },
+          person: { uid: "pat", name: "Pat Public", username: "pat", photoUrl: "https://lh3.googleusercontent.com/a/p" },
         },
         { id: "b", name: "Sam Sub", position: "cutter" },
       ],
       members: [
         { uid: "olive", name: "Olive Owner", tier: "owner", roles: [] },
-        { uid: "pat", name: "Pat Public", username: "pat", photoUrl: "https://img/p.jpg", tier: "player", roles: ["Captains", "Handlers"] },
+        { uid: "pat", name: "Pat Public", username: "pat", photoUrl: "https://lh3.googleusercontent.com/a/p", tier: "player", roles: ["Captains", "Handlers"] },
         { uid: "quinn", name: "Quinn Quiet", private: true, tier: "player", roles: [] },
       ],
       teams: [],

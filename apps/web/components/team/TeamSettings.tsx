@@ -29,6 +29,7 @@ import { MembersOnlySection } from "./TeamNav";
 import { LEAVE_CONFIRM } from "./TeamContext";
 import { optionalSectionInfo } from "./SectionGate";
 import { TeamReports } from "./TeamReports";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 /** The team doc's editable details (Team.toEditableMap in the app). */
 interface Details {
@@ -246,6 +247,7 @@ function SectionsCard() {
  * The live team doc shows the result.
  */
 function PublicPageCard() {
+  const askConfirm = useConfirm();
   const { teamId, viewer } = useTeamHub();
   const { act, busy, error } = useAct();
   // The switch in flight, until the live team doc shows it.
@@ -254,8 +256,8 @@ function PublicPageCard() {
   if (viewer.state !== "member") return null;
   const admin = viewer.can("manageTeam");
   // "Allow join requests" (F26): off declines those waiting, so it asks first.
-  function setRequests(on: boolean) {
-    if (!on && !window.confirm("Stop taking join requests? Anyone still waiting is declined. People can still join with an invite.")) return;
+  async function setRequests(on: boolean) {
+    if (!on && !(await askConfirm({ message: "Stop taking join requests? Anyone still waiting is declined. People can still join with an invite.", confirmLabel: "Stop", destructive: true }))) return;
     const body: SetAllowJoinRequestsRequest = { on };
     setAsking(on);
     void act(`/v1/teams/${encodeURIComponent(teamId)}/allow-join-requests`, "PUT", body).finally(() => setAsking(null));
@@ -321,6 +323,7 @@ function InviteCard() {
 }
 
 function MemberRoles() {
+  const askConfirm = useConfirm();
   const { teamId, kind, viewer } = useTeamHub();
   const { act, busy, error } = useAct();
   // Whose permission switches are open (F25; the owner's).
@@ -408,8 +411,8 @@ function MemberRoles() {
                         type="button"
                         className="text-btn"
                         disabled={busy}
-                        onClick={() => {
-                          if (window.confirm(`Remove ${team.memberNames?.[uid] ?? "this member"}?`)) {
+                        onClick={async () => {
+                          if ((await askConfirm({ message: `Remove ${team.memberNames?.[uid] ?? "this member"}?`, confirmLabel: "Remove", destructive: true }))) {
                             void act(`/v1/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(uid)}`, "DELETE");
                           }
                         }}
@@ -438,6 +441,7 @@ function MemberRoles() {
 }
 
 function TransferOwnership() {
+  const askConfirm = useConfirm();
   const { teamId, kind, viewer } = useTeamHub();
   const [to, setTo] = useState("");
   const { act, busy, error, ok } = useAct();
@@ -467,8 +471,8 @@ function TransferOwnership() {
           type="button"
           className="btn btn-quiet"
           disabled={busy || !to}
-          onClick={() => {
-            if (window.confirm(`Make ${team.memberNames?.[to] ?? "them"} the owner?`)) {
+          onClick={async () => {
+            if ((await askConfirm({ title: `Make ${team.memberNames?.[to] ?? "them"} the owner?`, confirmLabel: "Make owner", destructive: true }))) {
               void act(`/v1/teams/${encodeURIComponent(teamId)}/owner`, "POST", { uid: to }, "Done.");
             }
           }}
@@ -482,6 +486,7 @@ function TransferOwnership() {
 
 /** Deletes it for everyone (the owner, typing its name; `DELETE /v1/teams/:id`). */
 function DeleteTeam() {
+  const askConfirm = useConfirm();
   const { teamId, name, kind, viewer } = useTeamHub();
   const router = useRouter();
   const [typed, setTyped] = useState("");
@@ -512,8 +517,8 @@ function DeleteTeam() {
           type="button"
           className="btn btn-quiet"
           disabled={busy || !matches || others > 0}
-          onClick={() => {
-            if (!window.confirm(`Delete ${name} for everyone? This can't be undone.`)) return;
+          onClick={async () => {
+            if (!(await askConfirm({ message: `Delete ${name} for everyone? This can't be undone.`, confirmLabel: "Delete", destructive: true }))) return;
             void act(`/v1/teams/${encodeURIComponent(teamId)}`, "DELETE", { name: typed.trim() }).then((r) => {
               if (r !== null) router.push("/teams");
             });
@@ -527,6 +532,7 @@ function DeleteTeam() {
 }
 
 function LeaveTeam({ teamId }: { teamId: string }) {
+  const askConfirm = useConfirm();
   const { user } = useAuth();
   const router = useRouter();
   const { act, busy, error } = useAct();
@@ -539,8 +545,8 @@ function LeaveTeam({ teamId }: { teamId: string }) {
           type="button"
           className="btn btn-quiet"
           disabled={busy || !user}
-          onClick={() => {
-            if (!user || !window.confirm(LEAVE_CONFIRM)) return;
+          onClick={async () => {
+            if (!user || !(await askConfirm(LEAVE_CONFIRM))) return;
             void act(`/v1/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(user.uid)}`, "DELETE").then((r) => {
               if (r !== null) router.push("/teams");
             });

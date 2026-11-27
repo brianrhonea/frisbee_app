@@ -77,3 +77,15 @@
 .explore-live-score { flex: none; font-family: var(--font-score); font-size: 1.25rem; font-weight: 800; line-height: 1; }
 .live-dot.live-dot-small { width: 7px; height: 7px; box-shadow: none; }
 .explore-live-games li.explore-live-more { background: none; padding: 0 10px; color: var(--board-muted); }
+
+/* Discover's entry to Learn (Learn lives under Discover). */
+.learn-entry {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-lg); margin-bottom: var(--space-lg);
+  padding: var(--space-lg); min-height: 56px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--card);
+  color: var(--ink); text-decoration: none;
+}
+.learn-entry:hover { border-color: var(--line-2); }
+.learn-entry > span:first-child { display: grid; gap: 2px; min-width: 0; }
+.learn-entry small { color: var(--muted); font-size: var(--text-secondary-size); }
+.learn-entry > span:last-child { flex: none; color: var(--accent-ink); font-weight: 700; font-size: var(--text-secondary-size); }
+@media (max-width: 599px) { .learn-entry > span:last-child { display: none; } }

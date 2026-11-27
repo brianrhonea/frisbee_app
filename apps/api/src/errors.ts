@@ -1,6 +1,7 @@
 import { type ApiErrorBody, type ApiErrorCode, apiErrorStatus } from "@stall10/shared";
 import type { FastifyError, FastifyReply, FastifyRequest } from "fastify";
 import { type z, ZodError } from "zod";
+import { AlreadyExists } from "./store.js";
 
 /** A request the API turns down, with a message ready to show the user. */
 export class ApiError extends Error {
@@ -40,6 +41,9 @@ export function errorHandler(err: FastifyError | Error, req: FastifyRequest, rep
   let api: ApiError;
   if (err instanceof ApiError) {
     api = err;
+  } else if (err instanceof AlreadyExists) {
+    // A create() of an id the caller chose, replayed (phase-1 contract: the outbox treats this as sent).
+    api = new ApiError("already_exists", "That already exists.");
   } else if (err instanceof ZodError) {
     api = fromZod(err);
   } else if ("statusCode" in err && typeof err.statusCode === "number" && err.statusCode < 500) {

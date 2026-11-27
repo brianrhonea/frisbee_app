@@ -1,5 +1,6 @@
 import type { EventsPage, PublicHostedList } from "@stall10/shared";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Discover } from "@/components/explore/Explore";
 import { parseFilter } from "@/components/explore/filters";
 import { ForVisitors } from "@/components/ForVisitors";
@@ -48,6 +49,13 @@ export default async function DiscoverPage({ searchParams }: Props) {
           <ForVisitors> No account needed to look around.</ForVisitors>
         </p>
       </div>
+      <Link className="learn-entry" href="/learn">
+        <span>
+          <b>New to ultimate?</b>
+          <small>Learn to play: the rules, the throws and the spirit of the game.</small>
+        </span>
+        <span aria-hidden="true">Learn to play →</span>
+      </Link>
       <Discover initialQuery={q} initialFilter={only} tournaments={list?.tournaments ?? null} events={events} />
     </div>
   );

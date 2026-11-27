@@ -12,6 +12,7 @@
 // and most fall between 20 and 80.
 
 import type { Data } from "./model";
+import { trustedProfilePhoto } from "../media/photo_url";
 
 export const minPlayerGames = 10;
 
@@ -92,7 +93,7 @@ export function playerInput(uid: string, profile: Data): PlayerInput | null {
     uid,
     name,
     username: typeof profile.username === "string" ? profile.username : null,
-    photoUrl: typeof profile.photoUrl === "string" ? profile.photoUrl : null,
+    photoUrl: trustedProfilePhoto(profile.photoUrl, uid),
     seasons,
   };
 }

@@ -5,6 +5,7 @@ import { type FormEvent, useState } from "react";
 import { ApiError, callApi, problem } from "@/lib/client";
 import { signupDraft } from "@/lib/signupDraft";
 import { suggestUsername, UsernameField, useUsernameCheck } from "./UsernameField";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** Whether [user] signs in with a password (an email account). */
 const hasPassword = (user: User) => user.providerData.some((p) => p.providerId === "password");
@@ -156,9 +157,9 @@ export function UsernameStep({
         />
       )}
       {error && (
-        <p className="form-error" role="alert">
+        <ErrorNote>
           {error}
-        </p>
+        </ErrorNote>
       )}
       <button className={step ? "btn btn-primary" : "btn btn-primary btn-small"} type="submit" disabled={busy || !ready}>
         {busy ? "Saving…" : step ? "Continue" : "Save"}

@@ -10,6 +10,8 @@ import { loadDraft, saveDraft } from "@/lib/drafts";
 import { useVideoUploads } from "@/lib/metaFlags";
 import { chatFileProblem, isVideoFile, newId, removeUpload, uploadPhoto, videoUploadsClosed } from "@/lib/upload";
 import { useAuth } from "./AuthProvider";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 type Pending = { key: string; name: string; size: number; uploadId?: string; error?: string };
 
@@ -182,9 +184,9 @@ export function ChatComposer({
         </ul>
       )}
       {error && (
-        <p className="form-error" role="alert">
+        <ErrorNote>
           {error}
-        </p>
+        </ErrorNote>
       )}
       {suggest && <MentionMenu options={suggest.options} active={Math.min(active, suggest.options.length - 1)} onPick={pick} />}
       {notice && (
@@ -342,6 +344,7 @@ export function MessageActions({
   picking?: boolean;
   onPickingChange?: (open: boolean) => void;
 }) {
+  const askConfirm = useConfirm();
   const { user } = useAuth();
   const [pickingOwn, setPickingOwn] = useState(false);
   const picking = pickingProp ?? pickingOwn;
@@ -384,8 +387,8 @@ export function MessageActions({
         <button
           type="button"
           className="text-btn danger"
-          onClick={() => {
-            if (window.confirm("Delete this message?")) void call(path, "DELETE");
+          onClick={async () => {
+            if ((await askConfirm({ message: "Delete this message?", confirmLabel: "Delete", destructive: true }))) void call(path, "DELETE");
           }}
         >
           Delete

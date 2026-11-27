@@ -136,3 +136,83 @@ The owner accepted every recommendation:
 - **D-1317:** hiding uses the `ageOk` claim. The #3a backfill must run before enforcement, so adults aren't hidden.
 - **Website Learn:** stays a bottom tab for signed-out visitors. Members reach it under Discover.
 - **The #17 contract** (`contracts/phase1-writes.md`) is approved. 17-A goes to lane A after its current items.
+
+## Owner decision: security finding H1 (2026-11-26)
+
+Option **(a)** is approved: a server-only `profiles/{uid}.adult` field.
+- **Who writes it:** only the server. The account gate sets it when it issues `ageOk`, and the claims backfill sets it for existing adults. Clients can never write it.
+- **What the rules check:**
+  - `allowedStart` (DMs and message requests), `addsMember` (group adds) and direct message create all require the other person's profile to have `adult == true`.
+  - A list query on `profiles` for anyone other than the caller must filter on `adult == true`.
+- **Clients:** the app and website profile-search queries add the filter, in lanes B and C.
+- **Deploy:** the owner deploys the rules to dev, after the backfill has run.
+
+## Owner decision: the whole UI redesign moves forward (2026-11-26)
+
+All screens **H1–H10** are approved to start now, on both platforms, each platform in its own design. They begin as soon as the current lanes merge.
+
+**Scope:**
+- H1, H2 and H7 include the January additions already approved in UI-Q12:
+  - Home summary tiles;
+  - Schedule Month, Week and List;
+  - Chats filters.
+- Every other screen is a restyle onto C1–C10 and the new shell.
+- No new features from the mock-ups.
+- No business-logic, permission or navigation changes.
+
+**Order:**
+1. H1 Home
+2. H2 Schedule
+3. H7 Chats
+4. H3 Event details
+5. H5 Team overview
+6. H6 Roster
+7. H4 My teams
+8. H8 Notifications
+9. H9 Settings
+10. H10 Sign-in
+
+**Lanes:**
+- **App screens.** Lane B, after C5–C10 and N1/N2/N10 merge. Once lane A's API work is done, a second Flutter agent takes 17-B (the data layer, `lib/data/**`), while lane B keeps the screens (`lib/ui/**`). The two never edit the same files.
+- **Website screens.** Lane C, after its UI-review fixes merge.
+
+**Approval and checks for each screen:**
+- before and after pictures in light and dark at phone and desktop widths, reviewed by the UI reviewer, then by the owner in batches;
+- the screen's existing tests still pass, plus goldens and Playwright screenshots;
+- a full navigation re-run (N1–N10) at the end;
+- a parity review of app against website.
+
+## Owner review: navigation motion (N13, 2026-11-26)
+
+The owner reviews the before and after pictures **and** every navigation animation, to make sure moving around never feels clunky. This is checked across the shell, each screen and every breakpoint.
+
+**Inventory** (the UI reviewer, then each lane): every transition, compared with the K7 motion tokens (`design-tokens.md:73`: fast 120 ms, base 200 ms, sheet 300 ms, easing (0.2, 0, 0, 1), and 0 when reduced motion is on).
+- App: the 16 custom page and transition sites in `apps/mobile/lib`, plus the defaults.
+- Website: route changes, CSS transitions, dialogs and sheets.
+
+**What gets checked:**
+- tab switches don't slide, and each keeps its scroll and state;
+- pushes and pops are consistent, and iOS back-swipe works;
+- sheets and dialogs use the sheet timing;
+- nothing animates twice or flashes white or black between pages;
+- loading moves to content without jumping;
+- deep links and the sign-in redirect don't play a stray animation;
+- breakpoint changes (resizing, rotating an iPad) keep you where you were;
+- reduced motion is respected.
+
+**Recordings for the owner:**
+- Website: Playwright videos of the main journeys at 375 and 1440 px, light and dark, now.
+- App: iOS Simulator recordings (`xcrun simctl io recordVideo`) on the Mac mini once it's set up. Then a check on the physical iPhone through TestFlight.
+- Real-device feel (frame rate, back-swipe) can't be signed off from a simulator alone.
+
+**Fixes:** these are motion polish only, onto the K7 tokens. No navigation or route behaviour changes.
+
+## Owner plan: one merge to development (2026-11-26)
+
+All of Sprint 3 goes to `development` in **one** owner-approved pull request, once H1–H10 and the full navigation checks (N1–N13) are done.
+
+**Before that pull request, the orchestrator verifies the API and backend connections:**
+- Every app and website call matches a route that exists, with the request and response shapes `packages/shared` defines. That includes 17-B, the app's switch to the phase-1 API writes.
+- A signed-in smoke run against a local API and the emulators, for the core journeys on both platforms.
+- The order for the owner's dev deploys: the API in report mode and the functions groups, then the claim and `adult` backfill, then the apps, then enforcement, then the rules.
+- A regression run of every suite on the integrated branch, plus a security and QA pass.

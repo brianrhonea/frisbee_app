@@ -5,6 +5,7 @@ import { callApi, problem } from "@/lib/client";
 import { useLiveDoc } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
 import { useMyTeams } from "../useMyTeams";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** users/{uid}/settings/notifications (NotificationPreferences in the app). */
 interface Prefs {
@@ -29,7 +30,7 @@ export function NotificationSettings() {
   const [open, setOpen] = useState<string | null>(null);
 
   if (!user) return null;
-  if (prefs.error) return <p className="form-error">Couldn&apos;t load your settings. Try again.</p>;
+  if (prefs.error) return <ErrorNote>Couldn&apos;t load your settings. Try again.</ErrorNote>;
   if (prefs.data === undefined) return <p className="muted">Loading…</p>;
   const me = user;
   const p: Prefs = prefs.data ?? {};
@@ -118,7 +119,7 @@ export function NotificationSettings() {
           </ul>
         </div>
       )}
-      {error && <p className="form-error" role="alert">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
     </div>
   );
 }

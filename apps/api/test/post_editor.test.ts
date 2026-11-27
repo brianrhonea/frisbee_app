@@ -124,7 +124,7 @@ describe("posts", () => {
       { activity: "gym", durationMinutes: 30, exercises: Array.from({ length: 21 }, () => ({ name: "Lunge" })) },
     ];
     for (const workout of bad) {
-      expect((await s.call("POST", "/v1/posts", { workout })).statusCode, JSON.stringify(workout)).toBe(400);
+      expect((await s.call("POST", "/v1/posts", { workout }, "bad")).statusCode, JSON.stringify(workout)).toBe(400);
     }
     const res = await s.call("POST", "/v1/posts", { workout: { activity: "run", durationMinutes: 20 } });
     const { id } = res.json();

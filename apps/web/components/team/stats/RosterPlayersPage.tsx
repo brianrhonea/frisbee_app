@@ -7,6 +7,8 @@ import { useTeamHub } from "../TeamContext";
 import { apiUrl, statsAccess, useStatsPlayers } from "./data";
 import { BackToStats, StatsGate } from "./SeasonStatsPage";
 import "./stats.css";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 const positions = [
   ["handler", "Handler"],
@@ -40,6 +42,7 @@ const draftOf = (p?: StatsPlayer, userId: string | null = null, name = ""): Draf
 });
 
 function RosterPlayers() {
+  const askConfirm = useConfirm();
   const { teamId, viewer } = useTeamHub();
   const { user } = useAuth();
   const access = statsAccess(viewer);
@@ -55,7 +58,7 @@ function RosterPlayers() {
     .sort((a, b) => a.name.localeCompare(b.name));
   const memberName = (uid: string | null) => (uid ? (team.memberNames?.[uid] ?? "a former member") : "");
 
-  if (players.error) return <p className="form-error">{players.error}</p>;
+  if (players.error) return <ErrorNote>{players.error}</ErrorNote>;
   if (!players.data) return <p className="muted" aria-busy="true">Loading…</p>;
   const roster = players.data;
   const mine = roster.find((p) => p.userId === access.uid);
@@ -97,8 +100,8 @@ function RosterPlayers() {
   const link = (p: StatsPlayer, userId: string | null) =>
     run(() => callApi(user!, apiUrl(teamId, `/roster-players/${encodeURIComponent(p.id)}/link`), { method: "PUT", body: { userId } }));
 
-  const remove = (p: StatsPlayer) => {
-    if (!window.confirm(`Remove ${p.name}?\n\nThey will be removed from the roster.`)) return;
+  const remove = async (p: StatsPlayer) => {
+    if (!(await askConfirm({ message: `Remove ${p.name}?\n\nThey will be removed from the roster.`, confirmLabel: "Remove", destructive: true }))) return;
     void run(() => callApi(user!, apiUrl(teamId, `/roster-players/${encodeURIComponent(p.id)}`), { method: "DELETE" }));
   };
 
@@ -129,7 +132,7 @@ function RosterPlayers() {
           onSave={save}
         />
       )}
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       {access.manageTeam && roster.length > 0 && (
         <div className="toolbar">
           <span>

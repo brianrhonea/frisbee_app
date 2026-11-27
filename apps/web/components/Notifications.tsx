@@ -13,6 +13,8 @@ import { LocalTime } from "./LocalTime";
 import "./member.css";
 import { Button } from "./ui/Button";
 import { FilterChips } from "./ui/FilterChips";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** A notification as the functions write it (AppNotification in the app). */
 interface Notice {
@@ -97,6 +99,7 @@ export function useUnreadCount(): number {
  * back from here.
  */
 export function Notifications() {
+  const askConfirm = useConfirm();
   const { user } = useAuth();
   const { data, error } = useLiveQuery<Notice>(
     user ? `users/${user.uid}/notifications` : null,
@@ -142,8 +145,8 @@ export function Notifications() {
         <Button
           size="small"
           disabled={list.length === 0}
-          onClick={() => {
-            if (confirm("Clear these notifications?")) void clear(list.map((n) => n.id));
+          onClick={async () => {
+            if ((await askConfirm({ message: "Clear these notifications?", confirmLabel: "Clear", destructive: true }))) void clear(list.map((n) => n.id));
           }}
         >
           Clear
@@ -175,7 +178,7 @@ export function Notifications() {
         </Link>
       </section>
 
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       {data === undefined && !error && <p className="muted">Loading…</p>}
       {data && list.length === 0 && <p className="empty">You're all caught up.</p>}
       {byDay(list).map(([day, items]) => (

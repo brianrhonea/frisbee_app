@@ -36,6 +36,7 @@ import { type Data, type DocStore, serverTime } from "../store.js";
 import type { CalendarRepository } from "./repository.js";
 import { clip } from "../teams/access.js";
 import { laterIds, moveLater, scopeOf, seriesOccurrences, seriesOf } from "../series.js";
+import { trustedProfilePhoto } from "../media/photo_url.js";
 
 const p = {
   profile: (uid: string) => `profiles/${uid}`,
@@ -140,7 +141,7 @@ export class CalendarService {
       uid,
       name: clip(text(profile.name) || (username ? `@${username}` : "Player"), nameMax),
       username,
-      photoUrl: typeof profile.photoUrl === "string" && profile.photoUrl ? profile.photoUrl : null,
+      photoUrl: trustedProfilePhoto(profile.photoUrl, uid),
     };
   }
 

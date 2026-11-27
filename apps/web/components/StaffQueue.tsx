@@ -4,11 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import { callApi, problem } from "@/lib/client";
 import { useAuth } from "./AuthProvider";
 import { ReportCard } from "./ReportQueue";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
-const confirms: Partial<Record<StaffAction, string>> = {
-  remove: "Remove it for everyone? Every open report on it closes.",
-  suspend: "Suspend this account? They're signed out and can't sign in, post or message until you lift it.",
-  warn: "Send them a warning notification?",
+const confirms: Partial<Record<StaffAction, { title: string; message?: string; confirmLabel: string; destructive?: boolean }>> = {
+  remove: { title: "Remove it for everyone?", message: "Every open report on it closes.", confirmLabel: "Remove", destructive: true },
+  suspend: { title: "Suspend this account?", message: "They're signed out and can't sign in, post or message until you lift it.", confirmLabel: "Suspend", destructive: true },
+  warn: { title: "Send a warning?", message: "They get a warning notification.", confirmLabel: "Send warning" },
 };
 
 /**
@@ -17,6 +19,7 @@ const confirms: Partial<Record<StaffAction, string>> = {
  * or suspend their account (and lift it). A staff tool, on the website only.
  */
 export function StaffQueue() {
+  const askConfirm = useConfirm();
   const { user } = useAuth();
   const [staff, setStaff] = useState<boolean | null>(null);
   const [reports, setReports] = useState<ReportInfo[] | null>(null);
@@ -41,7 +44,7 @@ export function StaffQueue() {
   async function act(r: ReportInfo, action: StaffAction) {
     if (!user) return;
     const ask = confirms[action];
-    if (ask && !window.confirm(ask)) return;
+    if (ask && !(await askConfirm(ask))) return;
     setBusy(r.id);
     setError(null);
     try {
@@ -58,7 +61,7 @@ export function StaffQueue() {
   if (staff === false) return <p className="empty">This page is for Stall 10&apos;s staff.</p>;
   return (
     <div className="stack">
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       {reports === null ? (
         !error && <p className="muted">Loading…</p>
       ) : reports.length === 0 ? (

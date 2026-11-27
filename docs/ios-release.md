@@ -1,4 +1,56 @@
-# Releasing the iOS app (Codemagic, no Mac needed)
+# Releasing the iOS app
+
+Main route: build on the owner's Mac mini with `scripts/ios/` (next section).
+Fallback: Codemagic, described from "Fallback: Codemagic" on. Keep Codemagic
+until two Mac releases have installed on a device (plan Q-H, Q-G).
+
+## Building on the Mac mini (main route)
+
+Plan: `docs/specifications/mac-mini-build-plan.md` (owner approved 2026-11-26).
+Per-build checklist: `docs/specifications/release-checklist-ios.md`.
+
+One-time setup is plan section 3 (Mac, toolchain, certificate, profile, API
+key, secret files). Then, from the repo root on the Mac:
+
+1. `scripts/ios/mac-doctor.sh` prints an OK / FIX list: Xcode, Flutter 3.41.2,
+   CocoaPods, Node, pnpm, codemagic-cli-tools, the Apple Distribution
+   identity, key and secret-file presence and modes, energy settings.
+2. Copy `scripts/ios/release.env.example` to `~/.hylite-release.env`, fill it
+   in, `chmod 600` it. It holds the API key ID, issuer ID, key path and Team
+   ID. The `.p8` key goes in `~/.appstoreconnect/private_keys/`, mode 600.
+3. Put `secrets.local.json` and `GoogleService-Info.plist` in
+   `~/hylite-secrets/dev/` (the owner copies them; nobody opens them).
+4. `scripts/ios/release-ios.sh dev --dry-run` shows every step without running
+   Flutter or touching Apple.
+5. `scripts/ios/release-ios.sh dev` builds, checks and keeps the build in
+   `~/hylite-releases/dev/<version>+<build>/`. Add `--upload` to send it to
+   App Store Connect with `xcrun altool`. `--ref <sha|tag>` rebuilds an
+   earlier commit on `development`.
+
+What the script does: requires a clean tree on `development`, checks Flutter is
+exactly 3.41.2, runs `pub get`, `pod install`, `flutter analyze`, `flutter test`
+and the version check, takes the build number as the higher of the latest App
+Store and TestFlight numbers plus 1 (it stops if a lookup fails), builds with
+`--dart-define-from-file=secrets.local.json`, reads the bundle ID, version and
+build from the IPA, makes a local tag `ios-dev-<version>+<build>` (never
+pushed), and removes the copied secret files when it exits.
+
+Limits until the owner changes them:
+- **Prod is refused** (`HYLITE_PROD_READY=1` is required) until #9 and R3.
+  Dev and prod share one bundle ID today (release-audit Q14).
+- **Golden tests skip on the Mac.** Run them on Windows before UI approval.
+- Pushing the tag, `development` or `main` needs the owner each time.
+- At the first Mac release, make Codemagic's triggers manual-only
+  (`codemagic.yaml`; waiting for that release) so pushes stop costing money
+  and build numbers don't clash.
+- Rollback: ship a new, higher build from the last good commit
+  (`--ref <tag>`), or start Codemagic's dev workflow by hand.
+
+---
+
+# Fallback: Codemagic (no Mac needed)
+
+Everything below is the original Codemagic route, kept as the fallback.
 
 `codemagic.yaml` builds the app on a cloud Mac, signs it, and uploads it to
 TestFlight. These are the one-time setup steps, in order.

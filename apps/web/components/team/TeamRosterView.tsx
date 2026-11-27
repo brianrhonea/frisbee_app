@@ -24,6 +24,7 @@ import { ErrorNote, Loading } from "../StatusViews";
 import { InviteButton } from "./InviteDialog";
 import { useTeamHub } from "./TeamContext";
 import { StatusPill } from "../ui/StatusPill";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 /** In place of a youth team's roster for anyone who isn't on it (the app says the same). */
 export const youthRosterNote = "Rosters of youth teams are private: only members see them.";
@@ -377,7 +378,7 @@ function PlayersCard({
           )}
         </div>
       )}
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       {roster.players.length === 0 ? (
         <p className="muted small">No players on the roster yet.</p>
       ) : groups.length === 0 ? (
@@ -403,6 +404,7 @@ function PlayersCard({
  * Refetches when the team doc changes ([version]: someone joins).
  */
 function PendingInvitesCard({ teamId, version }: { teamId: string; version: number }) {
+  const askConfirm = useConfirm();
   const { user } = useAuth();
   const [invites, setInvites] = useState<PendingInvites["invites"] | null>(null);
   const [error, setError] = useState("");
@@ -421,7 +423,7 @@ function PendingInvitesCard({ teamId, version }: { teamId: string; version: numb
   if (!invites || invites.length === 0) return null;
 
   async function withdraw(uid: string, name: string) {
-    if (!user || !window.confirm(`Withdraw the invite to ${name}?\n\nThey won't be able to join with it any more.`)) return;
+    if (!user || !(await askConfirm({ message: `Withdraw the invite to ${name}?\n\nThey won't be able to join with it any more.`, confirmLabel: "Withdraw", destructive: true }))) return;
     setError("");
     try {
       await callApi(user, `/v1/teams/${encodeURIComponent(teamId)}/invites/${encodeURIComponent(uid)}`, { method: "DELETE" });
@@ -434,7 +436,7 @@ function PendingInvitesCard({ teamId, version }: { teamId: string; version: numb
   return (
     <section className="card">
       <h2 className="card-title">Invites pending · {invites.length}</h2>
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       <ul className="invite-rows">
         {invites.map((i) => (
           <li key={i.uid}>

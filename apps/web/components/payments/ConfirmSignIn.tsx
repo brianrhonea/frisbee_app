@@ -15,6 +15,7 @@ import {
 import { payoutsReauthMessage } from "@stall10/shared";
 import { type FormEvent, useState } from "react";
 import { isSignInCancelled, popupBlockedMessage } from "@/lib/auth_errors";
+import { ErrorNote } from "@/components/StatusViews";
 
 type Method = "password" | "google.com" | "apple.com";
 const methodNames: Record<"google.com" | "apple.com", string> = { "google.com": "Google", "apple.com": "Apple" };
@@ -64,7 +65,7 @@ export function ConfirmSignIn({ user, onConfirmed }: { user: User; onConfirmed: 
   }
 
   if (!method) {
-    return <p className="form-error">For your security, sign out and sign in again, then set up or change payouts.</p>;
+    return <ErrorNote>For your security, sign out and sign in again, then set up or change payouts.</ErrorNote>;
   }
   return (
     <form className="settings-form" onSubmit={(e) => void confirm(e)}>

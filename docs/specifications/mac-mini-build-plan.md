@@ -1,0 +1,414 @@
+# Moving Hylite iOS builds from Codemagic to the owner's Mac mini
+
+**Status:** draft for owner approval, written 2026-11-26 for the owner's setup session on 2026-11-27. Nothing here has been run. Items marked *(unverified)* must be confirmed on the Mac.
+
+**Baseline:** `feature/jan-4-release` at `9d71225`. The Crashlytics changes were read from `sprint3/lane-b`.
+
+**Why move:** Codemagic is pay-as-you-go. "Private hosting" here means a self-hosted build machine. Moving the website off Vercel or the API off Cloud Run is out of scope (§9).
+
+**Second machine:** §10 covers the always-on Windows PC: golden tests, bulk test runs, and Android builds later.
+
+## Summary and recommendation
+
+- **Option (a), local scripts.** Two scripts the owner runs on the Mac: `flutter build ipa`, then an upload using an App Store Connect API key. No fastlane and no self-hosted runner for January.
+- **Build numbers** follow exactly the same rule as today. The script reads the latest numbers with `codemagic-cli-tools`, the open-source tool behind Codemagic's own `app-store-connect` command.
+- **Signing:**
+  - The archive is signed automatically with the owner's development certificate.
+  - The export is signed manually with the Apple Distribution certificate and the existing App Store profile.
+  - No `match`.
+- **Golden tests** stay on Windows. The Mac does iOS builds, signing, the simulator and physical-device runs.
+- **Codemagic** stays as a fallback you start by hand, until two Mac releases have succeeded. Its automatic triggers go off at the first Mac release; otherwise every push to `development` still costs money.
+
+## 1. What Codemagic does today
+
+References are to `codemagic.yaml` unless another file is named.
+
+| Area | What it does | Ref |
+|---|---|---|
+| Workflows | `ios-testflight` (dev). `ios-app-store` (prod) inherits from it | 25-26, 127-129 |
+| Machine | `mac_mini_m2`, 60-minute limit, runs in `apps/mobile` | 27-29 |
+| Triggers | A push to `development` runs the dev build; a push to `main` runs prod. Earlier builds are cancelled. It skips unless `apps/mobile/`, `packages/` or `codemagic.yaml` changed | 52-65, 138-145 |
+| Flutter | Pinned to 3.41.2, the same pin as `ci-flutter.yml:39-43` and `_deploy-backend.yml:124-127` | 36 |
+| Xcode and CocoaPods | `xcode: latest` (not pinned); CocoaPods at its default version | 37-38 |
+| Secrets | Groups `frisbee_secrets_dev` and `frisbee_secrets`, each holding `SECRETS_LOCAL_JSON` and `GOOGLE_SERVICE_INFO_PLIST` in base64. They are decoded to files at build time, and the build fails unless `API_BASE_URL` starts with `https://` | 17-22, 40, 67-75 |
+| Google Sign-In | Writes `ios/Flutter/Secrets.xcconfig` from the plist (the file is gitignored) | 76-83 |
+| Signing | `use-profiles` with the Apple Distribution certificate and the "Stall 10 App Store" profile. Bundle ID `com.brianrhonea.frisbeeApp` | 41-46, 84-85 |
+| Packages | `flutter pub get`, then `pod install --repo-update`. No `Podfile.lock` is committed | 86-94 |
+| Checks | `flutter analyze` and `flutter test`. Golden tests skip because the machine isn't Windows | 95-98 |
+| Build number | The higher of the latest App Store and TestFlight build numbers, plus 1. A failed lookup counts as 0 | 99-109 |
+| Build | `flutter build ipa --release --dart-define-from-file=secrets.local.json --build-number=N --export-options-plist=…` | 110-117 |
+| Publish | Uploads to TestFlight through an API key. Prod has `submit_to_app_store: false` | 30-32, 122-125, 146-151 |
+
+**Other facts from the repo:**
+- **Xcode scheme:** there is only one, `Runner`.
+- **Bundle ID:** hard-coded as `com.brianrhonea.frisbeeApp` at `pbxproj:503, 686, 709`.
+- **iOS minimum version:** 15.0.
+- **Crashlytics (lane B):** adds an "Upload Crashlytics Symbols" phase (`${PODS_ROOT}/FirebaseCrashlytics/run`) and the `firebase_crashlytics: ^6.0.1` dependency.
+- **Podfile:** pins Firebase SDK 12.19.0.
+- **`.github/workflows/ci-flutter.yml`:** runs on Ubuntu and doesn't depend on Codemagic.
+- **Release audit:**
+  - Q14: dev and prod share one bundle ID, so the two apps can't be installed side by side.
+  - INF-1: a push to `main` still starts a paid prod build.
+
+## 2. Target design
+
+### 2.1 Options compared
+
+| | (a) Local scripts | (b) fastlane | (c) Self-hosted GitHub Actions runner |
+|---|---|---|---|
+| Moving parts | bash, `flutter`, `xcodebuild`, `xcrun`, `codemagic-cli-tools` | Adds Ruby, Bundler and a Fastfile | Adds a runner service, a workflow, and a trust link between GitHub and the Mac |
+| How a build starts | The owner runs a command | The owner runs a command | A push, or a manual start |
+| Owner approval for each build | Yes, built in | Yes, built in | Weaker |
+| Attack surface | Smallest | Medium (gem supply chain) | Largest |
+| Fit for January | **Best** | OK | Poor |
+
+A fourth option, **(d)**, runs both the Mac and the Windows PC as runners. It is deferred until after January (§10).
+
+**Recommendation: (a).** Fastlane or a runner can call the same script later, so this closes off nothing. Look at (c) again only after two successful releases, and only as a manual start.
+
+### 2.2 Design decisions
+
+1. **API key:**
+   - Create a new App Store Connect key with the App Manager role. Codemagic's `.p8` can't be downloaded again.
+   - Store it at `~/.appstoreconnect/private_keys/AuthKey_<KEYID>.p8`, mode 0600.
+   - Put the Key ID and Issuer ID in `~/.hylite-release.env`, mode 0600.
+   - None of these ever go in the repo, shell history or screenshots.
+   - Revoke the Codemagic key after cut-over.
+2. **Signing:**
+   - Archive with automatic signing.
+   - Export with a manual `ExportOptions.plist`: `app-store-connect` method, manual signing style, the team ID, and the profile map.
+   - Import the original distribution `.p12` if it still exists. Otherwise create a new certificate and regenerate the profile.
+   - *(Unverified)* whether `flutter build ipa` passes `-allowProvisioningUpdates`. If not, the fallback is `flutter build ios --no-codesign`, then `xcodebuild` archive and export.
+3. **Build number:** the same rule as today. The script **stops** if a lookup fails, rather than using 0. This is a deliberate hardening; please confirm it.
+4. **Dev and prod bundle IDs (Q14 / R3):**
+   - Replace the three hard-coded IDs with `$(APP_BUNDLE_ID)`, set in the gitignored `Secrets.xcconfig`. This uses the same mechanism as Google Sign-In.
+   - Each environment needs its own App ID, App Store Connect app, profile, Firebase iOS app with its plist, and APNs key. Only the owner can create these.
+   - Until R3 is done, the Mac builds dev only.
+5. **Crashlytics dSYMs:** the phase runs inside the archive step. Check these on the first archive *(unverified)*:
+   - the phase appears in the build log;
+   - `ENABLE_USER_SCRIPT_SANDBOXING` doesn't block it;
+   - the dSYM shows up in the Firebase console.
+
+   The script keeps the `.xcarchive` and dSYMs for re-upload.
+6. **Podfile.lock:** the owner generates it on the Mac after lane B merges, and the orchestrator commits it once approved. This makes builds reproducible and closes release-audit line 170.
+
+### 2.3 Scripts (design only)
+
+`scripts/ios/release-ios.sh <dev|prod> [--upload]` runs with `set -euo pipefail`. Steps:
+1. Refuse to run unless the tree is clean and on the right branch (`development` for dev, `main` for prod).
+2. Read `~/.hylite-release.env` and the environment's files from `~/hylite-secrets/<env>/`.
+3. Copy in the plist and write `Secrets.xcconfig`. Check that `API_BASE_URL` starts with `https://` without printing it.
+4. Run `flutter pub get`, `pod install`, `flutter analyze`, `flutter test` and the version check.
+5. Work out the build number.
+6. Run `flutter build ipa --release --dart-define-from-file=secrets.local.json --build-number=$BUILD --export-options-plist=…`.
+7. Check the IPA exists. Print only its bundle ID, version and build number.
+8. Keep the IPA, `.xcarchive`, dSYMs and logs in `~/hylite-releases/<env>/<version>+<build>/`.
+9. With `--upload`, upload with `xcrun altool --upload-app … --apiKey … --apiIssuer …`. *(Unverified)* whether altool still supports this; the fallbacks are `app-store-connect publish` or Transporter.
+10. Make a local tag `ios-<env>-<version>+<build>`. Pushing the tag needs the owner's approval.
+
+`scripts/ios/mac-doctor.sh` checks the setup and prints what it finds:
+- the Flutter version pin;
+- Xcode;
+- CocoaPods;
+- the key file's permissions;
+- that the secret files exist (presence only, never their contents);
+- the signing certificate and profile.
+
+## 3. Owner checklist for 2026-11-27
+
+**[OWNER ONLY]** marks steps that involve credentials, Apple accounts, sign-ins or secret files.
+
+### A. Mac
+1. **[OWNER ONLY]** Update macOS to a version the latest Xcode supports, then reboot.
+2. **[OWNER ONLY]** Create a standard user for builds (for example `hylitebuild`). Turn on FileVault (see Q-C) and the firewall.
+3. **[OWNER ONLY]** Turn on SSH or Screen Sharing only if you want them, for your user only. Set the Mac never to sleep on power.
+4. **[OWNER ONLY]** Sign in to Xcode (Settings, Accounts) with the Apple Developer account.
+
+### B. Toolchain
+5. **[OWNER ONLY]** Install Xcode:
+   - Open it once and accept the licence.
+   - Add the iOS platform and the simulator.
+   - Run `sudo xcodebuild -runFirstLaunch`.
+6. Install Homebrew, then `brew install cocoapods node pnpm git pipx`. Note the versions.
+7. Install Flutter at **3.41.2** exactly (`git checkout 3.41.2`), add it to your PATH, and don't upgrade it. Check with `flutter --version` and `flutter doctor -v`.
+8. Run `pipx install codemagic-cli-tools`, then `app-store-connect --help`.
+9. Clone the repo and check out `development`. Don't push from the Mac without approval.
+
+### C. Certificates, profile and key
+10. **[OWNER ONLY]** Apple Distribution certificate: import the saved `.p12`, or create a new certificate in Xcode → Settings → Accounts → Manage Certificates.
+11. **[OWNER ONLY]** Make sure the "Stall 10 App Store" profile includes that certificate; regenerate it if needed. Download and install it.
+12. **[OWNER ONLY]** Create the new API key with the App Manager role:
+    - Save the `.p8` to `~/.appstoreconnect/private_keys/` and run `chmod 600` on it.
+    - Put the Key ID and Issuer ID in `~/.hylite-release.env`, also with `chmod 600`.
+13. **[OWNER ONLY]** Put the dev `secrets.local.json` and the dev `GoogleService-Info.plist` in `~/hylite-secrets/dev/`. Copy them over USB or AirDrop. No agent opens them. Prod waits for #9.
+
+### D. First builds
+14. Check the setup: `flutter doctor -v`, `pod --version`, `xcodebuild -version`, and `security find-identity -v -p codesigning`, which should list an Apple Distribution identity.
+15. In `apps/mobile`:
+    - `flutter pub get`
+    - `cd ios && pod install --repo-update`
+    - `flutter analyze`
+    - `flutter test` (the golden tests skip here). Note the counts.
+16. **[OWNER ONLY]** Build locally without uploading, and check that `build/ios/ipa/*.ipa` exists.
+17. **[OWNER ONLY]** Upload a dev build to TestFlight. Check it finishes processing, then install it on the iPhone.
+18. Note the macOS, Xcode, Flutter and CocoaPods versions, the build number and how long it took.
+19. Leave Codemagic running for now (see §5).
+
+## 4. Repo changes to prepare after approval
+
+Nothing is written yet. Each change needs approval, and none is pushed without it.
+
+| File | Change |
+|---|---|
+| `scripts/ios/release-ios.sh`, `scripts/ios/mac-doctor.sh` | New (§2.3) |
+| `scripts/ios/ExportOptions.{dev,prod}.plist.template` | New: templates with placeholders |
+| `docs/ios-release.md` | The Mac becomes the main route and Codemagic the fallback |
+| `.gitignore` | Add guards for `.p8`, `.p12`, `.mobileprovision`, generated `ExportOptions*.plist` and `*.env` |
+| `.github/workflows/ci-flutter.yml` | Comment-only change at lines 3-4 |
+| `codemagic.yaml` | Make both trigger blocks manual-only at the first Mac release |
+| `project.pbxproj` (R3) | Use `$(APP_BUNDLE_ID)`, plus a committed default |
+| `ios/Flutter/Secrets.example.xcconfig` | Add an example `APP_BUNDLE_ID` key |
+| `ios/Podfile.lock` | Generated on the Mac, then committed once with approval |
+
+## 5. Cut-over and rollback
+
+**Cut-over:**
+1. **Nov 27:** the first local archive and a dev TestFlight upload. Codemagic stays unchanged.
+2. **First real Mac release:** switch Codemagic's triggers to manual-only. This avoids paid builds and clashing build numbers.
+3. Keep Codemagic, its key and its signing setup until **two** Mac releases have installed successfully on a device.
+4. Then decide whether to delete `codemagic.yaml` or keep it unused (Q-H).
+5. The `main` and prod route stays blocked on #9 and INF-1.
+
+**Rollback:**
+- **Bad build:** stop sending it out and ship a new, higher-numbered build from the last good commit.
+- **The Mac is unusable:** start Codemagic's dev workflow by hand.
+- **Backups:** back up `~/hylite-secrets`, `~/.appstoreconnect` and the `.p12` to an encrypted Time Machine disk.
+- **Xcode updates:** keep the previous Xcode installed until the next release succeeds.
+
+## 6. Security
+
+- **Secrets:**
+  - They live in the build user's home folder, mode 0600, on a FileVault disk.
+  - The signing key stays in the keychain.
+  - Scripts never print secrets and never run with `set -x`.
+- **Who can start a build:** only someone logged in to the Mac. Option (a) has no remote trigger.
+- **If a runner is added later (option c):**
+  - a non-admin user;
+  - registered to this repository only;
+  - started by hand, or by pushes to protected branches only;
+  - **never** run for pull requests or forks;
+  - a separate keychain;
+  - `permissions: contents: read`;
+  - pinned actions.
+- **FileVault:** after an unattended reboot, the password has to be typed before the Mac starts up (Q-C).
+- **Production:** no prod profile, plist or secrets go on the Mac until #9 is done.
+
+## 7. What the Mac also makes possible
+
+- **iOS Simulator:**
+  - `flutter run -d <sim> --dart-define-from-file=secrets.local.json`;
+  - screen recordings with `xcrun simctl io recordVideo` for the navigation motion review (N13).
+  - There are no `integration_test` or Maestro flows in the repo yet (release-audit #29).
+- **iPhone over USB:** `flutter run -d <iphone> --dart-define-from-file=secrets.local.json`, with Developer Mode on.
+- **These still need the physical device:**
+  - push notifications;
+  - camera, microphone and photo access;
+  - media playback;
+  - background behaviour and network changes;
+  - LiveKit;
+  - Apple and Google sign-in in a release build;
+  - Universal Links;
+  - the TestFlight test crash for Crashlytics;
+  - how navigation feels: frame rate and the back-swipe.
+- **Golden tests:** keep them on Windows. A second, macOS set of goldens isn't worth it for January: it doubles the review work, the fonts differ, and it causes false failures.
+
+## 8. Risks
+
+1. **One machine, one person.** Mitigated by the Codemagic fallback and backups.
+2. **Apple's minimum Xcode and SDK for uploads.** Check it on the first upload and again before Jan 18 *(unverified)*.
+3. **Flutter 3.41.2 with the latest Xcode** *(unverified)*. The fallback is the previous Xcode.
+4. **A missing `.p12`** means a new certificate and a new profile.
+5. **Upload support in altool** may have changed *(unverified)*. Fallbacks are listed in §2.3.
+6. **Script sandboxing** may block the Crashlytics phase *(unverified)*.
+7. **Build-number clashes** with Codemagic, until its triggers are switched off.
+8. **Prod** is blocked by INF-1 and #9.
+9. **No `Podfile.lock`**, so pod versions can drift.
+10. **Owner time:** this has to fit alongside R2, R3 and 9-P.
+
+## 9. Out of scope
+
+Hosting the website or the API on your own hardware would bring public IP or tunnel setup, TLS, uptime, backups and scaling. That works against January's reliability and security priorities. If you want it, plan it as its own task after the beta.
+
+## Decisions for the owner
+
+| # | Decision | Recommendation |
+|---|---|---|
+| Q-A | Which environment keeps `com.brianrhonea.frisbeeApp` | Dev keeps it; prod gets a new ID |
+| Q-B | Option (a): local scripts plus `codemagic-cli-tools` | Yes; fastlane only as a fallback |
+| Q-C | FileVault on a Mac that runs on its own | On, and type the password after reboots |
+| Q-D | Does the original distribution `.p12` still exist? | Owner to answer |
+| Q-E | A new API key for the Mac, and revoking Codemagic's after cut-over | Yes |
+| Q-F | Where release logs and archives live | `~/hylite-releases/`, plus a backup |
+| Q-G | Codemagic manual-only from the first Mac release | Yes |
+| Q-H | After two Mac releases: delete `codemagic.yaml`, or keep it unused | Decide then |
+| Q-I | Commit a `Podfile.lock` generated on the Mac | Yes |
+| Q-J | Golden tests stay on Windows | Yes |
+| Q-K | The Mac mini's model and macOS version (they decide which Xcode it can run) | Owner to answer |
+| Q-L | The beta runs on dev only until #9 | Yes |
+| Q-M | A self-hosted runner and moving off Vercel or Cloud Run are later decisions | Yes |
+| Q-N | For January: the Mac plus the laptop for golden tests, or also bring up the PC with runners? | The Mac plus the laptop. The PC joins later |
+| Q-O | If the PC joins: a test machine you run by hand, or a registered runner? | A test machine run by hand first |
+| Q-P | Which Windows edition does the PC run, and is a UPS available? | Owner to answer |
+| Q-Q | Android builds (#10): on the PC or the Mac? | Decide when #10 starts. The PC is a good fit |
+| Q-R | Does the PC become the reference machine for golden tests? | Only if its baseline run matches (§10.6 step 7) |
+
+## 10. Second machine: the always-on Windows PC
+
+**Status:** draft. The PC is off today, and nothing here has been run. The app has no Windows desktop version, so "Windows work" means test runs, plus Android builds later.
+
+### 10.1 Who does what
+
+| Machine | Does | Doesn't do |
+|---|---|---|
+| Mac mini | iOS builds, signing, TestFlight, the simulator, iPhone runs over USB, and integration and Maestro tests once they exist | Golden tests (they skip on anything but Windows) |
+| Windows PC | Golden tests, the full `flutter test`, website unit and Playwright tests, API and shared tests, Firebase emulator and rules tests; Android after the beta | Anything iOS |
+| Owner's laptop | Fallback for golden tests, and day-to-day work | Staying on all the time |
+
+The rules tests need Java. Playwright needs its browsers installed.
+
+### 10.2 Are two runners worth it for January?
+
+**Recommendation: no runners for January.** Use the Mac scripts, with the owner's laptop for golden tests, and add the PC later.
+
+**Mac only, plus the laptop for golden tests:**
+- **Setup before the beta:** least. Just the Mac, tomorrow.
+- **Owner time:** least.
+- **When builds and tests run:** only when the owner starts them, which matches "the owner approves each push".
+- **Exposure:** small.
+- **Golden tests:** the owner runs them on the laptop before approving UI changes.
+
+**Mac and PC both as runners:**
+- **Setup:** the most. It competes with R2, R3 and 9-P for the owner's time.
+- **Golden tests:** they run automatically.
+- **Risk:** two machines that are always on and have access to the repo.
+- **Payoff:** this becomes worth it once the test suites grow, or once Android (#10) starts.
+
+**A middle path:** leave the PC on as a test machine you run by hand, over Remote Desktop or SSH, with no runner. You get the always-on machine without the runner security risk. Decide about runners after two Mac releases.
+
+**Android (#10):** the PC is a good build machine for it. It needs an upload key, created only by the owner and kept outside the repo.
+
+### 10.3 Runner security (only if runners are adopted)
+
+**Both machines:**
+- Register runners to this repository only.
+- **Never run them for pull requests or forks.** Allow only manual starts and pushes to protected branches, and require approval for outside collaborators.
+- Run each runner as a dedicated non-admin user.
+- In workflows, use `permissions: contents: read`, actions pinned by SHA, and `persist-credentials: false`, and never print secrets.
+- No prod credentials go on either machine until #9 is done.
+- Start runners only when they're needed.
+
+**Windows PC:**
+- **User:** the standard user `hylitetest`, never running as Administrator.
+- **Disk encryption:** BitLocker, or device encryption on Home edition *(unverified)*. Keep the recovery key in your password manager.
+- **Updates:** keep Windows Update on, with active hours set and restarts scheduled at about 04:00. The runner service restarts on its own.
+- **Network:** Defender and the firewall on, and no ports opened inward. Use Remote Desktop only through your own VPN, never open to the internet.
+
+### 10.4 Power and sleep
+
+**PC:**
+- Never sleep or hibernate while plugged in.
+- Turn off Fast Startup.
+- In the BIOS, turn on "restore on AC power loss".
+- Use wired ethernet with a reserved IP, and turn off the network card's power saving.
+- A UPS is recommended.
+- The services start automatically.
+
+**Mac:**
+- Prevent sleep.
+- Turn on "start up automatically after a power failure" and "wake for network access".
+- FileVault needs the password after a reboot (Q-C).
+
+### 10.5 Labels, so each job goes to the right machine
+
+| Runner | Labels | Used by |
+|---|---|---|
+| Mac mini | `self-hosted`, `macos`, `arm64` *(unverified)*, `hylite-ios`, `hylite-signing` | iOS build and TestFlight only |
+| Windows PC | `self-hosted`, `windows`, `x64`, `hylite-goldens`, `hylite-tests`, and `hylite-android` later | Golden tests, bulk tests, Android |
+
+**Rules:**
+- Every job lists all the labels it needs, never only `self-hosted`.
+- The GitHub-hosted Ubuntu CI stays as the baseline. Self-hosted jobs are extra.
+- A signing workflow uses an environment (for example `ios-release`) with the owner as the required reviewer.
+
+### 10.6 Owner setup checklist for the PC
+
+1. **[OWNER ONLY]** Put the PC in its permanent spot on wired ethernet, then run Windows Update to completion and reboot.
+2. **[OWNER ONLY]** Create the `hylitetest` user, turn on BitLocker or device encryption, and save the recovery key.
+3. **[OWNER ONLY]** Set the power and BIOS options in §10.4, and reserve the IP address on your router.
+4. Install Git, Node, pnpm, Java and Flutter 3.41.2 (pinned), then run `flutter doctor -v`.
+5. Clone the repo as `hylitetest`. Don't push from the PC without approval.
+6. Run `pnpm install` and install the Playwright browsers.
+7. **First runs, by hand. Record the exact counts for each:**
+   - `flutter test` in `apps/mobile`. The golden tests have to match on this PC: if fonts or DPI differ, the laptop stays the reference machine.
+   - the website unit tests and Playwright;
+   - the API and shared tests;
+   - `npm run test:rules`.
+8. **[OWNER ONLY, runners only]** Register the runner, add its labels, and install it as a service running as `hylitetest`. Don't share the registration token.
+9. **[OWNER ONLY, runners only]** Apply the repository settings from §10.3.
+10. **Later, for #10:** install Android Studio and the SDK, and create the upload keystore outside the repo (**[OWNER ONLY]**).
+
+### 10.7 Repo changes I'd prepare (only if they're adopted)
+
+- `.github/workflows/ci-flutter-windows.yml`: golden tests on `[self-hosted, windows, hylite-goldens]`.
+- `.github/workflows/ci-tests-pc.yml`: optional bulk tests.
+- `.github/workflows/ios-mac.yml`: only if option (c) is chosen. Manual start, with environment approval.
+- `scripts/pc/pc-doctor.ps1`: a setup check for the PC.
+- A runner-security section, and "run golden tests on the PC or laptop before approving UI changes" in the release checklist.
+
+### 10.8 Added risks
+
+1. Golden images may not match between two Windows machines. The first runs (§10.6 step 7) decide.
+2. Windows Update restarts can interrupt a run.
+3. An always-on runner gives an attacker a lasting way in if the repo or a pull request is compromised. That's why runners are deferred and pull-request triggers are banned.
+4. The Windows edition is unknown.
+5. An internet or power outage takes the PC offline. The Ubuntu CI stays as the baseline.
+
+## Approval (owner, 2026-11-26)
+
+The owner approved the plan and took every recommendation:
+- **Q-A:** dev keeps the current bundle ID.
+- **Q-B:** option (a).
+- **Q-C:** FileVault on.
+- **Q-E:** a new API key.
+- **Q-F:** `~/hylite-releases/`, plus a backup.
+- **Q-G:** Codemagic goes manual-only at the first Mac release.
+- **Q-H:** decided after two releases.
+- **Q-I:** commit `Podfile.lock`.
+- **Q-J:** golden tests stay on Windows.
+- **Q-L:** dev only until #9.
+- **Q-M:** later decisions.
+- **Q-N:** the Mac plus the laptop for January.
+- **Q-O:** the PC starts as a test machine run by hand.
+- **Q-Q:** decided when #10 starts.
+- **Q-R:** only if the baseline matches.
+
+**Still open, for the owner to answer on the day:** Q-D (`.p12`), Q-K (Mac model and macOS), Q-P (Windows edition and UPS).
+
+**Preparation:** the release lane prepares the files in §4 and §10.7, apart from the runner workflows. The `codemagic.yaml` trigger change and the R3 bundle-ID change wait: the trigger change for the first Mac release, and R3 until lane B's iOS project changes are merged.
+
+## First Mac session, 2026-11-27: option 1 (owner choice)
+
+`development` doesn't contain the scripts yet, and `feature/jan-4-release` is not pushed. So the first session is a **local build only, with no upload**: it checks the toolchain and signing.
+
+1. Copy the `scripts/ios/` folder from the owner's PC to `~/hylite-tools/ios/` on the Mac (USB or AirDrop), then run `chmod +x ~/hylite-tools/ios/*.sh`.
+2. Clone the repo on the Mac and check out `development`, which is app 0.0.55. Leave the tree clean and don't push.
+3. Do plan §3, steps A to C. Then run:
+   - `~/hylite-tools/ios/mac-doctor.sh`
+   - `HYLITE_REPO=~/<clone> ~/hylite-tools/ios/release-ios.sh dev --dry-run`
+   - `HYLITE_REPO=~/<clone> ~/hylite-tools/ios/release-ios.sh dev` (**no `--upload`**)
+4. Check the printed bundle ID, version and build. The IPA and archive go to `~/hylite-releases/dev/…`.
+
+**Notes:**
+- TestFlight uploads from the Mac start after the owner's Sprint 3 merge to `development`.
+- The build-number lookup still contacts App Store Connect (read-only) during a local build.
+- `HYLITE_REPO` lets the scripts run from outside the clone; it was added for this session.

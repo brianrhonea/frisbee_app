@@ -58,6 +58,33 @@ describe("write limits", () => {
     });
   }
 
+  // Phase-1 social routes (contract phase1-writes.md A4): [perMinute], and the day cap when there is one.
+  const social = [
+    ["POST", "/v1/posts", 10, 200],
+    ["POST", "/v1/posts/p1/comments", 30, undefined],
+    ["PUT", "/v1/posts/p1/repost", 20, undefined],
+    ["PUT", "/v1/follows", 30, 300],
+  ] as const;
+  for (const [method, url, perMinute, perDay] of social) {
+    it(`${method} ${url}: ${perMinute} a minute${perDay ? ` and ${perDay} a day` : ""}, per caller`, async () => {
+      const { send, tick } = clocked();
+      const codes: number[] = [];
+      for (let i = 0; i < perMinute + 1; i++) codes.push(await send(method, url, "amy"));
+      expect(codes.slice(0, perMinute)).not.toContain(429);
+      expect(codes[perMinute]).toBe(429);
+      expect(await send(method, url, "ben")).not.toBe(429);
+      if (!perDay) return;
+      // A minute later there's room again, until the day's cap.
+      let used = perMinute;
+      while (used < perDay) {
+        tick(61_000);
+        for (let i = 0; i < perMinute && used < perDay; i++, used++) expect(await send(method, url, "amy")).not.toBe(429);
+      }
+      tick(61_000);
+      expect(await send(method, url, "amy")).toBe(429);
+    });
+  }
+
   it("reconcile has its own small bucket", async () => {
     const { send } = clocked();
     const codes: number[] = [];
