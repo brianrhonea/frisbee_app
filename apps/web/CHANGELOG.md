@@ -4,6 +4,14 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.63.6 — 2026-11-26
+
+Navigation motion onto the K7 tokens (N13). Motion polish only; no routing changes.
+
+- Dialogs open over the sheet time (`--dur-sheet`, 300 ms, `--ease`) with a short rise and a backdrop fade; both are 0 under reduced motion.
+- The username check spinner stops under reduced motion; the pinned-message highlight fade uses `--dur-base` instead of a fixed 0.4 s.
+- Tests: reduced-motion and token checks, and a width-change check (the page is not reloaded, URL and scroll place stay). Opt-in video recordings of the main journeys at 375 and 1440 px, light and dark (`E2E_MOTION=1`, projects `motion-*`), saved untracked under `review/web/motion/`.
+
 ## 0.63.5 — 2026-11-26
 
 UI review fixes for the shell and components (Sprint 3 lane C). No routes, logic or permissions change.

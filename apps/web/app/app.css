@@ -208,6 +208,7 @@
   border: 2px solid var(--line); border-top-color: var(--accent); animation: spin 0.8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .username-spin { animation: none; } }
 .username-field small.form-ok, .username-field small.form-error { font-size: 0.8rem; }
 .username-field { display: grid; gap: 6px; font-size: 0.88rem; font-weight: 600; color: var(--ink-soft); }
 .username-step-form { display: grid; gap: var(--space-lg); }
@@ -239,6 +240,11 @@ dialog.dialog {
   width: min(100% - 32px, 480px); max-width: none; max-height: calc(100vh - 32px); overflow: visible;
 }
 dialog.dialog::backdrop { background: rgb(0 0 0 / 0.45); }
+/* Opening: the sheet timing (N13). Closing is instant. The tokens are 0 under reduced motion. */
+dialog.dialog[open] { animation: dialog-in var(--dur-sheet) var(--ease); }
+dialog.dialog[open]::backdrop { animation: dialog-fade var(--dur-sheet) var(--ease); }
+@keyframes dialog-in { from { opacity: 0; transform: translateY(8px); } }
+@keyframes dialog-fade { from { opacity: 0; } }
 dialog.dialog > * { max-height: calc(100vh - 32px); overflow-y: auto; }
 .small { font-size: 0.88rem; }
 .pill {

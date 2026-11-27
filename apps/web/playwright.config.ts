@@ -12,6 +12,28 @@ const widths = [
   { name: "desktop", width: 1440, height: 900, mobile: false },
 ] as const;
 
+// N13: video recordings of the main journeys, opt-in so the normal suite is untouched:
+// E2E_MOTION=1 pnpm exec playwright test motion --project=motion-375-light ...
+// Videos land in review/web/motion/ (untracked).
+const motion = process.env.E2E_MOTION
+  ? [375, 1440].flatMap((width) =>
+      (["light", "dark"] as const).map((theme) => ({
+        name: `motion-${width}-${theme}`,
+        testMatch: /motion\.spec\.ts/,
+        outputDir: `../../review/web/motion/${width}-${theme}`,
+        use: {
+          ...devices["Desktop Chrome"],
+          viewport: { width, height: width === 375 ? 812 : 900 },
+          isMobile: width === 375,
+          hasTouch: width === 375,
+          colorScheme: theme,
+          reducedMotion: "no-preference" as const,
+          video: { mode: "on" as const, size: { width, height: width === 375 ? 812 : 900 } },
+        },
+      })),
+    )
+  : [];
+
 export default defineConfig({
   testDir: "tests/e2e",
   outputDir: "test-results",
@@ -28,7 +50,7 @@ export default defineConfig({
   projects: [
     ...widths.map((w) => ({
       name: w.name,
-      testIgnore: /routes\.spec\.ts/,
+      testIgnore: /routes\.spec\.ts|motion\.spec\.ts/,
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: w.width, height: w.height },
@@ -44,6 +66,7 @@ export default defineConfig({
       dependencies: widths.map((w) => w.name),
       use: { ...devices["Desktop Chrome"], viewport: { width: 1024, height: 768 } },
     },
+    ...motion,
   ],
   webServer: process.env.E2E_BASE_URL
     ? undefined
