@@ -182,7 +182,7 @@ All screens **H1–H10** are approved to start now, on both platforms, each plat
 - a full navigation re-run (N1–N10) at the end;
 - a parity review of app against website.
 
-## Owner review: navigation motion (N11, 2026-11-26)
+## Owner review: navigation motion (N13, 2026-11-26)
 
 The owner reviews the before and after pictures **and** every navigation animation, to make sure moving around never feels clunky. This is checked across the shell, each screen and every breakpoint.
 
