@@ -10,6 +10,10 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.65
+
+- **Under the hood:** posting, commenting, following, chatting, events, roster and team posts now go through Stall 10's server. Things you send while offline still send when you're back online. Please test sending a message, a post and a comment with and without a photo, in airplane mode and back.
+
 ## 0.0.64
 
 - **Smoother, consistent motion:** pages, sheets and dialogs now open and close at the same speed everywhere, and don't animate if you have Reduce Motion on.

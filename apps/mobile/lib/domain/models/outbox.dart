@@ -264,8 +264,7 @@ class OutboxJob {
       ],
       uploads: {
         for (final e in ((j['uploads'] as Map?) ?? const {}).entries)
-          if (int.tryParse('${e.key}') case final i?)
-            if (ReadyUpload.fromJson(e.value) case final u?) i: u,
+          ?int.tryParse('${e.key}'): ?ReadyUpload.fromJson(e.value),
       },
       // A job saved before versions existed is version 1.
       version: (j['version'] as num?)?.toInt() ?? 1,

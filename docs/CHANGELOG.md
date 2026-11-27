@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.65  | 2026-11-27 | `sprint3/17b`                           |                     |
 | 0.0.64  | 2026-11-26 | `sprint3/lane-b`                        |                     |
 | 0.0.63  | 2026-11-26 | `sprint3/lane-b`                        |                     |
 | 0.0.62  | 2026-11-26 | `sprint3/lane-b`                        |                     |
@@ -77,6 +78,15 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.65 — Phase-1 writes through the API (17-B, app half)
+
+- Posts, comments, likes, reposts, follows and follow requests, team chat and direct messages (send, react, delete, groups, members, requests), team events (create with series, edit and delete with scope, RSVP and note, reactions, votes), personal calendar events, roster spots (create with id, save, link, delete) and team posts (create with id and photos, edit, delete) now call the API. The direct Firestore write code for these is gone; there is no fallback (D10).
+- New `UploadClient` (`/v1/uploads`: create, PUT bytes, complete). Queued jobs keep their finished uploads, so a retry after "uploaded, send failed" does not upload again.
+- Outbox: every kind sends its job id as `id`; a 409 counts as sent; old queued payloads are mapped (comment `parentId` to `replyTo`, chat/DM `replyTo` object to its id, a user post's editable map to the request body, a team post's to its body); an unmappable job is marked failed, not dropped; new jobs carry a payload version (2).
+- H1: people search (direct messages, profiles) only lists adult accounts.
+- Removed the app's legacy roster-status migration (D7).
+- Still direct: read markers, typing, archive, clear (D6), and recorded runs (a post with a GPS route or duration), which the shared post schema cannot carry yet.
 
 ## 0.0.64 — Navigation motion on AppMotion (N13)
 
