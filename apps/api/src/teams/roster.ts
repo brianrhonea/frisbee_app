@@ -16,7 +16,7 @@ import {
 import type { AdultVisibility } from "../account/adult_visibility.js";
 import type { Caller } from "../auth.js";
 import { isPrivateProfile, validId } from "../browse/model.js";
-import { isDraftedLeagueTeam, pinnedImageUrl } from "../browse/visibility.js";
+import { isDraftedLeagueTeam } from "../browse/visibility.js";
 import { ApiError, parseBody } from "../errors.js";
 import { docIdParam } from "../ids.js";
 import { type Data, type DocStore, deleteField } from "../store.js";
@@ -49,7 +49,7 @@ export class RosterService {
   constructor(
     private readonly store: DocStore,
     /** Buckets visitors may load profile photos from (visibility.ts photoBuckets). */
-    private readonly buckets: readonly string[] = [],
+    _buckets: readonly string[] = [],
     /** D-1317: linked accounts without the adult claim are shown as private. */
     private readonly adults?: AdultVisibility,
   ) {}
@@ -159,7 +159,7 @@ export class RosterService {
           if (pos) out.position = pos;
           if (profile && shown) {
             if (str(profile.username)) out.username = str(profile.username);
-            const photo = pinnedImageUrl(profile.photoUrl, this.buckets);
+            const photo = trustedProfilePhoto(profile.photoUrl, linked);
             if (photo) out.photoUrl = photo;
           }
           return out;

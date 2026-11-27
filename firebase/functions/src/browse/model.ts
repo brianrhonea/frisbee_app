@@ -89,15 +89,15 @@ export function isPrivateProfile(profile: Data | undefined): boolean {
   return !profile || profile.private === true;
 }
 
-let imageBuckets: readonly string[] | null = null;
+let imageBuckets: readonly string[] = [];
 
 /**
  * The Storage buckets imageUrl trusts. Set once at startup; until then (or
- * with an empty list) any bucket's Storage URL passes, but Google photos
- * are still limited to lh3.
+ * with an empty list) only Google's lh3 photo host passes: no bucket is
+ * trusted until some are configured.
  */
 export function configureImageBuckets(buckets: readonly string[]): void {
-  imageBuckets = buckets.length > 0 ? buckets : null;
+  imageBuckets = buckets;
 }
 
 /**
@@ -112,12 +112,12 @@ export function imageUrl(v: unknown): string | undefined {
   try {
     const u = new URL(v);
     if (u.protocol !== "https:" || u.username || u.password || u.port) return undefined;
-    if (u.hostname === "lh3.googleusercontent.com") return v;
+    if (u.hostname === "lh3.googleusercontent.com") return u.href;
     let bucket: string | undefined;
     if (u.hostname === "firebasestorage.googleapis.com") bucket = /^\/v0\/b\/([^/]+)\/o\//.exec(u.pathname)?.[1];
     else if (u.hostname === "storage.googleapis.com") bucket = /^\/([^/]+)\//.exec(u.pathname)?.[1];
     else return undefined;
-    return bucket && (!imageBuckets || imageBuckets.includes(bucket)) ? v : undefined;
+    return bucket && imageBuckets.includes(bucket) ? u.href : undefined;
   } catch {
     return undefined;
   }

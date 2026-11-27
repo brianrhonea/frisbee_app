@@ -9,6 +9,19 @@
 const unsafeName = /[/\\]|%2f|%5c|%2e%2e|^\.|[^A-Za-z0-9._%-]/i;
 const googlePhotoHost = "https://lh3.googleusercontent.com/";
 
+/**
+ * The URL as the parser writes it (what a browser would fetch), so a value
+ * with stripped whitespace or odd escapes is never passed on as typed; null
+ * when it doesn't parse.
+ */
+function normal(url: string): string | null {
+  try {
+    return new URL(url).href;
+  } catch {
+    return null;
+  }
+}
+
 /** The deployment's Storage buckets: the project's two defaults and the one in FIREBASE_CONFIG. */
 export function projectBuckets(env: NodeJS.ProcessEnv = process.env): string[] {
   const project = env.GCLOUD_PROJECT;
@@ -24,7 +37,7 @@ export function projectBuckets(env: NodeJS.ProcessEnv = process.env): string[] {
 /** [url] when it is a picture trusted for [uid] (see the file comment), else null. */
 export function trustedPhotoUrl(url: string | null | undefined, uid: string, buckets: readonly string[], emulatorHost?: string): string | null {
   if (!url || url.length > 2000) return null;
-  if (url.startsWith(googlePhotoHost)) return url;
+  if (url.startsWith(googlePhotoHost)) return normal(url);
   const hosts = ["https://firebasestorage.googleapis.com", ...(emulatorHost ? [`http://${emulatorHost}`] : [])];
   const own = `users%2F${encodeURIComponent(uid)}%2Fprofile%2F`;
   for (const host of hosts) {
@@ -32,7 +45,7 @@ export function trustedPhotoUrl(url: string | null | undefined, uid: string, buc
       const prefix = `${host}/v0/b/${bucket}/o/${own}`;
       if (!url.startsWith(prefix)) continue;
       const rest = url.slice(prefix.length).split("?")[0]!;
-      if (rest.length > 0 && !unsafeName.test(rest)) return url;
+      if (rest.length > 0 && !unsafeName.test(rest)) return normal(url);
     }
   }
   return null;

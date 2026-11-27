@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   clientIp,
+  configureImageBuckets,
   eventView,
   isPrivateGroup,
   isPrivateProfile,
@@ -15,6 +16,10 @@ import {
   validId,
   visitorKey,
 } from "../../src/browse/model";
+
+// Only configured buckets are trusted for pictures (an empty list trusts lh3 alone).
+beforeAll(() => configureImageBuckets(["b"]));
+afterAll(() => configureImageBuckets([]));
 
 describe("visitors", () => {
   it("are keyed by a hash of their IP, never the IP itself", () => {
