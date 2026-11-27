@@ -146,3 +146,38 @@ Option **(a)** is approved: a server-only `profiles/{uid}.adult` field.
   - A list query on `profiles` for anyone other than the caller must filter on `adult == true`.
 - **Clients:** the app and website profile-search queries add the filter, in lanes B and C.
 - **Deploy:** the owner deploys the rules to dev, after the backfill has run.
+
+## Owner decision: the whole UI redesign moves forward (2026-11-26)
+
+All screens **H1–H10** are approved to start now, on both platforms, each platform in its own design. They begin as soon as the current lanes merge.
+
+**Scope:**
+- H1, H2 and H7 include the January additions already approved in UI-Q12:
+  - Home summary tiles;
+  - Schedule Month, Week and List;
+  - Chats filters.
+- Every other screen is a restyle onto C1–C10 and the new shell.
+- No new features from the mock-ups.
+- No business-logic, permission or navigation changes.
+
+**Order:**
+1. H1 Home
+2. H2 Schedule
+3. H7 Chats
+4. H3 Event details
+5. H5 Team overview
+6. H6 Roster
+7. H4 My teams
+8. H8 Notifications
+9. H9 Settings
+10. H10 Sign-in
+
+**Lanes:**
+- **App screens.** Lane B, after C5–C10 and N1/N2/N10 merge. Once lane A's API work is done, a second Flutter agent takes 17-B (the data layer, `lib/data/**`), while lane B keeps the screens (`lib/ui/**`). The two never edit the same files.
+- **Website screens.** Lane C, after its UI-review fixes merge.
+
+**Approval and checks for each screen:**
+- before and after pictures in light and dark at phone and desktop widths, reviewed by the UI reviewer, then by the owner in batches;
+- the screen's existing tests still pass, plus goldens and Playwright screenshots;
+- a full navigation re-run (N1–N10) at the end;
+- a parity review of app against website.
