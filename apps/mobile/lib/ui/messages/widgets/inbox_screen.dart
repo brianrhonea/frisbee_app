@@ -786,7 +786,11 @@ class _SwipeActionsState extends State<_SwipeActions>
 
   void _onOpenChanged() {
     if (widget.open.value != widget.id && _offset.value > 0) {
-      _offset.animateTo(0, curve: Curves.easeOut);
+      _offset.animateTo(
+        0,
+        duration: AppMotion.of(context, AppMotion.base),
+        curve: AppMotion.easing,
+      );
     }
   }
 
@@ -797,7 +801,11 @@ class _SwipeActionsState extends State<_SwipeActions>
   void _settle(DragEndDetails d) {
     final v = d.primaryVelocity ?? 0;
     final open = v < -300 || (v <= 300 && _offset.value > 0.5);
-    _offset.animateTo(open ? 1 : 0, curve: Curves.easeOut);
+    _offset.animateTo(
+      open ? 1 : 0,
+      duration: AppMotion.of(context, AppMotion.base),
+      curve: AppMotion.easing,
+    );
     if (open) {
       if (widget.open.value != widget.id) HapticFeedback.selectionClick();
       widget.open.value = widget.id;
@@ -807,7 +815,11 @@ class _SwipeActionsState extends State<_SwipeActions>
   }
 
   void _close() {
-    _offset.animateTo(0, curve: Curves.easeOut);
+    _offset.animateTo(
+      0,
+      duration: AppMotion.of(context, AppMotion.base),
+      curve: AppMotion.easing,
+    );
     if (widget.open.value == widget.id) widget.open.value = null;
   }
 

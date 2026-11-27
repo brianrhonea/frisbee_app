@@ -657,8 +657,8 @@ class _FilterChipsState extends State<_FilterChips> {
       if (clamped != pos.pixels) {
         _scroll.animateTo(
           clamped,
-          duration: AppMotion.base,
-          curve: Curves.easeOut,
+          duration: AppMotion.of(context, AppMotion.base),
+          curve: AppMotion.easing,
         );
       }
     });

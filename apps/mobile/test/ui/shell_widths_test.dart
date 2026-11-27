@@ -39,6 +39,27 @@ void main() {
     expect(t.takeException(), isNull);
   });
 
+  for (final size in const [Size(640, 360), Size(667, 375)]) {
+    testWidgets('$size: a phone on its side gets a rail that fits', (t) async {
+      await pumpFullApp(t, size: size);
+      expect(bar, findsNothing);
+      expect(find.byIcon(Icons.explore_outlined), findsWidgets);
+      expect(find.byType(HomeScreen), findsOneWidget);
+      expect(t.takeException(), isNull);
+      // Rail items are 48 px targets.
+      final item = find.ancestor(
+        of: find.byIcon(Icons.explore_outlined),
+        matching: find.byType(SizedBox),
+      );
+      expect(
+        item.evaluate().any(
+          (e) => t.getSize(find.byWidget(e.widget)).width == 48,
+        ),
+        isTrue,
+      );
+    });
+  }
+
   testWidgets('1024: full sidebar with the tab labels', (t) async {
     await pumpFullApp(t, size: const Size(1024, 768));
     expect(bar, findsNothing);

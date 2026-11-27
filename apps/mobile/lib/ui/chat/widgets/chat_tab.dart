@@ -955,7 +955,7 @@ class _RoomRowState extends State<_RoomRow> {
       data: room,
       holdToDrag: false,
       feedback: Container(
-        height: ListRow.minHeight,
+        constraints: const BoxConstraints(minHeight: ListRow.minHeight),
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
           color: c.card,

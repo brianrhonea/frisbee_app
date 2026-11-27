@@ -89,6 +89,32 @@ void main() {
     handle.dispose();
   });
 
+  testWidgets('at 200% text the actions drop under the title and wrap', (
+    t,
+  ) async {
+    await t.binding.setSurfaceSize(const Size(360, 800));
+    addTearDown(() => t.binding.setSurfaceSize(null));
+    await pumpInApp(
+      t,
+      MediaQuery(
+        data: const MediaQueryData(
+          size: Size(360, 800),
+          textScaler: TextScaler.linear(2),
+        ),
+        child: _header(
+          actions: [
+            OutlinedButton(onPressed: () {}, child: const Text('Follow')),
+            OutlinedButton(onPressed: () {}, child: const Text('Message')),
+            OutlinedButton(onPressed: () {}, child: const Text('Share')),
+          ],
+        ),
+      ),
+    );
+    expect(t.takeException(), isNull);
+    final title = t.getTopLeft(find.text('Northside Flyers')).dy;
+    expect(t.getTopLeft(find.text('Follow')).dy, greaterThan(title));
+  });
+
   for (final theme in GoldenTheme.values) {
     testWidgets('meets accessibility guidelines, ${theme.name}', (t) async {
       await pumpInApp(

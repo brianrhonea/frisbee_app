@@ -10,6 +10,10 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.65
+
+- **Easier to use and read:** form fields have a clearer outline, the side bar fits on a phone turned sideways, small text is a little bigger, and pages move at one steady speed (and not at all with Reduce Motion).
+
 ## 0.0.64
 
 - **Smoother, consistent motion:** pages, sheets and dialogs now open and close at the same speed everywhere, and don't animate if you have Reduce Motion on.

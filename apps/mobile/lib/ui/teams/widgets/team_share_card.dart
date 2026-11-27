@@ -1,3 +1,4 @@
+import '../../core/ui/confirm_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -65,23 +66,12 @@ class _TeamShareCardState extends State<TeamShareCard> {
   }
 
   Future<void> _stop(TeamShareViewModel vm) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      animationStyle: AppMotion.dialogStyle(context),
-      builder: (context) => AlertDialog(
-        title: const Text('Stop splitting the fee?'),
-        content: const Text("Everyone's paid marks are cleared too."),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Stop'),
-          ),
-        ],
-      ),
+    final ok = await confirmDialog(
+      context,
+      title: 'Stop splitting the fee?',
+      message: "Everyone's paid marks are cleared too.",
+      confirmLabel: 'Stop',
+      destructive: true,
     );
     if (ok != true || !mounted) return;
     await vm.clear.execute();

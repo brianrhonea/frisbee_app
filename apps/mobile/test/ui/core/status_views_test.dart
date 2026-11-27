@@ -85,6 +85,21 @@ void main() {
     expect(retries, 1);
   });
 
+  testWidgets('error can have a title and a retry label', (t) async {
+    await pumpInApp(
+      t,
+      ErrorState(
+        error: 'x',
+        title: 'Could not load teams',
+        retryLabel: 'Try again',
+        onRetry: () {},
+      ),
+    );
+    expect(find.text('Could not load teams'), findsOneWidget);
+    expect(find.text('Try again'), findsOneWidget);
+    expect(find.text('Retry'), findsNothing);
+  });
+
   testWidgets('error without onRetry has no button', (t) async {
     await pumpInApp(t, _error());
     expect(find.text('Retry'), findsNothing);

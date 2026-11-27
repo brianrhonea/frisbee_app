@@ -1,3 +1,4 @@
+import '../../core/ui/confirm_dialog.dart';
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/group_tournament.dart';
@@ -88,26 +89,14 @@ class LiveScoreSheet extends StatelessWidget {
         }
 
         Future<void> stop() async {
-          final ok = await showDialog<bool>(
-            context: context,
-            animationStyle: AppMotion.dialogStyle(context),
-            builder: (context) => AlertDialog(
-              title: const Text('Stop the live score?'),
-              content: const Text(
+          final ok = await confirmDialog(
+            context,
+            title: 'Stop the live score?',
+            message:
                 'The running score comes off for everyone. Start again any '
                 'time.',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Stop'),
-                ),
-              ],
-            ),
+            confirmLabel: 'Stop',
+            destructive: true,
           );
           if (ok == true) await vm.stopLive.execute(g.id);
         }

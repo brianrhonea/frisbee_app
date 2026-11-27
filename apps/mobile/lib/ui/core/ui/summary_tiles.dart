@@ -108,8 +108,7 @@ class _Tile extends StatelessWidget {
                   tile.label.toUpperCase(),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 10.5,
+                  style: AppText.caption.copyWith(
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.8,
                     color: c.muted,

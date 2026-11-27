@@ -25,7 +25,7 @@ class AppSearchField extends StatefulWidget {
   /// Shown at the end while the box is empty, e.g. a shortcut's key cap.
   final Widget? hintTrailing;
 
-  static const height = 44.0;
+  static const height = 48.0;
 
   @override
   State<AppSearchField> createState() => _AppSearchFieldState();

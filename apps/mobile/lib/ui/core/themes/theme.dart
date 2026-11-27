@@ -146,6 +146,12 @@ abstract final class AppMotion {
   static const sheet = Duration(milliseconds: 300);
   static const reduced = Duration.zero;
 
+  /// The dim behind a side panel (token for what was `Colors.black38`).
+  static const scrim = Color(0x61000000);
+
+  /// The shadow along the leading edge of a page sliding over another.
+  static const pageShadow = Color(0x42000000);
+
   /// cubic-bezier(0.2, 0, 0, 1).
   static const easing = Cubic(0.2, 0, 0, 1);
 
@@ -154,8 +160,9 @@ abstract final class AppMotion {
   static Duration of(BuildContext context, Duration d) =>
       MediaQuery.disableAnimationsOf(context) ? reduced : d;
 
-  /// A page sliding in (push) takes [sheet]; going back takes [base].
-  static const pageIn = sheet;
+  /// A page sliding in or out takes [base] (K7: transitions 200 ms; only
+  /// sheets take 300).
+  static const pageIn = base;
   static const pageOut = base;
 
   /// How dialogs fade in and out: [fast]; none when animations are off.
@@ -181,6 +188,31 @@ abstract final class AppMotion {
           reverseDuration: base,
           curve: easing,
           reverseCurve: easing,
+        );
+}
+
+/// The theme's page transition for plain `builder:` routes: [delegate]'s
+/// motion, or none at all when the platform asks for reduced motion.
+class AppPageTransitionsBuilder extends PageTransitionsBuilder {
+  const AppPageTransitionsBuilder(this.delegate);
+
+  final PageTransitionsBuilder delegate;
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) => MediaQuery.disableAnimationsOf(context)
+      ? child
+      : delegate.buildTransitions<T>(
+          route,
+          context,
+          animation,
+          secondaryAnimation,
+          child,
         );
 }
 
@@ -237,12 +269,22 @@ abstract final class AppTheme {
       // follows the back swipe), iOS's slide, and a fade elsewhere.
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
-          TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
+          TargetPlatform.android: AppPageTransitionsBuilder(
+            PredictiveBackPageTransitionsBuilder(),
+          ),
+          // iOS and macOS stay native so the edge back-swipe follows the
+          // finger.
           TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
           TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
-          TargetPlatform.windows: FadeForwardsPageTransitionsBuilder(),
-          TargetPlatform.linux: FadeForwardsPageTransitionsBuilder(),
-          TargetPlatform.fuchsia: FadeForwardsPageTransitionsBuilder(),
+          TargetPlatform.windows: AppPageTransitionsBuilder(
+            FadeForwardsPageTransitionsBuilder(),
+          ),
+          TargetPlatform.linux: AppPageTransitionsBuilder(
+            FadeForwardsPageTransitionsBuilder(),
+          ),
+          TargetPlatform.fuchsia: AppPageTransitionsBuilder(
+            FadeForwardsPageTransitionsBuilder(),
+          ),
         },
       ),
       textTheme: text.copyWith(
@@ -304,15 +346,23 @@ abstract final class AppTheme {
         hintStyle: TextStyle(color: c.muted),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(controlRadius),
-          borderSide: BorderSide(color: c.border),
+          borderSide: BorderSide(color: c.border2),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(controlRadius),
-          borderSide: BorderSide(color: c.border),
+          borderSide: BorderSide(color: c.border2),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(controlRadius),
-          borderSide: BorderSide(color: c.accent, width: 1.5),
+          borderSide: BorderSide(color: c.accent, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(controlRadius),
+          borderSide: BorderSide(color: c.error),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(controlRadius),
+          borderSide: BorderSide(color: c.error, width: 2),
         ),
       ),
       cardTheme: CardThemeData(
@@ -404,7 +454,7 @@ abstract final class AppTheme {
           (s) => TextStyle(
             fontFamily: appFont,
             fontFeatures: tabularFigures,
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: s.contains(WidgetState.selected)
                 ? FontWeight.w700
                 : FontWeight.w500,

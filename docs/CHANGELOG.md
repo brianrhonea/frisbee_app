@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.65  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.64  | 2026-11-26 | `sprint3/lane-b`                        |                     |
 | 0.0.63  | 2026-11-26 | `sprint3/lane-b`                        |                     |
 | 0.0.62  | 2026-11-26 | `sprint3/lane-b`                        |                     |
@@ -77,6 +78,15 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.65 — UI review fixes (N13 and components)
+
+- Input fields use the 3:1 outline (`border2`), a 2 px focus ring and error borders.
+- Page pushes and pops take the base 200 ms (K7: sheets stay 300 in, 200 out; dialogs 120 ms). Reduced motion is respected by scroll-to-top, chat jumps, swipe rows, the learn and explore scrolls, and every plain route (new `AppPageTransitionsBuilder`, native Cupertino kept on iOS and macOS). The side-panel scrim and page shadow are tokens (`AppMotion.scrim`, `pageShadow`).
+- Rail: scrolls and hides the logo under 420 px height (landscape phones); 48 px items and avatar. Top bar: safe area outside the 60 px bar; search field 48 px.
+- Type: ListRow, EventCard, SummaryTiles, CoverHeader, AppTextField, nav labels and Eyebrow use the `AppText` scale (nothing under 12 px). DateBadge follows the text scale up to 1.5x and its month is at least 11 px.
+- ListRow announces `selected`. ConfirmDialog: Cancel is the secondary button and has the focus first when destructive; `confirmDialog()` passes `cancelLabel`. Four more destructive dialogs (close poll, undo repost, stop fee split, stop live score) use it. ErrorState takes a title and retry label. CoverHeader actions wrap at large text and the initials avatar has a border ring.
+- K7 note: dialogs use fast 120 ms and sheets close in 200 ms (design-tokens.md is not in lane B's files, so noted here).
 
 ## 0.0.64 — Navigation motion on AppMotion (N13)
 

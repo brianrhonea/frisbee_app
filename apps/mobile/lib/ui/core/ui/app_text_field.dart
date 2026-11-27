@@ -86,7 +86,7 @@ class AppTextField extends StatelessWidget {
       maxLength: maxLength,
       onChanged: onChanged,
       onSubmitted: onSubmitted,
-      style: TextStyle(fontSize: 15, color: c.ink),
+      style: AppText.body.copyWith(color: c.ink),
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,

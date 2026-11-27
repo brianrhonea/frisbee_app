@@ -1,12 +1,13 @@
-import '../themes/theme.dart';
 import 'package:flutter/material.dart';
 
+import '../themes/theme.dart';
 import 'app_button.dart';
 
 /// A yes/no question in a dialog (C10): a [title], a [message] and two
 /// buttons. The confirm button says what happens ("Delete post"), not
 /// "OK". With [destructive] the confirm button takes the destructive
-/// button style, for deleting or leaving; Cancel is always there.
+/// button style, for deleting or leaving; Cancel is always there, and in
+/// a destructive dialog it has the focus first so Enter can't delete.
 ///
 /// Pops `true` to confirm and `false` to cancel. Use [confirmDialog] to
 /// show it.
@@ -33,8 +34,9 @@ class ConfirmDialog extends StatelessWidget {
     title: Text(title),
     content: Text(message),
     actions: [
-      AppButton.ghost(
+      AppButton.secondary(
         cancelLabel,
+        autofocus: destructive,
         onPressed: () => Navigator.pop(context, false),
       ),
       if (destructive)
@@ -58,6 +60,7 @@ Future<bool> confirmDialog(
   required String title,
   required String message,
   String confirmLabel = 'Confirm',
+  String cancelLabel = 'Cancel',
   bool destructive = false,
 }) async {
   final ok = await showDialog<bool>(
@@ -67,6 +70,7 @@ Future<bool> confirmDialog(
       title: title,
       message: message,
       confirmLabel: confirmLabel,
+      cancelLabel: cancelLabel,
       destructive: destructive,
     ),
   );

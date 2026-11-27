@@ -86,8 +86,7 @@ class EventCard extends StatelessWidget {
                   title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 15,
+                  style: AppText.bodyStrong.copyWith(
                     fontWeight: FontWeight.w700,
                     color: cancelled ? c.muted : c.ink,
                     decoration: cancelled ? TextDecoration.lineThrough : null,
@@ -100,7 +99,7 @@ class EventCard extends StatelessWidget {
                       meta!,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 13, color: c.ink2),
+                      style: AppText.secondary.copyWith(color: c.ink2),
                     ),
                   ),
                 if (chips.isNotEmpty)

@@ -65,8 +65,7 @@ class ListRow extends StatelessWidget {
                   title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 15,
+                  style: AppText.bodyStrong.copyWith(
                     fontWeight: unread ? FontWeight.w700 : FontWeight.w600,
                     color: titleColor,
                   ),
@@ -76,8 +75,7 @@ class ListRow extends StatelessWidget {
                     subtitle!,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
+                    style: AppText.secondary.copyWith(
                       color: muted ? c.muted : c.ink2,
                       fontWeight: unread ? FontWeight.w600 : FontWeight.w400,
                     ),
@@ -120,11 +118,16 @@ class ListRow extends StatelessWidget {
       heightFactor: 1,
       child: row,
     );
-    return Material(
-      color: selected ? c.accentSoft : Colors.transparent,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: minHeight),
-        child: onTap == null ? centred : InkWell(onTap: onTap, child: centred),
+    return Semantics(
+      selected: selected ? true : null,
+      child: Material(
+        color: selected ? c.accentSoft : Colors.transparent,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: minHeight),
+          child: onTap == null
+              ? centred
+              : InkWell(onTap: onTap, child: centred),
+        ),
       ),
     );
   }
