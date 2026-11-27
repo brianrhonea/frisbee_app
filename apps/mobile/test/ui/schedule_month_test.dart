@@ -145,7 +145,7 @@ void main() {
     });
   });
 
-  testWidgets("Month shows the grid and the picked day's events", (
+  testWidgets('Month shows the grid and the whole month as a list', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(390, 1100);
@@ -165,33 +165,78 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('November 2026'), findsOneWidget);
     expect(find.text('3 events'), findsOneWidget);
-    // Today's events below the grid, and nothing from other days.
+    // The whole month's events below the grid, grouped by day.
     expect(find.text('Thursday, Nov 19'), findsOneWidget);
     expect(find.text('Today'), findsOneWidget);
     expect(find.text('Thursday practice'), findsOneWidget);
     expect(find.text('Tempo run'), findsOneWidget);
-    expect(find.text('Snowmelt Hat'), findsNothing);
-    expect(find.text('Monday, Nov 16'), findsNothing);
+    expect(find.text('Saturday, Nov 28'), findsOneWidget);
+    expect(find.text('Snowmelt Hat'), findsOneWidget);
+    expect(find.text('Friday, Nov 20'), findsNothing);
     expect(find.byKey(const ValueKey('picked-week')), findsOneWidget);
-    // A day with nothing on says so.
-    await tester.tap(find.bySemanticsLabel('Friday, November 20'));
-    await tester.pumpAndSettle();
-    expect(find.text('Thursday practice'), findsNothing);
-    expect(find.text('Nothing scheduled'), findsOneWidget);
+    // Today's section is the picked one.
+    expect(find.byKey(const ValueKey('picked-day-section')), findsOneWidget);
 
+    // Picking a day with events highlights its section.
     await tester.tap(find.bySemanticsLabel('Saturday, November 28'));
     await tester.pumpAndSettle();
-    expect(find.text('Snowmelt Hat'), findsOneWidget);
-    expect(find.text('Thursday practice'), findsNothing);
-    expect(find.text('Needs RSVP'), findsOneWidget);
-    // Another day picked: Today brings it back.
-    await tester.tap(find.byTooltip('Today'));
+    expect(vm.selectedDay, DateTime(2026, 11, 28));
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('picked-day-section')),
+        matching: find.text('Snowmelt Hat'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Thursday practice'), findsOneWidget);
+
+    // A day with nothing on keeps the list; nothing is highlighted.
+    await tester.tap(find.bySemanticsLabel('Friday, November 20'));
     await tester.pumpAndSettle();
     expect(find.text('Thursday practice'), findsOneWidget);
+    expect(find.byKey(const ValueKey('picked-day-section')), findsNothing);
+
+    await tester.tap(find.byTooltip('Today'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('picked-day-section')), findsOneWidget);
 
     await tester.tap(find.text('Week'));
     await tester.pumpAndSettle();
     expect(find.byTooltip('Previous week'), findsOneWidget);
+    expect(find.byKey(const ValueKey('picked-day-section')), findsNothing);
+  });
+
+  testWidgets('Picking a day scrolls the month list to it or the next one', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    // Enough events that the later days start below the fold.
+    for (var d = 2; d <= 17; d++) {
+      events.events['e$d'] = TeamEvent(
+        id: 'e$d',
+        title: 'Filler $d',
+        startsAt: DateTime(2026, 11, d, 12),
+      );
+    }
+    final vm = schedule();
+    addTearDown(vm.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: ScheduleScreen(viewModel: vm),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Month'));
+    await tester.pumpAndSettle();
+    final hat = find.text('Snowmelt Hat', skipOffstage: false);
+    // Nov 27 has nothing: the list goes to Saturday the 28th.
+    await tester.tap(find.bySemanticsLabel('Friday, November 27'));
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(hat).dy, lessThan(700));
+    expect(tester.getTopLeft(hat).dy, greaterThan(0));
   });
 
   testWidgets('List shows every day of the month that has events', (
