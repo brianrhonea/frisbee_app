@@ -486,7 +486,7 @@ dialog.dialog > * { max-height: calc(100vh - 32px); overflow-y: auto; }
 .top-bar .header-actions { justify-self: end; margin-left: 0; gap: var(--space-sm); }
 .top-bar .header-actions .link { padding: 0 var(--space-sm); color: var(--ink); }
 .top-bar .header-actions .link:hover { color: var(--accent); }
-.top-bar .icon-btn { width: 40px; height: 40px; color: var(--ink-soft); }
+.top-bar .icon-btn { width: 48px; height: 48px; color: var(--ink-soft); }
 .top-divider { width: 1px; height: 28px; background: var(--line); margin: 0 var(--space-xs); }
 .top-bar .account-menu summary { border: 0; padding: var(--space-xs) 10px var(--space-xs) var(--space-xs); gap: 10px; }
 .top-bar .account-menu summary:hover { background: var(--field); }
@@ -1353,7 +1353,7 @@ button.person-row:hover { background: var(--field); }
 /* RSVP answers are separate buttons, not a quiet track, so they read as tappable. */
 .segmented.rsvp-buttons { display: flex; gap: var(--space-sm); padding: 0; background: none; border: 0; border-radius: 0; }
 .segmented.rsvp-buttons button {
-  flex: 1 1 0; min-height: 44px; border: 1.5px solid var(--line-2); background: var(--card); color: var(--ink);
+  flex: 1 1 0; min-height: 48px; border: 1.5px solid var(--line-2); background: var(--card); color: var(--ink);
   border-radius: 10px; box-shadow: 0 1px 2px rgb(0 0 0 / 0.12); padding: 6px 10px;
 }
 .segmented.rsvp-buttons button:hover:not(:disabled) { border-color: var(--accent); }
@@ -1685,7 +1685,8 @@ dialog.dialog:has(.invite-dialog) { width: min(100% - 32px, 560px); }
   .fab-post:hover { filter: brightness(1.05); }
   /* Above the voice bar (sticky at the foot) while in a call. */
   .frame:has(.voice-bar) .fab-post { bottom: calc(var(--tabbar-h) + 72px + env(safe-area-inset-bottom, 0px)); }
-  .frame.has-fab .frame-main { padding-bottom: calc(var(--tabbar-h) + 72px + env(safe-area-inset-bottom, 0px)); }
+  /* The Post button is about 52 px tall and sits 16 px above the bar: its height plus 16 px of air below the last row. */
+  .frame.has-fab .frame-main { padding-bottom: calc(var(--tabbar-h) + 16px + 52px + 16px + env(safe-area-inset-bottom, 0px)); }
   /* Pages with their own docked bar (stats game, tournament editor) have no floating Post button. */
   .frame:has(.st-dock, .gt-bar) .fab-post { display: none; }
   /* Sticky bars at the foot sit above the tab bar. */

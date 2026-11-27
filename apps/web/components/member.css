@@ -332,3 +332,20 @@
 .teams-page .community-list .ui-row { border-bottom: 0; }
 .teams-page .community-list .team-list.nested { margin: 0 0 var(--space-sm) var(--space-xxl); }
 .teams-page .stack { gap: var(--space-xl); }
+
+.teams-page .teams-secondary { gap: var(--space-xs); }
+.notifications .notice > .icon-btn { width: 48px; height: 48px; }
+.messages .chat-filter { margin-top: var(--space-xs); }
+/* Settings: the sections wrap on a phone (no sideways scroll to hide the rest). */
+@media (max-width: 860px) {
+  .settings .settings-nav { flex-wrap: wrap; overflow: visible; min-width: 0; }
+  .settings .settings-group { flex: 1 1 100%; flex-wrap: wrap; min-width: 0; }
+}
+/* The profile card: the picture with its Add a photo link beneath it, then the name with room above. */
+.settings .identity-photo { align-self: flex-start; }
+.settings .identity-name { padding-top: var(--space-xl); }
+@media (max-width: 560px) {
+  .settings .identity-body { flex-direction: column; gap: var(--space-sm); }
+  .settings .identity-photo { justify-items: start; }
+  .settings .identity-name { padding-top: var(--space-sm); min-width: 0; width: 100%; }
+}

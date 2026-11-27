@@ -334,7 +334,7 @@ function NoticeRow({ n, onOpen, onClear }: { n: Doc<Notice>; onOpen: () => void;
         <div className="notice-main">{title}</div>
       )}
       {n.followBack && <FollowButton targetId={n.followBack.uid} />}
-      <button type="button" className="icon-btn" aria-label="Clear" title="Clear" onClick={onClear}>
+      <button type="button" className="icon-btn" aria-label="Dismiss" title="Dismiss" onClick={onClear}>
         ×
       </button>
     </li>

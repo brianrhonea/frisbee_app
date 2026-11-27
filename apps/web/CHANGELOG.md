@@ -4,6 +4,18 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.74.0 — 2026-11-27
+
+UI review fixes (restyle only).
+
+- Team header on a phone is compact (no cover band, logo beside the name, actions in one row); the stray dot before the member stack and in the Owner pill is gone.
+- Schedule: no bare Delete under team event rows (Delete is in the event's details).
+- Chats: one scrollable chip row: All, Teams, Direct, Unread, Requests, Archived.
+- Teams: Create a team is the one primary; the other actions are a quieter row.
+- Settings: profile card layout fixed, sections wrap on a phone instead of clipping.
+- Targets: buttons and RSVP answers 48 px, top-bar icon buttons 48 px, notification dismiss 48 px and named Dismiss.
+- Post button: more room under the last row on pages that show it.
+
 ## 0.73.0 — 2026-11-27
 
 H10 Sign-in and sign-up restyle. Every option stays: Google, Apple, email or username, password, Forgot your password, Log in, Create an account, and the sign-up details and terms.
