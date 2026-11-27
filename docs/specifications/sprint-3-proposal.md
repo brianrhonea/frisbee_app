@@ -206,3 +206,13 @@ The owner reviews the before and after pictures **and** every navigation animati
 - Real-device feel (frame rate, back-swipe) can't be signed off from a simulator alone.
 
 **Fixes:** these are motion polish only, onto the K7 tokens. No navigation or route behaviour changes.
+
+## Owner plan: one merge to development (2026-11-26)
+
+All of Sprint 3 goes to `development` in **one** owner-approved pull request, once H1–H10 and the full navigation checks (N1–N13) are done.
+
+**Before that pull request, the orchestrator verifies the API and backend connections:**
+- Every app and website call matches a route that exists, with the request and response shapes `packages/shared` defines. That includes 17-B, the app's switch to the phase-1 API writes.
+- A signed-in smoke run against a local API and the emulators, for the core journeys on both platforms.
+- The order for the owner's dev deploys: the API in report mode and the functions groups, then the claim and `adult` backfill, then the apps, then enforcement, then the rules.
+- A regression run of every suite on the integrated branch, plus a security and QA pass.
