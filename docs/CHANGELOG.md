@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.62  | 2026-11-26 | `sprint3/lane-b`                        |                     |
 | 0.0.61  | 2026-11-26 | `sprint3/lane-b`                        |                     |
 | 0.0.60  | 2026-11-26 | `sprint3/lane-b`                        |                     |
 | 0.0.59  | 2026-11-26 | `sprint2/c2-layout-fixes`               |                     |
@@ -74,6 +75,10 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.62 — Shell at the guide's widths (S2)
+
+- Breakpoints are now 600 (rail), 900 (sidebar) and 1200 (room for a context panel; AppShell.contextPanel, none yet). Shell content is capped at 1600 px. Phones under 600 are unchanged.
 
 ## 0.0.61 — Crash reporting (R2, #7)
 

@@ -9,19 +9,27 @@ import 'balanced_text.dart';
 import 'scroll_to_top.dart';
 import 'status_pill.dart';
 
-/// The three layouts the app is designed for.
+/// The three layouts the app is designed for (the guide's breakpoints:
+/// 600, 900 and 1200).
 enum ScreenSize {
-  /// Phones: bottom navigation bar, single column.
+  /// Under 600: bottom navigation bar, single column.
   mobile,
 
-  /// Tablets and narrow windows: icon rail, single column.
+  /// 600 to 899: icon rail, single column.
   tablet,
 
-  /// Desktops and wide windows: full sidebar, side column on pages.
+  /// 900 and up: full sidebar, side column on pages. From 1200 the shell
+  /// also has room for a context panel ([ScreenSize.panelWidth]).
   desktop;
 
-  static const tabletWidth = 720.0;
-  static const desktopWidth = 1200.0;
+  static const tabletWidth = 600.0;
+  static const desktopWidth = 900.0;
+
+  /// From this width the shell may show a context panel beside the page.
+  static const panelWidth = 1200.0;
+
+  /// The shell's content (page and panel) never grows wider than this.
+  static const maxShellWidth = 1600.0;
 
   static ScreenSize forWidth(double width) => width >= desktopWidth
       ? desktop

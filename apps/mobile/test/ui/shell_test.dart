@@ -52,8 +52,9 @@ void main() {
 
   test('screen sizes follow the phone, tablet and desktop breakpoints', () {
     expect(ScreenSize.forWidth(390), ScreenSize.mobile);
-    expect(ScreenSize.forWidth(800), ScreenSize.tablet);
+    expect(ScreenSize.forWidth(700), ScreenSize.tablet);
     expect(ScreenSize.forWidth(1440), ScreenSize.desktop);
+    expect(ScreenSize.forWidth(900), ScreenSize.desktop);
   });
 
   test('the shell lists the user\'s teams and counts unread', () async {

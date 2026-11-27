@@ -65,6 +65,7 @@ class AppShell extends StatelessWidget {
     required this.viewModel,
     required this.navigationShell,
     required this.location,
+    this.contextPanel,
   });
 
   final ShellViewModel viewModel;
@@ -72,6 +73,13 @@ class AppShell extends StatelessWidget {
 
   /// The current path, for the breadcrumbs.
   final String location;
+
+  /// A panel beside the page when the window is [ScreenSize.panelWidth] or
+  /// wider (the guide's context panel); nothing yet, pages opt in later.
+  final Widget? contextPanel;
+
+  /// Width of [contextPanel].
+  static const contextPanelWidth = 320.0;
 
   ShellSection get _section =>
       ShellSection.values[navigationShell.currentIndex];
@@ -139,6 +147,9 @@ class AppShell extends StatelessWidget {
             ),
           );
         }
+        final showPanel =
+            contextPanel != null &&
+            MediaQuery.sizeOf(context).width >= ScreenSize.panelWidth;
         return Scaffold(
           body: Row(
             children: [
@@ -161,7 +172,27 @@ class AppShell extends StatelessWidget {
                       viewModel: viewModel,
                       crumbs: breadcrumbs(location, viewModel.teamName),
                     ),
-                    Expanded(child: navigationShell),
+                    Expanded(
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            maxWidth: ScreenSize.maxShellWidth,
+                          ),
+                          child: showPanel
+                              ? Row(
+                                  children: [
+                                    Expanded(child: navigationShell),
+                                    VerticalDivider(width: 1, color: c.border),
+                                    SizedBox(
+                                      width: contextPanelWidth,
+                                      child: contextPanel,
+                                    ),
+                                  ],
+                                )
+                              : navigationShell,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
