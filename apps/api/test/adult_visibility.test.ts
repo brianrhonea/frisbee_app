@@ -103,6 +103,20 @@ describe("enforce mode", () => {
     expect((res.json().players as Array<{ id: string }>).map((p) => p.id).sort()).toEqual(["adult", "amy"]);
   });
 
+  it("a profile already marked adult:true costs no claim lookup; only the unmarked are asked", async () => {
+    s.repo.profileMap.get("adult")!.adult = true;
+    s.repo.profileMap.get("amy")!.adult = true;
+    const res = await s.get("/v1/public/search?q=lee");
+    expect((res.json().players as Array<{ id: string }>).map((p) => p.id).sort()).toEqual(["adult", "amy"]);
+    expect(s.users.calls).toEqual([["legacy"]]);
+    s.users.calls.length = 0;
+    expect((await s.get("/v1/public/players/adult")).statusCode).toBe(200);
+    expect(s.users.calls).toEqual([]);
+    // The claim is still the source of truth for everyone unmarked.
+    expect((await s.get("/v1/public/players/legacy")).statusCode).toBe(404);
+    expect(s.users.calls).toEqual([]); // its claim answer is still cached from the search
+  });
+
   it("answers 404 for their public profile, and keeps the adult's", async () => {
     expect((await s.get("/v1/public/players/legacy")).statusCode).toBe(404);
     expect((await s.get("/v1/public/players/adult")).statusCode).toBe(200);

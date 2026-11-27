@@ -7,6 +7,39 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.53.2 - 2026-11-26
+
+H1 (owner-approved schema change): a server-only `adult: true` marker on `profiles/{uid}`.
+
+- The API sets it wherever the age claim is issued or already held: the account gate's sync (status,
+  personal details, agreement), the API's profile writes and the claims backfill
+  (`backfill_claims.ts`, same dry run and guards, now also reporting `adultMarked` and
+  `adultNoProfile`). It is never written false and never removed; no profile means nothing is created.
+- `firestore.rules` (deploy after the backfill): clients can't create, change or clear it; a profile
+  list must filter on `adult == true` (the caller's own doc excepted); a DM start, a message request,
+  a message in a direct conversation and a group add need the other person's profile to carry it.
+- Public search, profile and posts read the marker first, so only unmarked profiles cost a claim
+  lookup; the claim stays the source of truth for the gate.
+
+## 0.53.1 - 2026-11-26
+
+Sprint 3 lane A review fixes.
+
+- **D-1317:** the public team roster shows a linked account without `ageOk` as "Player" (number and
+  position only); a DM to a hidden account is refused with exactly the words of a "nobody" policy
+  (after the profile and policy checks); report mode never fails a request when the claim lookup
+  fails and logs counts only, never uids. The browse callables apply the same hiding.
+- **Photos:** `trustedProfilePhoto` is used for the roster's linked profile; the allow-list helpers
+  return the parsed URL, not the string as typed; an empty bucket list trusts `lh3` only.
+- **Moderation:** lifting a suspension re-disables the account, then fails, if the second age check
+  throws.
+- **Groups:** `POST /v1/conversations/groups` writes the group and its members in one transaction, so a
+  failed create leaves nothing for a retry to trip over (a replay with the same id is still 409).
+- **Limits:** `POST /v1/teams/:teamId/events` 10 a minute and 200 a day; `POST
+  /v1/teams/:teamId/roster-players` 30 a minute and 500 a day.
+- **One-off script:** `src/scripts/backfill_under13.ts` marks existing under-13 refusals (dry run by
+  default; dev or `demo-*` on the emulator only).
+
 ## 0.53.0 - 2026-11-26
 
 Sprint 3 lane A: account deletion cascade, under-13 purge, legacy-minor hiding, photo trust,
