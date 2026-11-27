@@ -181,3 +181,28 @@ All screens **H1–H10** are approved to start now, on both platforms, each plat
 - the screen's existing tests still pass, plus goldens and Playwright screenshots;
 - a full navigation re-run (N1–N10) at the end;
 - a parity review of app against website.
+
+## Owner review: navigation motion (N11, 2026-11-26)
+
+The owner reviews the before and after pictures **and** every navigation animation, to make sure moving around never feels clunky. This is checked across the shell, each screen and every breakpoint.
+
+**Inventory** (the UI reviewer, then each lane): every transition, compared with the K7 motion tokens (`design-tokens.md:73`: fast 120 ms, base 200 ms, sheet 300 ms, easing (0.2, 0, 0, 1), and 0 when reduced motion is on).
+- App: the 16 custom page and transition sites in `apps/mobile/lib`, plus the defaults.
+- Website: route changes, CSS transitions, dialogs and sheets.
+
+**What gets checked:**
+- tab switches don't slide, and each keeps its scroll and state;
+- pushes and pops are consistent, and iOS back-swipe works;
+- sheets and dialogs use the sheet timing;
+- nothing animates twice or flashes white or black between pages;
+- loading moves to content without jumping;
+- deep links and the sign-in redirect don't play a stray animation;
+- breakpoint changes (resizing, rotating an iPad) keep you where you were;
+- reduced motion is respected.
+
+**Recordings for the owner:**
+- Website: Playwright videos of the main journeys at 375 and 1440 px, light and dark, now.
+- App: iOS Simulator recordings (`xcrun simctl io recordVideo`) on the Mac mini once it's set up. Then a check on the physical iPhone through TestFlight.
+- Real-device feel (frame rate, back-swipe) can't be signed off from a simulator alone.
+
+**Fixes:** these are motion polish only, onto the K7 tokens. No navigation or route behaviour changes.
