@@ -4,12 +4,16 @@ import {
   type PublicRoster,
   type PublicRosterPlayer,
   rosterIsPublic,
+  type OutsiderRosterMember,
+  type OutsiderRosterPlayer,
+  type OutsiderTeamRoster,
   type RosterMember,
   type RosterPerson,
   type RosterPlayer,
   type RosterTeam,
   rosterLineOf,
   rosterMax,
+  staffTiers,
   setRosterLinesRequestSchema,
   type TeamRoster,
 } from "@stall10/shared";
@@ -65,7 +69,7 @@ export class RosterService {
     return !!org && can(org, uid, "manageMembers") && Object.hasOwn(mapOf(org.linkedTeams), teamId);
   }
 
-  async roster(caller: Caller, rawTeamId: unknown): Promise<TeamRoster> {
+  async roster(caller: Caller, rawTeamId: unknown): Promise<TeamRoster | OutsiderTeamRoster> {
     const teamId = docIdParam(rawTeamId);
     const team = await this.store.get(`teams/${teamId}`);
     if (!team) throw new ApiError("not_found", "That team doesn't exist any more.");
@@ -89,7 +93,11 @@ export class RosterService {
     const players = kind === "team" ? await this.store.list(`teams/${teamId}/roster`, rosterMax) : [];
     const uids = Object.keys(tiers).slice(0, rosterMax);
     const linked = players.map((p) => str(p.data.userId)).filter(Boolean);
-    const cards = await this.cards([...new Set([...uids, ...linked])], mapOf(team.memberNames));
+    const everyone = [...new Set([...uids, ...linked])];
+    // Members, and the admins of the school or club that took a team in, see
+    // the roster whole. Anyone else is an outsider (see outsiderView).
+    const full = isMember || (await this.managesOrgOf(team, teamId, caller.uid));
+    const { cards, hidden } = await this.cards(everyone, mapOf(team.memberNames), full);
 
     const roleDefs = mapOf(team.roles);
     const roleIds = Object.keys(roleDefs).sort(
@@ -108,15 +116,13 @@ export class RosterService {
       })
       .sort((a, b) => rank(a.tier) - rank(b.tier) || a.name.localeCompare(b.name));
 
-    return {
-      kind,
-      players: players
-        .map(({ id, data }) => player(id, data, cards))
-        // RosterPlayer.compareRoster: by number (none counts as 1000), then name by code units.
-        .sort((a, b) => (a.number ?? 1000) - (b.number ?? 1000) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)),
-      members,
-      teams: kind === "team" ? [] : linkedTeams(team.linkedTeams),
-    };
+    const sorted = players
+      .map(({ id, data }) => player(id, data, cards, hidden))
+      // RosterPlayer.compareRoster: by number (none counts as 1000), then name by code units.
+      .sort((a, b) => (a.number ?? 1000) - (b.number ?? 1000) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    const teams = kind === "team" ? [] : linkedTeams(team.linkedTeams);
+    if (full) return { kind, players: sorted, members, teams };
+    return outsiderView(kind, sorted, members, teams, hidden);
   }
 
   /**
@@ -207,12 +213,24 @@ export class RosterService {
     return mine.some((d) => d.level === "youth");
   }
 
-  /** Each person's public card, from their profile, or the team's copy of their name. */
-  private async cards(uids: string[], names: Record<string, unknown>): Promise<Map<string, RosterPerson>> {
+  /**
+   * Each person's public card, from their profile, or the team's copy of their
+   * name. For an outsider ([full] false) also who must stay hidden: a private
+   * profile, one that hides its teams (visibility.teams false) and an account
+   * D-1317 hides, as publicRoster does. A person without a profile is not hidden.
+   */
+  private async cards(
+    uids: string[],
+    names: Record<string, unknown>,
+    full: boolean,
+  ): Promise<{ cards: Map<string, RosterPerson>; hidden: Set<string> }> {
     const profiles = await this.store.getAll(uids.map((uid) => `profiles/${uid}`));
-    return new Map(
+    const noAdult = full || !this.adults ? new Set<string>() : await this.adults.hidden(uids);
+    const hidden = new Set<string>();
+    const cards = new Map(
       uids.map((uid, i) => {
         const p = profiles[i] ?? {};
+        if (!full && (noAdult.has(uid) || (profiles[i] && (isPrivateProfile(p) || mapOf(p.visibility).teams === false)))) hidden.add(uid);
         const card: RosterPerson = { uid, name: str(p.name) || str(names[uid]) || "Member" };
         if (str(p.username)) card.username = str(p.username);
         const photo = trustedProfilePhoto(p.photoUrl, uid);
@@ -221,7 +239,46 @@ export class RosterService {
         return [uid, card];
       }),
     );
+    return { cards, hidden };
   }
+}
+
+/**
+ * What a signed-in non-member gets (the same hiding publicRoster applies):
+ * a hidden person (private profile, teams hidden, no D-1317 adult claim) is
+ * left out of `members`, and a spot linked to one shows as "Player" with its
+ * number and position only. Everyone else keeps their public card but
+ * without `uid`, except staff (staffTiers), whose uid the Message sheet
+ * needs to open a conversation. A spot's person never carries a uid.
+ */
+function outsiderView(
+  kind: TeamRoster["kind"],
+  players: RosterPlayer[],
+  members: RosterMember[],
+  teams: RosterTeam[],
+  hidden: Set<string>,
+): OutsiderTeamRoster {
+  const staff = new Set<string>(staffTiers);
+  return {
+    kind,
+    players: players.map((p): OutsiderRosterPlayer => {
+      if (!p.person) return p;
+      if (hidden.has(p.person.uid)) {
+        const { person: _gone, ...rest } = p;
+        return rest;
+      }
+      const { uid: _uid, ...card } = p.person;
+      return { ...p, person: card };
+    }),
+    members: members
+      .filter((m) => !hidden.has(m.uid))
+      .map((m): OutsiderRosterMember => {
+        if (staff.has(m.tier)) return m;
+        const { uid: _uid, ...rest } = m;
+        return rest;
+      }),
+    teams,
+  };
 }
 
 const rank = (tier: string) => {
@@ -241,8 +298,9 @@ function linkedTeams(raw: unknown): RosterTeam[] {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function player(id: string, d: Data, cards: Map<string, RosterPerson>): RosterPlayer {
-  const out: RosterPlayer = { id, name: str(d.name) || "Player" };
+function player(id: string, d: Data, cards: Map<string, RosterPerson>, hidden: Set<string>): RosterPlayer {
+  // A spot linked to a hidden person isn't named (publicRoster's "Player").
+  const out: RosterPlayer = { id, name: (hidden.has(str(d.userId)) ? "" : str(d.name)) || "Player" };
   if (typeof d.number === "number" && Number.isInteger(d.number)) out.number = d.number;
   const pos = positions.find((p) => p === d.position);
   if (pos) out.position = pos;
