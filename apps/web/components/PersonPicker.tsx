@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { firestoreDb } from "@/lib/firebase";
 import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** Someone found in the people directory (profiles/{uid}: name, username and photo). */
 export interface PickedPerson {
@@ -92,7 +93,7 @@ export function PersonPicker({
         disabled={disabled}
         onChange={(e) => setQ(e.target.value)}
       />
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       {shown &&
         (shown.length === 0 ? (
           <p className="muted small">No one matches.</p>

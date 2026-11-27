@@ -18,6 +18,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../AuthProvider";
 import { attempt, divisionLabel, draftApi, draftHrefs, teamsOf, useDraftDetails, useLiveDraft, useSignups, useTournamentBase } from "./data";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 const pickTimes: Array<[number, string]> = [
   [0, "No limit"],
@@ -137,8 +138,8 @@ function Setup({ user, tournamentId, divisionId, locked }: { user: User; tournam
           <small className="muted">The clock is a guide: when time is up, you can auto-pick for the captain.</small>
         </label>
       </div>
-      {problem && chosen.length > 0 && <p className="form-error">{problem}</p>}
-      {error && <p className="form-error">{error}</p>}
+      {problem && chosen.length > 0 && <ErrorNote>{problem}</ErrorNote>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       <div className="home-actions">
         <button type="button" className="btn btn-primary btn-small" disabled={!!problem || busy} onClick={start}>
           Start the draft ({chosen.length} captains)
@@ -257,7 +258,7 @@ function Board(props: { user: User; tournamentId: string; divisionId: string; dr
           </Link>
         </p>
       )}
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
 
       <h3 className="draft-subtitle">{draft.status === "finished" ? "Teams" : `Teams (${draft.picks.length} of ${poolSize} picked)`}</h3>
       <div className="draft-board">

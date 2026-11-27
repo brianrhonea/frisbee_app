@@ -37,6 +37,7 @@ import type { PaymentDoc } from "@/components/drafts/data";
 import { callApi, problem } from "@/lib/client";
 import { ConfirmSignIn } from "./ConfirmSignIn";
 import { StatusPill } from "../ui/StatusPill";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** One fee's state on the host's payouts card (EarningsStatus.label in the app). */
 const earningsStatusLabels: Record<EarningsView["items"][number]["status"], string> = {
@@ -121,7 +122,7 @@ function EmbeddedPay({ clientSecret, account, onClose }: { clientSecret: string;
           Cancel
         </button>
       </div>
-      {error ? <p className="form-error">{error}</p> : <div ref={box} className="embedded-pay-frame" aria-busy="true" />}
+      {error ? <ErrorNote>{error}</ErrorNote> : <div ref={box} className="embedded-pay-frame" aria-busy="true" />}
     </div>
   );
 }
@@ -216,7 +217,7 @@ export function EmbeddedOnboarding({
       />
     );
   }
-  return error ? <p className="form-error">{error}</p> : <div ref={box} className="embedded-onboarding" aria-busy="true" />;
+  return error ? <ErrorNote>{error}</ErrorNote> : <div ref={box} className="embedded-onboarding" aria-busy="true" />;
 }
 
 /**
@@ -314,7 +315,7 @@ export function PayoutsCard({ user, teamId, amountCents }: { user: User; teamId:
           )}
         </>
       )}
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       {copy.action && !account.canSetUp && <p className="muted small">Only {account.ownerName} can set up payments. Ask them to open this page.</p>}
       {copy.action && account.canSetUp && !open && (
         <button type="button" className="btn btn-primary btn-small" disabled={busy} onClick={connect}>
@@ -514,7 +515,7 @@ export function PayOnline({ user, tournamentId, teamId, withStatus = false }: { 
         )
       )}
       {!checking && offline}
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
     </div>
   );
 }

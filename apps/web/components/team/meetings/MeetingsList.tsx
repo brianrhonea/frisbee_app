@@ -9,6 +9,7 @@ import { DateTile } from "../DateTile";
 import { startOfToday } from "@/lib/dates";
 import { meetingAnswer, needsRsvp, RsvpPill } from "../../RsvpPill";
 import { SegmentedTabs } from "../../ui/SegmentedTabs";
+import { ErrorNote } from "@/components/StatusViews";
 
 /**
  * The team's video meetings (/teams/:id/meetings): live ones first, then
@@ -23,7 +24,7 @@ export function MeetingsList() {
 
   if (viewer.state === "loading") return <p className="muted" aria-busy="true">Loading…</p>;
   if (viewer.state !== "member") return <MembersOnlySection what="meetings" />;
-  if (meetings.error) return <p className="form-error">{meetings.error}</p>;
+  if (meetings.error) return <ErrorNote>{meetings.error}</ErrorNote>;
   if (!meetings.data) return <p className="muted" aria-busy="true">Loading meetings…</p>;
 
   const admin = viewer.can("manageEvents");

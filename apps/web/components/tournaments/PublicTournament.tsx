@@ -25,6 +25,7 @@ import type { TournamentState } from "./useTournament";
 import { noLiveControls, serverLive } from "./useLiveScores";
 import { JoinToTakePart } from "./VisitorParts";
 import "./tournaments.css";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** Visitors' live events reread the page this often, so scores keep up. */
 const liveRefreshMs = 60_000;
@@ -34,7 +35,7 @@ export function TournamentsForEveryone({ list }: { list: PublicHostedCard[] | nu
   const { user } = useAuth();
   if (user) return <FindTournaments />;
   if (!list) {
-    return user === null ? <p className="form-error">Couldn&apos;t load events. Try again in a minute.</p> : <p className="muted" aria-busy="true">Loading…</p>;
+    return user === null ? <ErrorNote>Couldn&apos;t load events. Try again in a minute.</ErrorNote> : <p className="muted" aria-busy="true">Loading…</p>;
   }
   return (
     <div className="stack">

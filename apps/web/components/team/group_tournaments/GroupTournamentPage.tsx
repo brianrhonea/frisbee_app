@@ -42,6 +42,7 @@ import "../../tournaments/tournaments.css";
 import "./group_tournaments.css";
 import { SegmentedTabs } from "../../ui/SegmentedTabs";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 type Tab = "schedule" | "standings" | "bracket" | "teams";
 /** What a captain can do with a game (GameAction in the app). */
@@ -212,7 +213,7 @@ export function GroupTournamentPage({ tournamentId, publicListing }: { tournamen
           )}
         </div>
       </div>
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       {games.length > 0 && (
         <div className="gt-stats">
           <div className="gt-stat">
@@ -260,7 +261,7 @@ export function GroupTournamentPage({ tournamentId, publicListing }: { tournamen
               </button>
             </div>
           )}
-          {gameDocs.error && <p className="form-error">{gameDocs.error}</p>}
+          {gameDocs.error && <ErrorNote>{gameDocs.error}</ErrorNote>}
           {gameDocs.data && games.length === 0 && (
             <p className="empty">
               {organizer ? "No schedule yet. Open Setup to make teams and publish it." : "The schedule will appear here once organizers publish it."}
@@ -591,7 +592,7 @@ function GameSheet({
             )}
           </div>
         )}
-        {error && <p className="form-error">{error}</p>}
+        {error && <ErrorNote>{error}</ErrorNote>}
     </Dialog>
   );
 }
@@ -636,7 +637,7 @@ function ScoreForm({
         <ScoreStepper name={nameA} value={a} onChange={(v) => setA(v.replace(/\D/g, ""))} />
         <ScoreStepper name={nameB} value={b} onChange={(v) => setB(v.replace(/\D/g, ""))} />
       </div>
-      {why && <p className="form-error">{why}</p>}
+      {why && <ErrorNote>{why}</ErrorNote>}
       <div className="home-actions">
         <button type="submit" className="btn btn-primary" disabled={busy}>
           Submit

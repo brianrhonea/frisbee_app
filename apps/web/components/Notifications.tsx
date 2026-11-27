@@ -14,6 +14,7 @@ import "./member.css";
 import { Button } from "./ui/Button";
 import { FilterChips } from "./ui/FilterChips";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** A notification as the functions write it (AppNotification in the app). */
 interface Notice {
@@ -177,7 +178,7 @@ export function Notifications() {
         </Link>
       </section>
 
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       {data === undefined && !error && <p className="muted">Loading…</p>}
       {data && list.length === 0 && <p className="empty">You're all caught up.</p>}
       {byDay(list).map(([day, items]) => (

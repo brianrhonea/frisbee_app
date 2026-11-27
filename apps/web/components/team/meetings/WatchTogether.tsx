@@ -9,6 +9,7 @@ import { type Doc, useLiveDoc, useLiveQuery } from "@/lib/live";
 import { useAuth } from "../../AuthProvider";
 import { meetingApi } from "./model";
 import { loadYouTube, type YTPlayer } from "../videos/youtube";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** How many of the newest team videos the picker lists. */
 const pickerCap = 100;
@@ -246,9 +247,9 @@ export function WatchTogether({ teamId, meetingId, canControl, stage, volume = 1
         )
       )}
       {error && (
-        <p className="form-error" role="alert">
+        <ErrorNote>
           {error}
-        </p>
+        </ErrorNote>
       )}
     </div>
   );
@@ -279,9 +280,9 @@ function VideoPicker({ videos, onPick, error }: { videos: Video[]; onPick: (id: 
         </ul>
       )}
       {error && (
-        <p className="form-error" role="alert">
+        <ErrorNote>
           {error}
-        </p>
+        </ErrorNote>
       )}
     </div>
   );

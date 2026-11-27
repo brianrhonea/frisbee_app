@@ -8,6 +8,7 @@ import { apiUrl, statsAccess, useStatsPlayers } from "./data";
 import { BackToStats, StatsGate } from "./SeasonStatsPage";
 import "./stats.css";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 const positions = [
   ["handler", "Handler"],
@@ -57,7 +58,7 @@ function RosterPlayers() {
     .sort((a, b) => a.name.localeCompare(b.name));
   const memberName = (uid: string | null) => (uid ? (team.memberNames?.[uid] ?? "a former member") : "");
 
-  if (players.error) return <p className="form-error">{players.error}</p>;
+  if (players.error) return <ErrorNote>{players.error}</ErrorNote>;
   if (!players.data) return <p className="muted" aria-busy="true">Loading…</p>;
   const roster = players.data;
   const mine = roster.find((p) => p.userId === access.uid);
@@ -131,7 +132,7 @@ function RosterPlayers() {
           onSave={save}
         />
       )}
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       {access.manageTeam && roster.length > 0 && (
         <div className="toolbar">
           <span>

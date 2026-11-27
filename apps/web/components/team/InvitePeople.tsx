@@ -5,6 +5,7 @@ import { ApiError, callApi, problem } from "@/lib/client";
 import { useAuth } from "../AuthProvider";
 import { Avatar } from "../Avatar";
 import { StatusPill } from "../ui/StatusPill";
+import { ErrorNote } from "@/components/StatusViews";
 
 /**
  * Find people by name and invite them to [teamId] (`POST
@@ -81,7 +82,7 @@ export function InvitePeople({
         aria-label="Search people by name"
         autoFocus={!embedded}
       />
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       {results === null ? (
         <p className="muted small">They get an invite to accept from Teams, on the website or in the app.</p>
       ) : results.length === 0 ? (

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { callApi, problem } from "@/lib/client";
 import { useLiveDoc } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** Whether others see "Seen" when the member has read their messages (users/{uid}.readReceipts). */
 export function ReadReceiptsSetting() {
@@ -33,7 +34,7 @@ export function ReadReceiptsSetting() {
         </span>
         <input type="checkbox" role="switch" checked={on} disabled={busy} onChange={(e) => void set(e.target.checked)} />
       </label>
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
     </div>
   );
 }

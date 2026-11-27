@@ -19,6 +19,7 @@ import "./meetings.css";
 import "./devices.css";
 import { SegmentedTabs } from "../../ui/SegmentedTabs";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** What the lobby offers right now (LobbyState). */
 type Lobby = "loading" | "unavailable" | "ended" | "canStart" | "waitingToStart" | "canAsk" | "waitingForApproval" | "canJoin";
@@ -317,14 +318,14 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
           </aside>
         </div>
         {state.notice && (
-          <p className="form-error" role="alert">
+          <ErrorNote>
             {state.notice}
-          </p>
+          </ErrorNote>
         )}
         {error && (
-          <p className="form-error" role="alert">
+          <ErrorNote>
             {error}
-          </p>
+          </ErrorNote>
         )}
         <div className="call-controls" role="toolbar" aria-label="Call controls">
           <button type="button" className={`btn btn-small${state.micOn ? "" : " off"}`} aria-pressed={state.micOn} onClick={() => void call.setMic(!state.micOn)}>
@@ -383,9 +384,9 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
                   {preview ? <VideoView track={preview} mirror /> : <span className="lobby-preview-off">Camera is off</span>}
                 </div>
                 {mediaNotice && (
-                  <p className="form-error" role="alert">
+                  <ErrorNote>
                     {mediaNotice}
-                  </p>
+                  </ErrorNote>
                 )}
                 <fieldset>
                   <legend>Join with</legend>
@@ -453,9 +454,9 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
           </>
         )}
         {error && (
-          <p className="form-error" role="alert">
+          <ErrorNote>
             {error}
-          </p>
+          </ErrorNote>
         )}
       </section>
     </div>

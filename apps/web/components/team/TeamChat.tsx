@@ -26,6 +26,7 @@ import { useVoice } from "../voice/VoiceProvider";
 import { EmptyState, Loading } from "../StatusViews";
 import { ReportButton } from "../Report";
 import { MentionText, teamMentions } from "../Mentions";
+import { ErrorNote } from "@/components/StatusViews";
 
 type Room = ManagedRoom & InboxRoom;
 type Folder = ManagedFolder;
@@ -113,7 +114,7 @@ export function TeamChat() {
   }, [user, teamId, openRoom?.id, openRoom?.lastAt, openUnread]);
 
   if (!member) return <MembersOnlySection what="chat" />;
-  if (rooms.error) return <p className="form-error">{rooms.error}</p>;
+  if (rooms.error) return <ErrorNote>{rooms.error}</ErrorNote>;
   if (!rooms.data) return <Loading label="Loading chat…" />;
 
   const managing = all && params.get("manage") === "1";
@@ -341,7 +342,7 @@ function Thread({
       <div className="thread-body" aria-live="polite" ref={body} onScroll={loadAtTop(messages)} hidden={view === "pins"}>
         <OlderMessages paged={messages} />
         {messages.error ? (
-          <p className="form-error">{messages.error}</p>
+          <ErrorNote>{messages.error}</ErrorNote>
         ) : !messages.list ? (
           <Loading label="Loading messages…" />
         ) : list.length === 0 ? (

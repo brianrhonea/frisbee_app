@@ -11,6 +11,7 @@ import { useVideoUploads } from "@/lib/metaFlags";
 import { chatFileProblem, isVideoFile, newId, removeUpload, uploadPhoto, videoUploadsClosed } from "@/lib/upload";
 import { useAuth } from "./AuthProvider";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 type Pending = { key: string; name: string; size: number; uploadId?: string; error?: string };
 
@@ -183,9 +184,9 @@ export function ChatComposer({
         </ul>
       )}
       {error && (
-        <p className="form-error" role="alert">
+        <ErrorNote>
           {error}
-        </p>
+        </ErrorNote>
       )}
       {suggest && <MentionMenu options={suggest.options} active={Math.min(active, suggest.options.length - 1)} onPick={pick} />}
       {notice && (

@@ -14,6 +14,7 @@ import { blockPerson, loadBlocks } from "@/lib/moderation";
 import { useAuth } from "./AuthProvider";
 import { Dialog } from "./Dialog";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** What the report is about, as the dialog names it. */
 const noun: Record<ReportTarget["kind"], string> = {
@@ -115,7 +116,7 @@ export function ReportDialog({
         <label className="switch-row">
           <input type="checkbox" checked={block} onChange={(e) => setBlock(e.target.checked)} /> Also block {authorName}
         </label>
-        {error && <p className="form-error">{error}</p>}
+        {error && <ErrorNote>{error}</ErrorNote>}
         <div className="form-actions">
           <button type="button" className="btn btn-small" onClick={onClose}>
             Cancel

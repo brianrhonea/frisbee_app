@@ -7,6 +7,7 @@ import { newId, photoProblem, uploadPhoto } from "@/lib/upload";
 import { useAuth } from "../AuthProvider";
 import { ComposerPhotos } from "../ComposerPhotos";
 import type { TeamPostView } from "./TeamPostCard";
+import { ErrorNote } from "@/components/StatusViews";
 
 type Photo =
   | { kind: "saved"; path: string; name?: string }
@@ -180,9 +181,9 @@ export function TeamPostComposer({
           </ul>
         )}
         {error && (
-          <p className="form-error" role="alert">
+          <ErrorNote>
             {error}
-          </p>
+          </ErrorNote>
         )}
         <div className="composer-bar">
           <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(e) => addFiles([...(e.target.files ?? [])])} />

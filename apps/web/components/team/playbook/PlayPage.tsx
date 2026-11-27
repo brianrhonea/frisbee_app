@@ -7,6 +7,7 @@ import { useLiveDoc } from "@/lib/live";
 import { useTeamHub } from "../TeamContext";
 import { MembersOnlySection } from "../TeamNav";
 import { PlayEditor, PlayViewer } from "./PlayEditor";
+import { ErrorNote } from "@/components/StatusViews";
 
 /**
  * One play (/teams/:id/plays/:playId, or "new"): admins who manage the
@@ -41,7 +42,7 @@ export function PlayPage({ playId }: { playId: string }) {
       </div>
     );
   }
-  if (play.error) return <p className="form-error">{play.error}</p>;
+  if (play.error) return <ErrorNote>{play.error}</ErrorNote>;
   if (play.data === undefined) return <p className="muted" aria-busy="true">Loading…</p>;
   if (play.data === null) return <p className="empty">That play was deleted. {back}</p>;
   if (whiteboard) return <p className="muted" aria-busy="true">Opening the whiteboard…</p>;

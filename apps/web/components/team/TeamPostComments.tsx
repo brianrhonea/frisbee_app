@@ -10,6 +10,7 @@ import { Avatar } from "../Avatar";
 import { LocalTime } from "../LocalTime";
 import { ReportButton } from "../Report";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** A comment on a team post as stored (TeamPostComment in the app). */
 interface TeamPostComment {
@@ -63,7 +64,7 @@ export function TeamPostComments({ teamId, postId, moderator }: { teamId: string
   const all = [...(data ?? [])].reverse();
   return (
     <section className="comments" aria-label="Comments">
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       {data === undefined && !error && <p className="muted small">Loading comments…</p>}
       {data !== undefined && all.length === 0 && <p className="muted small">No comments yet.</p>}
       {all.map((c) => {

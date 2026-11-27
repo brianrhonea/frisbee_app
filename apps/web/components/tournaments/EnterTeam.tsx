@@ -36,6 +36,7 @@ import { TeamMark } from "./TournamentGames";
 import { type MyTeam, type TournamentState, tournamentPath, useAction, useTournament } from "./useTournament";
 import "./tournaments.css";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 const maxCaptains = 4;
 
@@ -398,7 +399,7 @@ function RespondStep({
           </fieldset>
         )}
       </section>
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       <div className="home-actions">
         <button className="btn btn-primary" disabled={busy || !team || !div || captains.length === 0}>
           {mode === "invite" ? "Accept" : mode === "entered" ? "Save and continue" : "Apply"}
@@ -451,7 +452,7 @@ function RosterStep({ s, entry, deadline, onNext }: { s: TournamentState; entry:
         {minimum > 0 ? `Pick at least ${minimum} players from your roster. ` : ""}
         {picked.length} picked. You can change it until play starts.
       </p>
-      {loadError && <p className="form-error">{loadError}</p>}
+      {loadError && <ErrorNote>{loadError}</ErrorNote>}
       {!players && !loadError && <p className="muted" aria-busy="true">Loading the roster…</p>}
       {players && players.length === 0 && (
         <p className="muted small">
@@ -478,7 +479,7 @@ function RosterStep({ s, entry, deadline, onNext }: { s: TournamentState; entry:
           ))}
         </fieldset>
       )}
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       <div className="home-actions">
         <button type="button" className="btn btn-primary" disabled={busy || locked || picked.length < Math.max(minimum, 1)} onClick={() => void save()}>
           Save roster

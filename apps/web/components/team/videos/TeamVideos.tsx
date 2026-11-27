@@ -25,6 +25,7 @@ import {
 } from "./model";
 import "./videos.css";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 const videosCap = 1000;
 const foldersCap = 200;
@@ -59,9 +60,9 @@ export function TeamVideos() {
     if (filter.kind === "folder" && foldersLive.data && !foldersLive.data.some((f) => f.id === filter.id)) setFilter({ kind: "all" });
   }, [filter, foldersLive.data]);
 
-  if (videosLive.error) return <p className="form-error">{videosLive.error}</p>;
+  if (videosLive.error) return <ErrorNote>{videosLive.error}</ErrorNote>;
   // Folders load before the editor opens, so editing never unfiles a video.
-  if (foldersLive.error) return <p className="form-error">{foldersLive.error}</p>;
+  if (foldersLive.error) return <ErrorNote>{foldersLive.error}</ErrorNote>;
   if (!videosLive.data || !foldersLive.data) return <p className="muted" aria-busy="true">Loading…</p>;
 
   const current = filter.kind === "folder" ? folders.find((f) => f.id === filter.id) : undefined;
@@ -211,9 +212,9 @@ export function TeamVideos() {
         </form>
       )}
       {error && (
-        <p className="form-error" role="alert">
+        <ErrorNote>
           {error}
-        </p>
+        </ErrorNote>
       )}
       {visible.length === 0 ? (
         videos.length === 0 ? (

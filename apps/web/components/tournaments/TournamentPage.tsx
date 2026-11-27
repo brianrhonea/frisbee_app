@@ -43,6 +43,7 @@ import "./tournaments.css";
 import { StatusPill } from "../ui/StatusPill";
 import { entryTone } from "./tones";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 type Tab = "overview" | "players" | "teams" | "schedule" | "results" | "news";
 
@@ -241,7 +242,7 @@ function ManagerMenu({ s }: { s: TournamentState }) {
       <button type="button" className="btn btn-small" disabled={busy} onClick={() => void remove()}>
         Delete
       </button>
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
     </>
   );
 }
@@ -499,7 +500,7 @@ function RunEvent({ s, onTab }: { s: TournamentState; onTab: (tab: Tab) => void 
           </li>
         ))}
       </ol>
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
     </section>
   );
 }
@@ -599,7 +600,7 @@ function Overview({ s, onTab }: { s: TournamentState; onTab: (tab: Tab) => void 
             );
           })}
         </div>
-        {error && <p className="form-error">{error}</p>}
+        {error && <ErrorNote>{error}</ErrorNote>}
       </section>
     </div>
   );
@@ -706,7 +707,7 @@ function YourTeams({ s }: { s: TournamentState }) {
         {mixedEntry(t) && open && t.visibility === "public" && s.divisions.length > 0 && !s.myActiveEntry && <ReserveSpot s={s} />}
         {!open && !s.myEntries.length && <p className="muted">Registration isn&apos;t open.</p>}
       </div>
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
     </section>
   );
 }
@@ -749,7 +750,7 @@ function ReserveSpot({ s }: { s: TournamentState }) {
           </label>
         )}
       </div>
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       <div className="home-actions">
         <button className="btn btn-primary btn-small" disabled={busy}>
           Start a team and reserve a spot
@@ -955,7 +956,7 @@ function TeamsTab({ s }: { s: TournamentState }) {
         </section>
       )}
       {s.manager && ["draft", "registration", "seeding"].includes(s.t.status) && <InviteTeams s={s} divisionId={d.id} />}
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
     </div>
   );
 }
@@ -1008,7 +1009,7 @@ function InviteTeams({ s, divisionId }: { s: TournamentState; divisionId: string
           );
         })}
       </div>
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
     </section>
   );
 }

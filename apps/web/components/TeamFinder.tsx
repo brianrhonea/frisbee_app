@@ -9,6 +9,7 @@ import { listingSubtitle } from "@/lib/site";
 import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
 import { minQueryLength } from "./explore/filters";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** How long typing pauses before searching. */
 const pause = 300;
@@ -91,7 +92,7 @@ export function TeamFinder() {
       {q.length > 0 && q.length < minQueryLength ? (
         <p className="muted small">Type at least {minQueryLength} letters.</p>
       ) : error ? (
-        <p className="form-error">{error}</p>
+        <ErrorNote>{error}</ErrorNote>
       ) : q.length === 0 ? null : !shown ? (
         <p className="muted small" aria-busy="true">
           Searching…

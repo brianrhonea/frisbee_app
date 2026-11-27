@@ -22,6 +22,7 @@ import {
   whiteboardReducer,
 } from "./whiteboard_state";
 import "./whiteboard.css";
+import { ErrorNote } from "@/components/StatusViews";
 
 const tools: Array<[WhiteboardTool, string, string]> = [
   ["move", "Move", "Drag pieces around."],
@@ -55,7 +56,7 @@ export function WhiteboardPage({ playId }: { playId: string }) {
   if (kind !== "team") return <p className="empty">Communities don&apos;t have a playbook.</p>;
   if (!member) return <MembersOnlySection what="playbook" />;
   if (isNew) return <WhiteboardBoard teamId={teamId} canSave={viewer.can("manageTeam")} back={playbook} />;
-  if (doc.error) return <p className="form-error">{doc.error}</p>;
+  if (doc.error) return <ErrorNote>{doc.error}</ErrorNote>;
   if (doc.data === undefined) return <p className="muted" aria-busy="true">Loading…</p>;
   if (doc.data === null)
     return (
@@ -360,9 +361,9 @@ function WhiteboardBoard({ teamId, canSave, back, initial }: { teamId: string; c
           </button>
         </div>
         {error && !ask && (
-          <p className="form-error" role="alert">
+          <ErrorNote>
             {error}
-          </p>
+          </ErrorNote>
         )}
       </div>
 
@@ -444,9 +445,9 @@ function SaveAsPlayDialog({
         </label>
         <p className="muted small">The pieces become the play&apos;s setup and your lines are kept. Add steps in the play editor.</p>
         {error && (
-          <p className="form-error" role="alert">
+          <ErrorNote>
             {error}
-          </p>
+          </ErrorNote>
         )}
         <div className="form-actions">
           <button type="button" className="btn btn-quiet btn-small" disabled={busy} onClick={onCancel}>
@@ -488,9 +489,9 @@ function NameDialog({
           <input autoFocus value={name} maxLength={playLimits.name} onChange={(e) => setName(e.target.value)} />
         </label>
         {error && (
-          <p className="form-error" role="alert">
+          <ErrorNote>
             {error}
-          </p>
+          </ErrorNote>
         )}
         <div className="form-actions">
           <button type="button" className="btn btn-quiet btn-small" disabled={busy} onClick={onCancel}>

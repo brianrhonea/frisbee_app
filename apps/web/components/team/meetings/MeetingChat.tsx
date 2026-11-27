@@ -8,6 +8,7 @@ import { LocalTime } from "../../LocalTime";
 import { loadAtTop, OlderMessages } from "../../OlderMessages";
 import { meetingApi } from "./model";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 interface Message {
   authorId?: string;
@@ -54,7 +55,7 @@ export function MeetingChat({ teamId, meetingId, canModerate }: { teamId: string
       <div className="call-chat-body" ref={body} aria-live="polite" onScroll={loadAtTop(messages)}>
         <OlderMessages paged={messages} />
         {messages.error ? (
-          <p className="form-error">{messages.error}</p>
+          <ErrorNote>{messages.error}</ErrorNote>
         ) : !messages.list ? (
           <p className="muted small">Loading…</p>
         ) : list.length === 0 ? (
@@ -93,9 +94,9 @@ export function MeetingChat({ teamId, meetingId, canModerate }: { teamId: string
         </button>
       </form>
       {error && (
-        <p className="form-error" role="alert">
+        <ErrorNote>
           {error}
-        </p>
+        </ErrorNote>
       )}
     </div>
   );

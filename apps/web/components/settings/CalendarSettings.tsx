@@ -24,6 +24,7 @@ import { Avatar } from "../Avatar";
 import { PersonPicker } from "../PersonPicker";
 import { Invites } from "../Schedule";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 const colorName = (c: CalendarColor) => c[0]!.toUpperCase() + c.slice(1);
 
@@ -87,9 +88,9 @@ export function CalendarSettings() {
     <div className="stack">
       {invites.length > 0 && <Invites invites={invites} onAnswered={load} />}
       {error && (
-        <p className="form-error" role="alert">
+        <ErrorNote>
           {error}
-        </p>
+        </ErrorNote>
       )}
       {calendars === null ? (
         !error && <p className="muted">Loading…</p>
@@ -454,7 +455,7 @@ function Subscribe() {
           </button>
         )
       )}
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
     </div>
   );
 }

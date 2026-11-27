@@ -6,6 +6,7 @@ import type { Doc } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
 import { rolesInOrder, useTeamHub } from "./TeamContext";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 export interface ManagedRoom {
   name?: string;
@@ -343,7 +344,7 @@ export function ChatManager({
             <ul className="role-list">{roomRows(inFolder(f.id))}</ul>
           </div>
         ))}
-        {error && <p className="form-error" role="alert">{error}</p>}
+        {error && <ErrorNote>{error}</ErrorNote>}
       </div>
     </div>
   );

@@ -48,6 +48,7 @@ import { Button } from "./ui/Button";
 import { SegmentedTabs } from "./ui/SegmentedTabs";
 import { FilterChips } from "./ui/FilterChips";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 const dayMs = 86_400_000;
 const canEdit = (c: CalendarInfo | undefined) => c?.role === "owner" || c?.role === "edit";
@@ -423,12 +424,12 @@ export function Schedule() {
           />
         )}
         {error && (
-          <p className="form-error">
+          <ErrorNote>
             {error}{" "}
             <button type="button" className="text-btn" onClick={() => void load()}>
               Retry
             </button>
-          </p>
+          </ErrorNote>
         )}
         {monthView ? (
           <>
@@ -683,7 +684,7 @@ export function Invites({ invites, onAnswered }: { invites: CalendarInvite[]; on
           </li>
         ))}
       </ul>
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
     </div>
   );
 }

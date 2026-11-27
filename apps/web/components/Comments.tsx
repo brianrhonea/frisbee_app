@@ -13,6 +13,7 @@ import { Avatar } from "./Avatar";
 import { LocalTime } from "./LocalTime";
 import { ReportButton } from "./Report";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** A comment as stored (PostComment in the app). */
 interface Comment {
@@ -68,7 +69,7 @@ export function Comments({ postId, postAuthorId, autoFocus = false }: {
 
   return (
     <section className="comments" aria-label="Comments">
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       {data === undefined && !error && <p className="muted small">Loading comments…</p>}
       {top.map((c) => (
         <div key={c.id} className="comment-thread">

@@ -27,6 +27,7 @@ import { Avatar } from "./Avatar";
 import { ComposerPhotos } from "./ComposerPhotos";
 import { NavIcon } from "./NavIcons";
 import "./composer_tag.css";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** Which prompt the next composer shows; goes round within a visit. */
 let promptTurn = 0;
@@ -515,9 +516,9 @@ export function Composer({
         )}
 
         {error && (
-          <p className="form-error" role="alert">
+          <ErrorNote>
             {error}
-          </p>
+          </ErrorNote>
         )}
         {queued && (
           <p className="muted small" role="status">

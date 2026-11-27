@@ -34,6 +34,7 @@ import { isTyping } from "@/lib/text";
 import { Dialog } from "../../Dialog";
 import { SegmentedTabs } from "../../ui/SegmentedTabs";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 type Tab = "track" | "lines" | "points" | "stats";
 type Act = (fn: (t: GameTracker) => void) => void;
@@ -63,7 +64,7 @@ function Game({ gameId }: { gameId: string }) {
     return (
       <div className="stack">
         <BackToStats teamId={teamId} />
-        {error ? <p className="form-error">{error}</p> : <p className="empty">Game not found.</p>}
+        {error ? <ErrorNote>{error}</ErrorNote> : <p className="empty">Game not found.</p>}
       </div>
     );
   }
@@ -120,7 +121,7 @@ function Game({ gameId }: { gameId: string }) {
           </div>
         )}
       </div>
-      {deleteError && <p className="form-error">{deleteError}</p>}
+      {deleteError && <ErrorNote>{deleteError}</ErrorNote>}
       {panel === "gameTo" && <GameToPanel t={t} act={act} onClose={() => setPanel(null)} />}
       {panel === "timeouts" && <TimeoutsPanel t={t} act={act} onClose={() => setPanel(null)} />}
 

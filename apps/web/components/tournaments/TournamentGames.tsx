@@ -43,6 +43,7 @@ import { dayKey, useRenderZone } from "@/lib/renderZone";
 import { type TournamentState, divisionPath, useAction } from "./useTournament";
 import { StatusPill } from "../ui/StatusPill";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 // In [zone] (useRenderZone: UTC while a server-rendered page hydrates), else the viewer's.
 const dayLabel = (d: Date, zone?: string) => d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: zone });
@@ -171,7 +172,7 @@ function ScoreForm({ s, g, mode, onDone, onSent }: { s: TournamentState; g: Engi
         <ScoreStepper name={slotLabel(s, g, false)} value={b} onChange={setB} />
       </div>
       <small className="muted">{mode === "report" ? "The other captain confirms it before it counts." : "As the host, this is final right away."}</small>
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       <div className="home-actions">
         <button className={`btn btn-small ${mode === "report" ? "hosted-btn-due" : "btn-primary"}`} disabled={busy}>
           {mode === "report" ? "Report score" : isDone(g) ? "Correct the score" : "Set final score"}
@@ -279,7 +280,7 @@ export function GameCard({ s, g, focus = false }: { s: TournamentState; g: Engin
           </div>
         )
       )}
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       {keeping && <LiveScoreDialog s={s} g={g} onClose={() => setKeeping(false)} />}
     </div>
   );
@@ -370,7 +371,7 @@ function LiveScoreDialog({ s, g: initial, onClose }: { s: TournamentState; g: En
             </button>
           )}
           <p className="muted small live-note">{!canKeep && !live ? whyNot : "Everyone following sees this score. It isn't final until the score is reported and confirmed."}</p>
-          {error && <p className="form-error">{error}</p>}
+          {error && <ErrorNote>{error}</ErrorNote>}
           {(captain || host) && (
             <button type="button" className="btn hosted-btn-due" disabled={stopping} onClick={() => setFinalMode(captain ? "report" : "final")}>
               {captain ? "Report final score" : "Set final score"}
@@ -462,7 +463,7 @@ function PublishCard({ s }: { s: TournamentState }) {
           Tip: for {d.seeds.length} teams, {tournamentFormatLabels[suggestedFormat(d.seeds.length)].label.toLowerCase()} usually works best.
         </p>
       )}
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       <div className="home-actions">
         <button type="button" className={`btn btn-small ${s.published ? "" : "hosted-btn-due"}`} disabled={!plan || busy} onClick={() => void publish()}>
           {s.published ? "Regenerate schedule" : "Publish schedule"}
@@ -514,7 +515,7 @@ export function ScheduleTab({ s, focusGame }: { s: TournamentState; focusGame?: 
           </button>
         </div>
       )}
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       {focused && (
         <section className="stack">
           <h3 className="hosted-heading">This game</h3>

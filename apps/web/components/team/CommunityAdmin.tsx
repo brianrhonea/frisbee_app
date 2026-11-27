@@ -17,6 +17,7 @@ import { ClubAgeNote } from "../ClubAge";
 import { rolesInOrder, useTeamHub } from "./TeamContext";
 import { EmptyState } from "../StatusViews";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 const levelLabels: Record<string, string> = { club: "Club", college: "College", youth: "Youth", league: "League", pickup: "Pickup" };
 
@@ -238,7 +239,7 @@ export function CommunityAdmin() {
           </ul>
         </>
       )}
-      {error && <p className="form-error" role="alert">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
     </section>
   );
 }
@@ -321,7 +322,7 @@ export function TeamCommunity() {
           )}
         </>
       )}
-      {error && <p className="form-error" role="alert">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
     </section>
   );
 }

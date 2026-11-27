@@ -378,7 +378,7 @@ function PlayersCard({
           )}
         </div>
       )}
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       {roster.players.length === 0 ? (
         <p className="muted small">No players on the roster yet.</p>
       ) : groups.length === 0 ? (
@@ -436,7 +436,7 @@ function PendingInvitesCard({ teamId, version }: { teamId: string; version: numb
   return (
     <section className="card">
       <h2 className="card-title">Invites pending · {invites.length}</h2>
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       <ul className="invite-rows">
         {invites.map((i) => (
           <li key={i.uid}>

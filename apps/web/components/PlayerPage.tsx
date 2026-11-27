@@ -15,6 +15,7 @@ import { BlockButton, ReportButton } from "./Report";
 import { PostCard } from "./PostCard";
 import { DashboardLayout, ProfileCard, StatTiles, TeamList } from "./ProfileDashboard";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 const statColumns: Array<[keyof StatTotals, string]> = [
   ["games", "Games"],
@@ -103,7 +104,7 @@ export function LivePlayer({ uid }: { uid: string }) {
       </div>
     ) : failed ? (
       <div className="page">
-        <p className="form-error">{failed.text}</p>
+        <ErrorNote>{failed.text}</ErrorNote>
         <button
           type="button"
           className="btn btn-small"

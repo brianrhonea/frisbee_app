@@ -13,6 +13,7 @@ import { useTeamHub } from "./TeamContext";
 import { JoinButton } from "./TeamNav";
 import { NeedsPill } from "../RsvpPill";
 import type { Room } from "./TeamStatTiles";
+import { ErrorNote } from "@/components/StatusViews";
 
 // The community page's own sections (redesign F27), on a pickup
 // community's or a school or club's page: the next event with RSVP, the
@@ -127,9 +128,9 @@ export function NextPickupCard({ event }: { event?: PickupEvent }) {
         <PickupJoin />
       )}
       {error && (
-        <p className="form-error" role="alert">
+        <ErrorNote>
           {error}
-        </p>
+        </ErrorNote>
       )}
     </div>
   );

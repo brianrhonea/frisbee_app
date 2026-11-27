@@ -36,6 +36,7 @@ import { useTeamHub } from "./TeamContext";
 import { permissionInfo } from "./TeamRoles";
 import "./discord_import.css";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 const permLabel = (p: TeamPermission) => permissionInfo[p]?.label ?? p;
 
@@ -195,7 +196,7 @@ export function DiscordImport() {
           {busy === "preview" ? "Reading…" : "Preview"}
         </button>
       </form>
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
 
       {plan && here && view && (
         <div className="discord-preview">

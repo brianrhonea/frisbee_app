@@ -15,6 +15,7 @@ import { useVideoComments, VideoComments, VideoEventTag, VideoNotes } from "./Vi
 import { VideoPlayer, type VideoSeeker } from "./VideoPlayer";
 import "./videos.css";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 /**
  * One video (/teams/:id/videos/:videoId; the app's VideoScreen): the player, who shared it, and for admins edit and
@@ -44,8 +45,8 @@ export function VideoPage({ videoId }: { videoId: string }) {
   );
 
   if (!member) return <MembersOnlySection what="videos" />;
-  if (live.error) return <p className="form-error">{live.error}</p>;
-  if (foldersLive.error) return <p className="form-error">{foldersLive.error}</p>;
+  if (live.error) return <ErrorNote>{live.error}</ErrorNote>;
+  if (foldersLive.error) return <ErrorNote>{foldersLive.error}</ErrorNote>;
   if (live.data === undefined || foldersLive.data === undefined) return <p className="muted" aria-busy="true">Loading…</p>;
   if (live.data === null) return <p className="empty">Video not available. It may have been removed. {back}</p>;
   const video = live.data as Video;
@@ -108,13 +109,13 @@ export function VideoPage({ videoId }: { videoId: string }) {
           </div>
           <VideoEventTag videoId={video.id} eventId={video.eventId} />
           {error && (
-            <p className="form-error" role="alert">
+            <ErrorNote>
               {error}
-            </p>
+            </ErrorNote>
           )}
         </div>
       )}
-      {discussion.error && <p className="form-error">{discussion.error}</p>}
+      {discussion.error && <ErrorNote>{discussion.error}</ErrorNote>}
       <VideoNotes videoId={video.id} notes={discussion.notes} seeker={seeker} />
       <VideoComments videoId={video.id} comments={discussion.comments} />
     </div>

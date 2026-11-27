@@ -33,6 +33,7 @@ import type { TeamViewer } from "./TeamContext";
 import { type TeamEventDoc, useTeamEvents } from "./TeamSchedule";
 import "./chat_extras.css";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** A team room message as the pins and cards need it. */
 export interface ExtrasMessage {
@@ -124,7 +125,7 @@ export function PinnedView({
           Pinned messages <small className="muted">{pins.length} of {chatPinsMax}</small>
         </h3>
       </div>
-      {actions.error && <p className="form-error">{actions.error}</p>}
+      {actions.error && <ErrorNote>{actions.error}</ErrorNote>}
       {pins.length === 0 ? (
         <EmptyState>
           Nothing pinned yet.{" "}
@@ -288,7 +289,7 @@ export function ChatEventCard({ teamId, eventId, uid }: { teamId: string; eventI
           ))}
         </div>
       )}
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
     </div>
   );
 }
@@ -332,7 +333,7 @@ export function ShareEventDialog({
     <Dialog label="Share an event" onClose={onClose} className="card pins-dialog" dismissOnBackdrop>
       <h2>Share an event</h2>
       {events.error ? (
-        <p className="form-error">{events.error}</p>
+        <ErrorNote>{events.error}</ErrorNote>
       ) : !events.data ? (
         <Loading label="Loading events…" />
       ) : list.length === 0 ? (
@@ -355,7 +356,7 @@ export function ShareEventDialog({
           ))}
         </ul>
       )}
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       <div className="form-actions">
         <button type="button" className="btn btn-small" onClick={onClose}>
           Cancel
@@ -511,7 +512,7 @@ export function ChatPollCard({
           })}
         </ul>
       )}
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
     </div>
   );
 }
@@ -606,8 +607,8 @@ export function CreatePollDialog({ teamId, roomId, onClose }: { teamId: string; 
           Closes <small className="muted">(optional; otherwise when someone closes it)</small>
           <input type="datetime-local" value={closesAt} onChange={(e) => setClosesAt(e.target.value)} />
         </label>
-        {problem && question.trim() && texts.every(Boolean) && <p className="form-error">{problem}</p>}
-        {error && <p className="form-error">{error}</p>}
+        {problem && question.trim() && texts.every(Boolean) && <ErrorNote>{problem}</ErrorNote>}
+        {error && <ErrorNote>{error}</ErrorNote>}
         <p className="muted small">Everyone in the room sees who voted for what.</p>
         <div className="form-actions">
           <button type="button" className="btn btn-small" onClick={onClose}>

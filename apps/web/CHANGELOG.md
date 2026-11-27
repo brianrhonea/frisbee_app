@@ -4,6 +4,10 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.63.2 — 2026-11-26
+
+C9: 168 plain `<p className="form-error">` messages in 84 files are now the shared ErrorNote (ErrorState): the same words in a soft red box, announced as an alert (`role="alert"`), the same colours in light and dark. Messages that sit in a form row keep their place; nothing about when an error shows has changed.
+
 ## 0.63.1 — 2026-11-26
 
 C10: the browser's `window.confirm` is replaced by the shared ConfirmDialog (`useConfirm()`) in 39 files, about 60 call sites: deletes, removals, withdrawals, unblock, publish and the rest. Deletes and removals use the destructive variant. Same questions, same outcomes; only the dialog is new.

@@ -3,6 +3,7 @@ import { useVoice } from "../../voice/VoiceProvider";
 import { useTeamHub } from "../TeamContext";
 import { PeopleList } from "./CallTiles";
 import "./meetings.css";
+import { ErrorNote } from "@/components/StatusViews";
 
 /**
  * A voice channel (VoiceChannelView): always open, like Discord's. Members
@@ -56,9 +57,9 @@ export function VoiceRoom({ teamId, roomId, name, canSpeak }: { teamId: string; 
           )}
           <PeopleList call={call} people={state.people} volumes={voice.volumes} onVolume={voice.setVolume} />
           {state.notice && (
-            <p className="form-error" role="alert">
+            <ErrorNote>
               {state.notice}
-            </p>
+            </ErrorNote>
           )}
           <div className="home-actions">
             {speak ? (
@@ -75,9 +76,9 @@ export function VoiceRoom({ teamId, roomId, name, canSpeak }: { teamId: string; 
         </>
       )}
       {voice.error && !voice.channel && (
-        <p className="form-error" role="alert">
+        <ErrorNote>
           {voice.error}
-        </p>
+        </ErrorNote>
       )}
     </div>
   );

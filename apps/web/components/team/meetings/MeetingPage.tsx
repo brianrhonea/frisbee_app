@@ -12,6 +12,7 @@ import { NoteQuote, RsvpNoteField } from "../../RsvpNote";
 import { audienceLine, canSee, inviteTier, isEditorTier, type MeetingData, meetingApi, meetingHref, meetingsHref, needsApproval, roomHref, whenLine } from "./model";
 import "./meetings.css";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** Members of [team] who can see [m] (TeamMeeting.invitees). */
 function invitees(team: TeamDoc, m: MeetingData): string[] {
@@ -158,9 +159,9 @@ export function MeetingPage({ meetingId }: { meetingId: string }) {
         </section>
       )}
       {error && (
-        <p className="form-error" role="alert">
+        <ErrorNote>
           {error}
-        </p>
+        </ErrorNote>
       )}
       <section className="card">
         <h2 className="card-title">Invited ({invited.length})</h2>

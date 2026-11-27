@@ -3,6 +3,7 @@ import { type MessagePolicy, messagePolicies, messagePolicyLabels, type MessageP
 import { useEffect, useState } from "react";
 import { callApi, problem } from "@/lib/client";
 import { useAuth } from "../AuthProvider";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** Who can start a conversation with them (`/v1/me/message-policy`), as in the app's Settings. */
 export function MessagePolicySettings() {
@@ -54,7 +55,7 @@ export function MessagePolicySettings() {
           ))}
         </fieldset>
       )}
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
     </div>
   );
 }

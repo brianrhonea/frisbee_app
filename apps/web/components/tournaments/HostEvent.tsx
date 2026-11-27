@@ -11,6 +11,7 @@ import { useMyTeams } from "../useMyTeams";
 import { canOn } from "./useTournament";
 import "./tournaments.css";
 import "./host_event.css";
+import { ErrorNote } from "@/components/StatusViews";
 
 const sections = [
   { key: "official", title: "Official organizer", blurb: "Events you run for an official organizer like Stall 10 carry its verified badge." },
@@ -39,7 +40,7 @@ export function HostEvent() {
   const { user } = useAuth();
   const [type, setType] = useState<HostedType>("league");
   const mine = useMyTeams<TeamDoc & { official?: boolean }>(user?.uid);
-  if (mine.error) return <p className="form-error">{mine.error}</p>;
+  if (mine.error) return <ErrorNote>{mine.error}</ErrorNote>;
   if (!mine.data) return <p className="muted" aria-busy="true">Loading…</p>;
   const hosts = mine.data.filter((t) => canOn(t, user?.uid, "manageEvents")).sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
   const of = (key: (typeof sections)[number]["key"]) =>

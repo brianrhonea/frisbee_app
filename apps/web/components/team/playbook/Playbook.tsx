@@ -139,9 +139,9 @@ function WhiteboardList({ teamId, editor, live }: { teamId: string; editor: bool
         </div>
       </div>
       {error && !confirm && (
-        <p className="form-error" role="alert">
+        <ErrorNote>
           {error}
-        </p>
+        </ErrorNote>
       )}
       {live.error ? (
         <ErrorNote>{live.error}</ErrorNote>
@@ -181,9 +181,9 @@ function WhiteboardList({ teamId, editor, live }: { teamId: string; editor: bool
           <h2 className="card-title">Delete &ldquo;{confirm.name || "Untitled whiteboard"}&rdquo;?</h2>
           <p className="muted">This whiteboard will be removed from the playbook.</p>
           {error && (
-            <p className="form-error" role="alert">
+            <ErrorNote>
               {error}
-            </p>
+            </ErrorNote>
           )}
           <div className="form-actions">
             <button type="button" className="btn btn-quiet btn-small" disabled={busy} onClick={() => setConfirm(null)}>

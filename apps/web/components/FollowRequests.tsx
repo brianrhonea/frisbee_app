@@ -8,6 +8,7 @@ import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
 import { LocalTime } from "./LocalTime";
 import { useMyProfile } from "./settings/useMyProfile";
+import { ErrorNote } from "@/components/StatusViews";
 
 interface Request {
   name?: string;
@@ -52,8 +53,8 @@ export function FollowRequests() {
           followers first.
         </p>
       )}
-      {error && <p className="form-error">{error}</p>}
-      {failed && <p className="form-error">{failed}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
+      {failed && <ErrorNote>{failed}</ErrorNote>}
       {data && data.length === 0 && <p className="empty">No requests right now.</p>}
       <ul className="people-list">
         {(data ?? []).map((r) => (

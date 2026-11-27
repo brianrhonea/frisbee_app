@@ -5,6 +5,7 @@ import { callApi, problem } from "@/lib/client";
 import { useAuth } from "./AuthProvider";
 import { ReportCard } from "./ReportQueue";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 const confirms: Partial<Record<StaffAction, string>> = {
   remove: "Remove it for everyone? Every open report on it closes.",
@@ -60,7 +61,7 @@ export function StaffQueue() {
   if (staff === false) return <p className="empty">This page is for Stall 10&apos;s staff.</p>;
   return (
     <div className="stack">
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       {reports === null ? (
         !error && <p className="muted">Loading…</p>
       ) : reports.length === 0 ? (

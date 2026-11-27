@@ -6,6 +6,7 @@ import { useAuth } from "../AuthProvider";
 import { ReportCard } from "../ReportQueue";
 import { useTeamHub } from "./TeamContext";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 /**
  * Settings › Reports, for the team's admins and moderators: reports on its
@@ -53,7 +54,7 @@ export function TeamReports() {
     <section className="card" id="reports">
       <h2 className="card-title">Reports</h2>
       <p className="muted small">What members reported in this team&apos;s chat and posts. Stall 10&apos;s staff see these reports too.</p>
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       {reports === null ? (
         !error && <p className="muted">Loading…</p>
       ) : reports.length === 0 ? (

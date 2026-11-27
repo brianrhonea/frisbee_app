@@ -28,6 +28,7 @@ import { gameTime, shortDay, slotLabel, tournamentDates, tournamentView, tournam
 import "./group_tournaments.css";
 import { formatDate, toLocalInput } from "@/lib/dates";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 /**
  * Sets a tournament up (/teams/:id/tournaments/new, or .../:id/edit):
@@ -52,7 +53,7 @@ export function TournamentEditorPage({ tournamentId, eventId }: { tournamentId: 
   if (kind === "team") return <p className="empty">Teams don&apos;t run their own tournaments. {back}</p>;
   if (!organizer) return <p className="empty">Only the group&apos;s organizers set tournaments up. {back}</p>;
   if (tournamentId) {
-    if (doc.error) return <p className="form-error">{doc.error}</p>;
+    if (doc.error) return <ErrorNote>{doc.error}</ErrorNote>;
     if (doc.data === undefined) return <p className="muted" aria-busy="true">Loading…</p>;
     if (doc.data === null) return <p className="empty">Tournament not found. {back}</p>;
   }
@@ -525,13 +526,13 @@ function Editor({
             {plan ? "Refresh preview" : "Preview schedule"}
           </button>
         </div>
-        {planError && <p className="form-error">{planError}</p>}
+        {planError && <ErrorNote>{planError}</ErrorNote>}
         {plan && (
           <div className="stack gt-preview">
             <p>
               {plan.days.length === 1 ? `${plan.games.length} games · ends about ${gameTime(plan.endsAt)}` : `${plan.games.length} games over ${plan.days.length} days`}
             </p>
-            {overrun > 0 && <p className="form-error">⚠ Runs {overrun} min past the ideal end. Add fields, shorten games or use fewer teams.</p>}
+            {overrun > 0 && <ErrorNote>⚠ Runs {overrun} min past the ideal end. Add fields, shorten games or use fewer teams.</ErrorNote>}
             <ol className="gt-preview-list">
               {plan.games.map((g) => {
                 const dayIndex = plan.days.findIndex((_, i) => plan.days.slice(0, i).reduce((n, d) => n + d.games, 0) === g.order && plan.days[i]!.games > 0);
@@ -644,7 +645,7 @@ function Editor({
       <div className="card gt-bar">
         <p className="small muted">{status}</p>
         {note && <p className="small">{note}</p>}
-        {error && <p className="form-error">{error}</p>}
+        {error && <ErrorNote>{error}</ErrorNote>}
         <div className="home-actions">
           <button type="button" className="btn" disabled={busy !== null || saveProblem !== null} onClick={() => void save()}>
             {busy === "save" ? "Saving…" : "Save"}
@@ -814,7 +815,7 @@ function Announcement({
         Place
         <input value={location} maxLength={200} onChange={(e) => setLocation(e.target.value)} />
       </label>
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       <div className="home-actions">
         <button type="submit" className="btn btn-primary" disabled={busy}>
           Post

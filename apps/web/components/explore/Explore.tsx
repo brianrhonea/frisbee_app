@@ -45,6 +45,7 @@ import "./explore.css";
 import { useMyTeams } from "../useMyTeams";
 import { StatusPill } from "../ui/StatusPill";
 import { FilterChips } from "../ui/FilterChips";
+import { ErrorNote } from "@/components/StatusViews";
 
 const chips: Array<[string, ExploreFilter | null]> = [
   ["All", null],
@@ -305,7 +306,7 @@ function SearchCard({
             Searching…
           </p>
         ) : failed && nothing ? (
-          <p className="form-error">Couldn&apos;t search. Try again.</p>
+          <ErrorNote>Couldn&apos;t search. Try again.</ErrorNote>
         ) : ready && nothing ? (
           <div className="empty">
             <b>Nothing found</b>
@@ -552,7 +553,7 @@ function ComingUp({
             </Link>
           </div>
           {error && !hosted ? (
-            <p className="form-error">{error}</p>
+            <ErrorNote>{error}</ErrorNote>
           ) : !hosted ? (
             <p className="muted" aria-busy="true">
               Loading…
@@ -574,7 +575,7 @@ function ComingUp({
             Loading events…
           </p>
         ) : events === null ? (
-          <p className="form-error">Couldn&apos;t load events. Try again.</p>
+          <ErrorNote>Couldn&apos;t load events. Try again.</ErrorNote>
         ) : (
           <EventsBrowser
             events={eventsFor(events.events, only)}
@@ -687,7 +688,7 @@ function RankingsPreview({ mine }: { mine: MyTeam[] }) {
       </div>
       {kind === "teams" ? (
         rankings.error ? (
-          <p className="form-error">{rankings.error}</p>
+          <ErrorNote>{rankings.error}</ErrorNote>
         ) : !rankings.data ? (
           <p className="muted" aria-busy="true">
             Loading…
@@ -722,7 +723,7 @@ function RankingsPreview({ mine }: { mine: MyTeam[] }) {
           </>
         )
       ) : players.error ? (
-        <p className="form-error">{players.error}</p>
+        <ErrorNote>{players.error}</ErrorNote>
       ) : players.data === undefined ? (
         <p className="muted" aria-busy="true">
           Loading…

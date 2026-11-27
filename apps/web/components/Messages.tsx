@@ -27,6 +27,7 @@ import { type Conversation, describe, isGroup, type Mine, ms } from "./conversat
 import "./member.css";
 import { Button } from "./ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 interface Message {
   authorId?: string;
@@ -163,7 +164,7 @@ export function Messages() {
   }, []);
 
   if (!user) return null;
-  if (convs.error) return <p className="form-error">{convs.error}</p>;
+  if (convs.error) return <ErrorNote>{convs.error}</ErrorNote>;
 
   return (
     <div className="hub-split chat-split messages">
@@ -326,9 +327,9 @@ function StartConversation({ uid, onStarted, onCancel }: { uid: string; onStarte
         <Avatar name={name} url={profile.data?.photoUrl || undefined} size={36} /> <b>{name}</b>
       </p>
       {error && (
-        <p className="form-error" role="alert">
+        <ErrorNote>
           {error}
-        </p>
+        </ErrorNote>
       )}
       <div className="form-actions">
         <button type="button" className="btn" onClick={onCancel}>
@@ -427,7 +428,7 @@ function NewConversation({ group, onDone }: { group: boolean; onDone: (id: strin
       ) : (
         <>
           <PersonPicker label="To" exclude={[user?.uid ?? ""]} disabled={busy} onPick={(p) => void start(p)} />
-          {error && <p className="form-error">{error}</p>}
+          {error && <ErrorNote>{error}</ErrorNote>}
           <p>
             <button type="button" className="btn" onClick={() => onDone(null)}>
               Cancel
@@ -539,7 +540,7 @@ function ConversationView({
       <div className="thread-body" aria-live="polite" ref={body} onScroll={loadAtTop(messages)}>
         <OlderMessages paged={messages} />
         {messages.error ? (
-          <p className="form-error">{messages.error}</p>
+          <ErrorNote>{messages.error}</ErrorNote>
         ) : !messages.list ? (
           <p className="muted" aria-busy="true">
             Loading messages…

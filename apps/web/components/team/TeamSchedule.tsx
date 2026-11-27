@@ -24,6 +24,7 @@ import { startOfToday } from "@/lib/dates";
 import { validId } from "@/lib/text";
 import { EmptyState, Loading } from "../StatusViews";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** A team event as members read it (TeamEvent in the app). */
 export interface TeamEventDoc extends PublicEvent {
@@ -195,7 +196,7 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
   }
   // Signed out: a youth team's card only.
   if (youth && viewer.state === "visitor") return <EmptyState>{youthVisitorNote}</EmptyState>;
-  if (live.error) return <p className="form-error">{live.error}</p>;
+  if (live.error) return <ErrorNote>{live.error}</ErrorNote>;
   const events: Array<Doc<TeamEventDoc>> = member ? (live.data ?? []) : outsiderYouth ? ((past ? [] : outsider.events.data) ?? []) : publicEvents;
   if (member && !live.data) return <Loading label="Loading the schedule…" />;
 
@@ -509,9 +510,9 @@ function EventDetail({ event, onEdit }: { event: Doc<TeamEventDoc>; onEdit?: () 
             </p>
           )}
           {error && (
-            <p className="form-error" role="alert">
+            <ErrorNote>
               {error}
-            </p>
+            </ErrorNote>
           )}
           <div className="rsvp-columns">
             {[

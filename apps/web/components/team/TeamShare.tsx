@@ -19,6 +19,7 @@ import { Dialog } from "../Dialog";
 import { useTeamHub } from "./TeamContext";
 import { StatusPill } from "../ui/StatusPill";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 const money = (cents: number) => `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}`;
 /** Cents from what someone typed ("40", "$40.50"), or null. */
@@ -159,7 +160,7 @@ export function TeamShare() {
           </ul>
         </>
       )}
-      {error && !editing && <p className="form-error">{error}</p>}
+      {error && !editing && <ErrorNote>{error}</ErrorNote>}
       {dialog}
     </div>
   );
@@ -225,7 +226,7 @@ function ShareDialog({
             onChange={(e) => setNote(e.target.value)}
           />
         </label>
-        {(problem ?? error) && <p className="form-error">{problem ?? error}</p>}
+        {(problem ?? error) && <ErrorNote>{problem ?? error}</ErrorNote>}
         <div className="form-actions">
           <button type="button" className="btn" onClick={onClose}>
             Cancel

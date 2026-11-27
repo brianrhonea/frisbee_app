@@ -6,6 +6,7 @@ import { useAuth } from "../AuthProvider";
 import { type CustomRoleDoc, useTeamHub } from "./TeamContext";
 import { EmptyState } from "../StatusViews";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** What each permission lets a role do (TeamPermission in the app). */
 export const permissionInfo: Record<TeamPermission, { label: string; summary: string }> = {
@@ -226,7 +227,7 @@ export function TeamRoles() {
           </div>
         </form>
       )}
-      {error && <p className="form-error" role="alert">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
     </section>
   );
 }

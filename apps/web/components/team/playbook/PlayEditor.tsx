@@ -21,6 +21,7 @@ import { callApi } from "@/lib/client";
 import { useAuth } from "../../AuthProvider";
 import { type FieldHit, PlayField } from "./PlayField";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorNote } from "@/components/StatusViews";
 
 type Tool = "select" | PlayElementKind | "cut" | "throw_" | "erase";
 const tools: Array<[Tool, string, string]> = [
@@ -442,7 +443,7 @@ export function PlayEditor({ teamId, id, initial }: { teamId: string; id: string
             Clear diagram
           </button>
         </div>
-        {error && <p className="form-error" role="alert">{error}</p>}
+        {error && <ErrorNote>{error}</ErrorNote>}
       </aside>
     </div>
   );

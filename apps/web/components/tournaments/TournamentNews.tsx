@@ -15,6 +15,7 @@ import { callApi, problem } from "@/lib/client";
 import { useLiveQuery } from "@/lib/live";
 import { canOn, type TournamentState } from "./useTournament";
 import "./tournament_news.css";
+import { ErrorNote } from "@/components/StatusViews";
 
 /** The app's dialog caps the details at 2,000 characters (the rule allows 5,000). */
 const detailsMax = 2000;
@@ -32,7 +33,7 @@ export function TournamentNews({ s }: { s: TournamentState }) {
   return (
     <div className="stack news-tab">
       {canPost && published && <NewsComposer hostId={hostId} tournamentKey={key} hostName={hostName} />}
-      {posts.error && <p className="form-error">{posts.error}</p>}
+      {posts.error && <ErrorNote>{posts.error}</ErrorNote>}
       {posts.data && rows.length === 0 && (
         <div className="card">
           <p className="muted small">
@@ -114,7 +115,7 @@ function NewsComposer({ hostId, tournamentKey, hostName }: { hostId: string; tou
         Details
         <textarea value={body} maxLength={detailsMax} rows={4} onChange={(e) => setBody(e.target.value)} />
       </label>
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       <div className="form-actions">
         <button type="submit" className="btn btn-primary" disabled={busy}>
           {busy ? "Posting…" : "Post"}
