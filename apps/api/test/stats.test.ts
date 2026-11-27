@@ -267,6 +267,16 @@ describe("roster spots", () => {
     expect((await call("PUT", `${url}/left`, { ...spot, userId: "someoneelse" })).status).toBe(400);
   });
 
+  it("an admin adds a player already linked to a member, in one call (Sprint 4 A3), and a replay is 409", async () => {
+    const res = await call("POST", url, { name: "Pat", number: 4, position: "handler", userId: "player", id: "spotpat" }, "admin");
+    expect(res.status).toBe(201);
+    expect(store.doc("teams/t1/roster/spotpat")).toEqual({ name: "Pat", number: 4, position: "handler", userId: "player" });
+    expect((await call("POST", url, { name: "Pat", number: 4, position: "handler", userId: "player", id: "spotpat" }, "admin")).status).toBe(409);
+    // A non-admin can't create a linked spot, and a non-member account can't be linked.
+    expect((await call("POST", url, { name: "Kay", userId: "keeper" }, "player")).status).toBe(403);
+    expect((await call("POST", url, { name: "Kay", userId: "stranger" }, "admin")).status).toBe(400);
+  });
+
   it("delete takes the paid mark too", async () => {
     const id = (await call("POST", url, spot)).json().id;
     expect((await call("DELETE", `${url}/${id}`, undefined, "keeper")).status).toBe(403);
@@ -283,10 +293,35 @@ describe("roster spots", () => {
     const link = (id: string, userId: string | null, uid: string) => call("PUT", `${url}/${id}/link`, { userId }, uid);
 
     it("isMember", async () => expect((await link("free", "stranger", "stranger")).status).toBe(403));
-    it("an unlinked spot, for yourself only", async () => {
+    it("a member can no longer claim an unlinked spot, for themselves or anyone (Sprint 4 A3: admins set links)", async () => {
       expect((await link("free", "keeper", "player")).status).toBe(403);
-      expect((await link("free", "player", "player")).status).toBe(204);
+      expect((await link("free", "player", "player")).status).toBe(403);
+      expect((await link("free", "keeper", "keeper")).status).toBe(403);
+      expect(store.doc("teams/t1/roster/free")).toEqual({ name: "Free", number: null, position: "hybrid", userId: null });
+    });
+    it("a keeper of stats can't claim one either", async () => {
+      expect((await link("free", "keeper", "keeper")).status).toBe(403);
+      expect((await link("free", "granted", "granted")).status).toBe(403);
+    });
+    it("an admin links the spot to a member, and that member can then let go of it", async () => {
+      expect((await link("free", "player", "admin")).status).toBe(204);
       expect(store.doc("teams/t1/roster/free")).toEqual({ name: "Free", number: null, position: "hybrid", userId: "player" });
+      expect((await link("free", null, "player")).status).toBe(204);
+      expect(store.doc("teams/t1/roster/free")!.userId).toBeNull();
+    });
+    it("refuses linking someone who already has another spot on the team (412), on link and on create", async () => {
+      const res = await link("free", "keeper", "admin");
+      expect(res.status).toBe(412);
+      expect(res.json().error.code).toBe("failed_precondition");
+      expect(store.doc("teams/t1/roster/free")!.userId).toBeNull();
+      const created = await call("POST", url, { name: "Dup", number: null, position: "hybrid", userId: "keeper" }, "admin");
+      expect(created.status).toBe(412);
+      expect(await link("free", "player", "admin").then((r) => r.status)).toBe(204);
+      // Re-saving a spot with the link it already has is not a second spot.
+      expect((await call("PUT", `${url}/free`, { name: "Free", number: null, position: "hybrid", userId: "player" }, "admin")).status).toBe(204);
+      // Editing a spot onto an account that has another one is refused too.
+      expect((await call("PUT", `${url}/free`, { name: "Free", number: null, position: "hybrid", userId: "keeper" }, "admin")).status).toBe(412);
+      expect(store.doc("teams/t1/roster/free")!.userId).toBe("player");
     });
     it("letting go of your own, not someone else's", async () => {
       expect((await link("taken", null, "player")).status).toBe(403);
@@ -300,14 +335,16 @@ describe("roster spots", () => {
     });
     it("says why a link is refused", async () => {
       const why = async (id: string, userId: string | null, uid: string) => (await link(id, userId, uid)).json().error.message;
-      expect(await why("free", "keeper", "player")).toBe("You can only claim a spot for yourself.");
+      expect(await why("free", "keeper", "player")).toBe("Only a team admin can link a player to a spot.");
+      expect(await why("free", "player", "player")).toBe("Only a team admin can link a player to a spot.");
       expect(await why("taken", null, "player")).toBe("This spot is linked to someone else.");
       expect(await why("free", "stranger", "admin")).toBe("Only one of the team's members can be linked to a spot.");
-      await link("free", "player", "player");
+      await link("free", "player", "admin");
       expect(await why("free", "keeper", "player")).toBe("You can only unlink yourself from your spot.");
     });
     it("only userId changes, and the spot must exist", async () => {
       expect((await call("PUT", `${url}/free/link`, { userId: "player", name: "X" }, "player")).status).toBe(400);
+      expect((await link("ghost", "player", "admin")).status).toBe(404);
       expect((await link("ghost", "player", "player")).status).toBe(404);
     });
   });

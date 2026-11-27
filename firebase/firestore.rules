@@ -993,8 +993,8 @@ service cloud.firestore {
       // What every member sees: name, number, position. Payment and USA
       // Ultimate status live in rosterStatus, readable by admins only.
       // userId links a spot to a member's account, so the spot's stats
-      // count on their profile. Admins link anyone on the team; a member
-      // claims an unlinked spot for themselves or lets go of their own.
+      // count on their profile. Only admins link anyone on the team (also via
+      // the API); a member can let go of their own link but not claim a spot.
       // line (O-line, D-line or both) is the API's to set (PUT
       // /v1/teams/:id/roster-lines): a client write keeps it as it was or
       // drops it (an app build from before lines rewrites the whole spot).
@@ -1027,13 +1027,13 @@ service cloud.firestore {
           && request.resource.data.name.size() <= 80
           && (request.resource.data.number == null || request.resource.data.number is int)
           && request.resource.data.position in ['handler', 'cutter', 'hybrid'];
+        // A member lets go of their own link, and nothing else (claiming
+        // a spot is the admins' to set).
         allow update: if accountOk()
           && isMember(get(teamPath(teamId)).data)
           && changed().hasOnly(['userId'])
-          && ((linkedTo(resource.data) == null
-                && linkedTo(request.resource.data) == uid())
-              || (linkedTo(resource.data) == uid()
-                && linkedTo(request.resource.data) == null));
+          && linkedTo(resource.data) == uid()
+          && linkedTo(request.resource.data) == null;
       }
 
       // Per-player paid mark, keyed like roster.
