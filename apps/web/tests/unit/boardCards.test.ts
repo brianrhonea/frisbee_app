@@ -45,7 +45,8 @@ describe("board-filled cards keep an edge", () => {
   });
 
   it("today markers use accent-soft with a 2px accent outline", () => {
-    for (const sel of [".week-day.today b", ".team-hub .sched-list a.team-sched-row.today"]) {
+    // H3: the team schedule rows became event cards (C8) with no today row; only the week strip marks today.
+    for (const sel of [".week-day.today b"]) {
       const r = rules.find((x) => x.sel === sel)!;
       expect(r, sel).toBeTruthy();
       expect(r.body, sel).toContain("background: var(--accent-soft)");

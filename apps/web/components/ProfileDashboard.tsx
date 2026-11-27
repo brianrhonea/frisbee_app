@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Avatar } from "./Avatar";
 import { NavIcon, type NavIconName } from "./NavIcons";
 import "./member.css";
+import { ListRow } from "./ui/ListRow";
 import { StatusPill } from "./ui/StatusPill";
 
 /**
@@ -115,7 +116,26 @@ interface TeamRow {
   subtitle?: string;
 }
 
-export function TeamList({ title = "Teams", teams, empty }: { title?: string; teams: TeamRow[]; empty?: ReactNode }) {
+export function TeamList({ title = "Teams", teams, empty, plain = false }: { title?: string; teams: TeamRow[]; empty?: ReactNode; plain?: boolean }) {
+  // Plain: a heading over list rows (C3), no box (the Teams tab); otherwise the profile's card.
+  if (plain) {
+    return (
+      <section className="teams-section">
+        <h2 className="card-title">{title}</h2>
+        {teams.length === 0 ? (
+          (empty ?? <p className="muted small">No teams yet.</p>)
+        ) : (
+          <ul className="teams-rows">
+            {teams.map((t) => (
+              <li key={t.id}>
+                <ListRow href={`/teams/${encodeURIComponent(t.id)}`} leading={<Avatar name={t.name} size={40} />} title={t.name} subtitle={t.subtitle} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    );
+  }
   return (
     <div className="card">
       <h2 className="card-title">{title}</h2>

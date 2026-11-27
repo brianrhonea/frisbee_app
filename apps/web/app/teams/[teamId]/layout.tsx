@@ -6,9 +6,10 @@ import { AllTeamsLink } from "@/components/team/AllTeamsLink";
 import { ForVisitors } from "@/components/ForVisitors";
 import { InviteProvider } from "@/components/team/InviteDialog";
 import { SectionGate } from "@/components/team/SectionGate";
-import { InviteOnlyHint, TeamAbout, TeamAddress, TeamBannerActions, TeamHeadBadge, TeamMeta, TeamName } from "@/components/team/TeamBanner";
+import { InviteOnlyHint, TeamAbout, TeamAddress, TeamBannerActions, TeamHeadBadge, TeamMeta, TeamNameText } from "@/components/team/TeamBanner";
 import { TeamProvider } from "@/components/team/TeamContext";
 import { TeamNav } from "@/components/team/TeamNav";
+import { CoverHeader } from "@/components/ui/CoverHeader";
 import { listingSubtitle } from "@/lib/site";
 import { loadTeam } from "@/lib/teamPage";
 import "@/components/team/team_hub.css";
@@ -51,19 +52,14 @@ export default async function TeamLayout({ params, children }: Props) {
       <InviteProvider>
         <div className="page page-wide team-hub">
           <AllTeamsLink />
-          <header className="team-banner team-head">
-            <TeamHeadBadge />
-            <div className="team-banner-text">
-              <TeamName />
+          <div className="team-banner team-head">
+            <CoverHeader avatar={<TeamHeadBadge size={88} />} title={<TeamNameText />} actions={<TeamBannerActions />}>
               <TeamMeta subtitle={subtitle} />
               <TeamAddress address={team.location?.address} />
               {team.description && <TeamAbout text={team.description} />}
               <InviteOnlyHint />
-            </div>
-            <div className="team-banner-actions">
-              <TeamBannerActions />
-            </div>
-          </header>
+            </CoverHeader>
+          </div>
           <ForVisitors>
             <div className="cta-card">
               <p>{group ? "Join this community on Stall 10." : "Follow this team and keep up with its season on Stall 10."}</p>

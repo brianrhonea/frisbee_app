@@ -20,8 +20,8 @@ import { Dialog } from "../Dialog";
 import { SectionsHint } from "./SectionsHint";
 import { TeamStatTiles, useTeamChatRooms } from "./TeamStatTiles";
 import { CommunityChat, CommunityOrganizers, NextPickupCard } from "./CommunitySections";
-import { DateTile } from "./DateTile";
-import { needsRsvp, RsvpPill } from "../RsvpPill";
+import { EventCard } from "../ui/EventCard";
+import { needsRsvp } from "../RsvpPill";
 import { useTeamEvents, useYouthOutsiderPublic, youthVisitorNote } from "./TeamSchedule";
 import { TournamentDayCard } from "../tournaments/TournamentDayCard";
 import { useTournamentDays } from "../tournaments/useTournamentDays";
@@ -140,26 +140,23 @@ export function TeamFeed({ publicPosts, publicEvents }: { publicPosts: PublicTea
             {upcoming.length === 0 ? (
               <p className="muted small">Nothing scheduled.</p>
             ) : (
-              <div className="coming-list">
+              <ul className="sched-list coming-list">
                 {upcoming.map((e) => {
                   const mine = viewer.state === "member" ? (e as { rsvps?: Record<string, string> }).rsvps?.[viewer.uid] : undefined;
                   return (
-                    <Link key={e.id} href={`/teams/${teamId}/schedule?event=${e.id}`} className="hub-event-link coming-row">
-                      <DateTile startsAt={e.startsAt} />
-                      <span className="sched-main">
-                        <b>
-                          <span className="type-dot" aria-hidden="true" />
-                          {e.title || "Event"}
-                        </b>
-                        <small>
-                          <LocalTime iso={e.startsAt} style="dateTime" />
-                        </small>
-                      </span>
-                      {member && <RsvpPill answer={mine} type={e.type} needs={needsRsvp(mine, e.startsAt, e.endsAt)} />}
-                    </Link>
+                    <li key={e.id}>
+                      <EventCard
+                        startsAt={e.startsAt}
+                        title={e.title || "Event"}
+                        href={`/teams/${teamId}/schedule?event=${e.id}`}
+                        meta={<LocalTime iso={e.startsAt} style="dateTime" />}
+                        answer={member ? mine : undefined}
+                        needsRsvp={member && needsRsvp(mine, e.startsAt, e.endsAt)}
+                      />
+                    </li>
                   );
                 })}
-              </div>
+              </ul>
             )}
           </div>
         )}

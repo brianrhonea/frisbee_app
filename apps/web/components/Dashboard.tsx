@@ -1,4 +1,5 @@
 "use client";
+import { scrollBehavior } from "@/lib/motion";
 import type { MeHome, MyEvent, PostPage, PublicPost } from "@stall10/shared";
 import type { User } from "firebase/auth";
 import Link from "next/link";
@@ -6,7 +7,6 @@ import { useCallback, useEffect, useState } from "react";
 import { newPostBox, onHomeRefresh } from "@/lib/homeRefresh";
 import { callApi, problem } from "@/lib/client";
 import { type Audience, Composer } from "./Composer";
-import { EventItem } from "./EventItem";
 import { LocalTime } from "./LocalTime";
 import { LearnPromo, PickupCard } from "./HomeCards";
 import { PostCard } from "./PostCard";
@@ -20,12 +20,12 @@ import { canOn } from "./tournaments/useTournament";
 import { TournamentDayCard } from "./tournaments/TournamentDayCard";
 import { useTournamentDays } from "./tournaments/useTournamentDays";
 import { useMyTeams } from "./useMyTeams";
-import { needsRsvp, RsvpPill } from "./RsvpPill";
+import { needsRsvp } from "./RsvpPill";
 import "./member.css";
+import { EventCard } from "./ui/EventCard";
 import { SegmentedTabs } from "./ui/SegmentedTabs";
+import { SummaryTiles } from "./ui/SummaryTiles";
 import { ErrorNote } from "@/components/StatusViews";
-
-const rsvpLabels: Record<string, string> = { going: "Going", maybe: "Maybe", notGoing: "Can't go" };
 
 /**
  * The feed's tabs, as the app's Home: the member's teams first (the
@@ -133,7 +133,7 @@ export function Dashboard({ user }: { user: User }) {
   useEffect(
     () =>
       onHomeRefresh(() => {
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        window.scrollTo({ top: 0, behavior: scrollBehavior() });
         void load();
         if (communityLoaded) void loadCommunity();
       }),
@@ -204,6 +204,15 @@ export function Dashboard({ user }: { user: User }) {
       <div className="huddle-main">
         <Greeting first={first} />
 
+        <SummaryTiles
+          label="Your week"
+          items={[
+            { id: "teams", label: teams.length === 1 ? "Team" : "Teams", value: teams.length, href: "/teams" },
+            { id: "upcoming", label: "Upcoming", value: events.length, href: "/schedule" },
+            { id: "answer", label: "To answer", value: events.filter((e) => needsRsvp(e.rsvp, e.startsAt, e.endsAt)).length, href: "/schedule" },
+          ]}
+        />
+
         {profile.needsUsername && (
           <div id="username">
             <UsernameStep user={user} onDone={() => void load()} />
@@ -217,9 +226,24 @@ export function Dashboard({ user }: { user: User }) {
         <div className="huddle-phone">
           <TeamInvites />
           {/* On a tournament day the card takes the next event's place. */}
-          {tournamentDays.length > 0
-            ? tournamentDays.map((d) => <TournamentDayCard key={`${d.teamId}/${d.tournamentId}`} day={d} />)
-            : events[0] && <NextEvent event={events[0]} />}
+          {tournamentDays.map((d) => (
+            <TournamentDayCard key={`${d.teamId}/${d.tournamentId}`} day={d} />
+          ))}
+          {events.length > 0 && (
+            <section className="home-upcoming" aria-labelledby="home-upcoming-title">
+              <div className="home-upcoming-head">
+                <h2 id="home-upcoming-title">Coming up</h2>
+                <Link className="see-all" href="/schedule">
+                  View all
+                </Link>
+              </div>
+              <div className="home-upcoming-list">
+                {events.slice(0, 3).map((e) => (
+                  <UpcomingEvent key={`${e.teamId}/${e.id}`} event={e} />
+                ))}
+              </div>
+            </section>
+          )}
         </div>
 
         {/* What's the member's to do: join requests on groups they approve for. */}
@@ -304,9 +328,9 @@ export function Dashboard({ user }: { user: User }) {
           </div>
         )}
 
-        <div className="card upcoming-card">
-          <div className="card-head">
-            <h2 className="card-title">Upcoming events</h2>
+        <section className="home-upcoming" aria-labelledby="home-upcoming-side">
+          <div className="home-upcoming-head">
+            <h2 id="home-upcoming-side">Upcoming events</h2>
             <Link className="see-all" href="/schedule">
               View all
             </Link>
@@ -314,28 +338,13 @@ export function Dashboard({ user }: { user: User }) {
           {events.length === 0 ? (
             <p className="muted small">Nothing scheduled on your teams.</p>
           ) : (
-            <div className="date-list">
-              {events.map((e) => (
-                <EventItem key={`${e.teamId}/${e.id}`} startsAt={e.startsAt} plain>
-                  <span className="upcoming-title">
-                    <Link className="upcoming-link" href={`/teams/${encodeURIComponent(e.teamId)}/schedule?event=${encodeURIComponent(e.id)}`}>
-                      <b>{e.title || "Event"}</b>
-                    </Link>
-                    <RsvpPill answer={e.rsvp} type={e.type} needs={needsRsvp(e.rsvp, e.startsAt, e.endsAt)} />
-                  </span>
-                  <small>
-                    <LocalTime iso={e.startsAt} style="dateTime" />
-                    {e.location ? ` · ${e.location}` : ""}
-                  </small>
-                  <small className="upcoming-team">
-                    <span className="team-dot" aria-hidden="true" />
-                    <Link href={`/teams/${encodeURIComponent(e.teamId)}`}>{e.teamName}</Link>
-                  </small>
-                </EventItem>
+            <div className="home-upcoming-list">
+              {events.slice(0, 4).map((e) => (
+                <UpcomingEvent key={`${e.teamId}/${e.id}`} event={e} />
               ))}
             </div>
           )}
-        </div>
+        </section>
 
         {/* One promo, last: pickup for someone without a team yet, else Learn. */}
         {teams.length === 0 ? <PickupCard /> : <LearnPromo />}
@@ -357,18 +366,21 @@ function Greeting({ first }: { first: string }) {
   );
 }
 
-/** The next event on the member's teams, for phones above the feed. */
-function NextEvent({ event: e }: { event: MyEvent }) {
+/** One of the member's upcoming events as the shared event card: date, title, when, where and which team, and their RSVP. */
+function UpcomingEvent({ event: e }: { event: MyEvent }) {
   return (
-    <Link className="card next-event" href={`/teams/${encodeURIComponent(e.teamId)}/schedule?event=${encodeURIComponent(e.id)}`}>
-      <small>Up next · {e.teamName}</small>
-      <b>{e.title || "Event"}</b>
-      <span className="muted small">
-        <LocalTime iso={e.startsAt} style="dateTime" />
-        {e.location ? ` · ${e.location}` : ""}
-        {e.rsvp ? ` · ${rsvpLabels[e.rsvp] ?? e.rsvp}` : ""}
-      </span>
-      {needsRsvp(e.rsvp, e.startsAt, e.endsAt) && <RsvpPill needs />}
-    </Link>
+    <EventCard
+      startsAt={e.startsAt}
+      title={e.title || "Event"}
+      href={`/teams/${encodeURIComponent(e.teamId)}/schedule?event=${encodeURIComponent(e.id)}`}
+      meta={
+        <>
+          <LocalTime iso={e.startsAt} style="dateTime" />
+          {e.location ? ` · ${e.location}` : ""} · {e.teamName}
+        </>
+      }
+      answer={e.rsvp}
+      needsRsvp={needsRsvp(e.rsvp, e.startsAt, e.endsAt)}
+    />
   );
 }

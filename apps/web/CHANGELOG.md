@@ -4,6 +4,102 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.73.0 — 2026-11-27
+
+H10 Sign-in and sign-up restyle. Every option stays: Google, Apple, email or username, password, Forgot your password, Log in, Create an account, and the sign-up details and terms.
+
+- Fields are the shared TextField (label above, hint, error tied to the input) and buttons the shared Button.
+- Forgot your password? sits under the password field instead of beside its label.
+
+## 0.72.0 — 2026-11-27
+
+H9 Settings restyle. Same sections, forms, appearance, privacy and the delete-account flow.
+
+- The section list is three grouped lists with chevrons, with a profile row (picture, name, View your profile) above it; on a phone the sections still run along the top.
+- Fixes Learn to play being listed twice (a repeated React key too).
+- Fixes the profile card: its header picture was inset and the profile picture sat behind it.
+- Appearance (Light, Dark, System) is unchanged, under Account.
+
+## 0.71.0 — 2026-11-27
+
+H8 Notifications restyle. Same filters, Mark all read, Clear, follow requests, opening a notification's target and unread dots.
+
+- The Requests, Today and Earlier groups are headings over rows instead of boxed cards; rows keep their icon, unread dot and clear button, with more room around them.
+- Fixes the page being wider than a phone screen (the chevron on Follow requests was cut off).
+
+## 0.70.0 — 2026-11-27
+
+H4 My teams restyle. Same teams, communities, invites, create, join with a code and the team finder.
+
+- Your teams, Communities and the finder's results are headings over list rows (C3) with the logo, name and role, kind and place; no boxes.
+- More space between the sections.
+- Not built: a Join button on finder results. Teams join by invite or code, and the page's Join with a code stays; a per-row Join would be a new action.
+
+## 0.69.0 — 2026-11-27
+
+H6 Roster restyle. Same members, filter, line picker, pending invites and Invite.
+
+- Members are list rows (C3): picture, name, @username and role pills; those who run the team (owner, coach, captain and so on) are in the accent tone, others neutral.
+- The roster, invites and members sections lose their boxes: a heading and spacing separate them.
+- Not built: a Members/Roles tab pair and an Add member button. Roles are managed in Settings (owner only) and adding is Invite; both would be new screens, so they are left for owner direction.
+
+## 0.68.0 — 2026-11-27
+
+H5 Team overview and feed restyle. Same sections, posts, composer, comments, pins, invite, follow, join and share.
+
+- The team header is a cover header (C5): logo, name, member stack and count, your role, and the actions (Invite, Message, Share, Settings). On a phone the actions sit in a row under the name.
+- Coming up in the side column is a list of event cards (C8).
+- The two quick tiles no longer carry an aria-label that differed from their visible text (an axe name-mismatch); they read their own text.
+- CoverHeader's title can now be any content, so the team's name (which members read from the team doc) can sit in it.
+
+## 0.67.0 — 2026-11-27
+
+H3 Event details and RSVP restyle. Same events, RSVP answers, notes, reactions, polls, edit, delete and series scope.
+
+- The team schedule is a list of event cards (C8): date badge, title, time, place, how many are going, your answer or Needs RSVP, and Repeats. The open event is outlined.
+- The open event has a cover header (C5) with the date badge, its title, type and time, and Edit and Delete beside it; place, notes and Add to calendar sit under it without extra boxes.
+- EventCard takes selected and scroll options for lists that open their details beside them.
+- Test notes: the K5-B/K5-C checks that named the old team-schedule today row no longer apply (that row is gone; the date badge shows the day).
+
+## 0.66.0 — 2026-11-27
+
+H7 Chats restyle with the filters the app has (UI-Q12). Same inbox, requests, archive, search, sending and unread rules.
+
+- All, Teams, Direct and Unread filter chips over the inbox; Unread shows how many are waiting (team chats with news plus unmuted direct conversations).
+- Team and direct chats are list rows (C3): avatar, name, last line, time and an unread dot; the open one is tinted with an accent edge. No dividers.
+- Empty states (C9) for no matches, nothing unread and no team chats.
+- Test note: the K5-B check that named the old .conv-row.active rule no longer applies (the rule is gone); the selected row now uses the shared .ui-row-selected, which has the accent edge.
+
+## 0.65.0 — 2026-11-27
+
+H2 Schedule restyle, with the Week view the website adds (UI-Q12). Same calendars, filters, invites, add, edit and delete.
+
+- Views: Month, Week and List. Week is a seven-day strip with previous and next week and a count; Month keeps its grid. Both show the picked day's events under them (Month used to list the whole picked week). The choice is still remembered in this browser, and List stays the default.
+- Every row is an EventCard (C8): date badge, title, time range, team or calendar, place, your RSVP or Needs RSVP, and Repeats; actions (Delete, Edit, Add to calendar) sit under the card.
+- Calmer page: the schedule is no longer a bordered card with dividers; spacing and type separate the days.
+
+## 0.64.0 — 2026-11-27
+
+H1 Home restyle (restyle only; same data, tabs, composer, drafts and refresh).
+
+- Greeting with the date under it, then SummaryTiles (C6): Teams, Upcoming and To answer, from the data Home already loads, linking to Teams and Schedule.
+- Upcoming events are EventCards (C8) in the right column (four) and on phones (three, under "Coming up"), replacing the tinted next-event box and the boxed date list.
+- More space between the parts; the upcoming events sit on the page instead of in a card.
+- Accessibility found by the new signed-in axe run: the notifications bell and the account menu no longer have an accessible name that differs from their visible text.
+- Tests: signed-in browser tests for Home and axe (light and dark) for it.
+
+## 0.63.8 — 2026-11-27
+
+Signed-in browser fixtures (emulators only, synthetic data) and the profile directory's adult filter.
+
+- `PersonPicker` lists profiles with `where("adult", "==", true)` next to the keyword filter (the new Firestore rules refuse a profiles list without it); unit test added.
+- Opt-in `E2E_WORLD=1` Playwright projects: seed a synthetic world through the real API into the Auth and Firestore emulators (two teams with chat, single and weekly events, posts, DMs, notifications, a community, adult profiles and one unmarked minor that must not be found), sign Ada in through the sign-in form, and capture the H screens at 375 and 1440 px, light and dark. See tests/e2e/world/start.md. The normal suite is unchanged.
+
+## 0.63.7 — 2026-11-26
+
+- The four scripted smooth scrolls (compose, back to top on Home and Videos, jump to a pinned message) use a shared `prefersReducedMotion()` helper and scroll instantly under reduced motion (N13).
+- Checked the whiteboard toast: `.frame .team-hub .wb-toast` (app.css) outranks the fixed `bottom: 24px` rule, so it sits above the phone tab bar.
+
 ## 0.63.6 — 2026-11-26
 
 Navigation motion onto the K7 tokens (N13). Motion polish only; no routing changes.

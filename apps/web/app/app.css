@@ -174,6 +174,8 @@
 .label-row label { display: inline; }
 .label-row .link-button { text-decoration: none; font-weight: 600; font-size: 0.82rem; }
 .label-row .link-button:hover { text-decoration: underline; }
+.auth-forgot { margin: calc(var(--space-sm) * -1) 0 0; text-align: right; }
+.auth-card .ui-field { gap: var(--space-xs); }
 
 /* Sign-up's steps (SignUpSteps) */
 .signup-steps { list-style: none; display: flex; gap: var(--space-sm); margin: 0 0 22px; padding: 0; }
@@ -1113,7 +1115,6 @@ a.play-card:hover { border-color: var(--accent); }
 }
 @media (max-width: 560px) {
   .team-banner { grid-template-columns: auto minmax(0, 1fr); padding: var(--space-lg); }
-  .team-banner-actions { grid-column: 1 / -1; justify-content: flex-start; }
   .rsvp-columns { grid-template-columns: 1fr; }
 }
 

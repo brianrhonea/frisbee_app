@@ -13,7 +13,7 @@ import "./ui.css";
 export interface CoverHeaderProps {
   coverUrl?: string | null;
   avatar: ReactNode;
-  title: string;
+  title: ReactNode;
   /** @handle, place, kind. */
   subtitle?: ReactNode;
   actions?: ReactNode;

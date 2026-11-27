@@ -26,6 +26,9 @@ import { useMutedRooms } from "./useUnreadChats";
 import { type Conversation, describe, isGroup, type Mine, ms } from "./conversations";
 import "./member.css";
 import { Button } from "./ui/Button";
+import { FilterChips } from "./ui/FilterChips";
+import { ListRow } from "./ui/ListRow";
+import { EmptyState } from "./ui/States";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { ErrorNote } from "@/components/StatusViews";
 
@@ -39,6 +42,9 @@ interface Message {
   reactions?: Record<string, string>;
 }
 
+/** The inbox's filters (H7): everything, team chats, direct messages, or only what's unread. */
+const chatFilters = ["all", "teams", "direct", "unread"] as const;
+type ChatFilter = (typeof chatFilters)[number];
 const views = ["inbox", "requests", "archived"] as const;
 type View = (typeof views)[number];
 /** Conversations per page (no index orders them by last message, so "More conversations" reads the next page). */
@@ -66,6 +72,7 @@ export function Messages() {
   const [composing, setComposing] = useState<"direct" | "group" | null>(null);
   // Search by name, as the app's inbox does (InboxViewModel.setQuery).
   const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<ChatFilter>("all");
   const rawView = params.get("view");
   const view: View = views.find((v) => v === rawView) ?? "inbox";
   const openId = validId(params.get("c"));
@@ -92,9 +99,17 @@ export function Messages() {
   const teamChats = useTeamChats(user?.uid);
   // Muted conversations have no unread bubble, as on the Chats tab.
   const muted = useMutedRooms(user?.uid);
+  const dmUnread = (d: { unread: boolean }, id: string) => d.unread && !muted.has(mutedConversationKey(id));
+  // Unread counts for the chips: team chats with something new, and unmuted direct conversations.
+  const unreadTeams = (teamChats.chats ?? []).filter((c) => c.unread.length > 0).length;
+  const unreadDirect = all.filter(({ c, d }) => d.inInbox && dmUnread(d, c.id)).length;
+  const inboxFilter = view === "inbox" ? filter : "all";
+  const shownDirect = shown.filter(({ c, d }) => (inboxFilter === "teams" ? false : inboxFilter === "unread" ? dmUnread(d, c.id) : true));
   const shownTeams =
-    view === "inbox" ? (teamChats.chats ?? []).filter((c) => !q || (c.team.name ?? "").toLowerCase().includes(q)) : [];
-  const headed = shownTeams.length > 0 && shown.length > 0;
+    view === "inbox" && inboxFilter !== "direct"
+      ? (teamChats.chats ?? []).filter((c) => (!q || (c.team.name ?? "").toLowerCase().includes(q)) && (inboxFilter !== "unread" || c.unread.length > 0))
+      : [];
+  const headed = shownTeams.length > 0 && shownDirect.length > 0;
   // Each section folds away for this browser session, as the app (until it restarts).
   const [folded, setFolded] = useFoldedSections();
   const teamsFolded = headed && folded.has("teams");
@@ -147,8 +162,8 @@ export function Messages() {
 
   // j / k move through the list; Esc closes the conversation. One
   // listener, reading the latest list through a ref.
-  const keys = useRef({ shown, openId, go });
-  keys.current = { shown, openId, go };
+  const keys = useRef({ shown: shownDirect, openId, go });
+  keys.current = { shown: shownDirect, openId, go };
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target)) return;
@@ -199,69 +214,76 @@ export function Messages() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+        {view === "inbox" && (
+          <FilterChips
+            className="chat-filter"
+            label="Show"
+            items={[
+              { id: "all", label: "All" },
+              { id: "teams", label: "Teams" },
+              { id: "direct", label: "Direct" },
+              { id: "unread", label: unreadTeams + unreadDirect > 0 ? `Unread (${unreadTeams + unreadDirect})` : "Unread" },
+            ]}
+            value={filter}
+            onChange={(f) => setFilter(f as ChatFilter)}
+          />
+        )}
         {shownTeams.length > 0 && (
           <>
             {headed && heading("teams", "Team chats", shownTeams.length)}
             <ul className="hub-items conv-list" aria-label="Team chats" hidden={teamsFolded}>
               {shownTeams.map((c) => (
                 <li key={c.team.id}>
-                  <Link
+                  <ListRow
                     href={`/teams/${encodeURIComponent(c.team.id)}/chat${c.open ? `?room=${encodeURIComponent(c.open.id)}` : ""}`}
-                    className={`conv-row${c.unread.length > 0 ? " unread" : ""}`}
-                  >
-                    <Avatar name={c.team.name ?? "Team"} size={36} />
-                    <span className="conv-main">
-                      <b>{c.team.name ?? "Team"}</b>
-                      <small className={c.mention ? "conv-mention" : undefined}>{c.subtitle}</small>
-                    </span>
-                    <small className="conv-time">
-                      <LocalTime iso={c.lastAt ?? undefined} style="relative" />
-                    </small>
-                    {c.unread.length > 0 && <span className="notice-dot" aria-label="Unread" />}
-                  </Link>
+                    leading={<Avatar name={c.team.name ?? "Team"} size={40} />}
+                    title={c.team.name ?? "Team"}
+                    subtitle={<span className={c.mention ? "conv-mention" : undefined}>{c.subtitle}</span>}
+                    meta={<LocalTime iso={c.lastAt ?? undefined} style="relative" />}
+                    unread={c.unread.length > 0}
+                  />
                 </li>
               ))}
             </ul>
-            {headed && heading("direct", "Direct messages", shown.length)}
+            {headed && heading("direct", "Direct messages", shownDirect.length)}
           </>
         )}
         {!convs.data ? (
           <p className="muted" aria-busy="true">
             Loading…
           </p>
-        ) : shown.length === 0 && shownTeams.length > 0 && !q ? null : shown.length === 0 ? (
-          <p className="empty">
+        ) : shownDirect.length === 0 && shownTeams.length > 0 && !q ? null : shownDirect.length === 0 && shownTeams.length === 0 ? (
+          <EmptyState>
             {q
               ? "No conversations match your search."
               : view === "requests"
                 ? "No message requests."
                 : view === "archived"
                   ? "Nothing archived."
-                  : "No conversations yet."}
-          </p>
-        ) : (
+                  : inboxFilter === "unread"
+                    ? "Nothing unread. You're all caught up."
+                    : inboxFilter === "teams"
+                      ? "No team chats yet."
+                      : "No conversations yet."}
+          </EmptyState>
+        ) : shownDirect.length === 0 ? null : (
           <ul className="hub-items conv-list" hidden={directFolded}>
-            {shown.map(({ c, d }) => (
+            {shownDirect.map(({ c, d }) => (
               <li key={c.id}>
-                <Link
+                <ListRow
                   href={`${pathname}?${new URLSearchParams({ ...(view !== "inbox" && { view }), c: c.id })}`}
-                  scroll={false}
-                  className={`conv-row${c.id === openId ? " active" : ""}${d.unread ? " unread" : ""}`}
-                  aria-current={c.id === openId ? "true" : undefined}
-                >
-                  <Avatar name={d.title} size={36} />
-                  <span className="conv-main">
-                    <b>{d.title}</b>
-                    <small>
+                  leading={<Avatar name={d.title} size={40} />}
+                  title={d.title}
+                  subtitle={
+                    <>
                       {c.lastSenderId === me ? "You: " : ""}
                       {c.lastMessage || (isGroup(c) ? `${c.participants?.length ?? 1} people` : "No messages yet")}
-                    </small>
-                  </span>
-                  <small className="conv-time">
-                    <LocalTime iso={c.lastMessageAt ?? undefined} style="relative" />
-                  </small>
-                  {d.unread && !muted.has(mutedConversationKey(c.id)) && <span className="notice-dot" aria-label="Unread" />}
-                </Link>
+                    </>
+                  }
+                  meta={<LocalTime iso={c.lastMessageAt ?? undefined} style="relative" />}
+                  unread={dmUnread(d, c.id)}
+                  selected={c.id === openId}
+                />
               </li>
             ))}
           </ul>

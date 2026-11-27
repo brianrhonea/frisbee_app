@@ -1,4 +1,5 @@
 "use client";
+import { scrollBehavior } from "@/lib/motion";
 import { formatVideoBytes, videoFileFormat, videoLimits, youtubeThumbnailUrl } from "@stall10/shared";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -244,7 +245,7 @@ export function TeamVideos() {
               onEdit={() => {
                 setAdding(false);
                 setEditing(v.id);
-                window.scrollTo({ top: 0, behavior: "smooth" });
+                window.scrollTo({ top: 0, behavior: scrollBehavior() });
               }}
               onMove={() => setMoving(v.id)}
               onMoved={(folderId) => {

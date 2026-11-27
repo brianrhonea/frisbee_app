@@ -34,23 +34,56 @@ const motion = process.env.E2E_MOTION
     )
   : [];
 
+// Signed-in tests (the H screens): E2E_WORLD=1 starts the website against the Firebase emulators
+// and the local API (demo-stall10, synthetic data; see tests/e2e/world/README in seed.mjs), seeds a
+// world, signs Ada in once and runs *.world.spec.ts at 375 and 1440 px. Start the emulators and the
+// API first (apps/web/tests/e2e/world/start.md). Pictures land in review/web/H*/.
+const world = process.env.E2E_WORLD === "1";
+const worldPort = process.env.E2E_PORT ?? "3102";
+const worldAuth = "review/web/.auth/ada.json";
+const emulatorEnv = {
+  NEXT_PUBLIC_FIREBASE_API_KEY: "demo-key",
+  NEXT_PUBLIC_FIREBASE_PROJECT_ID: "demo-stall10",
+  NEXT_PUBLIC_FIREBASE_APP_ID: "1:1:web:demo",
+  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "localhost",
+  NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST: "127.0.0.1:9099",
+  NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST: "127.0.0.1:8080",
+  NEXT_PUBLIC_API_BASE_URL: "http://localhost:8788",
+  API_BASE_URL: "http://localhost:8788",
+};
+const worldProjects = [375, 1440].map((width) => ({
+  name: `world-${width}`,
+  testMatch: /\.world\.spec\.ts/,
+  dependencies: ["world-setup"],
+  use: {
+    ...devices["Desktop Chrome"],
+    viewport: { width, height: width === 375 ? 812 : 900 },
+    isMobile: width === 375,
+    hasTouch: width === 375,
+    storageState: worldAuth,
+  },
+}));
+
 export default defineConfig({
   testDir: "tests/e2e",
   outputDir: "test-results",
   snapshotPathTemplate: "tests/e2e/__screenshots__/{testFilePath}/{arg}-{projectName}{ext}",
-  fullyParallel: true,
+  fullyParallel: !world,
+  workers: world ? 1 : undefined,
   retries: 0,
   reporter: [["list"], ["html", { open: "never", outputFolder: "playwright-report" }]],
   timeout: 60_000,
   expect: { toHaveScreenshot: { maxDiffPixelRatio: 0.01, animations: "disabled" } },
   use: {
-    baseURL: process.env.E2E_BASE_URL ?? `http://localhost:${port}`,
+    baseURL: process.env.E2E_BASE_URL ?? `http://localhost:${world ? worldPort : port}`,
     trace: "retain-on-failure",
   },
-  projects: [
+  projects: world
+    ? [{ name: "world-setup", testMatch: /world\.setup\.ts/, use: { ...devices["Desktop Chrome"] } }, ...worldProjects]
+    : [
     ...widths.map((w) => ({
       name: w.name,
-      testIgnore: /routes\.spec\.ts|motion\.spec\.ts/,
+      testIgnore: /routes\.spec\.ts|motion\.spec\.ts|world\./,
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: w.width, height: w.height },
@@ -68,7 +101,15 @@ export default defineConfig({
     },
     ...motion,
   ],
-  webServer: process.env.E2E_BASE_URL
+  webServer: world
+    ? {
+        command: `pnpm dev -p ${worldPort}`,
+        url: `http://localhost:${worldPort}/learn`,
+        reuseExistingServer: false,
+        timeout: 180_000,
+        env: emulatorEnv,
+      }
+    : process.env.E2E_BASE_URL
     ? undefined
     : {
         command: `pnpm dev -p ${port}`,

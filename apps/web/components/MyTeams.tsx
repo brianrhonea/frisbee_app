@@ -6,6 +6,7 @@ import { type Doc } from "@/lib/live";
 import { divisionLabels, listingSubtitle } from "@/lib/site";
 import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
+import { ListRow } from "./ui/ListRow";
 import { roleLabel, TeamList } from "./ProfileDashboard";
 import { useMyTeams } from "./useMyTeams";
 import "./member.css";
@@ -85,6 +86,7 @@ export function MyTeams() {
       <StartOrJoin />
       {teams.length > 0 && (
         <TeamList
+          plain
           title="Your teams"
           teams={teams.map((t) => ({
             id: t.id,
@@ -94,7 +96,7 @@ export function MyTeams() {
         />
       )}
       {communities.length > 0 && (
-        <section className="card">
+        <section className="teams-section">
           <h2 className="card-title">Communities</h2>
           <ul className="community-list">
             {communities.map((c) => (
@@ -114,17 +116,12 @@ function CommunityRow({ community: c, role, isOn }: { community: Doc<MyTeam>; ro
   const [open, setOpen] = useState(teams.length <= shownTeams);
   return (
     <li>
-      <Link className="community-head" href={`/teams/${encodeURIComponent(c.id)}`}>
-        <Avatar name={c.name ?? "Community"} size={36} />
-        <span>
-          <b>{c.name ?? "Community"}</b>
-          <small>
-            {[role, listingSubtitle(c), teams.length ? `${teams.length} ${teams.length === 1 ? "team" : "teams"}` : ""]
-              .filter(Boolean)
-              .join(" · ")}
-          </small>
-        </span>
-      </Link>
+      <ListRow
+        href={`/teams/${encodeURIComponent(c.id)}`}
+        leading={<Avatar name={c.name ?? "Community"} size={40} />}
+        title={c.name ?? "Community"}
+        subtitle={[role, listingSubtitle(c), teams.length ? `${teams.length} ${teams.length === 1 ? "team" : "teams"}` : ""].filter(Boolean).join(" · ")}
+      />
       {open && teams.length > 0 && (
         <ul className="team-list nested">
           {teams.map((t) => (

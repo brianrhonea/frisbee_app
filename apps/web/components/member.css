@@ -16,7 +16,7 @@
 .team-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--team); flex: none; }
 
 /* Cards on these pages: the redesign's 16px radius. */
-.huddle .card, .schedule-page .card, .messages .card, .notifications .notice-group, .settings .card,
+.huddle .card, .schedule-page .card, .messages .card, .settings .card,
 .teams-page .card, .create-page .card, .dash .card, .post-page .card { border-radius: var(--radius); }
 
 /* Delete and Leave links: neutral, not red. */
@@ -43,9 +43,17 @@
 .post-page .back-link a:hover { color: var(--ink); text-decoration: underline; }
 
 /* --- Home (Dashboard): greeting, Needs you, the feed, Coming up ------------ */
-.huddle .huddle-head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 16px; flex-wrap: wrap; }
+.huddle .huddle-head { display: grid; gap: var(--space-xs); }
 .huddle .huddle-greeting { font-size: clamp(1.5rem, 3vw, 1.9rem); letter-spacing: -0.03em; font-weight: 800; }
-.huddle .huddle-date { color: var(--muted); font-size: 0.9rem; font-weight: 600; }
+.huddle .huddle-date { color: var(--muted); font-size: var(--text-secondary-size); font-weight: 500; }
+/* Home is calm: more air between its parts, and the upcoming events sit on the page, not in a box. */
+.huddle .huddle-main { gap: var(--space-xl); }
+.huddle .home-upcoming { display: grid; gap: var(--space-md); min-width: 0; }
+.huddle .home-upcoming-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-md); }
+.huddle .home-upcoming-head h2 { margin: 0; font-size: var(--text-section-size); }
+.huddle .home-upcoming-list { display: grid; gap: var(--space-sm); }
+.huddle .huddle-side .ui-event { background: var(--card); border-radius: var(--radius-control); padding: var(--space-md); }
+.huddle .huddle-phone .ui-event { background: var(--card); border-radius: var(--radius-control); padding: var(--space-md); }
 
 /* The feed's tabs: Your teams / Following / Everyone. */
 .huddle .feed-tabs { margin-top: 2px; }
@@ -98,67 +106,38 @@
 .huddle .upcoming-team a:hover { color: var(--ink); text-decoration: underline; }
 .huddle .next-event .rsvp-pill { justify-self: start; margin-top: 4px; }
 
-/* --- Schedule (Schedule.tsx): days, then rows with a time column ---------- */
-.schedule-page .sched-card { padding: 18px 0 6px; box-shadow: none; }
-.schedule-page .sched-card > .card-head, .schedule-page .sched-card > .schedule-filter,
-.schedule-page .sched-card > .event-editor, .schedule-page .sched-card > p { margin-left: 18px; margin-right: 18px; }
-.sched-days { display: grid; }
-.sched-day-head {
-  margin: 0; padding: 14px 18px 6px; border-top: 1px solid var(--line);
-  font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
-}
-.sched-day:first-child .sched-day-head { border-top: 0; }
-.sched-list { list-style: none; margin: 0; padding: 0 8px 6px; display: grid; gap: 2px; }
-.sched-row {
-  display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; gap: 12px; align-items: start;
-  padding: 10px 10px; border-radius: var(--radius-control);
-}
-.sched-row:hover { background: var(--field); }
-.sched-row.needs { background: var(--disc-soft); }
-.sched-time { display: grid; line-height: 1.3; padding-top: 1px; }
-.sched-time b { font-size: 0.86rem; font-weight: 700; color: var(--ink); white-space: nowrap; }
-.sched-time small { font-size: 0.76rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sched-main { display: grid; gap: 2px; min-width: 0; }
-.sched-title { font-size: 0.95rem; line-height: 1.3; overflow-wrap: anywhere; }
-.sched-title a { color: var(--ink); text-decoration: none; }
-.sched-title a:hover { color: var(--accent-ink); text-decoration: underline; }
-.sched-meta { display: block; color: var(--muted); font-size: 0.8rem; overflow-wrap: anywhere; }
-.sched-meta .cal-dot { width: 8px; height: 8px; margin-right: 6px; vertical-align: 0.08em; }
-.sched-notes { white-space: pre-wrap; overflow-wrap: anywhere; }
-.sched-row .event-actions { margin-top: 2px; gap: 12px; }
-.sched-row .event-actions .text-btn { font-size: 0.8rem; text-decoration: none; font-weight: 600; }
-.sched-row .event-actions .text-btn:hover { text-decoration: underline; }
-.sched-row > .rsvp-pill { margin-top: 1px; }
-.schedule-page .schedule-meeting-live { color: var(--live-ink); font-weight: 700; }
-.schedule-page .cal-invites { border-color: var(--line); border-left: 4px solid var(--disc); }
-@media (max-width: 480px) {
-  .sched-row { grid-template-columns: 58px minmax(0, 1fr); gap: 4px 10px; }
-  .sched-row > .rsvp-pill { grid-column: 2; justify-self: start; }
-}
-/* List / Month, and the month grid (F16): dots for team (blue), personal
-   (magenta) and still to answer (amber); today in turf, the picked day
-   outlined. */
-.schedule-page .sched-card > .card-head { flex-wrap: wrap; gap: 8px; }
+/* --- Schedule (Schedule.tsx): a view switch, a month or week strip, then the picked day's event cards -- */
+.schedule-page .sched-card { padding: 0; border: 0; background: none; box-shadow: none; display: grid; gap: var(--space-lg); }
+.schedule-page .sched-card > .card-head { flex-wrap: wrap; gap: var(--space-sm); margin: 0; }
 .schedule-page .schedule-view { margin-left: auto; }
-.schedule-page .sched-month-head { display: flex; align-items: center; gap: 6px; margin: 12px 18px 6px; }
-.schedule-page .sched-month-head p { flex: 1; display: grid; justify-items: center; margin: 0; line-height: 1.3; }
-.schedule-page .sched-month-head small { font-size: 0.76rem; }
-.schedule-page .sched-month-head .btn { min-width: 36px; font-size: 1.1rem; line-height: 1; }
-.schedule-page .sched-month {
-  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px;
-  margin: 0 12px 6px; padding: 8px 6px; border: 1px solid var(--line); border-radius: var(--radius);
+.sched-days { display: grid; gap: var(--space-lg); }
+.sched-day { display: grid; gap: var(--space-sm); }
+.sched-day-head {
+  margin: 0; font-size: var(--text-caption-size); font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
 }
+.schedule-page .sched-day.picked .sched-day-head { color: var(--accent-ink); }
+.schedule-page .sched-day > p { margin: 0; }
+.sched-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-sm); }
+.sched-item { display: grid; gap: var(--space-xs); }
+.sched-item .event-actions { gap: var(--space-md); padding-left: var(--space-lg); }
+.sched-item .event-actions .text-btn { font-size: var(--text-secondary-size); text-decoration: none; font-weight: 600; }
+.sched-item .event-actions .text-btn:hover { text-decoration: underline; }
+.sched-notes { white-space: pre-wrap; overflow-wrap: anywhere; padding-left: var(--space-lg); }
+.sched-item .ui-event { border-color: transparent; }
+.schedule-page .cal-invites { border-color: var(--line); border-left: 4px solid var(--disc); }
+/* The month grid and the week strip (F16): dots for team, personal and still to answer; today filled,
+   the picked day outlined. */
+.schedule-page .sched-month-head { display: flex; align-items: center; gap: var(--space-sm); }
+.schedule-page .sched-month-head p { flex: 1; display: grid; justify-items: center; margin: 0; line-height: 1.3; }
+.schedule-page .sched-month-head small { font-size: var(--text-caption-size); }
+.schedule-page .sched-month-head .btn { min-width: 36px; font-size: 1.1rem; line-height: 1; }
+.schedule-page .sched-month { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
 .schedule-page .sched-month-dow { text-align: center; font-size: 11px; font-weight: 700; color: var(--muted); padding-bottom: 4px; }
 .schedule-page .sched-month-day {
   display: grid; justify-items: center; align-content: center; gap: 3px; height: 50px; padding: 0;
   border: 0; border-radius: 10px; background: none; color: var(--ink); font: inherit; cursor: pointer;
 }
 .schedule-page .sched-month-day:hover { background: var(--field); }
-/* The picked day's week, listed below the grid. */
-.schedule-page .sched-month-day.wk { background: color-mix(in srgb, var(--accent-soft) 55%, transparent); border-radius: 0; }
-.schedule-page .sched-month-day.wk:nth-child(7n + 1) { border-radius: 10px 0 0 10px; }
-.schedule-page .sched-month-day.wk:nth-child(7n) { border-radius: 0 10px 10px 0; }
-.schedule-page .sched-day.picked .sched-day-head { color: var(--accent-ink); }
 .schedule-page .sched-month-day b {
   display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%;
   font-size: 0.9rem; font-weight: 600; border: 1.5px solid transparent;
@@ -168,24 +147,23 @@
 .schedule-page .sched-month-day.today b { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 800; }
 .schedule-page .sched-month-dots { display: flex; gap: 3px; height: 5px; }
 .schedule-page .sched-month-dots i { width: 5px; height: 5px; border-radius: 50%; }
-.schedule-page .sched-month + .sched-day .sched-day-head { border-top: 0; }
-.schedule-page .sched-day > p { margin: 0 18px 10px; }
+.schedule-page .schedule-meeting-live { color: var(--live-ink); font-weight: 700; }
 
 /* --- Inbox (Messages.tsx) ------------------------------------------------- */
 .messages .messages-tools .btn { border-radius: var(--radius-control); }
 .messages .hub-list > .segmented { justify-self: stretch; display: flex; }
 .messages .hub-list > .segmented a { flex: 1; text-align: center; }
 .messages .hub-list > .search-input { border-radius: var(--radius-control); border-color: transparent; }
-.messages .conv-heading {
-  margin: 16px 10px 4px; font-size: 11px; font-weight: 800; letter-spacing: 0.1em; color: var(--muted);
-}
-/* .hub-items a would make the row a block; keep its avatar / text / time grid. */
-.messages .hub-items a.conv-row { display: grid; padding: 9px 10px; border-radius: var(--radius-control); }
-.messages .conv-row.active { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
-.messages .conv-row .avatar { border-radius: 50%; }
-.messages .conv-time { align-self: start; padding-top: 3px; }
-/* Unread: bold, with an amber dot (unread counts are amber). */
-.messages .conv-row .notice-dot { right: 12px; bottom: 12px; width: 10px; height: 10px; margin: 0; background: var(--disc); }
+.messages .conv-heading { margin: var(--space-lg) var(--space-sm) var(--space-xs); font-size: var(--text-caption-size); font-weight: 800; letter-spacing: 0.1em; color: var(--muted); }
+.messages .chat-filter { margin: var(--space-xs) 0; }
+.messages .conv-list { margin-top: var(--space-xs); }
+.messages .conv-list li { list-style: none; }
+/* Chat rows are ListRows (C3): no dividers between them, the picked one tinted. */
+.messages .ui-row { border-bottom: 0; padding: 0 var(--space-sm); border-radius: var(--radius-control); }
+.messages .ui-row:hover { background: var(--field); }
+.messages .hub-items a.ui-row-main { display: flex; padding: var(--space-sm) 0; }
+.messages .ui-row-selected { background: var(--accent-soft); }
+.messages .conv-mention { color: var(--accent); font-weight: 700; }
 .messages .thread { border-radius: var(--radius); box-shadow: none; }
 .messages .thread-head { padding: 14px 18px; }
 .messages .thread-body { background: var(--bg); gap: 4px; }
@@ -213,17 +191,16 @@
 .notifications .toolbar { gap: 8px 10px; }
 .notifications .notice-mark { font-weight: 700; text-decoration: none; }
 .notifications .notice-mark:hover:not(:disabled) { text-decoration: underline; }
-.notice-group {
-  margin-bottom: 14px; padding: 0; overflow: hidden;
-  background: var(--card); border: 1px solid var(--line);
-}
+/* Groups are a heading over rows, not boxes: spacing and the soft separators do the grouping. */
+.notifications { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-lg); }
+.notice-group { margin: 0; padding: 0; }
 .notice-group-head {
-  margin: 0; padding: 12px 18px 8px; font-size: 11px; font-weight: 800; letter-spacing: 0.1em;
+  margin: 0 0 var(--space-xs); padding: 0; font-size: var(--text-caption-size); font-weight: 800; letter-spacing: 0.1em;
   text-transform: uppercase; color: var(--muted);
 }
 .notice-group.needs .notice-group-head { color: var(--disc-ink); }
 .notifications .notice-list { gap: 0; }
-.notifications .notice { border: 0; border-top: 1px solid var(--line); border-radius: 0; padding: 12px 18px; }
+.notifications .notice { border: 0; border-top: 1px solid var(--line); border-radius: 0; padding: var(--space-md) var(--space-sm); }
 .notifications .notice:hover { background: var(--field); }
 .notifications .notice.unread { background: transparent; }
 .notifications .notice.unread:hover { background: var(--field); }
@@ -253,13 +230,25 @@
 .notice-group.needs .notice-requests .pill { background: var(--disc); color: var(--on-disc); }
 
 /* --- Settings ------------------------------------------------------------ */
-.settings .settings-nav {
-  padding: 8px; gap: 2px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
-  top: 88px;
-}
-.settings .settings-nav a { padding: 10px 12px; border-radius: var(--radius-control); font-weight: 600; font-size: 0.94rem; color: var(--ink-soft); }
+.settings .settings-nav { padding: 0; gap: var(--space-md); background: none; border: 0; top: 88px; align-content: start; }
+.settings .settings-group { display: grid; gap: 2px; padding: var(--space-xs); background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
+.settings .settings-nav a { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); padding: 10px 12px; border-radius: var(--radius-control); font-weight: 600; font-size: 0.94rem; color: var(--ink-soft); }
 .settings .settings-nav a.active { background: var(--accent-soft); color: var(--accent-ink); font-weight: 700; box-shadow: inset 3px 0 0 var(--accent); }
+.settings .settings-chevron { color: var(--muted); font-size: 1.2rem; line-height: 1; }
+.settings .settings-nav a.settings-me { justify-content: flex-start; gap: var(--space-md); padding: var(--space-sm) var(--space-md); background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); color: var(--ink); }
+.settings .settings-me span { display: grid; min-width: 0; }
+.settings .settings-me b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings .settings-me small { color: var(--muted); font-weight: 500; }
+@media (max-width: 860px) {
+  /* On a phone the sections run along the top, as before: no chevrons, no groups' boxes, the profile row first. */
+  .settings .settings-nav { display: flex; gap: var(--space-xs); }
+  .settings .settings-group { display: flex; flex: none; padding: 0; background: none; border: 0; }
+  .settings .settings-chevron { display: none; }
+  .settings .settings-nav a.settings-me { display: none; }
+}
 .settings .settings-main .card { padding: 20px; box-shadow: none; }
+.settings .settings-main .identity-card { padding: 0; }
+.settings .identity-photo { position: relative; z-index: 1; }
 .settings .settings-main .card-title { font-size: 1.05rem; font-weight: 800; letter-spacing: -0.01em; }
 /* Uppercase muted sub-headings inside a group. */
 .settings .settings-main .card h3, .settings .settings-form legend {
@@ -334,3 +323,12 @@
 /* The compact Calendars card under the schedule: names on one wrapped line. */
 .schedule-page .cal-list { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-bottom: 6px; }
 .schedule-page .cal-list + p { margin: 0; }
+
+/* --- Teams tab (MyTeams, TeamFinder): headings over list rows (C3), no boxes -------------- */
+.teams-page .teams-section { display: grid; gap: var(--space-sm); }
+.teams-page .teams-section > .card-title { margin: 0; font-size: var(--text-section-size); }
+.teams-page .teams-rows, .teams-page .community-list { list-style: none; margin: 0; padding: 0; }
+.teams-page .community-list > li { border-bottom: 1px solid var(--line); }
+.teams-page .community-list .ui-row { border-bottom: 0; }
+.teams-page .community-list .team-list.nested { margin: 0 0 var(--space-sm) var(--space-xxl); }
+.teams-page .stack { gap: var(--space-xl); }

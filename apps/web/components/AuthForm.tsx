@@ -30,6 +30,8 @@ import { localToday, signUpBirthDateProblem } from "./PersonalDetailsForm";
 import { SignUpSteps } from "./SignUpSteps";
 import { suggestUsername, UsernameField, useUsernameCheck } from "./UsernameField";
 import { ErrorNote } from "@/components/StatusViews";
+import { Button } from "@/components/ui/Button";
+import { TextField } from "@/components/ui/Fields";
 
 /** Firebase's error codes in words. */
 function message(e: unknown): string {
@@ -175,17 +177,15 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
 
   const oauth = (
     <div className="auth-oauth">
-      <button
-        className="btn auth-google"
-        type="button"
+      <Button
+        className="auth-google"
         disabled={busy}
         onClick={() => run(() => signInWithPopup(auth, new GoogleAuthProvider()))}
       >
         Continue with Google
-      </button>
-      <button
-        className="btn auth-google"
-        type="button"
+      </Button>
+      <Button
+        className="auth-google"
         disabled={busy}
         onClick={() =>
           run(() => {
@@ -197,7 +197,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
         }
       >
         Continue with Apple
-      </button>
+      </Button>
     </div>
   );
 
@@ -228,50 +228,46 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
           <span>or</span>
         </p>
         <form onSubmit={submit}>
-          <label>
-            Email or username
-            <input
-              type="text"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="username"
-              autoCapitalize="none"
-              spellCheck={false}
-            />
-          </label>
-          <div className="auth-field">
-            <span className="label-row">
-              <label htmlFor="si-password">Password</label>
-              <button
-                className="link-button small"
-                type="button"
-                disabled={busy}
-                onClick={() =>
-                  run(async () => {
-                    if (!email.trim().includes("@")) throw new FirebaseError("auth/invalid-email", "");
-                    await sendPasswordResetEmail(auth, email.trim());
-                    setNotice("If there's an account with that email, we've sent a link to reset its password.");
-                  })
-                }
-              >
-                Forgot your password?
-              </button>
-            </span>
-            <input
-              id="si-password"
-              type="password"
-              required
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-            />
-          </div>
+          <TextField
+            label="Email or username"
+            type="text"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
+          />
+          <TextField
+            id="si-password"
+            label="Password"
+            type="password"
+            required
+            minLength={6}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+          />
+          <p className="auth-forgot">
+            <button
+              className="link-button small"
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                run(async () => {
+                  if (!email.trim().includes("@")) throw new FirebaseError("auth/invalid-email", "");
+                  await sendPasswordResetEmail(auth, email.trim());
+                  setNotice("If there's an account with that email, we've sent a link to reset its password.");
+                })
+              }
+            >
+              Forgot your password?
+            </button>
+          </p>
           {alerts}
-          <button className="btn btn-primary" type="submit" disabled={busy}>
+          <Button variant="primary" type="submit" disabled={busy}>
             {busy ? "Logging in…" : "Log in"}
-          </button>
+          </Button>
         </form>
         <p className="auth-alt">
           New to Stall 10? <Link href={`/sign-up?next=${encodeURIComponent(next)}`}>Create an account</Link>
@@ -293,14 +289,8 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       </p>
       <form onSubmit={submit} noValidate>
         <div className="form-grid">
-          <label>
-            First name
-            <input id="su-first" value={first} onChange={(e) => setFirst(e.target.value)} autoComplete="given-name" maxLength={personNameLimits.first} />
-          </label>
-          <label>
-            Last name
-            <input id="su-last" value={last} onChange={(e) => setLast(e.target.value)} autoComplete="family-name" maxLength={personNameLimits.last} />
-          </label>
+          <TextField id="su-first" label="First name" value={first} onChange={(e) => setFirst(e.target.value)} autoComplete="given-name" maxLength={personNameLimits.first} />
+          <TextField id="su-last" label="Last name" value={last} onChange={(e) => setLast(e.target.value)} autoComplete="family-name" maxLength={personNameLimits.last} />
         </div>
         <UsernameField
           inputId="su-username"
@@ -313,38 +303,34 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
           check={check}
           hint="Suggested from your name. Change it to anything you like."
         />
-        <label>
-          Date of birth
-          <input
-            id="su-birth"
-            type="date"
-            value={birthDate}
-            max={localToday()}
-            min="1900-01-01"
-            autoComplete="bday"
-            onChange={(e) => {
-              setBirthDate(e.target.value);
-              setError("");
-            }}
-          />
-          <small className="muted">Only you see it. We ask so we can follow the rules for younger players.</small>
-        </label>
-        <label>
-          Email
-          <input
-            id="su-email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
-            autoCapitalize="none"
-            spellCheck={false}
-          />
-        </label>
-        <label>
-          Password
-          <input
+        <TextField
+          id="su-birth"
+          label="Date of birth"
+          hint="Only you see it. We ask so we can follow the rules for younger players."
+          type="date"
+          value={birthDate}
+          max={localToday()}
+          min="1900-01-01"
+          autoComplete="bday"
+          onChange={(e) => {
+            setBirthDate(e.target.value);
+            setError("");
+          }}
+        />
+        <TextField
+          id="su-email"
+          label="Email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="email"
+          autoCapitalize="none"
+          spellCheck={false}
+        />
+        <div className="auth-field">
+          <TextField
             id="su-password"
+            label="Password"
             type="password"
             minLength={passwordMinLength}
             maxLength={passwordMaxLength}
@@ -353,11 +339,11 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
             autoComplete="new-password"
           />
           <PasswordHints password={password} />
-        </label>
+        </div>
         {alerts}
-        <button className="btn btn-primary" type="submit" disabled={busy}>
+        <Button variant="primary" type="submit" disabled={busy}>
           {busy ? "Creating your account…" : "Continue"}
-        </button>
+        </Button>
       </form>
       <p className="auth-alt">
         Already have an account? <Link href={`/sign-in?next=${encodeURIComponent(next)}`}>Log in</Link>

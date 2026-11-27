@@ -5,16 +5,13 @@
    from the tokens in app/site.css only. */
 
 /* --- Header: badge, name, meta line, actions (TeamBanner.tsx) ---------- */
-.team-hub .team-head {
-  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px 16px; align-items: start;
-  padding: 4px 0 14px; margin: 0; border: 0; border-radius: 0; background: none;
-}
-.team-hub .team-head h1 {
-  margin: 0; font-size: clamp(1.4rem, 2.6vw, 1.75rem); font-weight: 800; letter-spacing: -0.03em; line-height: 1.15;
-  overflow-wrap: anywhere;
-}
+.team-hub .team-head { margin: 0 0 var(--space-md); }
+.team-hub .team-head .ui-cover { border-color: transparent; }
+.team-hub .team-head .ui-cover-photo { height: 88px; }
+.team-hub .team-head .ui-cover-title { font-size: clamp(1.4rem, 2.6vw, 1.75rem); line-height: 1.15; }
+.team-hub .team-head .ui-cover-actions { flex-wrap: wrap; justify-content: flex-end; align-items: center; }
+.team-hub .team-head .ui-cover-extra { margin-top: var(--space-xs); }
 .team-hub .team-head p { margin: 2px 0 0; }
-.team-hub .team-banner-text { min-width: 0; padding-top: 2px; }
 .team-hub .team-meta {
   display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; margin: 3px 0 0;
   color: var(--muted); font-size: 0.9rem;
@@ -26,12 +23,11 @@
 .team-hub .team-meta .member-count { color: var(--muted); font-weight: 500; font-size: inherit; gap: 6px; }
 .team-hub .team-meta .member-count:hover { color: var(--ink); }
 .team-hub .team-meta .avatar-stack .avatar { font-size: 9px !important; }
-.team-hub .team-head .team-about-wrap { margin-top: 8px; }
+.team-hub .team-head .team-about-wrap { margin-top: var(--space-sm); }
 .team-hub .team-head .team-about { color: var(--ink-soft); font-size: 0.92rem; white-space: pre-wrap; }
 .team-hub .team-head .invite-only { margin-top: 8px; }
-.team-hub .team-banner-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; padding-top: 6px; }
-.team-hub .team-banner-actions .btn-small { min-height: 40px; padding: 0 16px; border-radius: var(--radius-control); }
-.team-hub .team-banner-actions .follow { display: inline-flex; align-items: center; gap: 8px; }
+.team-hub .team-head .ui-cover-actions .btn-small { min-height: 40px; padding: 0 16px; border-radius: var(--radius-control); }
+.team-hub .team-head .ui-cover-actions .follow { display: inline-flex; align-items: center; gap: 8px; }
 .team-hub .team-gear {
   width: 40px; height: 40px; border-radius: var(--radius-control); border: 1px solid var(--line-2);
   background: var(--card); color: var(--ink);
@@ -56,12 +52,7 @@
 .team-hub .team-more-menu a { border-radius: 10px; padding: 9px 12px; }
 .team-hub .team-more-menu a.active { background: var(--accent-soft); color: var(--accent-ink); box-shadow: inset 3px 0 0 var(--accent); }
 
-@media (max-width: 720px) {
-  .team-hub .team-head { grid-template-columns: auto minmax(0, 1fr); }
-  .team-hub .team-banner-actions { grid-column: 1 / -1; justify-content: flex-start; padding-top: 0; }
-}
 @media (max-width: 560px) {
-  .team-hub .team-head .ui-logo { width: 48px !important; height: 48px !important; font-size: 22px !important; }
   .team-hub .team-tabs a, .team-hub .team-more-button { padding: 11px 10px 10px; }
 }
 
@@ -93,34 +84,20 @@
   margin: 0; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
 }
 
-/* --- Schedule (TeamSchedule.tsx): rows with date tiles in one card ----- */
-.team-hub .sched-tools { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+/* --- Schedule (TeamSchedule.tsx): event cards (C8) in a calm list, the open one beside it ----- */
+.team-hub .sched-tools { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); flex-wrap: wrap; }
 .team-hub .sched-tools .schedule-new { margin: 0; }
-.team-hub .sched-card { padding: 0; overflow: hidden; }
-.team-hub .sched-list { gap: 0; }
-.team-hub .sched-list > li + li { border-top: 1px solid var(--line); }
-.team-hub .sched-list a.team-sched-row {
-  display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 14px; align-items: center;
-  padding: 12px 16px; border-radius: 0; color: var(--ink);
-}
-.team-hub .sched-list a.team-sched-row:hover { background: var(--bg-2); }
-.team-hub .sched-list a.team-sched-row.active { background: var(--field); box-shadow: inset 3px 0 0 var(--accent); }
-.team-hub .sched-main { display: grid; min-width: 0; gap: 2px; }
-.team-hub .sched-main b { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.team-hub .sched-main small { color: var(--muted); font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.team-hub .rsvp-line { display: flex; align-items: center; gap: 10px; }
-.team-hub .rsvp-line > small { color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
-/* Today: a soft accent tint with a 2px accent outline (visible on the white card in both themes). */
-.team-hub .sched-list a.team-sched-row.today { background: var(--accent-soft); color: var(--accent-ink); box-shadow: inset 0 0 0 2px var(--accent); }
-.team-hub .sched-list a.team-sched-row.today small, .team-hub .sched-list a.team-sched-row.today .rsvp-line > small { color: var(--accent-ink); }
-.team-hub .sched-list a.team-sched-row.today .date-tile { background: var(--card); color: var(--accent-ink); }
-.team-hub .sched-list a.team-sched-row.today .type-dot { background: var(--accent-ink); }
-.team-hub .sched-list a.team-sched-row.today.active { box-shadow: inset 3px 0 0 var(--accent), inset 0 0 0 2px var(--accent); }
-.team-hub .schedule-meeting .type-dot { background: var(--personal); }
-.team-hub .sched-card + .pager { margin-top: 12px; }
+.team-hub .sched-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-sm); }
+.team-hub .sched-list .ui-event { border-color: transparent; }
+.team-hub .sched-list .ui-event-selected { border-color: var(--accent); }
+.team-hub .schedule-meeting-live { color: var(--live-ink); font-weight: 700; }
+.team-hub .sched-list + .pager { margin-top: var(--space-md); }
 
 /* The open event. */
-.team-hub .event-detail { padding: 20px; }
+.team-hub .event-detail { display: grid; gap: var(--space-md); align-content: start; }
+.team-hub .event-detail > p, .team-hub .event-detail > .event-cal { margin: 0; }
+.team-hub .event-detail .ui-cover-photo { height: 64px; }
+.team-hub .event-detail .ui-cover-title { font-size: var(--text-section-size); }
 .team-hub .event-detail-head .type-chip { display: inline-flex; align-items: center; margin: 0; background: var(--field); color: var(--ink-soft); }
 .team-hub .event-detail-head .type-chip .type-dot { margin-right: 6px; vertical-align: 0; }
 .team-hub .event-detail h2 { margin: 12px 0 4px; font-size: 1.45rem; font-weight: 800; letter-spacing: -0.02em; }
@@ -147,8 +124,6 @@
 .team-hub .rsvp-group ul { font-size: 0.84rem; overflow-wrap: anywhere; }
 @media (max-width: 560px) {
   .team-hub .rsvp-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .team-hub .sched-list a.team-sched-row { grid-template-columns: 44px minmax(0, 1fr); gap: 12px; padding: 12px; }
-  .team-hub .sched-list a.team-sched-row .rsvp-line { grid-column: 2; }
   .team-hub .date-tile { width: 44px; height: 46px; }
 }
 
@@ -181,14 +156,7 @@
 }
 .team-hub .card-head .small, .team-hub .card-head a { color: var(--accent); font-weight: 600; text-decoration: none; }
 .team-hub .card-head a:hover { text-decoration: underline; }
-.team-hub .coming-list { display: grid; }
-.team-hub a.coming-row {
-  display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 12px; align-items: center;
-  padding: 10px 0; color: var(--ink); text-decoration: none;
-}
-.team-hub a.coming-row + a.coming-row { border-top: 1px solid var(--line); }
-.team-hub a.coming-row .date-tile { width: 44px; height: 46px; }
-.team-hub a.coming-row:hover b { text-decoration: underline; }
+.team-hub .coming-up .ui-event { padding: var(--space-sm) var(--space-md); border-color: transparent; background: var(--field); }
 .team-hub .member-preview-list { gap: 4px; margin: 0; }
 .team-hub .member-preview-list > li { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px 0; }
 .team-hub .member-preview-list .person { flex: 1; font-weight: 600; font-size: 0.92rem; }
@@ -273,7 +241,7 @@
 .team-hub .event-place { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
 .team-hub .event-place a { font-weight: 700; text-decoration: none; }
 .team-hub .event-place a:hover { text-decoration: underline; }
-.team-hub .event-notes { margin: 12px 0; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); }
+.team-hub .event-notes { margin: 0; padding: var(--space-md); border-radius: var(--radius); background: var(--field); }
 .team-hub .event-notes h3 { margin: 0; font-size: 0.82rem; font-weight: 800; color: var(--muted); }
 .team-hub .event-notes .post-body { margin-top: 4px; }
 .team-hub .rsvp-ask .rsvp-buttons button { display: grid; justify-items: center; gap: 0; line-height: 1.2; }
@@ -532,3 +500,15 @@
 .entry-overdue { color: var(--disc-ink); font-weight: 700; }
 .tournament-invite-main .home-actions { margin-top: 4px; }
 .tournament-invites { border-left: 3px solid var(--accent); }
+@media (max-width: 560px) {
+  /* The actions go under the name and meta, in a row, rather than stacking beside the logo. */
+  .team-hub .team-head .ui-cover-avatar { grid-row: 1; }
+  .team-hub .team-head .ui-cover-actions { grid-column: 1 / -1; grid-row: 4; justify-content: flex-start; padding-top: var(--space-md); }
+}
+
+/* --- Roster (TeamRosterView.tsx): sections without boxes, members as list rows (C3) -------- */
+.team-hub .roster-section { display: grid; gap: var(--space-sm); }
+.team-hub .roster-section > .card-title { margin: 0; font-size: var(--text-section-size); }
+.team-hub .roster-rows { list-style: none; margin: 0; padding: 0; }
+.team-hub .roster-rows .ui-row-trailing .member-roles { display: inline-flex; flex-wrap: wrap; gap: var(--space-xs); justify-content: flex-end; }
+.team-hub .toolbar { align-items: center; }

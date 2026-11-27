@@ -42,9 +42,10 @@ import { useMyTeams } from "./useMyTeams";
 import { browserTimeZone, RepeatField, RepeatNote, repeatFormProblem, scopeQuery, useSeriesScope } from "./Repeat";
 import { type PickedPerson, PersonPicker } from "./PersonPicker";
 import { ColorPicker } from "./settings/CalendarSettings";
-import { meetingAnswer, needsRsvp, RsvpPill } from "./RsvpPill";
+import { meetingAnswer, needsRsvp } from "./RsvpPill";
 import "./member.css";
 import { Button } from "./ui/Button";
+import { EventCard } from "./ui/EventCard";
 import { SegmentedTabs } from "./ui/SegmentedTabs";
 import { FilterChips } from "./ui/FilterChips";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
@@ -151,7 +152,9 @@ export function Schedule() {
   // "This event or this and following" for deleting a repeating event.
   const scope = useSeriesScope();
   useEffect(() => setView(loadView()), []);
-  const monthView = view === "month";
+  // Month and Week both read the month grid's range and show the picked day; List is the upcoming run.
+  const monthView = view !== "list";
+  const weekView = view === "week";
   const grid = monthGrid(month);
   // Calendars are read for the list's window, or the month's whole grid.
   const rangeFrom = monthView ? grid[0].getTime() : startOfToday().getTime() - dayMs;
@@ -239,7 +242,8 @@ export function Schedule() {
   // The month view: each day's entries (the app's eventsOn), the picked day's week listed below the grid.
   const onDay = (d: Date) => scheduleOnDay(rows, d, { filter, hiddenCalendars: hidden });
   const pickedWeek = weekOf(picked);
-  const inPickedWeek = (d: Date) => pickedWeek.some((w) => sameDay(w, d));
+  const pickedItems = onDay(picked);
+  const weekCount = pickedWeek.reduce((n, d) => n + onDay(d).length, 0);
   const monthCount = grid.filter((d) => d.getMonth() === month.getMonth()).reduce((n, d) => n + onDay(d).length, 0);
   /** The dots on a day: team, personal, and one still to answer (DayMarks in the app). */
   function marksOn(d: Date) {
@@ -268,100 +272,92 @@ export function Schedule() {
     setPicked(d);
     if (!sameMonth(d, month)) setMonth(firstOfMonth(d));
   }
+  function moveWeek(by: number) {
+    const next = new Date(picked.getFullYear(), picked.getMonth(), picked.getDate() + by * 7);
+    setPicked(next);
+    setMonth(firstOfMonth(next));
+  }
   function goToToday() {
     setMonth(firstOfMonth(new Date()));
     setPicked(startOfToday());
   }
   const atToday = sameMonth(month, new Date()) && sameDay(picked, new Date());
 
-  /** One entry on the list or under the month's picked day. */
+  /** One entry on the list or under the picked day: an event card (C8), with its actions under it. */
   function renderRow(x: Row) {
     if (x.kind === "event") {
       const e = x.event;
       const label = eventTypeLabels[e.type as EventType] ?? "Event";
       const answer = e.rsvps?.[me.uid];
-      const needs = needsRsvp(answer, e.startsAt, e.endsAt);
       return (
-        <li key={x.key} className={`sched-row${needs ? " needs" : ""}`}>
-          <RowTime startsAt={e.startsAt} endsAt={e.endsAt} label={label} />
-          <span className="sched-main">
-            <b className="sched-title">
-              <Link href={`${teamBase(x.team.id)}/schedule?event=${encodeURIComponent(e.id)}`}>{e.title || label}</Link>
-            </b>
-            <small className="sched-meta">
-              <span className="cal-dot" style={{ background: teamColor }} aria-hidden />
-              {scheduleTeamLabel(x.team.name, teams.length)} · {label}
-              {e.location ? ` · ${e.location}` : ""}
-            </small>
-            {memberViewer(x.team, me.uid).can("manageEvents") && (
-              <span className="event-actions">
-                <button type="button" className="text-btn danger" onClick={() => void removeTeamEvent(x.team, e)}>
-                  Delete
-                </button>
-              </span>
-            )}
-          </span>
-          <RsvpPill answer={answer} type={e.type} needs={needs} />
+        <li key={x.key} className="sched-item">
+          <EventCard
+            startsAt={e.startsAt}
+            title={e.title || label}
+            href={`${teamBase(x.team.id)}/schedule?event=${encodeURIComponent(e.id)}`}
+            meta={`${timeSpan(e.startsAt, e.endsAt)} · ${scheduleTeamLabel(x.team.name, teams.length)} · ${label}${e.location ? ` · ${e.location}` : ""}`}
+            answer={answer}
+            needsRsvp={needsRsvp(answer, e.startsAt, e.endsAt)}
+            recurring={!!e.series}
+          />
+          {memberViewer(x.team, me.uid).can("manageEvents") && (
+            <span className="event-actions">
+              <button type="button" className="text-btn danger" onClick={() => void removeTeamEvent(x.team, e)}>
+                Delete
+              </button>
+            </span>
+          )}
         </li>
       );
     }
     if (x.kind === "meeting") {
       const m = x.meeting;
       const answer = meetingAnswer(m.rsvps?.[me.uid]);
-      const needs = needsRsvp(answer, m.startsAt, m.endsAt);
       return (
-        <li key={x.key} className={`sched-row${needs ? " needs" : ""}`}>
-          <RowTime startsAt={m.startsAt} endsAt={m.endsAt} label="Meeting" />
-          <span className="sched-main">
-            <b className="sched-title">
-              <Link href={meetingHref(x.team.id, m.id)}>{m.title || "Meeting"}</Link>
-            </b>
-            <small className="sched-meta">
-              <span className="cal-dot" style={{ background: teamColor }} aria-hidden />
-              {scheduleTeamLabel(x.team.name, teams.length)} · Meeting ·{" "}
-              <span className={x.live ? "schedule-meeting-live" : ""}>{x.live ? "Live now" : "Video meeting"}</span>
-            </small>
-          </span>
-          <RsvpPill answer={answer} needs={needs} />
+        <li key={x.key} className="sched-item">
+          <EventCard
+            startsAt={m.startsAt}
+            title={m.title || "Meeting"}
+            href={meetingHref(x.team.id, m.id)}
+            meta={`${timeSpan(m.startsAt, m.endsAt)} · ${scheduleTeamLabel(x.team.name, teams.length)} · Meeting · ${x.live ? "Live now" : "Video meeting"}`}
+            answer={answer}
+            needsRsvp={needsRsvp(answer, m.startsAt, m.endsAt)}
+          />
         </li>
       );
     }
     const e = x.event;
     const cal = byId.get(e.calendarId);
     return (
-      <li key={x.key} className="sched-row">
-        <RowTime startsAt={e.startsAt} endsAt={e.endsAt} label={eventTypeLabels[e.type]} />
-        <span className="sched-main">
-          <b className="sched-title">{e.title}</b>
-          <small className="sched-meta">
-            <span className="cal-dot" style={{ background: colorOf(cal?.color) }} aria-hidden />
-            {cal ? (cal.role === "owner" ? cal.name : `${cal.name} · ${cal.owner.name}`) : "Personal"} ·{" "}
-            {eventTypeLabels[e.type]}
-            {e.location ? ` · ${e.location}` : ""}
-          </small>
-          {e.notes && <small className="muted sched-notes">{e.notes}</small>}
-          <span className="event-actions">
-            {canEdit(cal) && (
-              <>
-                <button type="button" className="text-btn" onClick={() => setEditing(e)}>
-                  Edit
-                </button>
-                <button type="button" className="text-btn" onClick={() => void remove(e)}>
-                  Delete
-                </button>
-              </>
-            )}
-            <AddToCalendar
-              event={{
-                uid: `${e.calendarId}-${e.id}@stall10.app`,
-                title: e.title,
-                startsAt: e.startsAt,
-                endsAt: e.endsAt,
-                location: e.location,
-                description: e.notes,
-              }}
-            />
-          </span>
+      <li key={x.key} className="sched-item">
+        <EventCard
+          startsAt={e.startsAt}
+          title={e.title}
+          meta={`${timeSpan(e.startsAt, e.endsAt)} · ${cal ? (cal.role === "owner" ? cal.name : `${cal.name} · ${cal.owner.name}`) : "Personal"} · ${eventTypeLabels[e.type]}${e.location ? ` · ${e.location}` : ""}`}
+          recurring={!!e.series}
+        />
+        {e.notes && <small className="muted sched-notes">{e.notes}</small>}
+        <span className="event-actions">
+          {canEdit(cal) && (
+            <>
+              <button type="button" className="text-btn" onClick={() => setEditing(e)}>
+                Edit
+              </button>
+              <button type="button" className="text-btn" onClick={() => void remove(e)}>
+                Delete
+              </button>
+            </>
+          )}
+          <AddToCalendar
+            event={{
+              uid: `${e.calendarId}-${e.id}@stall10.app`,
+              title: e.title,
+              startsAt: e.startsAt,
+              endsAt: e.endsAt,
+              location: e.location,
+              description: e.notes,
+            }}
+          />
         </span>
       </li>
     );
@@ -403,7 +399,7 @@ export function Schedule() {
       {data && data.invites.length > 0 && <Invites invites={data.invites} onAnswered={load} />}
       <div className="card sched-card">
         <div className="card-head">
-          <h2 className="card-title">{monthView ? "Month" : "Upcoming"}</h2>
+          <h2 className="card-title">{weekView ? "Week" : monthView ? "Month" : "Upcoming"}</h2>
           <SegmentedTabs className="schedule-view" label="View" items={scheduleViews.map(([id, label]) => ({ id, label }))} value={view} onChange={(v) => chooseView(v as typeof view)} />
           {!editing && writable.length > 0 && (
             <Button variant="primary" size="small" onClick={() => setEditing({})}>
@@ -434,14 +430,20 @@ export function Schedule() {
         {monthView ? (
           <>
             <div className="sched-month-head">
-              <button type="button" className="btn btn-small btn-quiet" aria-label="Previous month" onClick={() => moveMonth(-1)}>
+              <button type="button" className="btn btn-small btn-quiet" aria-label={weekView ? "Previous week" : "Previous month"} onClick={() => (weekView ? moveWeek(-1) : moveMonth(-1))}>
                 ‹
               </button>
               <p>
-                <b>{month.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</b>
-                <small className="muted">{monthCount === 1 ? "1 event" : `${monthCount} events`}</small>
+                <b>{weekView ? weekRangeLabel(pickedWeek) : month.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</b>
+                <small className="muted">
+                  {weekView
+                    ? `${weekCount === 1 ? "1 event" : `${weekCount} events`} this week`
+                    : monthCount === 1
+                      ? "1 event"
+                      : `${monthCount} events`}
+                </small>
               </p>
-              <button type="button" className="btn btn-small btn-quiet" aria-label="Next month" onClick={() => moveMonth(1)}>
+              <button type="button" className="btn btn-small btn-quiet" aria-label={weekView ? "Next week" : "Next month"} onClick={() => (weekView ? moveWeek(1) : moveMonth(1))}>
                 ›
               </button>
               {!atToday && (
@@ -450,13 +452,13 @@ export function Schedule() {
                 </button>
               )}
             </div>
-            <div className="sched-month" role="grid" aria-label={month.toLocaleDateString(undefined, { month: "long", year: "numeric" })}>
+            <div className={`sched-month${weekView ? " week" : ""}`} role="grid" aria-label={weekView ? weekRangeLabel(pickedWeek) : month.toLocaleDateString(undefined, { month: "long", year: "numeric" })}>
               {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
                 <span key={i} className="sched-month-dow" aria-hidden>
                   {d}
                 </span>
               ))}
-              {grid.map((d) => {
+              {(weekView ? pickedWeek : grid).map((d) => {
                 const marks = marksOn(d);
                 const today = sameDay(d, new Date());
                 const on = sameDay(d, picked);
@@ -467,7 +469,7 @@ export function Schedule() {
                     role="gridcell"
                     aria-selected={on}
                     aria-label={d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
-                    className={`sched-month-day${d.getMonth() === month.getMonth() ? "" : " out"}${today ? " today" : ""}${on ? " on" : ""}${inPickedWeek(d) ? " wk" : ""}`}
+                    className={`sched-month-day${!weekView && d.getMonth() !== month.getMonth() ? " out" : ""}${today ? " today" : ""}${on ? " on" : ""}`}
                     onClick={() => pickDay(d)}
                   >
                     <b>{d.getDate()}</b>
@@ -480,15 +482,11 @@ export function Schedule() {
                 );
               })}
             </div>
-            {pickedWeek.map((d) => {
-              const items = onDay(d);
-              return (
-                <section key={d.getTime()} className={`sched-day${sameDay(d, picked) ? " picked" : ""}`} aria-label={dayLabelOf(d)}>
-                  <h3 className="sched-day-head">{dayLabelOf(d)}</h3>
-                  {items.length === 0 ? <p className="muted small">Nothing scheduled</p> : <ul className="sched-list">{items.map(renderRow)}</ul>}
-                </section>
-              );
-            })}
+            {/* The picked day's events. */}
+            <section className="sched-day picked" aria-label={dayLabelOf(picked)}>
+              <h3 className="sched-day-head">{dayLabelOf(picked)}</h3>
+              {pickedItems.length === 0 ? <p className="muted small">Nothing scheduled</p> : <ul className="sched-list">{pickedItems.map(renderRow)}</ul>}
+            </section>
           </>
         ) : !data && !error ? (
           <p className="muted">Loading…</p>
@@ -553,17 +551,19 @@ export function Schedule() {
 }
 
 /** List or Month: how My schedule shows its days (the app's Week / Month). */
-type ScheduleView = "list" | "month";
+type ScheduleView = "list" | "week" | "month";
 const scheduleViews: ReadonlyArray<readonly [ScheduleView, string]> = [
-  ["list", "List"],
   ["month", "Month"],
+  ["week", "Week"],
+  ["list", "List"],
 ];
 const viewKey = "stall10.schedule.view";
 
 /** The view last picked in this browser (List when none, or storage is off). */
 function loadView(): ScheduleView {
   try {
-    return localStorage.getItem(viewKey) === "month" ? "month" : "list";
+    const v = localStorage.getItem(viewKey);
+    return v === "month" || v === "week" ? v : "list";
   } catch {
     return "list";
   }
@@ -612,24 +612,24 @@ function byDay<T extends { startsAt?: string | null }>(items: T[]): Array<[strin
 
 const timeOf = (d: Date) => d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 
-/** A row's time column: when it starts, then when it ends (or its date, if another day) or its type. */
-function RowTime({ startsAt, endsAt, label }: { startsAt?: string; endsAt?: string | null; label: string }) {
+/** "6:00 PM – 8:00 PM", or "6:00 PM – Nov 29" for one that ends another day, or just the start. */
+function timeSpan(startsAt?: string, endsAt?: string | null): string {
   const start = startsAt ? new Date(startsAt) : null;
+  if (!start || Number.isNaN(start.getTime())) return "";
   const end = endsAt ? new Date(endsAt) : null;
-  if (!start || Number.isNaN(start.getTime())) return <span className="sched-time" />;
-  const endOk = end !== null && !Number.isNaN(end.getTime());
-  return (
-    <span className="sched-time">
-      <b>{timeOf(start)}</b>
-      <small>
-        {!endOk
-          ? label
-          : end.toDateString() === start.toDateString()
-            ? timeOf(end)
-            : `– ${end.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`}
-      </small>
-    </span>
-  );
+  if (!end || Number.isNaN(end.getTime())) return timeOf(start);
+  return end.toDateString() === start.toDateString()
+    ? `${timeOf(start)} – ${timeOf(end)}`
+    : `${timeOf(start)} – ${end.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+}
+
+/** "Nov 23 – 29", or "Nov 30 – Dec 6" across a month. */
+function weekRangeLabel(week: Date[]): string {
+  const a = week[0];
+  const b = week[week.length - 1];
+  const from = a.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const to = a.getMonth() === b.getMonth() ? String(b.getDate()) : b.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return `${from} – ${to}`;
 }
 
 /** Invites waiting for the member: nothing is shared until they accept. */

@@ -1,4 +1,5 @@
 "use client";
+import { scrollBehavior } from "@/lib/motion";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, type ReactNode, Suspense, useEffect } from "react";
@@ -67,7 +68,7 @@ const secondary = [
 function compose(router: ReturnType<typeof useRouter>) {
   const composer = document.querySelector<HTMLTextAreaElement>(newPostBox);
   if (composer) {
-    composer.scrollIntoView({ block: "center", behavior: "smooth" });
+    composer.scrollIntoView({ block: "center", behavior: scrollBehavior() });
     composer.focus({ preventScroll: true });
   } else router.push("/#compose");
 }
@@ -258,9 +259,11 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
           )}
           <ThemeToggle />
           {user && (
-            <Link href="/notifications" className="icon-btn icon-wrap" aria-label={`Notifications${unread ? ` (${unread} new)` : ""}`}>
+            <Link href="/notifications" className="icon-btn icon-wrap">
               <NavIcon name="bell" size={22} />
+              <span className="sr-only">Notifications</span>
               {badge}
+              {unread > 0 && <span className="sr-only"> new</span>}
             </Link>
           )}
           {user && <span className="top-divider" aria-hidden="true" />}
