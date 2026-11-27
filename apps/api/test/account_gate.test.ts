@@ -202,6 +202,10 @@ describe("the claims", () => {
     expect(s.store.doc("profiles/u3")).toEqual({ name: "Teen" });
     await s.call("token", "GET", "/v1/me/personal/status", undefined, "u4");
     expect(s.store.doc("profiles/u4")).toBeUndefined();
+    // The profile made afterwards is marked by the functions trigger, or by the next sync.
+    s.store.put("profiles/u4", { name: "Late" });
+    await s.call("token", "GET", "/v1/me/personal/status", undefined, "u4");
+    expect(s.store.doc("profiles/u4")).toEqual({ name: "Late", adult: true });
   });
 
   it("agreeing before a birth date sets only terms", async () => {

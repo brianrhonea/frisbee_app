@@ -10,6 +10,7 @@ import { getStorage } from "firebase-admin/storage";
 import { logger } from "firebase-functions";
 import { defineSecret } from "firebase-functions/params";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 
 import {
@@ -137,6 +138,39 @@ export async function deleteAccountFully(db: Firestore, uid: string, deps: Delet
   // A refused under-18 birth date, kept sealed so a different one can't be tried (account gate F3).
   await db.doc(`ageRefusals/${uid}`).delete();
 }
+
+/**
+ * D-1317: a profile the client creates (onboarding) has no `adult` marker,
+ * which only the server may set. When the account already carries the `ageOk`
+ * claim (the API sets it when the birth date is saved, so this also covers
+ * details saved before the profile existed), mark the new profile. The other
+ * order, a profile first and the claim later, is the API's gate sync
+ * (AccountGate.markAdult). Idempotent; never writes false and never creates a doc.
+ */
+export async function markNewProfileAdult(
+  db: Firestore,
+  uid: string,
+  ageOk: (uid: string) => Promise<boolean> = async (u) => (await getAuth().getUser(u)).customClaims?.ageOk === true,
+): Promise<"set" | "already" | "notAdult" | "gone"> {
+  const ref = db.doc(`profiles/${uid}`);
+  if (!(await ageOk(uid))) return "notAdult";
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return "gone";
+    if (snap.get("adult") === true) return "already";
+    tx.update(ref, { adult: true });
+    return "set";
+  });
+}
+
+export const markAdultOnProfileCreate = onDocumentCreated("profiles/{uid}", async (event) => {
+  try {
+    await markNewProfileAdult(getFirestore(), event.params.uid);
+  } catch (e) {
+    // Auth unreachable or the user is gone: the gate sync marks them later.
+    logger.warn("Could not mark a new profile adult", { error: String((e as { code?: string }).code ?? "error") });
+  }
+});
 
 /** How long a disabled under-13 account is kept after its refusal (owner decision D-U13). */
 export const under13RetentionMs = 30 * 24 * 3600_000;
