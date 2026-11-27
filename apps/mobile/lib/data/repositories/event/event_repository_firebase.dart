@@ -311,8 +311,17 @@ class EventRepositoryFirebase implements EventRepository {
       if (zoned) 'timeZone': await _timeZone(),
     };
     if (event.isNew) {
-      final r = await api.post(base, body);
-      return r['id'] as String? ?? '';
+      // The same request retried keeps its id; a 409 means it landed.
+      final id = _ids.idFor('myevent/$uid', body, PendingIds.mintId);
+      try {
+        final r = await api.post(base, {...body, 'id': id});
+        _ids.done(id);
+        return r['id'] as String? ?? id;
+      } on ApiException catch (e) {
+        if (e.code != 'already_exists') rethrow;
+        _ids.done(id);
+        return id;
+      }
     }
     await api.patch('$base/${_enc(event.id)}${_scope(scope)}', body);
     return event.id;

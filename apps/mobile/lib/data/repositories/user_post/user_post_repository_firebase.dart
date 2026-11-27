@@ -37,12 +37,6 @@ class UserPostRepositoryFirebase implements UserPostRepository {
       OutboxKind.userPost,
       OutboxHandler(
         send: (job, files, author) async {
-          final post = _queuedPost(job);
-          if (post != null && _isRecordedWorkout(post)) {
-            return _asVoid(
-              await _saveRecordedWorkout(post, author, job.id, files),
-            );
-          }
           final body = OutboxPayloads.userPost(job);
           if (body == null) {
             return Result.error(
@@ -66,20 +60,6 @@ class UserPostRepositoryFirebase implements UserPostRepository {
     Error(:final error) => Result.error(error),
   };
 
-  /// The post a queued job holds, as the composer made it.
-  static UserPost? _queuedPost(OutboxJob job) => job.payload['post'] is Map
-      ? UserPost.fromMap(
-          '',
-          Map<String, dynamic>.from(job.payload['post'] as Map),
-        )
-      : null;
-
-  /// A recorded run (with its GPS route or seconds): the API's workout can't
-  /// carry those yet, so it's saved the old way. See
-  /// [OutboxPayloads.workoutNeedsDirect].
-  static bool _isRecordedWorkout(UserPost post) =>
-      OutboxPayloads.workoutNeedsDirect(post.workout?.toMap());
-
   final UploadClient _uploads;
 
   /// Holds new posts made offline until they can go out.
@@ -96,12 +76,6 @@ class UserPostRepositoryFirebase implements UserPostRepository {
 
   CollectionReference<Map<String, dynamic>> get _posts =>
       _db.collection('posts');
-
-  /// Whether [uid]'s profile is private: their new posts say so
-  /// (`private`, which the rules check against the profile).
-  Future<bool> _profileIsPrivate(String uid) async =>
-      (await _db.collection('profiles').doc(uid).get()).data()?['private'] ==
-      true;
 
   List<UserPost> _list(QuerySnapshot<Map<String, dynamic>> snap) => [
     for (final d in snap.docs) UserPost.fromMap(d.id, plainData(d.data())),
@@ -395,10 +369,9 @@ class UserPostRepositoryFirebase implements UserPostRepository {
     final post = draft.post;
     final outbox = _outbox;
     Future<Result<void>> now() async {
-      if (_isRecordedWorkout(post)) {
-        return _asVoid(
-          await _saveRecordedWorkout(post, author, id, draft.newImages),
-        );
+      if (OutboxPayloads.workoutProblem(post.workout?.toMap())
+          case final problem?) {
+        return Result.error(ApiException('invalid_argument', problem));
       }
       final body = OutboxPayloads.userPost(
         OutboxJob(
@@ -476,45 +449,6 @@ class UserPostRepositoryFirebase implements UserPostRepository {
       'uploadIds': [for (final u in ready) u.id],
     });
     return r['id'] as String? ?? id;
-  });
-
-  /// A recorded run saved straight to Firestore: its GPS route and seconds
-  /// aren't in the API's workout yet.
-  Future<Result<String>> _saveRecordedWorkout(
-    UserPost post,
-    AppUser author,
-    String id,
-    List<NewAttachment> files,
-  ) => guard(() async {
-    final ref = _posts.doc(id);
-    // A replay of a post that already landed uploads nothing more.
-    if (files.isNotEmpty && await existsOnServer(ref)) return id;
-    // Photos go to Storage as before (users/{uid}/posts/{id}/...).
-    final uploaded = files.isEmpty
-        ? const <ChatAttachment>[]
-        : await _files.upload(
-            'users/${author.uid}/posts/$id/'
-            '${DateTime.now().millisecondsSinceEpoch}',
-            files,
-          );
-    final saved = post.copyWith(images: [...post.images, ...uploaded]);
-    try {
-      await ref.set({
-        ...saved.toEditableMap(),
-        'authorId': author.uid,
-        'authorName': author.label,
-        'authorPhotoUrl': author.photoUrl,
-        'private': await _profileIsPrivate(author.uid),
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-    } catch (_) {
-      await _files
-          .delete(uploaded.map((i) => i.path))
-          .catchError((Object _) => <void>[]);
-      rethrow;
-    }
-    return id;
   });
 
   /// `PATCH /v1/posts/:id`: the words, links and photos. The workout and a

@@ -164,6 +164,31 @@ void main() {
       });
     });
 
+    test('a new event sends an id; a retry reuses it; 409 is sent', () async {
+      final asked = <http.Request>[];
+      var n = 0;
+      final repo = CalendarRepositoryApi(
+        api: api(
+          (_) => json({
+            'error': {
+              'code': ++n == 1 ? 'internal' : 'already_exists',
+              'message': 'No.',
+            },
+          }, n == 1 ? 500 : 409),
+          asked,
+        ),
+      );
+      final e = event('', 'Gym', DateTime.utc(2026, 11, 15, 17));
+      expect(await repo.saveEvent('cal1', e), isA<Error<String>>());
+      final second = await repo.saveEvent('cal1', e);
+      expect(second, isA<Ok<String>>());
+      final ids = [for (final r in asked) jsonDecode(r.body)['id']];
+      expect(ids, hasLength(2));
+      expect(ids.toSet(), hasLength(1));
+      expect(ids.first, matches(RegExp(r'^[A-Za-z0-9]{1,40}$')));
+      expect((second as Ok<String>).value, ids.first);
+    });
+
     test('is off without an API', () async {
       final repo = CalendarRepositoryApi(api: null);
       expect(repo.enabled, isFalse);

@@ -3,6 +3,7 @@ import '../../../domain/models/team_event.dart';
 import '../../../utils/result.dart';
 import '../../services/api_client.dart';
 import '../../services/time_zone.dart';
+import '../../services/pending_ids.dart';
 import 'calendar_repository.dart';
 
 /// [CalendarRepository] through the API (`/v1/me/calendars`,
@@ -15,6 +16,7 @@ class CalendarRepositoryApi implements CalendarRepository {
        _timeZone = timeZone;
 
   final ApiClient? _api;
+  final _ids = PendingIds();
 
   /// The device's time zone, sent with repeats and "this and following"
   /// edits so times stay put across clock changes.
@@ -182,8 +184,17 @@ class CalendarRepositoryApi implements CalendarRepository {
       if (zoned) 'timeZone': await _timeZone(),
     };
     if (event.id.isEmpty) {
-      final json = await _client.post(base, body);
-      return json['id'] as String? ?? '';
+      // The same request retried keeps its id; a 409 means it landed.
+      final id = _ids.idFor('event/$calendarId', body, PendingIds.mintId);
+      try {
+        final json = await _client.post(base, {...body, 'id': id});
+        _ids.done(id);
+        return json['id'] as String? ?? id;
+      } on ApiException catch (e) {
+        if (e.code != 'already_exists') rethrow;
+        _ids.done(id);
+        return id;
+      }
     }
     await _client.patch('$base/${_id(event.id)}${_scope(scope)}', body);
     return event.id;

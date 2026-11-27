@@ -19,7 +19,6 @@ import '../../services/api_search.dart';
 import '../../services/attachment_storage.dart';
 import '../../services/feature_flags.dart';
 import '../../services/firestore_utils.dart';
-import '../../../domain/models/model_utils.dart' show enumByName;
 import '../../../domain/models/team_page.dart';
 import '../../services/pending_ids.dart';
 import '../../services/shared_streams.dart';
