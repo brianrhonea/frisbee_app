@@ -50,6 +50,28 @@ abstract final class OutboxPayloads {
     return {'text': _string(p['text']).trim(), 'replyTo': ?replyTo};
   }
 
+  // Team posts -----------------------------------------------------------
+
+  /// A team post's request body (`POST /v1/teams/:teamId/posts` without
+  /// `id` and `uploadIds`): the saved editable map (`post`) becomes
+  /// `{title, body, location, links, public, tournamentKey?}`. Null when
+  /// there's nothing to post.
+  static Map<String, Object?>? teamPost(OutboxJob job) {
+    final post = _map(job.payload['post']);
+    if (post == null) return null;
+    final body = _string(post['body']);
+    if (body.trim().isEmpty && job.files.isEmpty) return null;
+    final key = _id(post['tournamentKey']);
+    return {
+      'title': _string(post['title']).trim(),
+      'body': body,
+      'location': _string(post['location']).trim(),
+      'links': [for (final l in (post['links'] as List?) ?? const []) '$l'],
+      'public': post['public'] == true,
+      'tournamentKey': ?key,
+    };
+  }
+
   // User posts -----------------------------------------------------------
 
   /// A user post's request body (`POST /v1/posts` without `id` and
