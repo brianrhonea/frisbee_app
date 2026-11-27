@@ -230,13 +230,25 @@
 .notice-group.needs .notice-requests .pill { background: var(--disc); color: var(--on-disc); }
 
 /* --- Settings ------------------------------------------------------------ */
-.settings .settings-nav {
-  padding: 8px; gap: 2px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
-  top: 88px;
-}
-.settings .settings-nav a { padding: 10px 12px; border-radius: var(--radius-control); font-weight: 600; font-size: 0.94rem; color: var(--ink-soft); }
+.settings .settings-nav { padding: 0; gap: var(--space-md); background: none; border: 0; top: 88px; align-content: start; }
+.settings .settings-group { display: grid; gap: 2px; padding: var(--space-xs); background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
+.settings .settings-nav a { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); padding: 10px 12px; border-radius: var(--radius-control); font-weight: 600; font-size: 0.94rem; color: var(--ink-soft); }
 .settings .settings-nav a.active { background: var(--accent-soft); color: var(--accent-ink); font-weight: 700; box-shadow: inset 3px 0 0 var(--accent); }
+.settings .settings-chevron { color: var(--muted); font-size: 1.2rem; line-height: 1; }
+.settings .settings-nav a.settings-me { justify-content: flex-start; gap: var(--space-md); padding: var(--space-sm) var(--space-md); background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); color: var(--ink); }
+.settings .settings-me span { display: grid; min-width: 0; }
+.settings .settings-me b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings .settings-me small { color: var(--muted); font-weight: 500; }
+@media (max-width: 860px) {
+  /* On a phone the sections run along the top, as before: no chevrons, no groups' boxes, the profile row first. */
+  .settings .settings-nav { display: flex; gap: var(--space-xs); }
+  .settings .settings-group { display: flex; flex: none; padding: 0; background: none; border: 0; }
+  .settings .settings-chevron { display: none; }
+  .settings .settings-nav a.settings-me { display: none; }
+}
 .settings .settings-main .card { padding: 20px; box-shadow: none; }
+.settings .settings-main .identity-card { padding: 0; }
+.settings .identity-photo { position: relative; z-index: 1; }
 .settings .settings-main .card-title { font-size: 1.05rem; font-weight: 800; letter-spacing: -0.01em; }
 /* Uppercase muted sub-headings inside a group. */
 .settings .settings-main .card h3, .settings .settings-form legend {

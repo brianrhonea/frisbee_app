@@ -4,6 +4,15 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.72.0 — 2026-11-27
+
+H9 Settings restyle. Same sections, forms, appearance, privacy and the delete-account flow.
+
+- The section list is three grouped lists with chevrons, with a profile row (picture, name, View your profile) above it; on a phone the sections still run along the top.
+- Fixes Learn to play being listed twice (a repeated React key too).
+- Fixes the profile card: its header picture was inset and the profile picture sat behind it.
+- Appearance (Light, Dark, System) is unchanged, under Account.
+
 ## 0.71.0 — 2026-11-27
 
 H8 Notifications restyle. Same filters, Mark all read, Clear, follow requests, opening a notification's target and unread dots.
