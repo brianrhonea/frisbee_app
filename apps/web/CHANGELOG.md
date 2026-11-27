@@ -4,6 +4,15 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.68.0 — 2026-11-27
+
+H5 Team overview and feed restyle. Same sections, posts, composer, comments, pins, invite, follow, join and share.
+
+- The team header is a cover header (C5): logo, name, member stack and count, your role, and the actions (Invite, Message, Share, Settings). On a phone the actions sit in a row under the name.
+- Coming up in the side column is a list of event cards (C8).
+- The two quick tiles no longer carry an aria-label that differed from their visible text (an axe name-mismatch); they read their own text.
+- CoverHeader's title can now be any content, so the team's name (which members read from the team doc) can sit in it.
+
 ## 0.67.0 — 2026-11-27
 
 H3 Event details and RSVP restyle. Same events, RSVP answers, notes, reactions, polls, edit, delete and series scope.

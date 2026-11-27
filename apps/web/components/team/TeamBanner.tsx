@@ -57,9 +57,9 @@ export function TeamBannerActions() {
 }
 
 /** The header's initials badge, for the name members see (TeamName). */
-export function TeamHeadBadge() {
+export function TeamHeadBadge({ size = 56 }: { size?: number }) {
   const { name, kind } = useTeamHub();
-  return <TeamBadge name={name} kind={kind} size={56} />;
+  return <TeamBadge name={name} kind={kind} size={size} />;
 }
 
 /** Whether the banner offers Follow: only once the viewer is known not to be on the team (the app's TeamHomeViewModel.follow). */
@@ -174,8 +174,13 @@ export function InviteOnlyHint() {
  * (a drafted league team's real name is hidden from everyone else).
  */
 export function TeamName() {
+  return <h1>{<TeamNameText />}</h1>;
+}
+
+/** The same name as plain text, for a heading something else draws (the cover header). */
+export function TeamNameText() {
   const { name } = useTeamHub();
-  return <h1>{name}</h1>;
+  return <>{name}</>;
 }
 
 /**

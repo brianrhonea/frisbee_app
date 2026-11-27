@@ -1,5 +1,5 @@
 "use client";
-import { goingCount, type InboxRoom, newInChatDescription, type TeamChatSummary, teamChatSummary } from "@stall10/shared";
+import { goingCount, type InboxRoom, type TeamChatSummary, teamChatSummary } from "@stall10/shared";
 import { where } from "firebase/firestore";
 import Link from "next/link";
 import { useLiveDoc, useLiveQueries } from "@/lib/live";
@@ -56,14 +56,14 @@ export function TeamStatTiles({
   return (
     <div className="stat-tiles">
       {next && (
-        <Link className="stat-tile" href={`${base}/schedule?event=${encodeURIComponent(next.id)}`} aria-label={`${going} going to ${next.title || "the next event"}`}>
+        <Link className="stat-tile" href={`${base}/schedule?event=${encodeURIComponent(next.id)}`}>
           <span className="stat-tile-top">
             <b>{going}</b> going
           </span>
           <small>{next.title || "Next event"}</small>
         </Link>
       )}
-      <Link className={`stat-tile${unread > 0 ? " stat-tile-new" : ""}`} href={`${base}/chat`} aria-label={newInChatDescription(unread)}>
+      <Link className={`stat-tile${unread > 0 ? " stat-tile-new" : ""}`} href={`${base}/chat`}>
         <span className="stat-tile-top">
           <b>{unread}</b> new in chat
         </span>

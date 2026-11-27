@@ -1113,7 +1113,6 @@ a.play-card:hover { border-color: var(--accent); }
 }
 @media (max-width: 560px) {
   .team-banner { grid-template-columns: auto minmax(0, 1fr); padding: var(--space-lg); }
-  .team-banner-actions { grid-column: 1 / -1; justify-content: flex-start; }
   .rsvp-columns { grid-template-columns: 1fr; }
 }
 
