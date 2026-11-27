@@ -14,6 +14,7 @@ Future<PullResult?> showPullTimer(
   String? initial,
 }) => showDialog<PullResult>(
   context: context,
+  animationStyle: AppMotion.dialogStyle(context),
   barrierDismissible: false,
   builder: (_) => _PullTimer(pullers: pullers, initial: initial),
 );

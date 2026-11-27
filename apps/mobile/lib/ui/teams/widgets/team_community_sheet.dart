@@ -1,3 +1,4 @@
+import '../../core/themes/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -13,6 +14,7 @@ import '../view_models/team_community_viewmodel.dart';
 Future<void> showTeamCommunity(BuildContext context, Team team) =>
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: AppMotion.sheetStyle(context),
       isScrollControlled: true,
       showDragHandle: true,
       builder: (_) => ViewModelHost(

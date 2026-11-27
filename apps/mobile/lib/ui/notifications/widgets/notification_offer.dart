@@ -15,6 +15,7 @@ Future<bool?> showNotificationOffer(
   String declineLabel = 'Not now',
 }) => showModalBottomSheet<bool>(
   context: context,
+  sheetAnimationStyle: AppMotion.sheetStyle(context),
   showDragHandle: true,
   builder: (context) {
     final c = AppColors.of(context);

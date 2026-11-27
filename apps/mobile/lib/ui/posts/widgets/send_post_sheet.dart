@@ -22,6 +22,7 @@ Future<void> showSendPost(BuildContext context, UserPost post) async {
   dropKeyboard();
   await showModalBottomSheet<void>(
     context: context,
+    sheetAnimationStyle: AppMotion.sheetStyle(context),
     isScrollControlled: true,
     showDragHandle: true,
     useSafeArea: true,

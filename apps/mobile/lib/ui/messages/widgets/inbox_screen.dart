@@ -244,6 +244,7 @@ class _InboxListState extends State<InboxList> {
     final vm = viewModel;
     final action = await showModalBottomSheet<_InboxAction>(
       context: context,
+      sheetAnimationStyle: AppMotion.sheetStyle(context),
       showDragHandle: true,
       builder: (context) => SafeArea(
         child: Column(

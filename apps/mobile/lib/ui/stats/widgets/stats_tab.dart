@@ -29,6 +29,7 @@ class StatsTab extends StatelessWidget {
     final vm = viewModel;
     final kind = await showModalBottomSheet<EventType>(
       context: context,
+      sheetAnimationStyle: AppMotion.sheetStyle(context),
       showDragHandle: true,
       builder: (context) => SafeArea(
         child: Column(
@@ -56,6 +57,7 @@ class StatsTab extends StatelessWidget {
     if (kind == null || !context.mounted) return;
     final draft = await showDialog<_Draft>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (_) => _NewDialog(
         tournament: kind == EventType.tournament,
         events: vm.linkableEvents(kind),
@@ -568,6 +570,7 @@ class _NewDialogState extends State<_NewDialog> {
   Future<void> _newEvent() async {
     final draft = await showDialog<NewEvent>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (_) => _NewEventDialog(
         tournament: widget.tournament,
         title: widget.tournament ? _name.text.trim() : '',

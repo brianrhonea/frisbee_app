@@ -623,6 +623,7 @@ Future<String?> editPaymentNote(BuildContext context, String note) {
   final controller = TextEditingController(text: note);
   return showDialog<String>(
     context: context,
+    animationStyle: AppMotion.dialogStyle(context),
     builder: (context) => AlertDialog(
       title: const Text('Payment note'),
       content: TextField(

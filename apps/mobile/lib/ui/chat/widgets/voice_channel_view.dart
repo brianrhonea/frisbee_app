@@ -187,7 +187,7 @@ class _ParticipantTile extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
+            duration: AppMotion.of(context, AppMotion.fast),
             padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
               shape: BoxShape.circle,

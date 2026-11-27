@@ -45,6 +45,7 @@ Future<void> showEventDetails(
   if (ScreenSize.of(context).isMobile) {
     return showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: AppMotion.sheetStyle(context),
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
@@ -56,6 +57,7 @@ Future<void> showEventDetails(
   }
   return showDialog<void>(
     context: context,
+    animationStyle: AppMotion.dialogStyle(context),
     builder: (context) => Dialog(
       clipBehavior: Clip.antiAlias,
       child: ConstrainedBox(

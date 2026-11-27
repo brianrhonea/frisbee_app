@@ -50,6 +50,7 @@ Future<void> showReportSheet(
   );
   final blocked = await showModalBottomSheet<bool>(
     context: context,
+    sheetAnimationStyle: AppMotion.sheetStyle(context),
     isScrollControlled: true,
     showDragHandle: true,
     useSafeArea: true,

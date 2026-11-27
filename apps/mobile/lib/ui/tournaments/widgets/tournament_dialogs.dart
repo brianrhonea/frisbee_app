@@ -1,3 +1,4 @@
+import '../../core/themes/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -267,6 +268,7 @@ Future<SignupAnswers?> showPlayerSignupDialog(
   EntryFee? fee,
 }) => showDialog<SignupAnswers>(
   context: context,
+  animationStyle: AppMotion.dialogStyle(context),
   builder: (_) =>
       _SignupDialog(divisions: divisions, initial: initial, fee: fee),
 );

@@ -103,8 +103,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     if (target != null) {
       Scrollable.ensureVisible(
         target,
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOut,
+        duration: AppMotion.of(context, AppMotion.base),
+        curve: AppMotion.easing,
       );
     }
   }

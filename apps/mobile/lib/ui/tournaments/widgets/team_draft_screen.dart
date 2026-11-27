@@ -63,6 +63,7 @@ class _TeamDraftScreenState extends State<TeamDraftScreen> {
     final controller = TextEditingController(text: team.name);
     final name = await showDialog<String>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (context) => AlertDialog(
         title: const Text('Team name'),
         content: TextField(

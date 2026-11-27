@@ -136,18 +136,23 @@ CustomTransitionPage<void> _slidePage(LocalKey key, Widget child) =>
     CustomTransitionPage(
       key: key,
       child: child,
-      transitionDuration: const Duration(milliseconds: 280),
-      reverseTransitionDuration: const Duration(milliseconds: 240),
-      transitionsBuilder: (_, animation, _, child) => SlideTransition(
-        position: Tween(begin: const Offset(1, 0), end: Offset.zero).animate(
-          CurvedAnimation(
-            parent: animation,
-            curve: Curves.easeOutCubic,
-            reverseCurve: Curves.easeInCubic,
-          ),
-        ),
-        child: child,
-      ),
+      transitionDuration: AppMotion.pageIn,
+      reverseTransitionDuration: AppMotion.pageOut,
+      transitionsBuilder: (context, animation, _, child) =>
+          // Reduce motion: the page just appears.
+          MediaQuery.disableAnimationsOf(context)
+          ? child
+          : SlideTransition(
+              position: Tween(begin: const Offset(1, 0), end: Offset.zero)
+                  .animate(
+                    CurvedAnimation(
+                      parent: animation,
+                      curve: AppMotion.easing,
+                      reverseCurve: AppMotion.easing,
+                    ),
+                  ),
+              child: child,
+            ),
     );
 
 /// The bar above an open conversation: [avatar], [title] over [subtitle],

@@ -80,6 +80,7 @@ class _CommunityTeamsTabState extends State<CommunityTeamsTab> {
   Future<void> _newTeam() async {
     final made = await showDialog<NewCommunityTeam>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (_) => _NewTeamDialog(viewModel: vm),
     );
     if (made != null) vm.createTeam.execute(made);
@@ -409,6 +410,7 @@ Future<TeamAccess?> pickTeamAccess(
   Set<String> initial = const {},
 }) => showDialog<TeamAccess>(
   context: context,
+  animationStyle: AppMotion.dialogStyle(context),
   builder: (_) => AlertDialog(
     title: Text(title),
     content: SizedBox(

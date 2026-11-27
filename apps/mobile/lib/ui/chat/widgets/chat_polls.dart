@@ -81,6 +81,7 @@ class _PollCardBodyState extends State<_PollCardBody> {
   Future<void> _confirmClose() async {
     final ok = await showDialog<bool>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (context) => AlertDialog(
         title: const Text('Close this poll?'),
         content: const Text('Nobody can vote or change their vote after.'),
@@ -304,6 +305,7 @@ class _PollOption extends StatelessWidget {
 Future<void> _showVoters(BuildContext context, ChatPollCardViewModel vm) =>
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: AppMotion.sheetStyle(context),
       showDragHandle: true,
       isScrollControlled: true,
       builder: (context) {
@@ -358,6 +360,7 @@ Future<void> _showVoters(BuildContext context, ChatPollCardViewModel vm) =>
 Future<void> showCreatePollSheet(BuildContext context, ChatRoomViewModel vm) =>
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: AppMotion.sheetStyle(context),
       showDragHandle: true,
       isScrollControlled: true,
       builder: (context) => ViewModelHost(

@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.64  | 2026-11-26 | `sprint3/lane-b`                        |                     |
 | 0.0.63  | 2026-11-26 | `sprint3/lane-b`                        |                     |
 | 0.0.62  | 2026-11-26 | `sprint3/lane-b`                        |                     |
 | 0.0.61  | 2026-11-26 | `sprint3/lane-b`                        |                     |
@@ -76,6 +77,12 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.64 — Navigation motion on AppMotion (N13)
+
+- Slide-over and chat pages: 300 ms in, 200 ms out on the (0.2, 0, 0, 1) easing (were 280/220 and 280/240 on easeOutCubic/easeInCubic); no slide when animations are off. Reaction popover: fast (120 ms) on the easing, was 160 ms easeOutBack.
+- Every bottom sheet (41) and dialog (63 call sites) takes its timing from `AppMotion.sheetStyle` / `dialogStyle`, and opens instantly with reduce motion.
+- Inline outliers moved onto AppMotion tokens (message thread, voice, team page, in-app notice, skeleton image fade, schedule scroll). Tab switches were already instant (indexed stack); iOS back-swipe and Android predictive back untouched.
 
 ## 0.0.63 — Shared components C5-C10 (app half)
 

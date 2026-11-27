@@ -593,6 +593,7 @@ Future<void> repostOrUndo(
   if (actions.isReposted(post)) {
     final ok = await showDialog<bool>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (context) => AlertDialog(
         title: const Text('Undo your repost?'),
         content: const Text("Your followers won't see it from you any more."),
@@ -618,6 +619,7 @@ Future<void> repostOrUndo(
   if (original == null || !context.mounted) return;
   final note = await showDialog<String>(
     context: context,
+    animationStyle: AppMotion.dialogStyle(context),
     builder: (context) => _RepostDialog(original: original),
   );
   if (note == null) return;

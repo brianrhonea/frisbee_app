@@ -16,6 +16,7 @@ Future<Set<TeamPermission>?> showMemberPermissions(
   required String uid,
 }) => showDialog<Set<TeamPermission>>(
   context: context,
+  animationStyle: AppMotion.dialogStyle(context),
   builder: (_) => MemberPermissionsDialog(team: team, uid: uid),
 );
 

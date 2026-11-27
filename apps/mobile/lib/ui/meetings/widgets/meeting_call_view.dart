@@ -94,6 +94,7 @@ class _MeetingCallViewState extends State<MeetingCallView> {
     _setChat(true);
     await showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: AppMotion.sheetStyle(context),
       isScrollControlled: true,
       showDragHandle: true,
       builder: (context) => SizedBox(
@@ -109,6 +110,7 @@ class _MeetingCallViewState extends State<MeetingCallView> {
 
   void _showSettings() => showModalBottomSheet<void>(
     context: context,
+    sheetAnimationStyle: AppMotion.sheetStyle(context),
     isScrollControlled: true,
     showDragHandle: true,
     builder: (context) => SingleChildScrollView(
@@ -119,6 +121,7 @@ class _MeetingCallViewState extends State<MeetingCallView> {
 
   void _showRequests() => showModalBottomSheet<void>(
     context: context,
+    sheetAnimationStyle: AppMotion.sheetStyle(context),
     showDragHandle: true,
     builder: (context) =>
         SingleChildScrollView(child: JoinRequestList(viewModel: vm)),
@@ -126,6 +129,7 @@ class _MeetingCallViewState extends State<MeetingCallView> {
 
   void _showVolume(CallParticipant p) => showModalBottomSheet<void>(
     context: context,
+    sheetAnimationStyle: AppMotion.sheetStyle(context),
     showDragHandle: true,
     builder: (context) => _VolumeSheet(viewModel: vm, participant: p),
   );
@@ -134,6 +138,7 @@ class _MeetingCallViewState extends State<MeetingCallView> {
     if (!vm.isAdmin) return vm.leave();
     final choice = await showDialog<bool>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (context) => AlertDialog(
         title: const Text('Leave the meeting?'),
         content: const Text(

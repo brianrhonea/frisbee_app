@@ -364,6 +364,7 @@ Future<Set<String>?> _pickRoles(
   String name,
 ) => showDialog<Set<String>>(
   context: context,
+  animationStyle: AppMotion.dialogStyle(context),
   builder: (context) {
     var picked = {...?team.memberRoles[uid]};
     return StatefulBuilder(
@@ -429,6 +430,7 @@ class _MemberMenu extends StatelessWidget {
   Future<void> _changeRole(BuildContext context) async {
     final picked = await showDialog<TeamRole>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (context) => SimpleDialog(
         title: Text('Role for $name'),
         children: [

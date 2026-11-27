@@ -227,6 +227,7 @@ Future<String?> showVideoPicker(
   WatchTogetherViewModel viewModel,
 ) => showModalBottomSheet<String>(
   context: context,
+  sheetAnimationStyle: AppMotion.sheetStyle(context),
   isScrollControlled: true,
   showDragHandle: true,
   builder: (context) => SizedBox(

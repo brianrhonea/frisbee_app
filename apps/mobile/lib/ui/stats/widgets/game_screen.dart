@@ -210,6 +210,7 @@ String _halfName(int half) => half == 1 ? '1st half' : '2nd half';
 Future<void> openTimeouts(BuildContext context, GameTrackerViewModel vm) =>
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: AppMotion.sheetStyle(context),
       showDragHandle: true,
       isScrollControlled: true,
       builder: (_) => ListenableBuilder(
@@ -227,6 +228,7 @@ Future<void> editGameTo(BuildContext context, GameTrackerViewModel vm) async {
   ].reduce((a, b) => a > b ? a : b);
   final picked = await showDialog<int>(
     context: context,
+    animationStyle: AppMotion.dialogStyle(context),
     builder: (context) => SimpleDialog(
       title: const Text('Game to'),
       children: [
@@ -836,6 +838,7 @@ class _LineBar extends StatelessWidget {
     final vm = viewModel;
     final swap = await showModalBottomSheet<(String, String)>(
       context: context,
+      sheetAnimationStyle: AppMotion.sheetStyle(context),
       showDragHandle: true,
       isScrollControlled: true,
       useSafeArea: true,
@@ -1859,6 +1862,7 @@ class _LinesTab extends StatelessWidget {
     final event = vm.game?.eventId;
     final source = await showModalBottomSheet<LineSource>(
       context: context,
+      sheetAnimationStyle: AppMotion.sheetStyle(context),
       showDragHandle: true,
       isScrollControlled: true,
       builder: (context) => SafeArea(

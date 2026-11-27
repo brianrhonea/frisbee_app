@@ -420,6 +420,7 @@ Future<void> _editFolder(
 ) async {
   final edited = await showDialog<ChatFolder>(
     context: context,
+    animationStyle: AppMotion.dialogStyle(context),
     builder: (_) => _FolderDialog(
       folder: folder ?? const ChatFolder(id: '', name: ''),
       audiences: vm.audiences,
@@ -750,6 +751,7 @@ Future<void> showRoomSheet(
   if (actions.isEmpty) return;
   final picked = await showModalBottomSheet<_RoomAction>(
     context: context,
+    sheetAnimationStyle: AppMotion.sheetStyle(context),
     showDragHandle: true,
     builder: (context) => SafeArea(
       child: Column(

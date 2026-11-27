@@ -50,6 +50,7 @@ class _TeamEventsTabState extends State<TeamEventsTab> {
     }
     final route = await showModalBottomSheet<String>(
       context: context,
+      sheetAnimationStyle: AppMotion.sheetStyle(context),
       showDragHandle: true,
       builder: (context) => SafeArea(
         child: Column(

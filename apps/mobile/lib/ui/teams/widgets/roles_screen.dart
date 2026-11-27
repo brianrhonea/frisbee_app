@@ -51,6 +51,7 @@ class _RolesScreenState extends State<RolesScreen> {
   Future<void> _edit(CustomRole? role) async {
     final edited = await showDialog<CustomRole>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (_) => RoleDialog(
         role: role ?? const CustomRole(id: '', name: ''),
         permissions: vm.permissions,

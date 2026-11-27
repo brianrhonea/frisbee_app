@@ -138,6 +138,7 @@ Future<void> showCommandPalette(
 }) async {
   final picked = await showDialog<PaletteCommand>(
     context: context,
+    animationStyle: AppMotion.dialogStyle(context),
     barrierColor: Colors.black38,
     builder: (_) => CommandPalette(commands: commands),
   );

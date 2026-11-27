@@ -78,6 +78,7 @@ class _VideosTabState extends State<VideosTab> {
   Future<void> _move(TeamVideo v) async {
     final folderId = await showDialog<String>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (context) => SimpleDialog(
         title: Text('Move "${v.title}" to'),
         children: [
@@ -270,6 +271,7 @@ Future<String?> _folderName(
   String confirmLabel = 'Create',
 }) => showDialog<String>(
   context: context,
+  animationStyle: AppMotion.dialogStyle(context),
   builder: (_) => _FolderNameDialog(
     title: title,
     initial: initial,

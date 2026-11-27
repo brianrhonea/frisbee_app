@@ -30,6 +30,7 @@ class TournamentScreen extends StatelessWidget {
     final last = vm.games.lastOrNull;
     final game = await showDialog<NewTournamentGame>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (_) => _AddGameDialog(
         gameTo: last?.gameTo ?? 15,
         timeouts: last?.timeoutsPerHalf ?? 2,
@@ -249,6 +250,7 @@ class _RosterAndLines extends StatelessWidget {
     final vm = viewModel;
     final picked = await showDialog<List<String>>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (_) => _RosterDialog(
         players: vm.allPlayers,
         initial: vm.tournament!.roster.toSet(),

@@ -16,6 +16,7 @@ Future<void> showLiveScoreSheet(
   String gameId,
 ) => showModalBottomSheet<void>(
   context: context,
+  sheetAnimationStyle: AppMotion.sheetStyle(context),
   showDragHandle: true,
   isScrollControlled: true,
   builder: (_) => LiveScoreSheet(viewModel: viewModel, gameId: gameId),
@@ -89,6 +90,7 @@ class LiveScoreSheet extends StatelessWidget {
         Future<void> stop() async {
           final ok = await showDialog<bool>(
             context: context,
+            animationStyle: AppMotion.dialogStyle(context),
             builder: (context) => AlertDialog(
               title: const Text('Stop the live score?'),
               content: const Text(

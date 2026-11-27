@@ -1,3 +1,4 @@
+import '../../core/themes/theme.dart';
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/app_user.dart';
@@ -18,6 +19,7 @@ class AdultsOnlyScreen extends StatelessWidget {
     final usesPassword = viewModel.reauthMethod == SignInMethod.password;
     final go = await showDialog<bool>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (context) => AlertDialog(
         title: const Text('Delete account'),
         content: Column(

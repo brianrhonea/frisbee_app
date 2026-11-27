@@ -91,6 +91,7 @@ class _GroupTournamentScreenState extends State<GroupTournamentScreen> {
 
   void _openGame(GroupGame g) => showModalBottomSheet<void>(
     context: context,
+    sheetAnimationStyle: AppMotion.sheetStyle(context),
     showDragHandle: true,
     isScrollControlled: true,
     builder: (_) => _GameSheet(viewModel: vm, gameId: g.id),

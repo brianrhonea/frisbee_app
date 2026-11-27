@@ -53,6 +53,7 @@ class _OfflineBannerState extends State<OfflineBanner> {
     unawaited(
       showModalBottomSheet<void>(
         context: context,
+        sheetAnimationStyle: AppMotion.sheetStyle(context),
         showDragHandle: true,
         builder: (_) => OutboxSheet(viewModel: widget.viewModel),
       ),

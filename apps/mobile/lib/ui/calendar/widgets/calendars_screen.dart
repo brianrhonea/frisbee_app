@@ -907,6 +907,7 @@ Future<void> showSubscribeSheet(
   if (!context.mounted) return;
   await showModalBottomSheet<void>(
     context: context,
+    sheetAnimationStyle: AppMotion.sheetStyle(context),
     showDragHandle: true,
     builder: (sheet) => SafeArea(
       child: SingleChildScrollView(

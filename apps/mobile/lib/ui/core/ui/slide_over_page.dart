@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../themes/theme.dart';
+
 /// Width of a [slideOverPage] panel on wide windows.
 const slideOverPanelWidth = 440.0;
 
@@ -49,13 +51,15 @@ Page<void> slideOverPage(
     barrierDismissible: panel,
     barrierColor: panel && dim ? Colors.black38 : null,
     barrierLabel: panel ? 'Close' : null,
-    transitionDuration: const Duration(milliseconds: 280),
-    reverseTransitionDuration: const Duration(milliseconds: 220),
+    transitionDuration: AppMotion.of(context, AppMotion.pageIn),
+    reverseTransitionDuration: AppMotion.of(context, AppMotion.pageOut),
     transitionsBuilder: (context, animation, _, child) {
+      // Reduce motion: the page just appears.
+      if (MediaQuery.disableAnimationsOf(context)) return child;
       final curved = CurvedAnimation(
         parent: animation,
-        curve: Curves.easeOutCubic,
-        reverseCurve: Curves.easeInCubic,
+        curve: AppMotion.easing,
+        reverseCurve: AppMotion.easing,
       );
       final slide = Tween(
         begin: const Offset(1, 0),

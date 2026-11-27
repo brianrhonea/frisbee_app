@@ -20,18 +20,21 @@ Future<String?> showReactionBubble(
     barrierDismissible: true,
     barrierLabel: 'Close reactions',
     barrierColor: Colors.black.withValues(alpha: 0.12),
-    transitionDuration: const Duration(milliseconds: 160),
+    transitionDuration: AppMotion.of(context, AppMotion.fast),
     pageBuilder: (context, _, _) =>
         _BubbleLayer(anchor: anchor, mine: mine, alignEnd: alignEnd),
-    transitionBuilder: (context, animation, _, child) => FadeTransition(
-      opacity: animation,
-      child: ScaleTransition(
-        scale: Tween(begin: 0.85, end: 1.0).animate(
-          CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
-        ),
-        child: child,
-      ),
-    ),
+    transitionBuilder: (context, animation, _, child) =>
+        MediaQuery.disableAnimationsOf(context)
+        ? child
+        : FadeTransition(
+            opacity: animation,
+            child: ScaleTransition(
+              scale: Tween(begin: 0.85, end: 1.0).animate(
+                CurvedAnimation(parent: animation, curve: AppMotion.easing),
+              ),
+              child: child,
+            ),
+          ),
   );
   if (picked != _more || !context.mounted) return picked;
   return showEmojiPicker(context, mine: mine);
@@ -45,6 +48,7 @@ const _more = '+';
 Future<String?> showEmojiPicker(BuildContext context, {String? mine}) =>
     showModalBottomSheet<String>(
       context: context,
+      sheetAnimationStyle: AppMotion.sheetStyle(context),
       showDragHandle: true,
       isScrollControlled: true,
       constraints: BoxConstraints(

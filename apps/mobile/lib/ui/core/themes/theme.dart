@@ -153,6 +153,35 @@ abstract final class AppMotion {
   /// disable-animations setting is on.
   static Duration of(BuildContext context, Duration d) =>
       MediaQuery.disableAnimationsOf(context) ? reduced : d;
+
+  /// A page sliding in (push) takes [sheet]; going back takes [base].
+  static const pageIn = sheet;
+  static const pageOut = base;
+
+  /// How dialogs fade in and out: [fast]; none when animations are off.
+  /// Pass to `showDialog(animationStyle: ...)`.
+  static AnimationStyle dialogStyle(BuildContext context) =>
+      MediaQuery.disableAnimationsOf(context)
+      ? AnimationStyle.noAnimation
+      : const AnimationStyle(
+          duration: fast,
+          reverseDuration: fast,
+          curve: easing,
+          reverseCurve: easing,
+        );
+
+  /// How bottom sheets open and close: [sheet] in, [base] out, on
+  /// [easing]; none at all when animations are off. Pass to
+  /// `showModalBottomSheet(sheetAnimationStyle: ...)`.
+  static AnimationStyle sheetStyle(BuildContext context) =>
+      MediaQuery.disableAnimationsOf(context)
+      ? AnimationStyle.noAnimation
+      : const AnimationStyle(
+          duration: sheet,
+          reverseDuration: base,
+          curve: easing,
+          reverseCurve: easing,
+        );
 }
 
 abstract final class AppTheme {

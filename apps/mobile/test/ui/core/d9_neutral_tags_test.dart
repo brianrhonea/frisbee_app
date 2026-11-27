@@ -1,6 +1,5 @@
 // D9: tournament-status tags are neutral (zinc/indigo); red only for live,
 // green only for success. Team-kind tags use Tone.grey (neutral).
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/domain/models/hosted_tournament.dart';
 import 'package:frisbee_app/ui/core/ui/status_pill.dart';

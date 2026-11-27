@@ -128,6 +128,7 @@ class _PlayEditorScreenState extends State<PlayEditorScreen>
   Future<void> _editDetails() async {
     await showDialog<void>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (_) => _PlayDetailsDialog(viewModel: vm),
     );
   }
@@ -209,6 +210,7 @@ class _PlayEditorScreenState extends State<PlayEditorScreen>
                             ? _editDetails
                             : () => showDialog<void>(
                                 context: context,
+                                animationStyle: AppMotion.dialogStyle(context),
                                 builder: (_) => _NotesDialog(play: vm.play),
                               ),
                       ),

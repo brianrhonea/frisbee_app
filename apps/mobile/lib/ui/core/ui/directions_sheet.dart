@@ -1,3 +1,4 @@
+import '../themes/theme.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -23,6 +24,7 @@ Future<void> showDirectionsSheet(
   final options = directionsOptions(_platform(), place: place, point: point);
   final picked = await showModalBottomSheet<DirectionsOption>(
     context: context,
+    sheetAnimationStyle: AppMotion.sheetStyle(context),
     showDragHandle: true,
     builder: (sheet) => SafeArea(
       child: Column(

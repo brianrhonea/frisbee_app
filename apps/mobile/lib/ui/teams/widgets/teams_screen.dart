@@ -80,6 +80,7 @@ class _TeamsScreenState extends State<TeamsScreen> {
   Future<void> _join() async {
     final code = await showDialog<String>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (_) => const JoinTeamDialog(),
     );
     if (code != null) vm.joinTeam.execute(code);
@@ -208,6 +209,7 @@ class _TeamsScreenState extends State<TeamsScreen> {
   Future<void> _add() async {
     final choice = await showModalBottomSheet<String>(
       context: context,
+      sheetAnimationStyle: AppMotion.sheetStyle(context),
       showDragHandle: true,
       builder: (context) => SafeArea(
         child: Column(
@@ -251,6 +253,7 @@ class _TeamsScreenState extends State<TeamsScreen> {
   Future<void> _create() async {
     final kind = await showModalBottomSheet<TeamKind>(
       context: context,
+      sheetAnimationStyle: AppMotion.sheetStyle(context),
       showDragHandle: true,
       builder: (context) => SafeArea(
         child: Column(

@@ -192,6 +192,7 @@ class _HostedTournamentScreenState extends State<HostedTournamentScreen> {
       if (!mounted) return;
       showModalBottomSheet<void>(
         context: context,
+        sheetAnimationStyle: AppMotion.sheetStyle(context),
         showDragHandle: true,
         isScrollControlled: true,
         builder: (_) => _GameSheet(viewModel: vm, gameId: id),
@@ -2128,6 +2129,7 @@ class _YourGameCard extends StatelessWidget {
 void _openGame(BuildContext context, HostedTournamentViewModel vm, String id) =>
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: AppMotion.sheetStyle(context),
       showDragHandle: true,
       isScrollControlled: true,
       builder: (_) => _GameSheet(viewModel: vm, gameId: id),
@@ -2818,6 +2820,7 @@ class _NewsTab extends StatelessWidget {
     final body = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (context) => AlertDialog(
         title: const Text('Post an update'),
         content: SizedBox(

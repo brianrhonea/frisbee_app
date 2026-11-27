@@ -398,6 +398,7 @@ class PrivacySettingsScreen extends StatelessWidget {
                   onTap: () async {
                     final picked = await showDialog<MessagePolicy>(
                       context: context,
+                      animationStyle: AppMotion.dialogStyle(context),
                       builder: (_) =>
                           MessagePolicyDialog(selected: vm.messagePolicy),
                     );
@@ -492,6 +493,7 @@ class AccountSettingsScreen extends StatelessWidget {
     final controller = TextEditingController(text: viewModel.user?.displayName);
     final name = await showDialog<String>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (context) => AlertDialog(
         title: const Text('Display name'),
         content: TextField(
@@ -521,6 +523,7 @@ class AccountSettingsScreen extends StatelessWidget {
   Future<void> _changePassword(BuildContext context) async {
     final changed = await showDialog<bool>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       barrierDismissible: false,
       builder: (_) => ChangePasswordDialog(viewModel: viewModel),
     );
@@ -624,6 +627,7 @@ class AccountSettingsScreen extends StatelessWidget {
                       OutlinedButton(
                         onPressed: () => showDialog<void>(
                           context: context,
+                          animationStyle: AppMotion.dialogStyle(context),
                           barrierDismissible: false,
                           builder: (_) => DeleteAccountDialog(viewModel: vm),
                         ),

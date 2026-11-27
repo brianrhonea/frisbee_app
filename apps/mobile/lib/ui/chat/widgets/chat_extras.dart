@@ -32,6 +32,7 @@ Future<void> showReplacePinSheet(
 ) async {
   final unpin = await showModalBottomSheet<String>(
     context: context,
+    sheetAnimationStyle: AppMotion.sheetStyle(context),
     showDragHandle: true,
     isScrollControlled: true,
     builder: (context) => _PinList(
@@ -391,6 +392,7 @@ Future<void> showShareEventSheet(
   if (team == null) return;
   final id = await showModalBottomSheet<String>(
     context: context,
+    sheetAnimationStyle: AppMotion.sheetStyle(context),
     showDragHandle: true,
     isScrollControlled: true,
     builder: (context) => ViewModelHost(

@@ -253,6 +253,7 @@ class _MessageThreadViewState extends State<MessageThreadView>
     HapticFeedback.mediumImpact();
     final action = await showModalBottomSheet<_MessageAction>(
       context: context,
+      sheetAnimationStyle: AppMotion.sheetStyle(context),
       showDragHandle: true,
       builder: (_) => _MessageActionsSheet(
         message: m,
@@ -660,7 +661,7 @@ class _TypingIndicator extends StatelessWidget {
         child: Align(
           alignment: Alignment.centerLeft,
           child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 150),
+            duration: AppMotion.of(context, AppMotion.fast),
             child: label == null
                 ? const SizedBox.shrink()
                 : Text(
@@ -833,7 +834,7 @@ class _MessageList extends StatelessWidget {
         return KeyedSubtree(
           key: m.id == vm.jumpTarget ? jumpKey : null,
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 400),
+            duration: AppMotion.of(context, AppMotion.sheet),
             color: m.id == vm.highlightedId
                 ? AppColors.of(context).accentSoft
                 : Colors.transparent,
@@ -937,9 +938,9 @@ class _SwipeToReplyState extends State<_SwipeToReply> {
             ),
           AnimatedContainer(
             duration: _dx == 0
-                ? const Duration(milliseconds: 180)
+                ? AppMotion.of(context, AppMotion.base)
                 : Duration.zero,
-            curve: Curves.easeOut,
+            curve: AppMotion.easing,
             transform: Matrix4.translationValues(_dx, 0, 0),
             child: widget.child,
           ),
@@ -1855,6 +1856,7 @@ class _ImageAttachmentState extends State<_ImageAttachment> {
           Ok(:final value) => InkWell(
             onTap: () => showDialog<void>(
               context: context,
+              animationStyle: AppMotion.dialogStyle(context),
               builder: (_) => _PhotoDialog(
                 bytes: value,
                 name: a.name,
@@ -2007,6 +2009,7 @@ class _VideoAttachment extends StatelessWidget {
             child: InkWell(
               onTap: () => showDialog<void>(
                 context: context,
+                animationStyle: AppMotion.dialogStyle(context),
                 builder: (_) => _VideoDialog(
                   attachment: a,
                   viewModel: viewModel,

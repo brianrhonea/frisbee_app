@@ -10,6 +10,10 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.64
+
+- **Smoother, consistent motion:** pages, sheets and dialogs now open and close at the same speed everywhere, and don't animate if you have Reduce Motion on.
+
 ## 0.0.63
 
 - **Tidier building blocks** under the hood (headers, rows, event cards, empty and error screens, dialogs) so every screen matches. Confirm dialogs for deleting now use the red destructive button.

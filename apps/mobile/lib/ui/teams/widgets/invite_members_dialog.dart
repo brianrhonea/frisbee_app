@@ -24,6 +24,7 @@ Future<void> showInviteMembers(
   bool withLink = true,
 }) => showDialog<void>(
   context: context,
+  animationStyle: AppMotion.dialogStyle(context),
   builder: (_) => ViewModelHost(
     create: (c) => InviteMembersViewModel(
       team: team,
@@ -257,6 +258,7 @@ class _LinkCard extends StatelessWidget {
     if (link == null || !context.mounted) return;
     await showDialog<void>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (_) => InviteQrDialog(
         link: link,
         teamName: viewModel.team.name,

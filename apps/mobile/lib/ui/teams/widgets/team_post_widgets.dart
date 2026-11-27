@@ -507,6 +507,7 @@ class _PostImageState extends State<PostImage> {
               InkWell(
                 onTap: () => showDialog<void>(
                   context: context,
+                  animationStyle: AppMotion.dialogStyle(context),
                   builder: (context) => Dialog(
                     clipBehavior: Clip.antiAlias,
                     child: Stack(

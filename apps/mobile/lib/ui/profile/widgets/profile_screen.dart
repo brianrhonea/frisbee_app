@@ -114,6 +114,7 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
   Future<void> _edit() async {
     final details = await showDialog<ProfileDetails>(
       context: context,
+      animationStyle: AppMotion.dialogStyle(context),
       builder: (_) => EditProfileDialog(
         initial: vm.details,
         images: vm.canEditImages ? vm : null,
@@ -1363,6 +1364,7 @@ class _ClaimCard extends StatelessWidget {
                     : () async {
                         final picked = await showDialog<String>(
                           context: context,
+                          animationStyle: AppMotion.dialogStyle(context),
                           builder: (context) => SimpleDialog(
                             title: Text('You on ${claim.team.name}'),
                             children: [

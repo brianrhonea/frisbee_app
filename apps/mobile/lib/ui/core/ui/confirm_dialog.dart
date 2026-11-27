@@ -1,3 +1,4 @@
+import '../themes/theme.dart';
 import 'package:flutter/material.dart';
 
 import 'app_button.dart';
@@ -61,6 +62,7 @@ Future<bool> confirmDialog(
 }) async {
   final ok = await showDialog<bool>(
     context: context,
+    animationStyle: AppMotion.dialogStyle(context),
     builder: (_) => ConfirmDialog(
       title: title,
       message: message,

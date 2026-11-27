@@ -320,6 +320,7 @@ final List<(String, List<_Entry>)> _sections = [
 /// Full-screen guide to every stat and how it's calculated.
 Future<void> showStatsGlossary(BuildContext context) => showDialog<void>(
   context: context,
+  animationStyle: AppMotion.dialogStyle(context),
   builder: (_) => const Dialog.fullscreen(child: _Glossary()),
 );
 
