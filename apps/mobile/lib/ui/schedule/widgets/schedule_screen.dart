@@ -10,10 +10,13 @@ import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
 import '../../core/ui/app_segmented_button.dart';
 import '../../core/ui/error_message.dart';
+import '../../core/ui/event_card.dart';
+import '../../core/ui/status_pill.dart';
 import '../../core/ui/scoreboard.dart' show TeamDot;
 import '../../core/ui/status_views.dart';
 import '../view_models/schedule_viewmodel.dart';
 import 'event_editor_screen.dart';
+import 'event_style.dart';
 import 'schedule_widgets.dart';
 
 /// Personal and team events a week at a time, day by day, or a month at
@@ -92,10 +95,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   /// Picks [day] in the month grid and scrolls its week's list to it.
   void _pickMonthDay(DateTime day) {
     vm.selectDay(day);
-    // After the list rebuilds for the (maybe new) week.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _scrollToDay(day.weekday - 1);
-    });
   }
 
   void _scrollToDay(int index) {
@@ -116,6 +115,32 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final id = await showEventEditor(context, day: vm.selectedDay);
     // Other calendars aren't live.
     if (id != null) await vm.refreshCalendars();
+  }
+
+  /// The List view: every day of the month with something on it.
+  List<Widget> _monthList(ScheduleViewModel vm) {
+    final days = [
+      for (final d in vm.monthDays)
+        if (d.month == vm.monthStart.month && vm.eventsOn(d).isNotEmpty) d,
+    ];
+    if (days.isEmpty) {
+      return [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpace.xl),
+          child: Text(
+            'Nothing scheduled this month',
+            textAlign: TextAlign.center,
+            style: AppText.secondary.copyWith(
+              color: AppColors.of(context).muted,
+            ),
+          ),
+        ),
+      ];
+    }
+    return [
+      for (final d in days)
+        _DaySection(day: d, viewModel: vm, onSwiped: _onSwiped),
+    ];
   }
 
   @override
@@ -190,6 +215,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         builder: (context, _) {
           if (!vm.loaded) return const LoadingState();
           final month = vm.view == ScheduleView.month;
+          final list = vm.view == ScheduleView.list;
           return ConstrainedContent(
             maxWidth: 720,
             child: Column(
@@ -206,6 +232,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 ),
                 if (month)
                   _MonthHeader(viewModel: vm, onPickDay: _pickMonthDay)
+                else if (list)
+                  _ListHeader(viewModel: vm)
                 else
                   _WeekHeader(viewModel: vm, onPickDay: _pickDay),
                 Expanded(
@@ -221,15 +249,24 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                         children: [
                           for (final invite in vm.invites)
                             _InviteCard(invite: invite, viewModel: vm),
-                          // The week, or in the month the picked day's week.
-                          for (final (i, day)
-                              in (month ? vm.selectedWeek : vm.days).indexed)
+                          // Week: its seven days. Month: the picked day.
+                          // List: the month's days that have events.
+                          if (month)
                             _DaySection(
-                              key: _dayKeys[i],
-                              day: day,
+                              day: vm.selectedDay,
                               viewModel: vm,
                               onSwiped: _onSwiped,
-                            ),
+                            )
+                          else if (list)
+                            ..._monthList(vm)
+                          else
+                            for (final (i, day) in vm.days.indexed)
+                              _DaySection(
+                                key: _dayKeys[i],
+                                day: day,
+                                viewModel: vm,
+                                onSwiped: _onSwiped,
+                              ),
                           if (vm.hasCalendars) ...[
                             const SizedBox(height: 16),
                             _CalendarsCard(calendars: vm.calendars),
@@ -263,51 +300,53 @@ class _WeekHeader extends StatelessWidget {
         '${DateFormat.MMMd().format(days.first)} – '
         '${DateFormat.MMMd().format(days.last)}';
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      // The day strip runs edge to edge, so each day is a 48 px target.
+      padding: const EdgeInsets.fromLTRB(0, 4, 0, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              IconButton(
-                tooltip: 'Previous week',
-                icon: const Icon(Icons.chevron_left),
-                onPressed: vm.previousWeek,
-              ),
-              Expanded(
-                child: Column(
-                  children: [
-                    Text(
-                      range,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: c.ink,
-                      ),
-                    ),
-                    Text(
-                      vm.weekCount == 1 ? '1 event' : '${vm.weekCount} events',
-                      style: TextStyle(fontSize: 12, color: c.muted),
-                    ),
-                  ],
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                IconButton(
+                  tooltip: 'Previous week',
+                  icon: const Icon(Icons.chevron_left),
+                  onPressed: vm.previousWeek,
                 ),
-              ),
-              IconButton(
-                tooltip: 'Next week',
-                icon: const Icon(Icons.chevron_right),
-                onPressed: vm.nextWeek,
-              ),
-            ],
+                Expanded(
+                  child: Column(
+                    children: [
+                      Text(
+                        range,
+                        textAlign: TextAlign.center,
+                        style: AppText.bodyStrong.copyWith(color: c.ink),
+                      ),
+                      Text(
+                        vm.weekCount == 1
+                            ? '1 event'
+                            : '${vm.weekCount} events',
+                        style: AppText.caption.copyWith(color: c.muted),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Next week',
+                  icon: const Icon(Icons.chevron_right),
+                  onPressed: vm.nextWeek,
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 6),
-          Card(
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+              padding: EdgeInsets.zero,
               child: Row(
                 children: [
                   for (var i = 0; i < days.length; i++) ...[
-                    if (i > 0) const SizedBox(width: 4),
                     Expanded(
                       child: WeekDayCell(
                         day: days[i],
@@ -324,7 +363,10 @@ class _WeekHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          _FilterTabs(selected: vm.filter, onSelect: vm.setFilter),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _FilterTabs(selected: vm.filter, onSelect: vm.setFilter),
+          ),
         ],
       ),
     );
@@ -348,49 +390,18 @@ class _MonthHeader extends StatelessWidget {
     final vm = viewModel;
     final c = AppColors.of(context);
     final days = vm.monthDays;
-    final count = vm.monthCount;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              IconButton(
-                tooltip: 'Previous month',
-                icon: const Icon(Icons.chevron_left),
-                onPressed: vm.previousMonth,
-              ),
-              Expanded(
-                child: Column(
-                  children: [
-                    Text(
-                      DateFormat.yMMMM().format(vm.monthStart),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: c.ink,
-                      ),
-                    ),
-                    Text(
-                      count == 1 ? '1 event' : '$count events',
-                      style: TextStyle(fontSize: 12, color: c.muted),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                tooltip: 'Next month',
-                icon: const Icon(Icons.chevron_right),
-                onPressed: vm.nextMonth,
-              ),
-            ],
-          ),
+          _MonthNav(viewModel: vm),
           const SizedBox(height: 6),
-          Card(
+          // No box around the grid: the days sit on the page.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(0, 4, 0, 6),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(6, 8, 6, 6),
+              padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
               child: Column(
                 children: [
                   Row(
@@ -400,8 +411,7 @@ class _MonthHeader extends StatelessWidget {
                           child: Text(
                             d,
                             textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 11,
+                            style: AppText.caption.copyWith(
                               fontWeight: FontWeight.w700,
                               color: c.muted,
                             ),
@@ -453,6 +463,69 @@ class _MonthHeader extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The month's name with its event count, and the arrows.
+class _MonthNav extends StatelessWidget {
+  const _MonthNav({required this.viewModel});
+
+  final ScheduleViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = viewModel;
+    final c = AppColors.of(context);
+    final count = vm.monthCount;
+    return Row(
+      children: [
+        IconButton(
+          tooltip: 'Previous month',
+          icon: const Icon(Icons.chevron_left),
+          onPressed: vm.previousMonth,
+        ),
+        Expanded(
+          child: Column(
+            children: [
+              Text(
+                DateFormat.yMMMM().format(vm.monthStart),
+                textAlign: TextAlign.center,
+                style: AppText.bodyStrong.copyWith(color: c.ink),
+              ),
+              Text(
+                count == 1 ? '1 event' : '$count events',
+                style: AppText.caption.copyWith(color: c.muted),
+              ),
+            ],
+          ),
+        ),
+        IconButton(
+          tooltip: 'Next month',
+          icon: const Icon(Icons.chevron_right),
+          onPressed: vm.nextMonth,
+        ),
+      ],
+    );
+  }
+}
+
+/// The List view's header: the month and the filter, no grid.
+class _ListHeader extends StatelessWidget {
+  const _ListHeader({required this.viewModel});
+
+  final ScheduleViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _MonthNav(viewModel: viewModel),
+        const SizedBox(height: AppSpace.sm),
+        _FilterTabs(selected: viewModel.filter, onSelect: viewModel.setFilter),
+      ],
+    ),
+  );
 }
 
 /// One day in the month grid: its number (turf on today, outlined when
@@ -519,8 +592,7 @@ class _MonthDayCell extends StatelessWidget {
                 ),
                 child: Text(
                   '${day.day}',
-                  style: TextStyle(
-                    fontSize: 14,
+                  style: AppText.label.copyWith(
                     fontWeight: isToday || selected
                         ? FontWeight.w800
                         : FontWeight.w600,
@@ -634,79 +706,88 @@ class _DaySection extends StatelessWidget {
     final isToday = day == vm.today;
     final selected = day == vm.selectedDay;
     return Padding(
-      padding: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.only(top: AppSpace.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              Text(
-                DateFormat('EEEE, MMM d').format(day).toUpperCase(),
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.8,
-                  color: selected && !isToday ? c.accentInk : c.ink2,
+              Flexible(
+                child: Semantics(
+                  header: true,
+                  child: Text(
+                    DateFormat('EEEE, MMM d').format(day),
+                    style: AppText.label.copyWith(
+                      color: selected && !isToday ? c.accentInk : c.ink,
+                    ),
+                  ),
                 ),
               ),
               if (isToday) ...[
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: c.feature,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: c.border),
-                  ),
-                  child: Text(
-                    'TODAY',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1,
-                      color: c.onFeature,
-                    ),
-                  ),
-                ),
+                const SizedBox(width: AppSpace.sm),
+                const StatusPill('Today', tone: PillTone.accent),
               ],
             ],
           ),
-          const SizedBox(height: 8),
-          Card(
-            child: events.isEmpty
-                ? Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Text(
-                      'Nothing scheduled',
-                      style: TextStyle(color: c.muted),
-                    ),
-                  )
-                : Column(
-                    children: [
-                      for (var i = 0; i < events.length; i++) ...[
-                        if (i > 0) const Divider(height: 1),
-                        _SwipeToDelete(
-                          entry: events[i],
-                          enabled: vm.canDelete(events[i]),
-                          onSwiped: onSwiped,
-                          child: ScheduleEventRow(
-                            entry: events[i],
-                            showDay: false,
-                            large: true,
-                            rsvp: vm.myRsvp(events[i]),
-                            needsRsvp: vm.needsRsvp(events[i]),
-                            onCalendarChanged: vm.refreshCalendars,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-          ),
+          const SizedBox(height: AppSpace.sm),
+          if (events.isEmpty)
+            Text(
+              'Nothing scheduled',
+              style: AppText.secondary.copyWith(color: c.muted),
+            )
+          else
+            for (final entry in events) ...[
+              _SwipeToDelete(
+                entry: entry,
+                enabled: vm.canDelete(entry),
+                onSwiped: onSwiped,
+                child: _EntryCard(entry: entry, viewModel: vm),
+              ),
+              const SizedBox(height: AppSpace.sm),
+            ],
         ],
       ),
+    );
+  }
+}
+
+/// One event on the schedule as an [EventCard]: opens its page, or its
+/// sheet when it is on another calendar.
+class _EntryCard extends StatelessWidget {
+  const _EntryCard({required this.entry, required this.viewModel});
+
+  final ScheduleEntry entry;
+  final ScheduleViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final e = entry.event;
+    final vm = viewModel;
+    final answer = vm.myRsvp(entry);
+    final EventRsvp? rsvp = switch (answer) {
+      RsvpStatus.going => EventRsvp.going,
+      RsvpStatus.maybe => EventRsvp.maybe,
+      RsvpStatus.notGoing => EventRsvp.declined,
+      null => vm.needsRsvp(entry) ? EventRsvp.needsReply : null,
+    };
+    final where = entry.team?.name ?? entry.calendar?.name ?? 'Personal';
+    return EventCard(
+      date: e.startsAt,
+      title: e.title,
+      meta: [
+        eventTimeRange(e),
+        if (e.location.isNotEmpty) e.location,
+        where,
+      ].join(' · '),
+      rsvp: rsvp,
+      recurring: e.series != null,
+      onTap: () => entry.isOnCalendar
+          ? showCalendarEventSheet(
+              context,
+              entry,
+              onChanged: vm.refreshCalendars,
+            )
+          : context.push(Routes.scheduleEvent(entry)),
     );
   }
 }

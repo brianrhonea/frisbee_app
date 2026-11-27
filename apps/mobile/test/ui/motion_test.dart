@@ -41,7 +41,7 @@ void main() {
     expect(AppMotion.base, const Duration(milliseconds: 200));
     expect(AppMotion.sheet, const Duration(milliseconds: 300));
     expect(AppMotion.easing, const Cubic(0.2, 0, 0, 1));
-    expect(AppMotion.pageIn, AppMotion.sheet);
+    expect(AppMotion.pageIn, AppMotion.base);
     expect(AppMotion.pageOut, AppMotion.base);
   });
 
@@ -69,7 +69,7 @@ void main() {
   });
 
   group('slide-over pages', () {
-    testWidgets('push takes 300 ms, back 200 ms', (t) async {
+    testWidgets('push and back both take 200 ms', (t) async {
       final ctx = await _context(t, off: false);
       final page = _asCustom(
         slideOverPage(ctx, const ValueKey('p'), const SizedBox()),
@@ -122,13 +122,20 @@ void main() {
   });
 
   group('chat pages', () {
-    testWidgets('300 in, 200 out; reduced motion shows the page at once', (
+    testWidgets('200 both ways; reduced motion shows the page at once', (
       t,
     ) async {
-      final page = _asCustom(chatPage(const ValueKey('c'), const SizedBox()));
-      expect(page.transitionDuration, AppMotion.pageIn);
-      expect(page.reverseTransitionDuration, AppMotion.pageOut);
+      final on = await _context(t, off: false);
+      final timed = _asCustom(
+        chatPage(on, const ValueKey('c'), const SizedBox()),
+      );
+      expect(timed.transitionDuration, AppMotion.base);
+      expect(timed.reverseTransitionDuration, AppMotion.base);
       final ctx = await _context(t, off: true);
+      final page = _asCustom(
+        chatPage(ctx, const ValueKey('c'), const SizedBox()),
+      );
+      expect(page.transitionDuration, Duration.zero);
       final child = const Text('chat');
       expect(
         page.transitionsBuilder(
@@ -139,6 +146,54 @@ void main() {
         ),
         same(child),
       );
+    });
+  });
+
+  group('page transitions on plain routes', () {
+    testWidgets('reduced motion: the page is returned as is', (t) async {
+      final ctx = await _context(t, off: true);
+      const child = Text('page');
+      final route = PageRouteBuilder<void>(pageBuilder: (_, _, _) => child);
+      const builder = AppPageTransitionsBuilder(
+        FadeUpwardsPageTransitionsBuilder(),
+      );
+      expect(
+        builder.buildTransitions<void>(
+          route,
+          ctx,
+          const AlwaysStoppedAnimation(0.5),
+          const AlwaysStoppedAnimation(0),
+          child,
+        ),
+        same(child),
+      );
+    });
+
+    testWidgets('normal motion: the platform transition runs', (t) async {
+      final ctx = await _context(t, off: false);
+      const child = Text('page');
+      final route = PageRouteBuilder<void>(pageBuilder: (_, _, _) => child);
+      const builder = AppPageTransitionsBuilder(
+        FadeUpwardsPageTransitionsBuilder(),
+      );
+      expect(
+        builder.buildTransitions<void>(
+          route,
+          ctx,
+          const AlwaysStoppedAnimation(0.5),
+          const AlwaysStoppedAnimation(0),
+          child,
+        ),
+        isNot(same(child)),
+      );
+    });
+
+    test('the theme uses it everywhere but iOS and macOS', () {
+      final b = AppTheme.light.pageTransitionsTheme.builders;
+      expect(b[TargetPlatform.android], isA<AppPageTransitionsBuilder>());
+      expect(b[TargetPlatform.windows], isA<AppPageTransitionsBuilder>());
+      expect(b[TargetPlatform.iOS], isA<CupertinoPageTransitionsBuilder>());
+      expect(b[TargetPlatform.macOS], isA<CupertinoPageTransitionsBuilder>());
     });
   });
 
@@ -169,6 +224,7 @@ void main() {
       await t.pump(const Duration(milliseconds: 100));
       final mid = t.getTopLeft(find.byType(Scaffold).last).dx;
       expect(mid, greaterThan(0), reason: 'still sliding at 100 ms');
+      await t.pump(AppMotion.pageIn);
       await t.pump(AppMotion.pageIn);
       await t.pumpAndSettle();
       expect(t.getTopLeft(find.byType(Scaffold).last).dx, lessThan(mid));

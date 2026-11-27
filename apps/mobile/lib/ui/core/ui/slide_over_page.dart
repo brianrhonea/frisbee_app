@@ -49,7 +49,7 @@ Page<void> slideOverPage(
         : child,
     opaque: !panel,
     barrierDismissible: panel,
-    barrierColor: panel && dim ? Colors.black38 : null,
+    barrierColor: panel && dim ? AppMotion.scrim : null,
     barrierLabel: panel ? 'Close' : null,
     transitionDuration: AppMotion.of(context, AppMotion.pageIn),
     reverseTransitionDuration: AppMotion.of(context, AppMotion.pageOut),
@@ -84,7 +84,7 @@ Page<void> slideOverPage(
           decoration: const BoxDecoration(
             boxShadow: [
               BoxShadow(
-                color: Colors.black26,
+                color: AppMotion.pageShadow,
                 blurRadius: 16,
                 offset: Offset(-2, 0),
               ),

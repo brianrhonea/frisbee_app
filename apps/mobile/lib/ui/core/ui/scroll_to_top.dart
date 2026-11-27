@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../themes/theme.dart';
 
 /// Scrolls [controller]'s list to the top when the status bar is tapped
 /// (iOS), or the tab the page is on is tapped again ([ScrollToTop.request]),
@@ -78,8 +79,8 @@ class _ScrollToTopState extends State<ScrollToTop> with WidgetsBindingObserver {
       if ((p.pixels - target).abs() < 1) continue;
       p.animateTo(
         target,
-        duration: const Duration(milliseconds: 600),
-        curve: Curves.easeOutCubic,
+        duration: AppMotion.of(context, AppMotion.sheet),
+        curve: AppMotion.easing,
       );
     }
   }

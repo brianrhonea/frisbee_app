@@ -10,6 +10,50 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.75
+
+- **Sign in:** the same sign-in and sign-up with the new buttons.
+
+## 0.0.74
+
+- **Settings:** the same settings with consistent type.
+
+## 0.0.73
+
+- **Notifications:** quick All and Unread filters and a cleaner list.
+
+## 0.0.72
+
+- **Teams:** a cleaner list of your teams with your role on each.
+
+## 0.0.71
+
+- **Roster:** tidier member and role lists.
+
+## 0.0.70
+
+- **Teams:** a cleaner team page with a cover, event cards and a face stack of members.
+
+## 0.0.69
+
+- **Events:** a cleaner event page with a cover, who is going and your answer.
+
+## 0.0.68
+
+- **Chats:** quick filters for team chats and direct messages, with counts, and cleaner rows.
+
+## 0.0.67
+
+- **Schedule:** a new List view next to Week and Month, and the events are easier to read.
+
+## 0.0.66
+
+- **Home, simpler:** a greeting, three quick numbers, your next events with whether you have replied, and a + button to post, add an event or find a team.
+
+## 0.0.65
+
+- **Easier to use and read:** form fields have a clearer outline, the side bar fits on a phone turned sideways, small text is a little bigger, and pages move at one steady speed (and not at all with Reduce Motion).
+
 ## 0.0.64
 
 - **Smoother, consistent motion:** pages, sheets and dialogs now open and close at the same speed everywhere, and don't animate if you have Reduce Motion on.

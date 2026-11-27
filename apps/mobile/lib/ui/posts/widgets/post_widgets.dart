@@ -1,3 +1,4 @@
+import '../../core/ui/confirm_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -591,23 +592,12 @@ Future<void> repostOrUndo(
       : '';
 
   if (actions.isReposted(post)) {
-    final ok = await showDialog<bool>(
-      context: context,
-      animationStyle: AppMotion.dialogStyle(context),
-      builder: (context) => AlertDialog(
-        title: const Text('Undo your repost?'),
-        content: const Text("Your followers won't see it from you any more."),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Undo repost'),
-          ),
-        ],
-      ),
+    final ok = await confirmDialog(
+      context,
+      title: 'Undo your repost?',
+      message: "Your followers won't see it from you any more.",
+      confirmLabel: 'Undo repost',
+      destructive: true,
     );
     if (ok != true) return;
     await actions.undoRepost.execute(post);

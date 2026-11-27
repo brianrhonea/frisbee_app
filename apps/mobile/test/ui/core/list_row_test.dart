@@ -136,6 +136,16 @@ void main() {
     expect(material.color, AppColors.light.accentSoft);
   });
 
+  testWidgets('selected is announced as selected', (t) async {
+    final handle = t.ensureSemantics();
+    await pumpInApp(t, const ListRow(title: 'Ana', selected: true));
+    expect(
+      t.getSemantics(find.byType(ListRow)),
+      matchesSemantics(isSelected: true, hasSelectedState: true, label: 'Ana'),
+    );
+    handle.dispose();
+  });
+
   for (final theme in GoldenTheme.values) {
     testWidgets('meets accessibility guidelines, ${theme.name}', (t) async {
       await pumpInApp(t, _gallery(), theme: theme, height: 520);

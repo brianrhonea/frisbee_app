@@ -8,6 +8,7 @@ import 'package:frisbee_app/ui/schedule/view_models/schedule_viewmodel.dart';
 import 'package:frisbee_app/ui/schedule/widgets/schedule_screen.dart';
 
 import '../testing/fakes.dart';
+import '../ui_harness/harness.dart';
 
 void main() {
   late FakeTeamRepository teams;
@@ -144,7 +145,7 @@ void main() {
     });
   });
 
-  testWidgets('Month shows the grid and the picked day\'s week', (
+  testWidgets("Month shows the grid and the picked day's events", (
     tester,
   ) async {
     tester.view.physicalSize = const Size(390, 1100);
@@ -164,25 +165,24 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('November 2026'), findsOneWidget);
     expect(find.text('3 events'), findsOneWidget);
-    // Today's events below the grid.
+    // Today's events below the grid, and nothing from other days.
+    expect(find.text('Thursday, Nov 19'), findsOneWidget);
+    expect(find.text('Today'), findsOneWidget);
     expect(find.text('Thursday practice'), findsOneWidget);
     expect(find.text('Tempo run'), findsOneWidget);
     expect(find.text('Snowmelt Hat'), findsNothing);
-
-    // The whole week is listed, Monday to Sunday, with its row tinted.
-    expect(find.text('MONDAY, NOV 16'), findsOneWidget);
-    expect(find.text('SUNDAY, NOV 22'), findsOneWidget);
+    expect(find.text('Monday, Nov 16'), findsNothing);
     expect(find.byKey(const ValueKey('picked-week')), findsOneWidget);
-    // Another day in the same week keeps the week's events.
+    // A day with nothing on says so.
     await tester.tap(find.bySemanticsLabel('Friday, November 20'));
     await tester.pumpAndSettle();
-    expect(find.text('Thursday practice'), findsOneWidget);
+    expect(find.text('Thursday practice'), findsNothing);
+    expect(find.text('Nothing scheduled'), findsOneWidget);
 
     await tester.tap(find.bySemanticsLabel('Saturday, November 28'));
     await tester.pumpAndSettle();
     expect(find.text('Snowmelt Hat'), findsOneWidget);
     expect(find.text('Thursday practice'), findsNothing);
-    expect(find.text('MONDAY, NOV 23'), findsOneWidget);
     expect(find.text('Needs RSVP'), findsOneWidget);
     // Another day picked: Today brings it back.
     await tester.tap(find.byTooltip('Today'));
@@ -192,5 +192,88 @@ void main() {
     await tester.tap(find.text('Week'));
     await tester.pumpAndSettle();
     expect(find.byTooltip('Previous week'), findsOneWidget);
+  });
+
+  testWidgets('List shows every day of the month that has events', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final vm = schedule();
+    addTearDown(vm.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: ScheduleScreen(viewModel: vm),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('List'), findsOneWidget);
+    await tester.tap(find.text('List'));
+    await tester.pumpAndSettle();
+    expect(vm.view, ScheduleView.list);
+    expect(find.text('November 2026'), findsOneWidget);
+    // No grid, but the days with events, in order.
+    expect(find.byKey(const ValueKey('picked-week')), findsNothing);
+    expect(find.text('Thursday practice'), findsOneWidget);
+    expect(find.text('Tempo run'), findsOneWidget);
+    expect(find.text('Snowmelt Hat'), findsOneWidget);
+    expect(find.text('Nothing scheduled'), findsNothing);
+    final first = tester.getTopLeft(find.text('Thursday practice')).dy;
+    final later = tester.getTopLeft(find.text('Snowmelt Hat')).dy;
+    expect(first, lessThan(later));
+    // Next month is empty.
+    await tester.tap(find.byTooltip('Next month'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nothing scheduled this month'), findsOneWidget);
+  });
+  // H2: Week, Month and List, light and dark, phone and tablet.
+  group('H2 Schedule redesign', () {
+    for (final view in ScheduleView.values) {
+      Widget screen() {
+        final vm = schedule()..setView(view);
+        addTearDown(vm.dispose);
+        return ScheduleScreen(viewModel: vm);
+      }
+
+      testWidgets(
+        '${view.label}: goldens at phone and tablet widths',
+        skip: goldenSkip != null,
+        (tester) async {
+          await expectGoldens(
+            tester,
+            screen(),
+            'schedule_h2_${view.name}',
+            widths: const [GoldenWidth.phone, GoldenWidth.tablet],
+            height: 860,
+          );
+        },
+      );
+
+      for (final theme in GoldenTheme.values) {
+        testWidgets('${view.label}: meets guidelines, ${theme.name}', (
+          tester,
+        ) async {
+          await pumpInApp(tester, screen(), theme: theme, height: 860);
+          await expectAccessible(tester);
+        });
+      }
+
+      testWidgets('${view.label}: fits at text scale 2.0', (tester) async {
+        await expectNoOverflowWithLargeText(tester, screen(), height: 860);
+      });
+    }
+
+    testWidgets('the three views are one control: Week, Month, List', (
+      tester,
+    ) async {
+      final vm = schedule();
+      addTearDown(vm.dispose);
+      await pumpInApp(tester, ScheduleScreen(viewModel: vm), height: 860);
+      for (final label in ['Week', 'Month', 'List']) {
+        expect(find.text(label), findsOneWidget);
+      }
+    });
   });
 }

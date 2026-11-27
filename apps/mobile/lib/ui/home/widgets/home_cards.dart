@@ -66,8 +66,10 @@ class TeamStrip extends StatelessWidget {
         ),
       ),
     );
+    // Grows with the text scale, so the label never overflows.
+    final grow = (MediaQuery.textScalerOf(context).scale(12) - 12) * 1.3;
     return SizedBox(
-      height: 92,
+      height: 92 + grow,
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: [

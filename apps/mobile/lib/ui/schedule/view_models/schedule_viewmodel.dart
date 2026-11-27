@@ -30,7 +30,10 @@ enum ScheduleFilter {
 /// listed, or a month grid with the picked day's week listed below.
 enum ScheduleView {
   week('Week'),
-  month('Month');
+  month('Month'),
+
+  /// The month as a plain list of its days that have events (no grid).
+  list('List');
 
   const ScheduleView(this.label);
   final String label;
@@ -132,7 +135,7 @@ class ScheduleViewModel extends ChangeNotifier {
 
   /// Brings [day]'s week or month into view, for the current [view].
   void _showDay(DateTime day) {
-    if (_view == ScheduleView.month) {
+    if (_view != ScheduleView.week) {
       _monthStart = DateTime(day.year, day.month);
     } else if (day.isBefore(_weekStart) ||
         !day.isBefore(_weekStart.add(const Duration(days: 7)))) {
@@ -171,7 +174,8 @@ class ScheduleViewModel extends ChangeNotifier {
   /// month with today picked), so the Today button has nothing to do.
   bool get showsToday => switch (_view) {
     ScheduleView.week => isCurrentWeek,
-    ScheduleView.month => isCurrentMonth && _selectedDay == today,
+    ScheduleView.month ||
+    ScheduleView.list => isCurrentMonth && _selectedDay == today,
   };
 
   /// Number of events in the month shown that pass the filter.

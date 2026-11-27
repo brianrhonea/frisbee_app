@@ -1,3 +1,4 @@
+import '../../core/ui/confirm_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -79,23 +80,12 @@ class _PollCardBodyState extends State<_PollCardBody> {
   }
 
   Future<void> _confirmClose() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      animationStyle: AppMotion.dialogStyle(context),
-      builder: (context) => AlertDialog(
-        title: const Text('Close this poll?'),
-        content: const Text('Nobody can vote or change their vote after.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Close poll'),
-          ),
-        ],
-      ),
+    final ok = await confirmDialog(
+      context,
+      title: 'Close this poll?',
+      message: 'Nobody can vote or change their vote after.',
+      confirmLabel: 'Close poll',
+      destructive: true,
     );
     if (ok == true) vm.close.execute();
   }

@@ -25,10 +25,12 @@ import 'package:frisbee_app/ui/messages/view_models/inbox_viewmodel.dart';
 import 'package:frisbee_app/ui/messages/widgets/direct_chat_screen.dart';
 import 'package:frisbee_app/ui/chat/widgets/reaction_bubble.dart';
 import 'package:frisbee_app/ui/messages/widgets/inbox_screen.dart';
+import 'package:frisbee_app/ui/core/ui/list_row.dart';
 import 'package:frisbee_app/utils/result.dart';
 
 import '../testing/fakes.dart';
 import '../testing/social_fakes.dart';
+import '../ui_harness/harness.dart';
 
 void main() {
   group('UserProfile', () {
@@ -799,7 +801,14 @@ void main() {
     await tester.pump();
     expect(find.text('Avery Jones'), findsOneWidget);
     expect(find.text('See you at practice'), findsOneWidget);
-    expect(find.byIcon(Icons.circle), findsOneWidget);
+    final handle = tester.ensureSemantics();
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is Semantics && w.properties.label == 'Unread',
+      ),
+      findsOneWidget,
+    );
+    handle.dispose();
   });
 
   group('team chats in the inbox', () {
@@ -1083,6 +1092,7 @@ void main() {
     );
     await tester.pump();
     expect(find.text('Avery'), findsNothing);
+    await tester.ensureVisible(find.text('Requests'));
     await tester.tap(find.text('Requests'));
     await tester.pump();
     expect(find.text('Avery'), findsOneWidget);
@@ -1568,5 +1578,164 @@ void main() {
     vm.setFilter(InboxFilter.all);
     vm.setQuery('bla');
     expect(vm.items.single.title, 'Blake');
+  });
+  // H7: Chats with All, Teams, Direct and Unread filters, rows as ListRow.
+  group('H7 Chats redesign', () {
+    final at = DateTime(2026, 11, 1, 9);
+
+    InboxViewModel both() {
+      teams.teams['t1'] = Team(
+        id: 't1',
+        name: 'Northside Flyers',
+        division: Division.mixed,
+        level: CompetitionLevel.club,
+        ownerId: 'coach',
+        members: {'coach': TeamRole.owner, testUser.uid: TeamRole.player},
+      );
+      chats
+        ..rooms['general'] = ChatRoom.general()
+        ..teamOf['r:general'] = 't1'
+        ..stampRoom('general', at);
+      dms.conversations['a_u1'] = Conversation(
+        id: 'a_u1',
+        participants: const ['a', 'u1'],
+        names: const {'a': 'Avery Jones'},
+        lastMessage: 'See you at practice',
+        lastMessageAt: DateTime(2026, 10, 1),
+        lastSenderId: 'a',
+      );
+      dms.conversations['b_u1'] = Conversation(
+        id: 'b_u1',
+        participants: const ['b', 'u1'],
+        names: const {'b': 'Blake Jordan'},
+        lastMessage: 'Thanks!',
+        lastMessageAt: DateTime(2026, 9, 1),
+        lastSenderId: 'u1',
+      );
+      final vm = InboxViewModel(
+        directMessageRepository: dms,
+        authRepository: auth,
+        teamRepository: teams,
+        chatRepository: chats,
+      );
+      addTearDown(vm.dispose);
+      return vm;
+    }
+
+    Widget screen(InboxViewModel vm) => withRepos(InboxScreen(viewModel: vm));
+
+    test('Teams lists only team chats, Direct only conversations', () async {
+      final vm = both();
+      await pumpEventQueue();
+      vm.setFilter(InboxFilter.teams);
+      expect(vm.items, isEmpty);
+      expect(vm.teamChats.map((s) => s.team.name), ['Northside Flyers']);
+      vm.setFilter(InboxFilter.direct);
+      expect(vm.teamChats, isEmpty);
+      expect(vm.items.map((i) => i.title), ['Avery Jones', 'Blake Jordan']);
+      vm.setFilter(InboxFilter.all);
+      expect(vm.items, hasLength(2));
+      expect(vm.teamChats, hasLength(1));
+    });
+
+    testWidgets('the chips are All, Teams, Direct, Unread, Requests, '
+        'Archived, each with its unread count', (tester) async {
+      final vm = both();
+      await pumpInApp(tester, screen(vm), width: 390, height: 800);
+      for (final label in [
+        'All',
+        'Teams',
+        'Direct',
+        'Unread',
+        'Requests',
+        'Archived',
+      ]) {
+        expect(find.text(label), findsOneWidget, reason: label);
+      }
+      // One unread team chat and one unread conversation.
+      final handle = tester.ensureSemantics();
+      expect(find.bySemanticsLabel('Teams, 1'), findsOneWidget);
+      expect(find.bySemanticsLabel('Direct, 1'), findsOneWidget);
+      expect(find.bySemanticsLabel('Unread, 2'), findsOneWidget);
+      handle.dispose();
+    });
+
+    testWidgets('tapping Teams shows team chats only; Direct the rest', (
+      tester,
+    ) async {
+      final vm = both();
+      await pumpInApp(tester, screen(vm), width: 390, height: 800);
+      expect(find.text('Northside Flyers'), findsOneWidget);
+      expect(find.text('Avery Jones'), findsOneWidget);
+      await tester.tap(find.text('Teams'));
+      await tester.pump();
+      expect(find.text('Northside Flyers'), findsOneWidget);
+      expect(find.text('Avery Jones'), findsNothing);
+      await tester.tap(find.text('Direct'));
+      await tester.pump();
+      expect(find.text('Northside Flyers'), findsNothing);
+      expect(find.text('Avery Jones'), findsOneWidget);
+      expect(find.text('Blake Jordan'), findsOneWidget);
+    });
+
+    testWidgets('rows are list rows with an unread dot and the time', (
+      tester,
+    ) async {
+      final vm = both();
+      await pumpInApp(tester, screen(vm), width: 390, height: 800);
+      expect(find.byType(ListRow), findsNWidgets(3));
+      expect(find.text('See you at practice'), findsOneWidget);
+    });
+
+    testWidgets('an empty filter says so in words', (tester) async {
+      final vm = both();
+      dms.conversations.clear();
+      dms.emit();
+      await pumpInApp(tester, screen(vm), width: 390, height: 800);
+      await tester.tap(find.text('Direct'));
+      await tester.pump();
+      expect(find.text('No direct messages'), findsOneWidget);
+    });
+
+    for (final theme in GoldenTheme.values) {
+      testWidgets('meets accessibility guidelines, ${theme.name}', (
+        tester,
+      ) async {
+        final vm = both();
+        await pumpInApp(
+          tester,
+          screen(vm),
+          theme: theme,
+          width: 390,
+          height: 800,
+        );
+        await expectAccessible(tester);
+      });
+    }
+
+    testWidgets('fits at text scale 2.0', (tester) async {
+      final vm = both();
+      await expectNoOverflowWithLargeText(
+        tester,
+        screen(vm),
+        width: 390,
+        height: 800,
+      );
+    });
+
+    testWidgets(
+      'goldens at phone and tablet widths, light and dark',
+      skip: goldenSkip != null,
+      (tester) async {
+        final vm = both();
+        await expectGoldens(
+          tester,
+          screen(vm),
+          'inbox_h7',
+          widths: const [GoldenWidth.phone, GoldenWidth.tablet],
+          height: 800,
+        );
+      },
+    );
   });
 }

@@ -593,65 +593,84 @@ class _Rail extends StatelessWidget {
       color: c.sidebar,
       child: SafeArea(
         right: false,
-        child: Column(
-          children: [
-            const SizedBox(height: 18),
-            InkWell(
-              onTap: () => onSelect(ShellSection.community),
-              child: const AppLogo(size: 34),
-            ),
-            const SizedBox(height: 22),
-            for (final s in ShellSection.tabs)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 3),
-                child: Tooltip(
-                  message: '${s.label}  ·  ${shortcutLabel('${s.index + 1}')}',
-                  child: Material(
-                    color: s == selected ? c.accentSoft : Colors.transparent,
-                    borderRadius: BorderRadius.circular(controlRadius),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(controlRadius),
-                      onTap: () => onSelect(s),
-                      child: SizedBox(
-                        width: 44,
-                        height: 44,
-                        child: Badge(
-                          isLabelVisible:
-                              s == ShellSection.messages &&
-                              viewModel.unreadMessages > 0,
-                          label: Text('${viewModel.unreadMessages}'),
-                          offset: const Offset(-4, 4),
-                          child: Center(
-                            child: Icon(
-                              s == selected ? s.activeIcon : s.icon,
-                              size: 21,
-                              color: s == selected
-                                  ? c.accent
-                                  : c.onSidebarMuted,
-                            ),
-                          ),
-                        ),
+        child: LayoutBuilder(
+          builder: (context, box) {
+            // A phone on its side is short: drop the logo and let the tabs
+            // scroll rather than overflow.
+            final short = box.maxHeight < 420;
+            return Column(
+              children: [
+                SizedBox(height: short ? 8 : 18),
+                if (!short) ...[
+                  InkWell(
+                    onTap: () => onSelect(ShellSection.community),
+                    child: const AppLogo(size: 34),
+                  ),
+                  const SizedBox(height: 22),
+                ],
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        for (final s in ShellSection.tabs) _item(c, s),
+                      ],
+                    ),
+                  ),
+                ),
+                InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: () => onSelect(ShellSection.profile),
+                  child: SizedBox.square(
+                    dimension: 48,
+                    child: Center(
+                      child: PersonAvatar(
+                        name: viewModel.userName,
+                        photoUrl: viewModel.user?.photoUrl,
+                        radius: 17,
                       ),
                     ),
                   ),
                 ),
-              ),
-            const Spacer(),
-            InkWell(
-              customBorder: const CircleBorder(),
-              onTap: () => onSelect(ShellSection.profile),
-              child: PersonAvatar(
-                name: viewModel.userName,
-                photoUrl: viewModel.user?.photoUrl,
-                radius: 17,
-              ),
-            ),
-            const SizedBox(height: 18),
-          ],
+                SizedBox(height: short ? 8 : 18),
+              ],
+            );
+          },
         ),
       ),
     );
   }
+
+  Widget _item(AppColors c, ShellSection s) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 3),
+    child: Tooltip(
+      message: '${s.label}  ·  ${shortcutLabel('${s.index + 1}')}',
+      child: Material(
+        color: s == selected ? c.accentSoft : Colors.transparent,
+        borderRadius: BorderRadius.circular(controlRadius),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(controlRadius),
+          onTap: () => onSelect(s),
+          child: SizedBox(
+            width: 48,
+            height: 48,
+            child: Badge(
+              isLabelVisible:
+                  s == ShellSection.messages && viewModel.unreadMessages > 0,
+              label: Text('${viewModel.unreadMessages}'),
+              offset: const Offset(-4, 4),
+              child: Center(
+                child: Icon(
+                  s == selected ? s.activeIcon : s.icon,
+                  size: 21,
+                  color: s == selected ? c.accent : c.onSidebarMuted,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 // Top bar --------------------------------------------------------------------
@@ -666,9 +685,7 @@ class _TopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     final desktop = ScreenSize.of(context) == ScreenSize.desktop;
-    return Container(
-      height: 60,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+    return DecoratedBox(
       decoration: BoxDecoration(
         color: c.card,
         border: Border(bottom: BorderSide(color: c.border)),
@@ -676,23 +693,27 @@ class _TopBar extends StatelessWidget {
       child: SafeArea(
         bottom: false,
         left: false,
-        child: Row(
-          children: [
-            Expanded(child: _Breadcrumbs(crumbs: crumbs)),
-            SizedBox(width: desktop ? 300 : 220, child: const SearchField()),
-            const SizedBox(width: 8),
-            NotificationsButton(count: viewModel.unreadNotifications),
-            const SizedBox(width: 6),
-            InkWell(
-              customBorder: const CircleBorder(),
-              onTap: () => context.go(Routes.profile),
-              child: PersonAvatar(
-                name: viewModel.userName,
-                photoUrl: viewModel.user?.photoUrl,
-                radius: 16,
+        child: Container(
+          height: 60,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            children: [
+              Expanded(child: _Breadcrumbs(crumbs: crumbs)),
+              SizedBox(width: desktop ? 300 : 220, child: const SearchField()),
+              const SizedBox(width: 8),
+              NotificationsButton(count: viewModel.unreadNotifications),
+              const SizedBox(width: 6),
+              InkWell(
+                customBorder: const CircleBorder(),
+                onTap: () => context.go(Routes.profile),
+                child: PersonAvatar(
+                  name: viewModel.userName,
+                  photoUrl: viewModel.user?.photoUrl,
+                  radius: 16,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -818,7 +839,15 @@ class MobileTopBar extends StatelessWidget implements PreferredSizeWidget {
       titleSpacing: 16,
       title: InkWell(
         onTap: () => context.go(Routes.home),
-        child: AppWordmark(size: 28, color: c.onSidebar, logo: false),
+        // A 48 px tall tap target around the wordmark.
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            widthFactor: 1,
+            child: AppWordmark(size: 28, color: c.onSidebar, logo: false),
+          ),
+        ),
       ),
       actions: [
         if (search)

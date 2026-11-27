@@ -182,8 +182,7 @@ class Eyebrow extends StatelessWidget {
     text.toUpperCase(),
     maxLines: 1,
     overflow: TextOverflow.ellipsis,
-    style: TextStyle(
-      fontSize: 10.5,
+    style: AppText.caption.copyWith(
       fontWeight: FontWeight.w700,
       letterSpacing: 0.8,
       color: color ?? AppColors.of(context).muted,
@@ -333,7 +332,8 @@ class CardLink extends StatelessWidget {
   }
 }
 
-/// A scoreboard-navy card for what is live or today, e.g. the next game.
+/// A card in the feature colour for what is live or today, e.g. the next
+/// game.
 class FeatureCard extends StatelessWidget {
   const FeatureCard({
     super.key,
@@ -434,7 +434,7 @@ class OfficialBadge extends StatelessWidget {
           Text(
             text,
             style: TextStyle(
-              fontSize: 10.5,
+              fontSize: 12,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.2,
               color: c.ink,

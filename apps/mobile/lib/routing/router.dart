@@ -838,10 +838,11 @@ GoRouter router(
                     GoRoute(
                       path: 'chats/:roomId',
                       parentNavigatorKey: _rootKey,
-                      pageBuilder: (_, state) {
+                      pageBuilder: (context, state) {
                         final teamId = state.pathParameters['teamId']!;
                         final roomId = state.pathParameters['roomId']!;
                         return chatPage(
+                          context,
                           state.pageKey,
                           ViewModelHost(
                             key: ValueKey('chat-$teamId-$roomId'),
@@ -1034,9 +1035,10 @@ GoRouter router(
                 GoRoute(
                   path: ':conversationId',
                   parentNavigatorKey: _rootKey,
-                  pageBuilder: (_, state) {
+                  pageBuilder: (context, state) {
                     final id = state.pathParameters['conversationId']!;
                     return chatPage(
+                      context,
                       state.pageKey,
                       ViewModelHost(
                         key: ValueKey('dm-$id'),

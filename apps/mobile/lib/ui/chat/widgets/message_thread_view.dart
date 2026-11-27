@@ -322,6 +322,7 @@ class _MessageThreadViewState extends State<MessageThreadView>
   /// Scrolls up a screen at a time until the row of [id] is built (the
   /// list only builds what's near the screen), then centres it.
   Future<void> _scrollTo(String id) async {
+    final duration = AppMotion.of(context, AppMotion.sheet);
     try {
       for (var i = 0; i < 400 && mounted; i++) {
         final row = _jumpKey.currentContext;
@@ -329,8 +330,8 @@ class _MessageThreadViewState extends State<MessageThreadView>
           await Scrollable.ensureVisible(
             row,
             alignment: 0.5,
-            duration: AppMotion.sheet,
-            curve: Curves.easeOut,
+            duration: duration,
+            curve: AppMotion.easing,
           );
           if (mounted) vm.jumpFinished(id);
           return;

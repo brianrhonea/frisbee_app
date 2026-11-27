@@ -245,10 +245,7 @@ class _RoleTile extends StatelessWidget {
     return ListTile(
       contentPadding: const EdgeInsets.fromLTRB(16, 2, 4, 2),
       leading: RoleDot(color: role.color, size: 12),
-      title: Text(
-        role.name,
-        style: TextStyle(fontWeight: FontWeight.w700, color: c.ink),
-      ),
+      title: Text(role.name, style: AppText.bodyStrong.copyWith(color: c.ink)),
       subtitle: Text(
         [
           summary,
@@ -256,7 +253,7 @@ class _RoleTile extends StatelessWidget {
           if (from case final f?)
             'given out by ${f.isEmpty ? 'the community' : f}',
         ].join(' · '),
-        style: TextStyle(color: c.muted, fontSize: 12.5),
+        style: AppText.caption.copyWith(color: c.muted),
       ),
       trailing: menu,
     );
@@ -279,17 +276,9 @@ class _ListHeading extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.2,
-                color: c.ink,
-              ),
-            ),
+            child: Text(title, style: AppText.section.copyWith(color: c.ink)),
           ),
-          Text(trailing, style: TextStyle(fontSize: 12.5, color: c.muted)),
+          Text(trailing, style: AppText.caption.copyWith(color: c.muted)),
         ],
       ),
     );
@@ -341,7 +330,7 @@ class _RoleDialogState extends State<RoleDialog> {
                 onChanged: (_) => setState(() {}),
               ),
               const SizedBox(height: 8),
-              Text('Color', style: TextStyle(color: c.muted, fontSize: 13)),
+              Text('Color', style: AppText.secondary.copyWith(color: c.muted)),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -371,7 +360,7 @@ class _RoleDialogState extends State<RoleDialog> {
               const SizedBox(height: 16),
               Text(
                 'Permissions',
-                style: TextStyle(color: c.muted, fontSize: 13),
+                style: AppText.secondary.copyWith(color: c.muted),
               ),
               for (final p in widget.permissions)
                 CheckboxListTile(

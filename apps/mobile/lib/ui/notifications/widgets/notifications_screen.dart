@@ -9,6 +9,7 @@ import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/disc_icon.dart';
 import '../../core/ui/error_message.dart';
+import '../../core/ui/filter_chips.dart';
 import '../../core/ui/layout.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/notifications_viewmodel.dart';
@@ -62,6 +63,9 @@ class NotificationsScreen extends StatefulWidget {
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
   NotificationsViewModel get vm => widget.viewModel;
+
+  /// A view-only filter: All, or just what's unread.
+  bool _unreadOnly = false;
 
   late final List<Command<void>> _commands = [
     vm.open,
@@ -124,10 +128,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           title: const Text('Notifications'),
           actions: [
             if (vm.unreadCount > 0)
-              TextButton(
-                onPressed: vm.markAllRead.execute,
-                child: const Text('Mark all read'),
-              ),
+              // Large text: an icon, so the title keeps its room.
+              if (MediaQuery.textScalerOf(context).scale(14) > 14 * 1.3)
+                IconButton(
+                  tooltip: 'Mark all read',
+                  onPressed: vm.markAllRead.execute,
+                  icon: const Icon(Icons.done_all),
+                )
+              else
+                TextButton(
+                  onPressed: vm.markAllRead.execute,
+                  child: const Text('Mark all read'),
+                ),
             PopupMenuButton<String>(
               onSelected: (v) => switch (v) {
                 'settings' => context.push(Routes.notificationSettings),
@@ -160,7 +172,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Widget _body() {
     if (!vm.loaded) return const LoadingState();
-    final items = vm.items;
+    final all = vm.items;
+    // Nothing unread: the filter has nothing to keep, so show everything.
+    final unreadOnly = _unreadOnly && vm.unreadCount > 0;
+    final items = unreadOnly
+        ? [
+            for (final n in all)
+              if (!n.read) n,
+          ]
+        : all;
     final requests = vm.showsFollowRequests
         ? _FollowRequestsTile(
             count: vm.followRequestCount,
@@ -209,6 +229,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
+          AppFilterChips<bool>(
+            selected: _unreadOnly ? true : null,
+            onSelected: (v) => setState(() => _unreadOnly = v ?? false),
+            options: [
+              (value: null, label: 'All', count: null, leading: null),
+              (
+                value: true,
+                label: 'Unread',
+                count: vm.unreadCount > 0 ? vm.unreadCount : null,
+                leading: null,
+              ),
+            ],
+          ),
           // Follow requests waiting are the user's to do: amber, on top.
           if (requests != null) ...[
             if (waiting)
@@ -280,9 +313,7 @@ class _GroupHeader extends StatelessWidget {
               header: true,
               child: Text(
                 label.toUpperCase(),
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w800,
+                style: AppText.label.copyWith(
                   letterSpacing: 0.8,
                   color: needsYou ? c.highlightInk : c.muted,
                 ),
@@ -304,18 +335,14 @@ class _GroupCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    return Card(
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (final (i, child) in children.indexed) ...[
-            if (i > 0) Divider(height: 1, color: c.border),
-            child,
-          ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final (i, child) in children.indexed) ...[
+          if (i > 0) Divider(height: 1, color: c.border),
+          child,
         ],
-      ),
+      ],
     );
   }
 }
@@ -360,14 +387,13 @@ class _FollowRequestsTile extends StatelessWidget {
       ),
       title: Text(
         'Follow requests',
-        style: TextStyle(
-          fontWeight: count > 0 ? FontWeight.w700 : FontWeight.w500,
+        style: (count > 0 ? AppText.bodyStrong : AppText.body).copyWith(
           color: c.ink,
         ),
       ),
       subtitle: Text(
         count == 0 ? 'None waiting' : '$count waiting for an answer',
-        style: TextStyle(fontSize: 13, color: c.muted),
+        style: AppText.secondary.copyWith(color: c.muted),
       ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
@@ -410,90 +436,89 @@ class _NotificationTile extends StatelessWidget {
     final at = item.createdAt;
     return InkWell(
       onTap: onTap,
-      child: Padding(
-        // Compact rows without category icons (a deliberate choice).
-        padding: const EdgeInsets.fromLTRB(16, 10, 14, 10),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 56),
+        child: Padding(
+          // Compact rows without category icons (a deliberate choice).
+          padding: const EdgeInsets.fromLTRB(16, 10, 14, 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            // New: bold and larger. Read: lighter and
+                            // smaller, but still listed.
+                            style:
+                                (unread
+                                        ? AppText.bodyStrong.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                          )
+                                        : AppText.secondary)
+                                    .copyWith(color: unread ? c.ink : c.muted),
+                          ),
+                        ),
+                        if (at != null) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            _when(at),
+                            style: AppText.caption.copyWith(
+                              color: unread ? c.accent : c.muted,
+                            ),
+                          ),
+                        ],
+                        // Unread: a small turf dot after the time.
+                        if (unread) ...[
+                          const SizedBox(width: 6),
+                          Icon(Icons.circle, size: 8, color: c.accent),
+                        ],
+                      ],
+                    ),
+                    if (item.followBack != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: following
+                            ? OutlinedButton.icon(
+                                onPressed: null,
+                                style: _compactButton,
+                                icon: const Icon(Icons.check, size: 16),
+                                label: const Text('Following'),
+                              )
+                            : FilledButton.icon(
+                                onPressed: followingBack ? null : onFollowBack,
+                                style: _compactButton,
+                                icon: const Icon(
+                                  Icons.person_add_alt_1,
+                                  size: 16,
+                                ),
+                                label: const Text('Follow back'),
+                              ),
+                      )
+                    else if (item.body.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 1),
                         child: Text(
-                          item.title,
+                          item.body,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          // New: bold and larger. Read: lighter and
-                          // smaller, but still listed.
-                          style: TextStyle(
-                            fontSize: unread ? 15.5 : 14,
-                            height: 1.3,
-                            fontWeight: unread
-                                ? FontWeight.w700
-                                : FontWeight.w400,
+                          style: AppText.secondary.copyWith(
                             color: unread ? c.ink : c.muted,
                           ),
                         ),
                       ),
-                      if (at != null) ...[
-                        const SizedBox(width: 8),
-                        Text(
-                          _when(at),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: unread ? c.accent : c.muted,
-                          ),
-                        ),
-                      ],
-                      // Unread: a small turf dot after the time.
-                      if (unread) ...[
-                        const SizedBox(width: 6),
-                        Icon(Icons.circle, size: 8, color: c.accent),
-                      ],
-                    ],
-                  ),
-                  if (item.followBack != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: following
-                          ? OutlinedButton.icon(
-                              onPressed: null,
-                              style: _compactButton,
-                              icon: const Icon(Icons.check, size: 16),
-                              label: const Text('Following'),
-                            )
-                          : FilledButton.icon(
-                              onPressed: followingBack ? null : onFollowBack,
-                              style: _compactButton,
-                              icon: const Icon(
-                                Icons.person_add_alt_1,
-                                size: 16,
-                              ),
-                              label: const Text('Follow back'),
-                            ),
-                    )
-                  else if (item.body.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 1),
-                      child: Text(
-                        item.body,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: unread ? 14 : 13,
-                          height: 1.3,
-                          color: unread ? c.ink : c.muted,
-                        ),
-                      ),
-                    ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -503,9 +528,7 @@ class _NotificationTile extends StatelessWidget {
     visualDensity: VisualDensity.compact,
     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
     padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 12)),
-    textStyle: const WidgetStatePropertyAll(
-      TextStyle(fontFamily: appFont, fontSize: 13, fontWeight: FontWeight.w600),
-    ),
+    textStyle: WidgetStatePropertyAll(AppText.label),
   );
 
   static String _when(DateTime d) {

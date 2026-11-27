@@ -125,35 +125,37 @@ class ChatDrawer extends StatelessWidget {
 /// Slides a chat in from the right, the way a phone opens a conversation.
 /// iOS and macOS get the native page, so swiping from the left edge goes
 /// back, following the finger.
-Page<void> chatPage(LocalKey key, Widget child) =>
+Page<void> chatPage(BuildContext context, LocalKey key, Widget child) =>
     switch (defaultTargetPlatform) {
       TargetPlatform.iOS ||
       TargetPlatform.macOS => CupertinoPage(key: key, child: child),
-      _ => _slidePage(key, child),
+      _ => _slidePage(context, key, child),
     };
 
-CustomTransitionPage<void> _slidePage(LocalKey key, Widget child) =>
-    CustomTransitionPage(
-      key: key,
-      child: child,
-      transitionDuration: AppMotion.pageIn,
-      reverseTransitionDuration: AppMotion.pageOut,
-      transitionsBuilder: (context, animation, _, child) =>
-          // Reduce motion: the page just appears.
-          MediaQuery.disableAnimationsOf(context)
-          ? child
-          : SlideTransition(
-              position: Tween(begin: const Offset(1, 0), end: Offset.zero)
-                  .animate(
-                    CurvedAnimation(
-                      parent: animation,
-                      curve: AppMotion.easing,
-                      reverseCurve: AppMotion.easing,
-                    ),
-                  ),
-              child: child,
+CustomTransitionPage<void> _slidePage(
+  BuildContext context,
+  LocalKey key,
+  Widget child,
+) => CustomTransitionPage(
+  key: key,
+  child: child,
+  transitionDuration: AppMotion.of(context, AppMotion.pageIn),
+  reverseTransitionDuration: AppMotion.of(context, AppMotion.pageOut),
+  transitionsBuilder: (context, animation, _, child) =>
+      // Reduce motion: the page just appears.
+      MediaQuery.disableAnimationsOf(context)
+      ? child
+      : SlideTransition(
+          position: Tween(begin: const Offset(1, 0), end: Offset.zero).animate(
+            CurvedAnimation(
+              parent: animation,
+              curve: AppMotion.easing,
+              reverseCurve: AppMotion.easing,
             ),
-    );
+          ),
+          child: child,
+        ),
+);
 
 /// The bar above an open conversation: [avatar], [title] over [subtitle],
 /// and [actions], on the card color with a line below.

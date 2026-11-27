@@ -20,13 +20,7 @@ PreferredSizeWidget settingsAppBar(
     titleSpacing: ModalRoute.of(context)?.impliesAppBarDismissal ?? false
         ? 4
         : null,
-    titleTextStyle: TextStyle(
-      fontFamily: appFont,
-      fontSize: 17,
-      fontWeight: FontWeight.w700,
-      letterSpacing: -0.2,
-      color: c.ink,
-    ),
+    titleTextStyle: AppText.section.copyWith(color: c.ink),
     shape: Border(bottom: BorderSide(color: c.border)),
   );
 }
@@ -79,9 +73,7 @@ class SettingsHeading extends StatelessWidget {
           Flexible(
             child: Text(
               text.toUpperCase(),
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
+              style: AppText.label.copyWith(
                 letterSpacing: 0.6,
                 color: AppColors.of(context).muted,
               ),
@@ -105,11 +97,7 @@ class SettingsFooter extends StatelessWidget {
     padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
     child: Text(
       text,
-      style: TextStyle(
-        fontSize: 12,
-        height: 1.4,
-        color: AppColors.of(context).muted,
-      ),
+      style: AppText.caption.copyWith(color: AppColors.of(context).muted),
     ),
   );
 }
@@ -145,18 +133,8 @@ class SettingsGroup extends StatelessWidget {
           Card(
             // Rows (switches and radios too) in the settings type sizes.
             child: ListTileTheme.merge(
-              titleTextStyle: TextStyle(
-                fontFamily: appFont,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: c.ink,
-              ),
-              subtitleTextStyle: TextStyle(
-                fontFamily: appFont,
-                fontSize: 12,
-                height: 1.35,
-                color: c.muted,
-              ),
+              titleTextStyle: AppText.bodyStrong.copyWith(color: c.ink),
+              subtitleTextStyle: AppText.caption.copyWith(color: c.muted),
               child: Column(
                 children: [
                   for (final (i, row) in children.indexed) ...[
@@ -190,7 +168,7 @@ class SettingsIcon extends StatelessWidget {
       height: 32,
       decoration: BoxDecoration(
         color: c.field,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppRadius.control),
       ),
       child: Icon(icon, size: 18, color: color ?? c.ink2),
     );
@@ -235,16 +213,12 @@ class SettingsTile extends StatelessWidget {
       leading: SettingsIcon(icon, color: color),
       title: Text(
         title,
-        style: TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.w600,
-          color: color ?? c.ink,
-        ),
+        style: AppText.bodyStrong.copyWith(color: color ?? c.ink),
       ),
       subtitle: subtitle != null
-          ? Text(subtitle!, style: TextStyle(color: c.muted, fontSize: 12))
+          ? Text(subtitle!, style: AppText.caption.copyWith(color: c.muted))
           : long
-          ? Text(value!, style: TextStyle(color: c.muted, fontSize: 13))
+          ? Text(value!, style: AppText.secondary.copyWith(color: c.muted))
           : null,
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
@@ -256,7 +230,7 @@ class SettingsTile extends StatelessWidget {
                 v,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: c.muted, fontSize: 13),
+                style: AppText.secondary.copyWith(color: c.muted),
               ),
             ),
           if (opensPage && onTap != null) ...[

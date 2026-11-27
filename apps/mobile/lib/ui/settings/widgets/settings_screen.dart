@@ -68,17 +68,14 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   title: Text(
                     user?.label ?? '',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 17,
-                    ),
+                    style: AppText.section.copyWith(color: c.ink),
                   ),
                   subtitle: Text(
                     [
                       if (user?.username case final u?) '@$u',
                       ?user?.email,
                     ].join(' · '),
-                    style: TextStyle(fontSize: 13, color: c.muted),
+                    style: AppText.secondary.copyWith(color: c.muted),
                   ),
                   trailing: Icon(Icons.chevron_right, color: c.muted),
                   onTap: () => context.push(Routes.settingsAccount),
@@ -312,8 +309,7 @@ class _ThemeChoice extends StatelessWidget {
                           const SizedBox(width: 6),
                           Text(
                             themeModeLabel(mode),
-                            style: TextStyle(
-                              fontSize: 14,
+                            style: AppText.label.copyWith(
                               fontWeight: mode == value
                                   ? FontWeight.w700
                                   : FontWeight.w600,
@@ -614,11 +610,7 @@ class AccountSettingsScreen extends StatelessWidget {
                             child: Text(
                               'Deletes your profile, posts and messages for '
                               'good. Teams you own pass to another member.',
-                              style: TextStyle(
-                                fontSize: 14,
-                                height: 1.4,
-                                color: c.ink2,
-                              ),
+                              style: AppText.secondary.copyWith(color: c.ink2),
                             ),
                           ),
                         ],
@@ -670,8 +662,7 @@ class _ValueTile extends StatelessWidget {
       leading: icon == null ? null : SettingsIcon(icon!),
       title: Text(
         label,
-        style: TextStyle(
-          fontSize: 12,
+        style: AppText.caption.copyWith(
           fontWeight: FontWeight.w600,
           color: c.muted,
         ),
@@ -680,22 +671,11 @@ class _ValueTile extends StatelessWidget {
         value,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.w600,
-          color: c.ink,
-        ),
+        style: AppText.bodyStrong.copyWith(color: c.ink),
       ),
       trailing: action == null || onTap == null
           ? null
-          : Text(
-              action!,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: c.accent,
-              ),
-            ),
+          : Text(action!, style: AppText.label.copyWith(color: c.accent)),
       onTap: onTap,
     );
   }

@@ -23,7 +23,11 @@ import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
 import 'package:frisbee_app/data/repositories/event/event_repository.dart';
 import 'package:frisbee_app/data/repositories/team/team_repository.dart';
 
+import 'package:frisbee_app/ui/core/ui/event_card.dart';
+import 'package:frisbee_app/ui/core/ui/summary_tiles.dart';
+
 import '../testing/fakes.dart';
+import '../ui_harness/harness.dart';
 import '../testing/social_fakes.dart';
 
 TeamEvent event(String id, String title, EventType type, DateTime at) =>
@@ -739,6 +743,7 @@ void main() {
     expect(find.byType(Dialog), findsNothing);
     // No Link tool: links go in the words.
     expect(find.text('Link'), findsNothing);
+    await tester.ensureVisible(find.text('Workout'));
     await tester.tap(find.text('Workout'));
     await tester.pumpAndSettle();
     expect(find.byType(PostComposer), findsNothing);
@@ -824,6 +829,7 @@ void main() {
     await tester.pump();
     expect(find.text('Pickup at the lake, all welcome'), findsNothing);
 
+    await tester.ensureVisible(feedTab('Everyone'));
     await tester.tap(feedTab('Everyone'));
     await tester.pump();
     await tester.pump();
@@ -983,5 +989,104 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(EventEditorScreen), findsOneWidget);
     expect(find.textContaining('Went to'), findsNothing);
+  });
+  // H1: greeting, summary tiles, coming up as event cards, the + button.
+  group('H1 Home redesign', () {
+    Widget home(HomeViewModel vm, {GoldenTheme theme = GoldenTheme.light}) =>
+        HomeScreen(viewModel: vm);
+
+    testWidgets('greets the user by name and shows the date', (tester) async {
+      final vm = await tester.runAsync(load);
+      await pumpInApp(tester, home(vm!), width: 390, height: 844);
+      expect(find.text('Good morning, Alex'), findsOneWidget);
+      expect(find.text('Wednesday, October 28'), findsOneWidget);
+    });
+
+    testWidgets('summary tiles count events and teams, and open them', (
+      tester,
+    ) async {
+      final vm = await tester.runAsync(load);
+      await pumpInApp(tester, home(vm!), width: 390, height: 844);
+      final tiles = tester.widget<SummaryTiles>(find.byType(SummaryTiles));
+      expect(tiles.tiles.map((t) => t.label), ['Coming up', 'Your teams']);
+      expect(tiles.tiles[1].value, '1');
+      expect(int.parse(tiles.tiles[0].value), greaterThan(0));
+      expect(tiles.tiles.every((t) => t.onTap != null), isTrue);
+    });
+
+    testWidgets('coming up is a list of event cards with the RSVP state', (
+      tester,
+    ) async {
+      final vm = await tester.runAsync(load);
+      await pumpInApp(tester, home(vm!), width: 390, height: 844);
+      expect(find.byType(EventCard), findsWidgets);
+      expect(find.text('Thursday practice'), findsOneWidget);
+      // A team event they haven't answered asks for an RSVP, in words.
+      expect(find.text('Needs RSVP'), findsWidgets);
+    });
+
+    testWidgets('the + button offers a post, an event or a team', (
+      tester,
+    ) async {
+      final vm = await tester.runAsync(load);
+      await pumpInApp(tester, home(vm!), width: 390, height: 844);
+      await tester.tap(find.byType(FloatingActionButton));
+      await tester.pumpAndSettle();
+      expect(find.text('New post'), findsOneWidget);
+      expect(find.text('Add event'), findsNWidgets(2));
+      expect(find.text('Create or join a team'), findsOneWidget);
+      // The event choice goes to the same place as the Coming up link.
+      await tester.tap(find.byKey(const Key('add-event')));
+      await tester.pumpAndSettle();
+      expect(find.text('Add an event to'), findsOneWidget);
+    });
+
+    testWidgets('keeps the three feed tabs', (tester) async {
+      final vm = await tester.runAsync(() => load(withPersonal: true));
+      await pumpInApp(tester, home(vm!), width: 390, height: 844);
+      final tabs = tester.widget<UnderlineTabs>(find.byType(UnderlineTabs));
+      expect(tabs.labels.take(2), ['Your teams', 'Following']);
+    });
+
+    for (final theme in GoldenTheme.values) {
+      testWidgets('meets accessibility guidelines, ${theme.name}', (
+        tester,
+      ) async {
+        final vm = await tester.runAsync(load);
+        await pumpInApp(
+          tester,
+          home(vm!),
+          theme: theme,
+          width: 390,
+          height: 844,
+        );
+        await expectAccessible(tester);
+      });
+    }
+
+    testWidgets('fits at text scale 2.0', (tester) async {
+      final vm = await tester.runAsync(load);
+      await expectNoOverflowWithLargeText(
+        tester,
+        home(vm!),
+        width: 390,
+        height: 844,
+      );
+    });
+
+    testWidgets(
+      'goldens at phone and tablet widths, light and dark',
+      skip: goldenSkip != null,
+      (tester) async {
+        final vm = await tester.runAsync(load);
+        await expectGoldens(
+          tester,
+          home(vm!),
+          'home_h1',
+          widths: const [GoldenWidth.phone, GoldenWidth.tablet],
+          height: 900,
+        );
+      },
+    );
   });
 }

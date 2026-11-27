@@ -19,6 +19,12 @@ enum InboxSection { teams, direct }
 /// Which inbox entries to list.
 enum InboxFilter {
   all,
+
+  /// Only team and community chats.
+  teams,
+
+  /// Only direct messages and group conversations.
+  direct,
   unread,
 
   /// Message requests waiting on the user.
@@ -158,6 +164,7 @@ class InboxViewModel extends ChangeNotifier {
     return [
       for (final s in all)
         if ((_filter == InboxFilter.all ||
+                _filter == InboxFilter.teams ||
                 (_filter == InboxFilter.unread && s.unread)) &&
             (q.isEmpty || s.team.name.toLowerCase().contains(q)))
           s,
@@ -267,7 +274,8 @@ class InboxViewModel extends ChangeNotifier {
   List<InboxItem> get items {
     final q = _query.trim().toLowerCase();
     final source = switch (_filter) {
-      InboxFilter.all => allItems,
+      InboxFilter.all || InboxFilter.direct => allItems,
+      InboxFilter.teams => const <InboxItem>[],
       InboxFilter.unread => allItems.where((i) => i.unread),
       InboxFilter.requests => requestItems,
       InboxFilter.archived => archivedItems,

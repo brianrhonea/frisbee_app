@@ -23,6 +23,7 @@ class CoverHeader extends StatelessWidget {
     this.actions = const [],
     this.coverHeight = 120,
     this.avatarSize = 72,
+    this.roundAvatar = true,
   });
 
   final String title;
@@ -37,11 +38,29 @@ class CoverHeader extends StatelessWidget {
   final double coverHeight;
   final double avatarSize;
 
+  /// A round picture (people, teams) or a rounded square (e.g. an event's
+  /// date badge).
+  final bool roundAvatar;
+
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     final url = coverUrl;
     final band = ColoredBox(color: c.accentSoft);
+    final wrapActions = MediaQuery.textScalerOf(context).scale(14) > 14 * 1.3;
+    final titleBlock = Semantics(
+      header: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          BalancedText(title, style: AppText.heading3.copyWith(color: c.ink)),
+          if (subtitle != null) ...[
+            const SizedBox(height: 2),
+            Text(subtitle!, style: AppText.secondary.copyWith(color: c.muted)),
+          ],
+        ],
+      ),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -76,10 +95,28 @@ class CoverHeader extends StatelessWidget {
               bottom: -avatarSize / 2,
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
+                  shape: roundAvatar ? BoxShape.circle : BoxShape.rectangle,
+                  borderRadius: roundAvatar
+                      ? null
+                      : BorderRadius.circular(AppRadius.card),
                   border: Border.all(color: c.background, width: 4),
                 ),
-                child: avatar,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    shape: roundAvatar ? BoxShape.circle : BoxShape.rectangle,
+                    borderRadius: roundAvatar
+                        ? null
+                        : BorderRadius.circular(AppRadius.card),
+                    border: Border.all(color: c.border),
+                  ),
+                  position: DecorationPosition.foreground,
+                  child: roundAvatar
+                      ? ClipOval(child: avatar)
+                      : ClipRRect(
+                          borderRadius: BorderRadius.circular(AppRadius.card),
+                          child: avatar,
+                        ),
+                ),
               ),
             ),
           ],
@@ -87,42 +124,30 @@ class CoverHeader extends StatelessWidget {
         SizedBox(height: avatarSize / 2 + AppSpace.md),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Semantics(
-                  header: true,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      BalancedText(
-                        title,
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.5,
-                          height: 1.15,
-                          color: c.ink,
-                        ),
-                      ),
-                      if (subtitle != null) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          subtitle!,
-                          style: TextStyle(color: c.muted, fontSize: 13.5),
-                        ),
-                      ],
+          child: wrapActions && actions.isNotEmpty
+              // Large text: the buttons drop under the title and wrap.
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    titleBlock,
+                    const SizedBox(height: AppSpace.md),
+                    Wrap(
+                      spacing: AppSpace.sm,
+                      runSpacing: AppSpace.sm,
+                      children: actions,
+                    ),
+                  ],
+                )
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: titleBlock),
+                    if (actions.isNotEmpty) ...[
+                      const SizedBox(width: AppSpace.md),
+                      Wrap(spacing: AppSpace.sm, children: actions),
                     ],
-                  ),
+                  ],
                 ),
-              ),
-              if (actions.isNotEmpty) ...[
-                const SizedBox(width: AppSpace.md),
-                Wrap(spacing: AppSpace.sm, children: actions),
-              ],
-            ],
-          ),
         ),
       ],
     );

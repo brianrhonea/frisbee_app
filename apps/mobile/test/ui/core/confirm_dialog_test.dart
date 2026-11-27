@@ -103,6 +103,39 @@ void main() {
     expect(button.style?.backgroundColor?.resolve({}), AppColors.light.accent);
   });
 
+  testWidgets('destructive: Cancel has the focus first', (t) async {
+    await pumpInApp(t, _dialog(destructive: true));
+    await t.pump();
+    final cancel = t.widget<OutlinedButton>(find.byType(OutlinedButton));
+    expect(cancel.autofocus, isTrue);
+    await pumpInApp(t, _dialog());
+    expect(
+      t.widget<OutlinedButton>(find.byType(OutlinedButton)).autofocus,
+      isFalse,
+    );
+  });
+
+  testWidgets('confirmDialog passes cancelLabel through', (t) async {
+    await pumpInApp(
+      t,
+      Builder(
+        builder: (context) => TextButton(
+          onPressed: () => confirmDialog(
+            context,
+            title: 'Leave?',
+            message: 'Sure?',
+            cancelLabel: 'Stay',
+          ),
+          child: const Text('Ask'),
+        ),
+      ),
+    );
+    await t.tap(find.text('Ask'));
+    await t.pumpAndSettle();
+    expect(find.text('Stay'), findsOneWidget);
+    expect(find.text('Cancel'), findsNothing);
+  });
+
   testWidgets('the confirm button says what happens', (t) async {
     await pumpInApp(t, _dialog(destructive: true));
     expect(find.text('Delete post'), findsOneWidget);

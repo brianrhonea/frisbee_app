@@ -26,7 +26,10 @@ class ListRow extends StatelessWidget {
     this.unread = false,
     this.muted = false,
     this.selected = false,
+    this.subtitleStyle,
     this.onTap,
+    this.onLongPress,
+    this.onSecondaryTap,
   });
 
   final String title;
@@ -37,6 +40,13 @@ class ListRow extends StatelessWidget {
   final bool muted;
   final bool selected;
   final VoidCallback? onTap;
+
+  /// Press and hold, or right-click: a menu of actions for the row.
+  final VoidCallback? onLongPress;
+  final VoidCallback? onSecondaryTap;
+
+  /// Changes how the subtitle looks (e.g. an italic "typing...").
+  final TextStyle? subtitleStyle;
 
   /// Shortest a row gets.
   static const minHeight = 56.0;
@@ -65,8 +75,7 @@ class ListRow extends StatelessWidget {
                   title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 15,
+                  style: AppText.bodyStrong.copyWith(
                     fontWeight: unread ? FontWeight.w700 : FontWeight.w600,
                     color: titleColor,
                   ),
@@ -76,11 +85,14 @@ class ListRow extends StatelessWidget {
                     subtitle!,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: muted ? c.muted : c.ink2,
-                      fontWeight: unread ? FontWeight.w600 : FontWeight.w400,
-                    ),
+                    style: AppText.secondary
+                        .copyWith(
+                          color: muted ? c.muted : c.ink2,
+                          fontWeight: unread
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                        )
+                        .merge(subtitleStyle),
                   ),
               ],
             ),
@@ -120,11 +132,21 @@ class ListRow extends StatelessWidget {
       heightFactor: 1,
       child: row,
     );
-    return Material(
-      color: selected ? c.accentSoft : Colors.transparent,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: minHeight),
-        child: onTap == null ? centred : InkWell(onTap: onTap, child: centred),
+    return Semantics(
+      selected: selected ? true : null,
+      child: Material(
+        color: selected ? c.accentSoft : Colors.transparent,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: minHeight),
+          child: onTap == null
+              ? centred
+              : InkWell(
+                  onTap: onTap,
+                  onLongPress: onLongPress,
+                  onSecondaryTap: onSecondaryTap,
+                  child: centred,
+                ),
+        ),
       ),
     );
   }

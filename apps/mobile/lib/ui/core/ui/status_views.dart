@@ -22,10 +22,20 @@ class LoadingState extends StatelessWidget {
 ///
 /// Website counterpart: `ErrorState` (apps/web).
 class ErrorState extends StatelessWidget {
-  const ErrorState({super.key, required this.error, this.onRetry});
+  const ErrorState({
+    super.key,
+    required this.error,
+    this.onRetry,
+    this.title,
+    this.retryLabel = 'Retry',
+  });
 
   final Object? error;
   final VoidCallback? onRetry;
+
+  /// A heading above the message, e.g. "Couldn't load your teams".
+  final String? title;
+  final String retryLabel;
 
   @override
   Widget build(BuildContext context) => Center(
@@ -43,11 +53,19 @@ class ErrorState extends StatelessWidget {
               color: Theme.of(context).colorScheme.error,
             ),
             const SizedBox(height: 12),
+            if (title != null) ...[
+              Text(
+                title!,
+                textAlign: TextAlign.center,
+                style: AppText.bodyStrong,
+              ),
+              const SizedBox(height: AppSpace.xs),
+            ],
             Text(errorMessage(error), textAlign: TextAlign.center),
             if (onRetry != null) ...[
               const SizedBox(height: 12),
               AppButton.secondary(
-                'Retry',
+                retryLabel,
                 icon: Icons.refresh,
                 onPressed: onRetry,
               ),

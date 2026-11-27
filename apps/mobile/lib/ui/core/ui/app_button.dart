@@ -27,6 +27,7 @@ class AppButton extends StatelessWidget {
     this.icon,
     this.loading = false,
     this.expand = false,
+    this.autofocus = false,
   });
 
   const AppButton.primary(
@@ -37,6 +38,7 @@ class AppButton extends StatelessWidget {
     IconData? icon,
     bool loading = false,
     bool expand = false,
+    bool autofocus = false,
   }) : this(
          label,
          key: key,
@@ -45,6 +47,7 @@ class AppButton extends StatelessWidget {
          icon: icon,
          loading: loading,
          expand: expand,
+         autofocus: autofocus,
        );
 
   const AppButton.secondary(
@@ -55,6 +58,7 @@ class AppButton extends StatelessWidget {
     IconData? icon,
     bool loading = false,
     bool expand = false,
+    bool autofocus = false,
   }) : this(
          label,
          key: key,
@@ -64,6 +68,7 @@ class AppButton extends StatelessWidget {
          icon: icon,
          loading: loading,
          expand: expand,
+         autofocus: autofocus,
        );
 
   const AppButton.ghost(
@@ -74,6 +79,7 @@ class AppButton extends StatelessWidget {
     IconData? icon,
     bool loading = false,
     bool expand = false,
+    bool autofocus = false,
   }) : this(
          label,
          key: key,
@@ -83,6 +89,7 @@ class AppButton extends StatelessWidget {
          icon: icon,
          loading: loading,
          expand: expand,
+         autofocus: autofocus,
        );
 
   const AppButton.destructive(
@@ -93,6 +100,7 @@ class AppButton extends StatelessWidget {
     IconData? icon,
     bool loading = false,
     bool expand = false,
+    bool autofocus = false,
   }) : this(
          label,
          key: key,
@@ -102,6 +110,7 @@ class AppButton extends StatelessWidget {
          icon: icon,
          loading: loading,
          expand: expand,
+         autofocus: autofocus,
        );
 
   final String label;
@@ -119,6 +128,10 @@ class AppButton extends StatelessWidget {
 
   /// Fill the available width.
   final bool expand;
+
+  /// Takes focus when it first appears (e.g. Cancel in a destructive
+  /// confirm).
+  final bool autofocus;
 
   @override
   Widget build(BuildContext context) {
@@ -159,16 +172,19 @@ class AppButton extends StatelessWidget {
     final button = switch (variant) {
       AppButtonVariant.primary || AppButtonVariant.destructive => FilledButton(
         style: style,
+        autofocus: autofocus,
         onPressed: tap,
         child: content,
       ),
       AppButtonVariant.secondary => OutlinedButton(
         style: style,
+        autofocus: autofocus,
         onPressed: tap,
         child: content,
       ),
       AppButtonVariant.ghost => TextButton(
         style: style,
+        autofocus: autofocus,
         onPressed: tap,
         child: content,
       ),

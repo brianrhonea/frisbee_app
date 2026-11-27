@@ -122,17 +122,11 @@ class _AuthLayoutState extends State<AuthLayout>
       children: [
         BalancedText(
           widget.title,
-          style: TextStyle(
-            fontSize: 26,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.5,
-            height: 1.15,
-            color: c.ink,
-          ),
+          style: AppText.heading3.copyWith(color: c.ink),
         ),
         if (widget.subtitle case final s?) ...[
           const SizedBox(height: 4),
-          Text(s, style: TextStyle(fontSize: 14, color: c.muted)),
+          Text(s, style: AppText.secondary.copyWith(color: c.muted)),
         ],
         const SizedBox(height: 20),
         widget.child,

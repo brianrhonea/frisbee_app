@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../domain/models/username.dart';
 import '../../../routing/routes.dart';
 import '../../core/themes/theme.dart';
+import '../../core/ui/app_button.dart';
 import '../../core/ui/error_message.dart';
 import '../view_models/sign_in_viewmodel.dart';
 import 'auth_layout.dart';
@@ -112,11 +113,11 @@ class _SignInScreenState extends State<SignInScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (vm.showGoogle)
-                    OutlinedButton.icon(
-                      style: _social,
+                    AppButton.secondary(
+                      'Continue with Google',
+                      expand: true,
+                      icon: Icons.g_mobiledata,
                       onPressed: busy ? null : vm.signInWithGoogle.execute,
-                      icon: const Icon(Icons.g_mobiledata, size: 28),
-                      label: const Text('Continue with Google'),
                     ),
                   if (vm.showApple) ...[
                     if (vm.showGoogle) const SizedBox(height: 10),
@@ -139,7 +140,7 @@ class _SignInScreenState extends State<SignInScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           child: Text(
                             'or',
-                            style: TextStyle(fontSize: 13, color: c.muted),
+                            style: AppText.secondary.copyWith(color: c.muted),
                           ),
                         ),
                         const Expanded(child: Divider()),
@@ -180,14 +181,11 @@ class _SignInScreenState extends State<SignInScreen> {
                       child: const Text('Forgot password?'),
                     ),
                   ),
-                  FilledButton(
+                  AppButton.primary(
+                    'Sign in',
+                    expand: true,
+                    loading: vm.signIn.running,
                     onPressed: busy ? null : _submit,
-                    child: vm.signIn.running
-                        ? const SizedBox.square(
-                            dimension: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Sign in'),
                   ),
                   const SizedBox(height: 20),
                   TextButton(
@@ -195,17 +193,11 @@ class _SignInScreenState extends State<SignInScreen> {
                     child: Text.rich(
                       TextSpan(
                         text: "Don't have an account? ",
-                        style: TextStyle(
-                          color: c.muted,
-                          fontWeight: FontWeight.w400,
-                        ),
+                        style: AppText.body.copyWith(color: c.muted),
                         children: [
                           TextSpan(
                             text: 'Sign up',
-                            style: TextStyle(
-                              color: c.accent,
-                              fontWeight: FontWeight.w700,
-                            ),
+                            style: AppText.bodyStrong.copyWith(color: c.accent),
                           ),
                         ],
                       ),

@@ -13,6 +13,17 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.75  | 2026-11-27 | `sprint3/lane-b`                        |                     |
+| 0.0.74  | 2026-11-27 | `sprint3/lane-b`                        |                     |
+| 0.0.73  | 2026-11-27 | `sprint3/lane-b`                        |                     |
+| 0.0.72  | 2026-11-27 | `sprint3/lane-b`                        |                     |
+| 0.0.71  | 2026-11-27 | `sprint3/lane-b`                        |                     |
+| 0.0.70  | 2026-11-27 | `sprint3/lane-b`                        |                     |
+| 0.0.69  | 2026-11-27 | `sprint3/lane-b`                        |                     |
+| 0.0.68  | 2026-11-27 | `sprint3/lane-b`                        |                     |
+| 0.0.67  | 2026-11-27 | `sprint3/lane-b`                        |                     |
+| 0.0.66  | 2026-11-27 | `sprint3/lane-b`                        |                     |
+| 0.0.65  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.64  | 2026-11-26 | `sprint3/lane-b`                        |                     |
 | 0.0.63  | 2026-11-26 | `sprint3/lane-b`                        |                     |
 | 0.0.62  | 2026-11-26 | `sprint3/lane-b`                        |                     |
@@ -77,6 +88,57 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.75 — H10 Sign in and sign up
+
+- Sign in and sign up: Sign in, Create account and Continue with Google use the shared `AppButton` (with its loading spinner); titles and links on the shared type scale. Google, Apple, email and username sign-in, forgot password, validation messages and the sign-up form are unchanged. The fields stay themed `TextFormField`s (same look as `AppTextField`) because the forms validate through `Form`.
+
+## 0.0.74 — H9 Settings
+
+- Settings: the profile row, grouped rows with chevrons and the appearance choice (Light, Dark, System) keep their layout; titles, headings, values and notes move to the shared type scale and radius tokens. Delete account, change password, privacy and every other action are unchanged.
+
+## 0.0.73 — H8 Notifications
+
+- Notifications: All and Unread filter chips (view-only, in the screen; the view model is unchanged), Today and Earlier groups without a card round them, 56 px rows on the shared type scale, unread dot kept. Tapping an entry still marks it read and opens its target. At large text, Mark all read becomes an icon so the title fits.
+
+## 0.0.72 — H4 My teams
+
+- Teams tab: your teams and communities are `ListRow`s with a role pill (`StatusPill`) and no box; headings on the shared type scale. Explore's team, community and player results are `ListRow`s too (a team's Join stays on its page). Routes, join with code, find and start are unchanged.
+
+## 0.0.71 — H6 Roster and permissions
+
+- Members, Roles and Roster screens: names, role pills (owner, captain), counts and notes on the shared type scale; join-request card on the card radius token. Add member (Invite), the member menu, permissions and role editing are unchanged (the existing tests find the rows as list tiles, so the rows keep that structure).
+
+## 0.0.70 — H5 Team overview and feed
+
+- Team page: a cover band with the team logo (`CoverHeader`) on wide screens; sections (About, Coming up, Meet the sideline) lose their boxes; upcoming events are `EventCard`s; members show a face stack (`AvatarStack`) beside the existing tiles; type moved to the shared scale. The phone header's rows grow with large text. Tabs, Invite, Message, follow, share box, posts and permissions are unchanged.
+
+## 0.0.69 — H3 Event details and RSVP
+
+- Event page: a cover band with the date badge on its edge (`CoverHeader` gained `roundAvatar`), calm detail lines, an attendee count under "Are you in?" ("2 people going"), Going / Maybe / Can't go, Responses and Notes without boxes. RSVP, note, reactions, poll, edit and delete are unchanged.
+
+## 0.0.68 — H7 Chats redesign
+
+- Chats: filters All, Teams, Direct, Unread, Requests and Archived (Teams and Direct are the approved addition UI-Q12: `InboxFilter.teams` and `.direct`), each with its unread count; chips are 48 px targets. Team chats and conversations are `ListRow`s (unread dot, muted bell, selected tint, time) with no card around the list. Swipe actions, long-press menu, search, requests, folding sections and the chat screens (send, pending, failed) are unchanged.
+- `ListRow` takes `onLongPress`, `onSecondaryTap` and a `subtitleStyle`.
+
+## 0.0.67 — H2 Schedule redesign (Month, Week, List)
+
+- Schedule: Week, Month and the new List view (approved addition UI-Q12; `ScheduleView.list`, remembered like the others). Events are `EventCard`s under a calm day heading with a Today pill; Month shows the picked day's events (it used to list the picked day's week); List shows every day of the month that has events. The week strip runs edge to edge so every day is a 48 px target. Swipe to delete, invites, filters, calendars and pull to refresh are unchanged.
+
+## 0.0.66 — H1 Home redesign
+
+- Home: a greeting with today's date, summary tiles (coming up, your teams, needs you; each opens its page), Coming up as event cards with the RSVP state, and a flat + button for a new post, an event or a team. The three feed tabs, composer, drafts and pull to refresh are unchanged. Only the screen changed: no view-model, route or permission change.
+- Top-bar wordmark has a 48 px tap target; the team strip grows with the text scale; floating action buttons are flat (no shadow).
+
+## 0.0.65 — UI review fixes (N13 and components)
+
+- Input fields use the 3:1 outline (`border2`), a 2 px focus ring and error borders.
+- Page pushes and pops take the base 200 ms (K7: sheets stay 300 in, 200 out; dialogs 120 ms). Reduced motion is respected by scroll-to-top, chat jumps, swipe rows, the learn and explore scrolls, and every plain route (new `AppPageTransitionsBuilder`, native Cupertino kept on iOS and macOS). The side-panel scrim and page shadow are tokens (`AppMotion.scrim`, `pageShadow`).
+- Rail: scrolls and hides the logo under 420 px height (landscape phones); 48 px items and avatar. Top bar: safe area outside the 60 px bar; search field 48 px.
+- Type: ListRow, EventCard, SummaryTiles, CoverHeader, AppTextField, nav labels and Eyebrow use the `AppText` scale (nothing under 12 px). DateBadge follows the text scale up to 1.5x and its month is at least 11 px.
+- ListRow announces `selected`. ConfirmDialog: Cancel is the secondary button and has the focus first when destructive; `confirmDialog()` passes `cancelLabel`. Four more destructive dialogs (close poll, undo repost, stop fee split, stop live score) use it. ErrorState takes a title and retry label. CoverHeader actions wrap at large text and the initials avatar has a border ring.
+- K7 note: dialogs use fast 120 ms and sheets close in 200 ms (design-tokens.md is not in lane B's files, so noted here).
 
 ## 0.0.64 — Navigation motion on AppMotion (N13)
 
