@@ -134,7 +134,10 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
     if (_search case final s? when s.enabled) {
       hits = await s.search(SearchKind.people, k);
     } else {
+      // The rules refuse a profiles query that doesn't ask for adults only
+      // (H1: a profile is listed once it carries the adult marker).
       final snap = await _profiles
+          .where('adult', isEqualTo: true)
           .where('keywords', arrayContains: k)
           .limit(_searchLimit * 2)
           .get();
