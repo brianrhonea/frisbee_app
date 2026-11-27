@@ -288,6 +288,7 @@ List<SingleChildWidget> get firebaseProviders => [
       attachments: context.read<AttachmentStorage>(),
       search: context.read<ApiSearch>(),
       outbox: context.read<OutboxRepository>(),
+      api: context.read<ApiClient?>(),
     ),
   ),
   Provider(
