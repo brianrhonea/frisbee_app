@@ -160,13 +160,25 @@ export class ConversationService {
     await checkNotMuted(this.store, caller.uid, this.now());
     const id = req.id ?? `g-${randomBytes(15).toString("base64").replace(/[^A-Za-z0-9]/g, "").slice(0, 20) || "x"}`;
     const me = await this.name(caller);
+    // Who may be added is decided first; the group and its members are then
+    // one write, so a replay (same id) is a plain 409 and a failure leaves no
+    // group without its members for a retry to trip over.
+    const notAdded: string[] = [];
+    const added: { uid: string; name: string }[] = [];
+    for (const raw of [...new Set(req.members)]) {
+      const uid = docIdParam(raw);
+      const check = await this.canAdd(caller, uid);
+      if (!check.ok) notAdded.push(check.name);
+      else if (added.length + 1 >= groupSizeMax) notAdded.push(check.name);
+      else added.push({ uid, name: check.name });
+    }
     await this.store.transact(async (tx) => {
       tx.create(p.conv(id), {
         kind: "group",
         name: req.name,
         createdBy: caller.uid,
-        participants: [caller.uid],
-        names: { [caller.uid]: me },
+        participants: [caller.uid, ...added.map((a) => a.uid)],
+        names: { [caller.uid]: me, ...Object.fromEntries(added.map((a) => [a.uid, a.name])) },
         lastMessage: "",
         lastMessageAt: null,
         lastSenderId: "",
@@ -174,7 +186,19 @@ export class ConversationService {
         createdAt: serverTime,
       });
     });
-    return { id, notAdded: await this.addEach(caller, id, req.members) };
+    return { id, notAdded };
+  }
+
+  /** addsMember() for one person: their name, and whether the caller may add them. */
+  private async canAdd(caller: Caller, uid: string): Promise<{ ok: boolean; name: string }> {
+    const [profile, user, follows] = await Promise.all([
+      this.store.get(p.profile(uid)),
+      this.store.get(p.user(uid)),
+      this.store.get(p.follow(uid, caller.uid)),
+    ]);
+    const name = clip(typeof profile?.name === "string" && profile.name ? profile.name : "Player", 80);
+    const ok = !(!profile || !follows || policyOf(user) === "nobody" || (await blockedBetween(this.store, caller.uid, uid)) || (await this.adults?.isHidden(uid)));
+    return { ok, name };
   }
 
   /** `POST /v1/conversations/:id/members`. */
@@ -189,13 +213,8 @@ export class ConversationService {
     const notAdded: string[] = [];
     for (const raw of [...new Set(members)]) {
       const uid = docIdParam(raw);
-      const [profile, user, follows] = await Promise.all([
-        this.store.get(p.profile(uid)),
-        this.store.get(p.user(uid)),
-        this.store.get(p.follow(uid, caller.uid)),
-      ]);
-      const name = clip(typeof profile?.name === "string" && profile.name ? profile.name : "Player", 80);
-      if (!profile || !follows || policyOf(user) === "nobody" || (await blockedBetween(this.store, caller.uid, uid)) || (await this.adults?.isHidden(uid))) {
+      const { ok, name } = await this.canAdd(caller, uid);
+      if (!ok) {
         notAdded.push(name);
         continue;
       }

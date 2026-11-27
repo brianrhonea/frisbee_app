@@ -114,6 +114,26 @@ describe("A2: POST /v1/conversations/groups takes an optional id", () => {
     expect(s.store.doc("conversations/g-abc123")).toMatchObject({ name: "Crew", participants: ["coach", "player"] });
   });
 
+  it("writes the group and its members as one transaction (L7), so a failed create leaves nothing to trip a retry", async () => {
+    s.store.put("users/player/follows/user_coach", { at: new Date(now) });
+    s.store.put("users/kim/follows/user_coach", { at: new Date(now) });
+    const transact = s.store.transact.bind(s.store);
+    let runs = 0;
+    s.store.transact = ((fn: never) => (runs++, transact(fn))) as typeof s.store.transact;
+    const res = await s.call("POST", url, { id: "g-one", name: "Crew", members: ["player", "kim", "ghost"] });
+    expect(res.statusCode).toBe(201);
+    expect(runs).toBe(1);
+    expect(res.json().notAdded).toEqual(["Player"]);
+    expect(s.store.doc("conversations/g-one")).toMatchObject({ participants: ["coach", "player", "kim"], names: { coach: "Casey", player: "Pat", kim: "Kim" } });
+    // The write failing leaves no group, so the same id can simply be sent again.
+    s.store.transact = (() => Promise.reject(new Error("store down"))) as typeof s.store.transact;
+    expect((await s.call("POST", url, { id: "g-two", name: "Crew", members: ["player"] })).statusCode).toBe(500);
+    expect(s.store.doc("conversations/g-two")).toBeUndefined();
+    s.store.transact = transact;
+    expect((await s.call("POST", url, { id: "g-two", name: "Crew", members: ["player"] })).statusCode).toBe(201);
+    expect(s.store.doc("conversations/g-two")).toMatchObject({ participants: ["coach", "player"] });
+  });
+
   it("mints one when absent, and refuses ids that aren't g- plus letters or digits", async () => {
     const res = await s.call("POST", url, { name: "Crew" });
     expect(res.statusCode).toBe(201);
