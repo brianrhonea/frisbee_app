@@ -12,6 +12,7 @@ import '../../services/api_search.dart';
 import '../../services/attachment_storage.dart';
 import '../../services/firestore_utils.dart';
 import '../../services/api_client.dart';
+import '../../services/pending_ids.dart';
 import '../../services/shared_streams.dart';
 import '../../services/upload_client.dart';
 import '../outbox/outbox_payloads.dart';
@@ -64,6 +65,8 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
   /// The Stall 10 API: conversations and their messages are written through
   /// it (`/v1/conversations`); there's no direct fallback.
   final ApiClient? _api;
+
+  final _ids = PendingIds();
 
   final UploadClient _uploads;
 
@@ -229,13 +232,23 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
     String name,
     List<UserProfile> members,
   ) => guard(() async {
-    final id = 'g-${_conversations.doc().id}';
-    final r = await _api.required.post('/v1/conversations/groups', {
-      'id': id,
+    final body = {
       'name': cleanText(name).trim(),
       'members': [for (final m in members) m.uid],
-    });
-    return (id: r['id'] as String? ?? id, notAdded: _names(r['notAdded']));
+    };
+    final id = _ids.idFor('group', body, () => 'g-${_conversations.doc().id}');
+    try {
+      final r = await _api.required.post('/v1/conversations/groups', {
+        ...body,
+        'id': id,
+      });
+      _ids.done(id);
+      return (id: r['id'] as String? ?? id, notAdded: _names(r['notAdded']));
+    } on ApiException catch (e) {
+      if (e.code != 'already_exists') rethrow;
+      _ids.done(id);
+      return (id: id, notAdded: const <String>[]);
+    }
   });
 
   /// `POST /v1/conversations/:id/members`; the server adds each person who

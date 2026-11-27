@@ -19,6 +19,7 @@ import '../../services/api_search.dart';
 import '../../services/attachment_storage.dart';
 import '../../services/feature_flags.dart';
 import '../../services/firestore_utils.dart';
+import '../../services/pending_ids.dart';
 import '../../services/shared_streams.dart';
 import '../chat/chat_repository_firebase.dart';
 import 'team_repository.dart';
@@ -88,6 +89,8 @@ class TeamRepositoryFirebase implements TeamRepository {
   final AttachmentStorage _files;
   final FirebaseFirestore _db;
   final Random _random;
+
+  final _ids = PendingIds();
 
   /// One listener per query, shared by every screen (see [SharedStreams]).
   final SharedStreams _shared;
@@ -1093,7 +1096,17 @@ class TeamRepositoryFirebase implements TeamRepository {
         };
         final base = '/v1/teams/${Uri.encodeComponent(teamId)}/roster-players';
         if (player.id.isEmpty) {
-          await api.post(base, {...body, 'id': _roster(teamId).doc().id});
+          final id = _ids.idFor(
+            'roster/$teamId',
+            body,
+            () => _roster(teamId).doc().id,
+          );
+          try {
+            await api.post(base, {...body, 'id': id});
+          } on ApiException catch (e) {
+            if (e.code != 'already_exists') rethrow;
+          }
+          _ids.done(id);
         } else {
           await api.put('$base/${Uri.encodeComponent(player.id)}', body);
         }

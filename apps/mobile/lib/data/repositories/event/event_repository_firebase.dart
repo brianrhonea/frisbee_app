@@ -5,6 +5,7 @@ import '../../../domain/models/team_event.dart';
 import '../../../utils/result.dart';
 import '../../services/api_client.dart';
 import '../../services/firestore_utils.dart';
+import '../../services/pending_ids.dart';
 import '../../services/shared_streams.dart';
 import '../../services/time_zone.dart';
 import 'event_repository.dart';
@@ -25,6 +26,8 @@ class EventRepositoryFirebase implements EventRepository {
   /// (`/v1/teams/:teamId/events`, `/v1/calendars/:id/events`); there's no
   /// direct fallback.
   final ApiClient? _api;
+
+  final _ids = PendingIds();
 
   /// The device's time zone, sent with a repeat and with "this and
   /// following" edits so the server keeps each event's wall-clock time
@@ -162,14 +165,26 @@ class EventRepositoryFirebase implements EventRepository {
         final problem = repeatProblem(event.startsAt, repeat);
         if (problem != null) throw ApiException('invalid_argument', problem);
       }
-      final id = _events(teamId).doc().id;
-      final r = await api.post(base, {
+      final body = {
         ..._teamBody(event),
-        'id': id,
         'repeat': ?repeat?.toJson(),
         if (zoned) 'timeZone': await _timeZone(),
-      });
-      return r['id'] as String? ?? id;
+      };
+      // The same request retried keeps its id; a 409 means it landed.
+      final id = _ids.idFor(
+        'event/$teamId',
+        body,
+        () => _events(teamId).doc().id,
+      );
+      try {
+        final r = await api.post(base, {...body, 'id': id});
+        _ids.done(id);
+        return r['id'] as String? ?? id;
+      } on ApiException catch (e) {
+        if (e.code != 'already_exists') rethrow;
+        _ids.done(id);
+        return id;
+      }
     }
     await api.patch('$base/${_enc(event.id)}${_scope(scope)}', {
       ..._teamBody(event),
