@@ -18,11 +18,21 @@ const on = (account: string | null) => (account ? { stripeAccount: account } : {
 /** Everything is shown inside Stall 10, so nobody is asked to sign in to Stripe. */
 const inApp = { external_account_collection: true, disable_stripe_user_authentication: true };
 
-export function stripeFromEnv(env: NodeJS.ProcessEnv = process.env): PaymentGateway | undefined {
+/**
+ * Payers never link a US bank account (owner decision, 2026-11-27): cards,
+ * Apple Pay, Google Pay and Link only. Stripe's per-transaction exclusion
+ * keeps the rest managed in the Dashboard (dynamic payment methods); the
+ * wallets and Link are not excluded this way. Payments already started
+ * with a bank still settle through the "processing" path.
+ */
+export const excludedPaymentMethodTypes = ["us_bank_account" as const];
+
+/** [config] is for tests only (a stubbed HTTP client): nothing in production passes it. */
+export function stripeFromEnv(env: NodeJS.ProcessEnv = process.env, config: Stripe.StripeConfig = {}): PaymentGateway | undefined {
   const key = env.STRIPE_SECRET_KEY?.trim();
   const secrets = [env.STRIPE_PLATFORM_WEBHOOK_SECRET, env.STRIPE_WEBHOOK_SECRET].map((s) => s?.trim() ?? "").filter((s) => s !== "");
   if (!key || secrets.length === 0) return undefined;
-  const stripe = new Stripe(key, { maxNetworkRetries: 2, timeout: 20_000 });
+  const stripe = new Stripe(key, { maxNetworkRetries: 2, timeout: 20_000, ...config });
   return {
     async createAccount({ email, name, idempotencyKey }) {
       // Accounts v2 (POST /v2/core/accounts): a recipient that only
@@ -81,6 +91,7 @@ export function stripeFromEnv(env: NodeJS.ProcessEnv = process.env): PaymentGate
       const session = await stripe.checkout.sessions.create(
         {
           mode: "payment",
+          excluded_payment_method_types: excludedPaymentMethodTypes,
           line_items: input.items.map((item) => ({
             quantity: 1,
             price_data: { currency: input.currency.toLowerCase(), unit_amount: item.amountCents, product_data: { name: item.name } },
@@ -101,13 +112,14 @@ export function stripeFromEnv(env: NodeJS.ProcessEnv = process.env): PaymentGate
       return { id: session.id, url: session.url, clientSecret: null };
     },
     async createIntent(input) {
-      // The payment methods on (cards, wallets, bank payments) come from
-      // Stall 10's settings, never a list here.
+      // The payment methods on come from Stall 10's Dashboard settings
+      // (dynamic payment methods); only US bank payments are excluded.
       const pi = await stripe.paymentIntents.create(
         {
           amount: input.amountCents,
           currency: input.currency.toLowerCase(),
           automatic_payment_methods: { enabled: true },
+          excluded_payment_method_types: excludedPaymentMethodTypes,
           transfer_group: input.transferGroup,
           description: input.description,
           metadata: input.metadata,

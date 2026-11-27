@@ -1199,6 +1199,33 @@ describe("the real Stripe gateway", () => {
     expect(stripeFromEnv({ STRIPE_SECRET_KEY: "sk_test_dummy", STRIPE_PLATFORM_WEBHOOK_SECRET: "whsec_one" })).toBeDefined();
   });
 
+  it("excludes US bank payments (and nothing else) from the app sheet and from Checkout, embedded and hosted", async () => {
+    const bodies: { path: string; params: URLSearchParams }[] = [];
+    const http = Stripe.createFetchHttpClient((async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
+      bodies.push({ path: url.pathname, params: new URLSearchParams(String(init?.body ?? "")) });
+      const body = url.pathname.endsWith("payment_intents")
+        ? { id: "pi_x", object: "payment_intent", client_secret: "pi_x_secret" }
+        : { id: "cs_x", object: "checkout.session", url: "https://checkout.stripe.test/c/cs_x", client_secret: "cs_x_secret" };
+      return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
+    }) as typeof fetch);
+    const gateway = stripeFromEnv(env, { httpClient: http, maxNetworkRetries: 0 })!;
+    const common = { currency: "USD", transferGroup: "g", metadata: { a: "b" }, idempotencyKey: "k", email: "p@example.com" };
+    const checkout = { ...common, amountCents: 1000, items: [{ name: "Fee", amountCents: 1000 }], successUrl: "https://site.test/ok?x=1", cancelUrl: "https://site.test/no", expiresAt: 2_000_000_000 };
+    await gateway.createIntent({ ...common, amountCents: 1000, description: "d" });
+    await gateway.createCheckout({ ...checkout, embedded: false });
+    await gateway.createCheckout({ ...checkout, embedded: true });
+    expect(bodies.map((b) => b.path)).toEqual(["/v1/payment_intents", "/v1/checkout/sessions", "/v1/checkout/sessions"]);
+    for (const b of bodies) {
+      expect(b.params.getAll("excluded_payment_method_types[0]")).toEqual(["us_bank_account"]);
+      expect(b.params.get("excluded_payment_method_types[1]")).toBeNull();
+      // Everything else stays Dashboard-managed: no fixed list of methods, no wallet or Link exclusion.
+      expect([...b.params.keys()].some((k) => k.startsWith("payment_method_types") || k.startsWith("allowed_payment_method_types"))).toBe(false);
+    }
+    expect(bodies[0].params.get("automatic_payment_methods[enabled]")).toBe("true");
+    expect(bodies[2].params.get("ui_mode")).toBe("embedded_page");
+  });
+
   it("checks Stripe's signature on the raw body through the route, for either endpoint's secret", async () => {
     const gateway = stripeFromEnv(env)!;
     const store = new FakeStore(() => now);
