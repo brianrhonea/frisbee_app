@@ -35,6 +35,7 @@ Future<String?> showEventEditor(
   BuildContext context, {
   String? teamId,
   DateTime? day,
+  List<TeamEvent> Function()? knownEvents,
 }) async {
   final messenger = ScaffoldMessenger.maybeOf(context);
   final router = GoRouter.of(context);
@@ -45,6 +46,7 @@ Future<String?> showEventEditor(
         teamId: teamId,
         eventId: null,
         initialDay: day,
+        knownEvents: knownEvents,
         eventRepository: c.read(),
         teamRepository: c.read(),
         authRepository: c.read(),
@@ -77,6 +79,18 @@ Future<String?> showEventEditor(
       ),
     );
   return created.id;
+}
+
+/// When [e] is, for the overlap warning: "Thu, Nov 19, 6:00 PM – 7:30 PM".
+String overlapTime(TeamEvent e) {
+  final day = DateFormat.MMMEd().format(e.startsAt);
+  final start = DateFormat.jm().format(e.startsAt);
+  final end = e.endsAt;
+  if (end == null) return '$day, $start';
+  final sameDay = DateUtils.isSameDay(e.startsAt, end);
+  return sameDay
+      ? '$day, $start – ${DateFormat.jm().format(end)}'
+      : '$day, $start – ${DateFormat.MMMEd().add_jm().format(end)}';
 }
 
 /// What the panel closes with when an event is created.
@@ -231,6 +245,19 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
           allowShare: vm.canShare,
           allowRepeat: vm.isNew,
           onSubmit: (event, share, repeat) async {
+            // An event on top of another is allowed, but asked about.
+            if (vm.overlapFor(event, repeat: repeat) case final other?) {
+              final ok = await confirmDialog(
+                context,
+                title: 'Overlapping event',
+                message:
+                    'This overlaps with ${other.title} '
+                    '(${overlapTime(other)}). Save anyway?',
+                confirmLabel: 'Save anyway',
+                cancelLabel: 'Go back',
+              );
+              if (!ok || !context.mounted) return;
+            }
             var scope = SeriesScope.one;
             if (vm.isSeries) {
               // One of a repeating series: this one, or it and later ones.

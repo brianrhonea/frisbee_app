@@ -199,11 +199,15 @@ class TeamHomeViewModel extends ChangeNotifier {
         .listen(
           (t) {
             _team = (t?.members.containsKey(uid) ?? false) ? t : null;
+            // Whatever the doc says, for the Message sheet: only members
+            // can read a team, so an outsider normally gets none.
+            _staff = t == null ? const [] : communityOrganizers(t);
             _teamLoaded = true;
             _onChange();
           },
           onError: (Object _) {
             _team = null;
+            _staff = const [];
             _teamLoaded = true;
             _onChange();
           },
@@ -361,6 +365,24 @@ class TeamHomeViewModel extends ChangeNotifier {
   };
 
   final DirectMessageRepository? _dms;
+
+  List<CommunityOrganizer> _staff = const [];
+
+  /// The team's staff (owner, admins, coaches) the user can start a direct
+  /// conversation with: not themselves, and none when messages can't be
+  /// opened from here. The DM server's own checks (adults only, blocks)
+  /// still apply when one is opened.
+  List<CommunityOrganizer> get messageableStaff => !canMessage
+      ? const []
+      : [
+          for (final o in _staff)
+            if (o.uid != uid) o,
+        ];
+
+  /// Whether the header shows Message: members (for the team chat and
+  /// staff) and signed-in outsiders where there is staff to message.
+  bool get showsMessage =>
+      uid.isNotEmpty && (isMember || messageableStaff.isNotEmpty);
 
   /// Whether the organizers' Message buttons can open a conversation.
   bool get canMessage => _dms != null;

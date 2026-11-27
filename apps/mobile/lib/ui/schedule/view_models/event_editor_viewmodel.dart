@@ -15,6 +15,7 @@ import '../../../domain/models/team_event.dart';
 import '../../../domain/models/user_post.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
+import 'event_overlap.dart';
 
 /// Creates or edits a team or personal event. Form state lives in the
 /// screen; this loads the original and saves the submitted draft.
@@ -38,7 +39,9 @@ class EventEditorViewModel extends ChangeNotifier {
     ProfileRepository? profileRepository,
     String? calendarId,
     DateTime? initialDay,
+    List<TeamEvent> Function()? knownEvents,
   }) : assert(teamId == null || calendarId == null),
+       _known = knownEvents,
        _teamId = teamId,
        _calendarId = calendarId,
        _calendarRepo = calendarRepository,
@@ -62,6 +65,21 @@ class EventEditorViewModel extends ChangeNotifier {
   final CalendarRepository? _calendarRepo;
   final ProfileRepository? _profiles;
   final DateTime? _initialDay;
+  final List<TeamEvent> Function()? _known;
+
+  /// The first event already on the schedule that [event] (saved with
+  /// [repeat], when new) overlaps, to warn before saving. Looks only at
+  /// the events the opener's schedule has loaded ([knownEvents]); with
+  /// none, there is nothing to compare and it's null.
+  TeamEvent? overlapFor(TeamEvent event, {Repeat? repeat}) {
+    final known = _known;
+    if (known == null) return null;
+    return firstOverlap(
+      event.copyWith(id: eventId ?? ''),
+      known(),
+      repeat: isNew ? repeat : null,
+    );
+  }
 
   /// A new event can go on a calendar made right here.
   bool get canCreateCalendar => isNew && _calendarRepo != null;

@@ -40,6 +40,7 @@ import 'join_team_dialog.dart';
 import 'team_form.dart';
 import 'team_share_card.dart';
 import 'team_initials.dart';
+import 'team_message_sheet.dart';
 import 'team_post_comments_sheet.dart';
 import 'team_post_widgets.dart';
 import 'team_community_sheet.dart';
@@ -1571,13 +1572,29 @@ List<Widget> _headerActions(
       ),
       label: Text(summary.isCommunity ? 'Invite members' : 'Invite players'),
     ),
-  if (vm.isMember)
+  if (vm.showsMessage)
     OutlinedButton.icon(
-      onPressed: () => goWithinTeam(context, TeamSection.chat.route(vm.teamId)),
+      onPressed: () => _openMessage(context, vm),
       icon: const Icon(Icons.chat_bubble_outline, size: 17),
       label: const Text('Message'),
     ),
 ];
+
+/// The Message sheet: the team chat (members) and the staff to message;
+/// the choice opens the chat, or starts a direct conversation, whose
+/// errors the page shows.
+Future<void> _openMessage(BuildContext context, TeamHomeViewModel vm) async {
+  final choice = await showTeamMessageSheet(context, vm);
+  if (!context.mounted) return;
+  switch (choice) {
+    case TeamChatChoice():
+      goWithinTeam(context, TeamSection.chat.route(vm.teamId));
+    case StaffChoice(:final staff):
+      vm.messageOrganizer.execute(staff);
+    case null:
+      break;
+  }
+}
 
 /// The buttons under the team's name: its community, [follow], Invite and
 /// Message.

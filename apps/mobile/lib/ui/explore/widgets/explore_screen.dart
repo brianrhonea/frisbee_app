@@ -11,7 +11,9 @@ import '../../../domain/models/player_profile.dart';
 import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
 import '../../core/themes/theme.dart';
+import '../../core/ui/error_message.dart';
 import '../../core/ui/list_row.dart';
+import '../../core/ui/status_pill.dart';
 import '../../core/ui/layout.dart';
 import '../../core/ui/scoreboard.dart';
 import '../../core/ui/status_views.dart';
@@ -82,6 +84,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   bool get _hasEvents => widget.explore != null || widget.events != null;
 
+  /// A refused join (the server's checks, e.g. a club team's age rule).
+  void _onJoin() {
+    if (vm.join.error) {
+      showErrorSnackBar(context, vm.join.result);
+      vm.join.clearResult();
+    }
+  }
+
   void _search(String text) {
     vm.search.execute(text);
     players.search.execute(text);
@@ -94,6 +104,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   @override
   void initState() {
     super.initState();
+    vm.join.addListener(_onJoin);
     _applyFilter(widget.initialFilter);
     if (widget.initialQuery.isNotEmpty) _search(widget.initialQuery);
   }
@@ -113,6 +124,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   @override
   void dispose() {
+    vm.join.removeListener(_onJoin);
     _debounce?.cancel();
     _text.dispose();
     super.dispose();
@@ -710,6 +722,16 @@ class _ResultTile extends StatelessWidget {
           : t.subtitle,
       trailing: vm.isMine(t.id)
           ? Tag(t.isCommunity ? 'Your community' : 'Your team')
+          : vm.requested(t.id)
+          ? const StatusPill('Requested', icon: Icons.hourglass_top)
+          : vm.canJoin(t)
+          ? ListenableBuilder(
+              listenable: vm.join,
+              builder: (context, _) => FilledButton(
+                onPressed: vm.join.running ? null : () => vm.join.execute(t),
+                child: Text(vm.joinLabel(t)),
+              ),
+            )
           : Icon(Icons.chevron_right, color: AppColors.of(context).muted),
       onTap: () => context.go(Routes.team(t.id)),
     );

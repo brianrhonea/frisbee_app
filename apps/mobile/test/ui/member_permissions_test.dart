@@ -185,7 +185,7 @@ void main() {
     expect(vm.canSetPermissions(testUser.uid), isFalse);
     final patRow = find.ancestor(
       of: find.text('Pat'),
-      matching: find.byType(ListTile),
+      matching: find.byType(InkWell),
     );
     await tester.tap(
       find.descendant(

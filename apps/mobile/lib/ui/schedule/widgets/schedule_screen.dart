@@ -92,10 +92,38 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     _scrollToDay(index);
   }
 
-  /// Picks [day] in the month grid and scrolls its week's list to it.
+  /// One key per day section of the month list, to scroll to a picked day.
+  final _monthKeys = <DateTime, GlobalKey>{};
+
+  GlobalKey _monthKey(DateTime day) =>
+      _monthKeys.putIfAbsent(day, () => GlobalKey());
+
+  /// Picks [day] in the month grid and scrolls the month's list to it, or
+  /// to the nearest following day that has events.
   void _pickMonthDay(DateTime day) {
     vm.selectDay(day);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final target = _monthListDays(
+        vm,
+      ).where((d) => !d.isBefore(vm.selectedDay));
+      if (target.isEmpty) return;
+      final context = _monthKey(target.first).currentContext;
+      if (context != null) {
+        Scrollable.ensureVisible(
+          context,
+          duration: AppMotion.of(this.context, AppMotion.base),
+          curve: AppMotion.easing,
+        );
+      }
+    });
   }
+
+  /// The days of the viewed month that have events, in order.
+  List<DateTime> _monthListDays(ScheduleViewModel vm) => [
+    for (final d in vm.monthDays)
+      if (d.month == vm.monthStart.month && vm.eventsOn(d).isNotEmpty) d,
+  ];
 
   void _scrollToDay(int index) {
     final target = _dayKeys[index].currentContext;
@@ -112,17 +140,18 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   static const _wideHeader = 480.0;
 
   Future<void> _newEvent() async {
-    final id = await showEventEditor(context, day: vm.selectedDay);
+    final id = await showEventEditor(
+      context,
+      day: vm.selectedDay,
+      knownEvents: () => vm.knownEvents,
+    );
     // Other calendars aren't live.
     if (id != null) await vm.refreshCalendars();
   }
 
   /// The List view: every day of the month with something on it.
-  List<Widget> _monthList(ScheduleViewModel vm) {
-    final days = [
-      for (final d in vm.monthDays)
-        if (d.month == vm.monthStart.month && vm.eventsOn(d).isNotEmpty) d,
-    ];
+  List<Widget> _monthList(ScheduleViewModel vm, {bool keyed = false}) {
+    final days = _monthListDays(vm);
     if (days.isEmpty) {
       return [
         Padding(
@@ -139,7 +168,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     }
     return [
       for (final d in days)
-        _DaySection(day: d, viewModel: vm, onSwiped: _onSwiped),
+        _DaySection(
+          key: keyed ? _monthKey(d) : null,
+          day: d,
+          viewModel: vm,
+          onSwiped: _onSwiped,
+          highlightPicked: keyed,
+        ),
     ];
   }
 
@@ -249,14 +284,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                         children: [
                           for (final invite in vm.invites)
                             _InviteCard(invite: invite, viewModel: vm),
-                          // Week: its seven days. Month: the picked day.
-                          // List: the month's days that have events.
+                          // Week: its seven days. Month and List: the
+                          // month's days that have events (Month scrolls
+                          // to the day picked in the grid).
                           if (month)
-                            _DaySection(
-                              day: vm.selectedDay,
-                              viewModel: vm,
-                              onSwiped: _onSwiped,
-                            )
+                            ..._monthList(vm, keyed: true)
                           else if (list)
                             ..._monthList(vm)
                           else
@@ -692,11 +724,15 @@ class _DaySection extends StatelessWidget {
     required this.day,
     required this.viewModel,
     required this.onSwiped,
+    this.highlightPicked = false,
   });
 
   final DateTime day;
   final ScheduleViewModel viewModel;
   final void Function(ScheduleEntry, SeriesScope) onSwiped;
+
+  /// Tints the section when it is the day picked in the month grid.
+  final bool highlightPicked;
 
   @override
   Widget build(BuildContext context) {
@@ -705,47 +741,58 @@ class _DaySection extends StatelessWidget {
     final events = vm.eventsOn(day);
     final isToday = day == vm.today;
     final selected = day == vm.selectedDay;
+    final tinted = highlightPicked && selected;
     return Padding(
       padding: const EdgeInsets.only(top: AppSpace.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
+      child: DecoratedBox(
+        key: tinted ? const ValueKey('picked-day-section') : null,
+        decoration: BoxDecoration(
+          color: tinted ? c.accentSoft : null,
+          borderRadius: BorderRadius.circular(AppRadius.control),
+        ),
+        child: Padding(
+          padding: tinted ? const EdgeInsets.all(AppSpace.sm) : EdgeInsets.zero,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Flexible(
-                child: Semantics(
-                  header: true,
-                  child: Text(
-                    DateFormat('EEEE, MMM d').format(day),
-                    style: AppText.label.copyWith(
-                      color: selected && !isToday ? c.accentInk : c.ink,
+              Row(
+                children: [
+                  Flexible(
+                    child: Semantics(
+                      header: true,
+                      child: Text(
+                        DateFormat('EEEE, MMM d').format(day),
+                        style: AppText.label.copyWith(
+                          color: selected && !isToday ? c.accentInk : c.ink,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              if (isToday) ...[
-                const SizedBox(width: AppSpace.sm),
-                const StatusPill('Today', tone: PillTone.accent),
-              ],
-            ],
-          ),
-          const SizedBox(height: AppSpace.sm),
-          if (events.isEmpty)
-            Text(
-              'Nothing scheduled',
-              style: AppText.secondary.copyWith(color: c.muted),
-            )
-          else
-            for (final entry in events) ...[
-              _SwipeToDelete(
-                entry: entry,
-                enabled: vm.canDelete(entry),
-                onSwiped: onSwiped,
-                child: _EntryCard(entry: entry, viewModel: vm),
+                  if (isToday) ...[
+                    const SizedBox(width: AppSpace.sm),
+                    const StatusPill('Today', tone: PillTone.accent),
+                  ],
+                ],
               ),
               const SizedBox(height: AppSpace.sm),
+              if (events.isEmpty)
+                Text(
+                  'Nothing scheduled',
+                  style: AppText.secondary.copyWith(color: c.muted),
+                )
+              else
+                for (final entry in events) ...[
+                  _SwipeToDelete(
+                    entry: entry,
+                    enabled: vm.canDelete(entry),
+                    onSwiped: onSwiped,
+                    child: _EntryCard(entry: entry, viewModel: vm),
+                  ),
+                  const SizedBox(height: AppSpace.sm),
+                ],
             ],
-        ],
+          ),
+        ),
       ),
     );
   }

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../domain/models/roster_player.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/app_segmented_button.dart';
+import '../../core/ui/layout.dart';
 
 /// Add/edit a roster player; pops with the updated player or null.
 class PlayerDialog extends StatefulWidget {
@@ -43,6 +45,14 @@ class _PlayerDialogState extends State<PlayerDialog> {
     _name.dispose();
     _number.dispose();
     super.dispose();
+  }
+
+  /// A member picked (or null for none): their name fills the Name field.
+  void _pickMember(String? uid) {
+    setState(() {
+      _userId = uid;
+      if (uid != null) _name.text = widget.members[uid] ?? _name.text;
+    });
   }
 
   void _submit() {
@@ -112,22 +122,15 @@ class _PlayerDialogState extends State<PlayerDialog> {
               ),
               if (widget.members.isNotEmpty) ...[
                 const SizedBox(height: 8),
-                DropdownButtonFormField<String?>(
-                  initialValue: widget.members.containsKey(_userId)
-                      ? _userId
-                      : null,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Linked account',
-                    helperText: "Their stats show on this member's profile",
-                  ),
-                  items: [
-                    const DropdownMenuItem(value: null, child: Text('None')),
+                _LinkPicker(
+                  key: const ValueKey('link-to-member'),
+                  linkedName: widget.members[_userId],
+                  available: {
                     for (final e in widget.members.entries)
                       if (!widget.linkedElsewhere.contains(e.key))
-                        DropdownMenuItem(value: e.key, child: Text(e.value)),
-                  ],
-                  onChanged: (v) => setState(() => _userId = v),
+                        e.key: e.value,
+                  },
+                  onPick: _pickMember,
                 ),
               ],
             ],
@@ -141,6 +144,110 @@ class _PlayerDialogState extends State<PlayerDialog> {
         ),
         FilledButton(onPressed: _submit, child: const Text('Save')),
       ],
+    );
+  }
+}
+
+/// "Link to a member": the member this roster spot is, whose stats then show
+/// on their profile. Opens a list of the team's members who aren't linked to
+/// a spot yet; picking one fills the player's name.
+class _LinkPicker extends StatelessWidget {
+  const _LinkPicker({
+    super.key,
+    required this.linkedName,
+    required this.available,
+    required this.onPick,
+  });
+
+  final String? linkedName;
+
+  /// Members (uid to name) with no spot yet, or this spot's own member.
+  final Map<String, String> available;
+  final ValueChanged<String?> onPick;
+
+  Future<void> _open(BuildContext context) async {
+    final c = AppColors.of(context);
+    final picked = await showModalBottomSheet<({String? uid})>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      sheetAnimationStyle: AppMotion.sheetStyle(context),
+      builder: (context) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.7,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpace.lg,
+                  0,
+                  AppSpace.lg,
+                  AppSpace.sm,
+                ),
+                child: Text(
+                  'Link to a member',
+                  style: AppText.section.copyWith(color: c.ink),
+                ),
+              ),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    if (linkedName != null)
+                      ListTile(
+                        minVerticalPadding: 12,
+                        leading: const Icon(Icons.link_off),
+                        title: const Text('Not linked'),
+                        onTap: () => Navigator.pop(context, (uid: null)),
+                      ),
+                    if (available.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.all(AppSpace.lg),
+                        child: Text(
+                          'Every member is already linked to a spot.',
+                          style: AppText.secondary.copyWith(color: c.muted),
+                        ),
+                      ),
+                    for (final e in available.entries)
+                      ListTile(
+                        minVerticalPadding: 12,
+                        leading: PersonAvatar(name: e.value, radius: 18),
+                        title: Text(e.value),
+                        trailing: e.value == linkedName
+                            ? const Icon(Icons.check)
+                            : null,
+                        onTap: () => Navigator.pop(context, (uid: e.key)),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (picked != null) onPick(picked.uid);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      minVerticalPadding: 8,
+      leading: Icon(Icons.link, color: c.muted),
+      title: Text(linkedName ?? 'Link to a member'),
+      subtitle: Text(
+        linkedName == null
+            ? "Pick a member; their stats show on their profile"
+            : "Linked: their stats show on this member's profile",
+      ),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => _open(context),
     );
   }
 }

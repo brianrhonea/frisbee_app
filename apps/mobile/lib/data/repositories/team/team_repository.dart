@@ -218,8 +218,10 @@ abstract class TeamRepository {
     bool withStatus = false,
   });
 
-  /// Creates the player when [RosterPlayer.id] is empty, otherwise updates it.
-  Future<Result<void>> savePlayer(String teamId, RosterPlayer player);
+  /// Creates the player when [RosterPlayer.id] is empty, otherwise updates
+  /// it; the result is the player's id. The server ignores
+  /// [RosterPlayer.userId] here: linking an account is [linkPlayer].
+  Future<Result<String>> savePlayer(String teamId, RosterPlayer player);
 
   Future<Result<void>> deletePlayer(String teamId, String playerId);
 

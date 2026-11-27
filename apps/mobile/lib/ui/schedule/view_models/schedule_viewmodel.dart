@@ -437,6 +437,14 @@ class ScheduleViewModel extends ChangeNotifier {
       if (_matches(e) && !_isPending(e)) e,
   ];
 
+  /// Every event the schedule has loaded (not only the week or filter
+  /// shown), minus ones being deleted: what the event editor checks a new
+  /// event's time against.
+  List<TeamEvent> get knownEvents => [
+    for (final e in _feed.entries)
+      if (!_isPending(e)) e.event,
+  ];
+
   /// Number of events this week that pass the filter.
   int get weekCount => days.fold(0, (n, d) => n + eventsOn(d).length);
 

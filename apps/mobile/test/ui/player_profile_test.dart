@@ -70,25 +70,26 @@ void main() {
   );
 
   group('own profile', () {
-    test('suggests the roster spot matching your name', () async {
+    test('an unlinked user has no spot and nothing to claim', () async {
       final vm = profileOf(testUser.uid);
       await pumpEventQueue();
       expect(vm.isMe, isTrue);
-      expect(vm.claimable.single.team.id, 't1');
-      // Bo is linked to someone else; Alex matches the name.
-      expect([for (final p in vm.claimable.single.players) p.id], ['r1', 'r3']);
+      // Only a team admin links people to roster spots.
+      expect(vm.linkedSpots, isEmpty);
       expect(vm.totals.isEmpty, isTrue);
       vm.dispose();
     });
 
-    test('claiming a spot counts its stats and publishes them', () async {
+    test('a spot an admin links to you counts its stats and publishes '
+        'them', () async {
       final vm = profileOf(testUser.uid);
       await pumpEventQueue();
-      await vm.claim.execute(('t1', 'r1'));
+      // The admin's link call, as the team's roster does it.
+      await teams.linkPlayer('t1', 'r1', testUser.uid);
       await pumpEventQueue();
 
-      expect(teams.links.last, ('t1', 'r1', testUser.uid));
-      expect(vm.claimable, isEmpty);
+      expect(vm.linkedSpots.single.team.id, 't1');
+      expect(vm.linkedSpots.single.player.id, 'r1');
       expect(vm.totals.games, 1);
       expect(vm.totals.goals, 1);
       expect(vm.totals.completions, 1);
@@ -104,7 +105,7 @@ void main() {
         'published again', () async {
       final vm = profileOf(testUser.uid);
       await pumpEventQueue();
-      await vm.claim.execute(('t1', 'r1'));
+      await teams.linkPlayer('t1', 'r1', testUser.uid);
       await pumpEventQueue();
       final sent = vm.summary;
       expect(sent.games, isNotEmpty);
@@ -140,7 +141,7 @@ void main() {
       () async {
         final vm = profileOf(testUser.uid);
         await pumpEventQueue();
-        await vm.claim.execute(('t1', 'r1'));
+        await teams.linkPlayer('t1', 'r1', testUser.uid);
         await pumpEventQueue();
         expect(profiles.published.last.teamSeasons, isNotEmpty);
         await vm.saveDetails.execute(
@@ -202,7 +203,7 @@ void main() {
       expect(vm.totals.goals, 4);
       vm.selectSeason('2025');
       expect(vm.totals.goals, 3);
-      expect(vm.claimable, isEmpty);
+      expect(vm.linkedSpots, isEmpty);
       vm.dispose();
     });
 
@@ -537,7 +538,8 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Edit profile'), findsOneWidget);
-    expect(find.text("I'm Alex Smith"), findsOneWidget);
+    // No claim prompt any more: an admin links you to a roster spot.
+    expect(find.text("I'm Alex Smith"), findsNothing);
     expect(find.text('Appearance'), findsNothing, reason: 'not on the profile');
 
     await tester.tap(find.byTooltip('Settings'));
@@ -642,6 +644,71 @@ void main() {
       await tester.pumpAndSettle();
     }
     vm.dispose();
+  });
+
+  group('roster spot on the profile', () {
+    Future<void> pumpProfile(
+      WidgetTester tester,
+      PlayerProfileViewModel vm,
+    ) async {
+      tester.view.physicalSize = const Size(390, 1400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: PlayerProfileScreen(viewModel: vm),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('an unlinked player is never asked to claim a spot', (
+      tester,
+    ) async {
+      // Alex Smith's name matches an unlinked spot: it used to be offered.
+      final vm = profileOf(testUser.uid);
+      addTearDown(vm.dispose);
+      await pumpProfile(tester, vm);
+      expect(find.textContaining('Link your stats'), findsNothing);
+      expect(find.text('Which player on the roster is you?'), findsNothing);
+      expect(find.textContaining("I'm "), findsNothing);
+      expect(find.text('Roster spots'), findsNothing);
+    });
+
+    testWidgets('a linked player sees the spot and can unlink', (tester) async {
+      teams.roster['t1'] = const [
+        RosterPlayer(id: 'r1', name: 'Alex Smith', number: 17, userId: 'u1'),
+      ];
+      final vm = profileOf(testUser.uid);
+      addTearDown(vm.dispose);
+      await pumpProfile(tester, vm);
+      expect(find.text('Roster spots'), findsOneWidget);
+      expect(find.text('Alex Smith · #17'), findsOneWidget);
+      await tester.tap(find.text('Unlink'));
+      await tester.pumpAndSettle();
+      expect(find.text('Unlink from Team?'), findsOneWidget);
+      // Backing out changes nothing.
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(teams.links, isEmpty);
+      await tester.tap(find.text('Unlink'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Unlink'));
+      await tester.pumpAndSettle();
+      expect(teams.links.single, ('t1', 'r1', null));
+      expect(vm.linkedSpots, isEmpty);
+      expect(find.text('Roster spots'), findsNothing);
+    });
+
+    testWidgets("someone else's profile shows no roster spots", (tester) async {
+      profiles.put(PlayerProfile(uid: 'p2', name: 'Pat'));
+      final vm = profileOf('p2');
+      addTearDown(vm.dispose);
+      await pumpProfile(tester, vm);
+      expect(find.text('Roster spots'), findsNothing);
+      expect(find.text('Unlink'), findsNothing);
+    });
   });
 
   testWidgets('the profile shows the @username under the name', (tester) async {

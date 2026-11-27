@@ -11,36 +11,44 @@ import '../view_models/team_detail_viewmodel.dart';
 import 'player_dialog.dart';
 import '../../core/ui/app_segmented_button.dart';
 
+/// The Add/Edit player form for [player] (a new spot when null), saved
+/// through [viewModel]. Members not linked to a spot yet can be picked to
+/// link it to.
+Future<void> showPlayerEditor(
+  BuildContext context,
+  TeamDetailViewModel viewModel, [
+  RosterPlayer? player,
+]) async {
+  final team = viewModel.team;
+  final members = <String, String>{
+    if (team != null)
+      for (final e in [
+        for (final uid in team.members.keys) MapEntry(uid, team.nameOf(uid)),
+      ]..sort((a, b) => a.value.compareTo(b.value)))
+        e.key: e.value,
+  };
+  final result = await showDialog<RosterPlayer>(
+    context: context,
+    animationStyle: AppMotion.dialogStyle(context),
+    builder: (_) => PlayerDialog(
+      initial: player,
+      members: members,
+      linkedElsewhere: {
+        for (final p in viewModel.roster)
+          if (p.id != player?.id && p.userId != null) p.userId!,
+      },
+    ),
+  );
+  if (result != null) viewModel.savePlayer.execute(result);
+}
+
 class RosterTab extends StatelessWidget {
   const RosterTab({super.key, required this.viewModel});
 
   final TeamDetailViewModel viewModel;
 
-  Future<void> _edit(BuildContext context, [RosterPlayer? player]) async {
-    final result = await showDialog<RosterPlayer>(
-      context: context,
-      animationStyle: AppMotion.dialogStyle(context),
-      builder: (_) => PlayerDialog(
-        initial: player,
-        members: _members(),
-        linkedElsewhere: {
-          for (final p in viewModel.roster)
-            if (p.id != player?.id && p.userId != null) p.userId!,
-        },
-      ),
-    );
-    if (result != null) viewModel.savePlayer.execute(result);
-  }
-
-  /// Members by name, for linking a roster spot to an account.
-  Map<String, String> _members() {
-    final team = viewModel.team;
-    if (team == null) return const {};
-    final entries = [
-      for (final uid in team.members.keys) MapEntry(uid, team.nameOf(uid)),
-    ]..sort((a, b) => a.value.compareTo(b.value));
-    return Map.fromEntries(entries);
-  }
+  Future<void> _edit(BuildContext context, [RosterPlayer? player]) =>
+      showPlayerEditor(context, viewModel, player);
 
   Future<void> _delete(BuildContext context, RosterPlayer player) async {
     if (await confirmDialog(
