@@ -45,7 +45,11 @@ class _TeamEventsTabState extends State<TeamEventsTab> {
   /// adds an event straight away.
   Future<void> _add() async {
     if (!vm.meetingsOn) {
-      await showEventEditor(context, teamId: vm.teamId);
+      await showEventEditor(
+        context,
+        teamId: vm.teamId,
+        knownEvents: () => vm.events,
+      );
       return;
     }
     final route = await showModalBottomSheet<String>(
@@ -74,7 +78,11 @@ class _TeamEventsTabState extends State<TeamEventsTab> {
     );
     if (route == null || !mounted) return;
     if (route == Routes.newEvent(vm.teamId)) {
-      await showEventEditor(context, teamId: vm.teamId);
+      await showEventEditor(
+        context,
+        teamId: vm.teamId,
+        knownEvents: () => vm.events,
+      );
     } else {
       context.push(route);
     }

@@ -140,7 +140,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   static const _wideHeader = 480.0;
 
   Future<void> _newEvent() async {
-    final id = await showEventEditor(context, day: vm.selectedDay);
+    final id = await showEventEditor(
+      context,
+      day: vm.selectedDay,
+      knownEvents: () => vm.knownEvents,
+    );
     // Other calendars aren't live.
     if (id != null) await vm.refreshCalendars();
   }
