@@ -32,7 +32,8 @@ test("Schedule: Week has a seven-day strip, previous and next week, and the pick
   expect(await page.locator(".sched-day.picked .ui-event").count()).toBe(1);
 });
 
-test("Schedule: Month shows the grid and the picked day's events; the view is remembered", async ({ page }) => {
+// Sprint 4 C1: the Month view lists the whole month under the grid; the picked day is highlighted in that list.
+test("Schedule: Month shows the grid and the picked day's events in the month list; the view is remembered", async ({ page }) => {
   await openMember(page, "/schedule");
   await page.getByRole("tab", { name: "Month" }).click();
   expect(await page.getByRole("gridcell").count()).toBeGreaterThanOrEqual(28);

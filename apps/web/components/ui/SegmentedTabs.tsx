@@ -48,8 +48,13 @@ export function SegmentedTabs({ items, value, onChange, label, variant = "segmen
       first.current = false;
       return;
     }
+    // The bar scrolls the tab into view, but the page stays where it is: scrollIntoView also moves the page
+    // when the bar sits near the screen's edge (the feed tabs on a phone's Home scrolled it by itself after load).
     const el = bar.current?.querySelector<HTMLElement>('[aria-selected="true"]');
-    el?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+    if (!el?.scrollIntoView) return;
+    const { scrollX, scrollY } = window;
+    el.scrollIntoView({ block: "nearest", inline: "nearest" });
+    window.scrollTo({ left: scrollX, top: scrollY, behavior: "instant" });
   }, [value]);
 
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {

@@ -120,7 +120,7 @@ export function TeamRoles() {
 
   const toggle = <T,>(xs: T[], x: T) => (xs.includes(x) ? xs.filter((y) => y !== x) : [...xs, x]);
   return (
-    <section className="card">
+    <section className="card" id="team-roles">
       <div className="card-head">
         <h2 className="card-title">Roles</h2>
         {!draft && list.length < roleLimits.roles && (

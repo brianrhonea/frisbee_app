@@ -294,6 +294,7 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
       <div className="hub-detail">
         {shownEditor ? (
           <TeamEventEditor
+            others={events}
             event={shownEditor === "new" ? undefined : (events.find((e) => e.id === shownEditor) ?? (open?.id === shownEditor ? open : undefined))}
             onDone={(id) => {
               setEditing(null);

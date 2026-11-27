@@ -1,12 +1,13 @@
 "use client";
 import type { SaveRosterPlayerRequest, StatsPlayer } from "@stall10/shared";
 import { useState } from "react";
-import { callApi, problem } from "@/lib/client";
+import { ApiError, callApi, problem } from "@/lib/client";
 import { useAuth } from "../../AuthProvider";
 import { useTeamHub } from "../TeamContext";
 import { apiUrl, statsAccess, useStatsPlayers } from "./data";
 import { BackToStats, StatsGate } from "./SeasonStatsPage";
 import "./stats.css";
+import { draftOf, type PlayerDraft, RosterPlayerForm, saveRosterPlayer } from "../RosterPlayerForm";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { ErrorNote } from "@/components/StatusViews";
 
@@ -20,8 +21,9 @@ const positionLabel = Object.fromEntries(positions) as Record<string, string>;
 /**
  * Roster spots, kept for stats (the app's Roster tab): people with or
  * without an account. Admins who manage the team add, edit, mark paid,
- * link to a member and remove them; any member claims an unlinked spot as
- * theirs (their stats then show on their profile) or lets go of their own.
+ * link to a member and remove them. A member never claims a spot (the API
+ * refuses it): an admin links them when adding the player, and the member may
+ * let go of their own spot (their stats then leave their profile).
  */
 export function RosterPlayersPage() {
   return (
@@ -31,23 +33,13 @@ export function RosterPlayersPage() {
   );
 }
 
-type Draft = { id: string; name: string; number: string; position: StatsPlayer["position"]; paid: boolean; userId: string | null };
-const draftOf = (p?: StatsPlayer, userId: string | null = null, name = ""): Draft => ({
-  id: p?.id ?? "",
-  name: p?.name ?? name,
-  number: p?.number?.toString() ?? "",
-  position: p?.position ?? "hybrid",
-  paid: p?.paid ?? false,
-  userId: p?.userId ?? userId,
-});
-
 function RosterPlayers() {
   const askConfirm = useConfirm();
   const { teamId, viewer } = useTeamHub();
   const { user } = useAuth();
   const access = statsAccess(viewer);
   const players = useStatsPlayers(teamId, access.manageTeam);
-  const [editing, setEditing] = useState<Draft | null>(null);
+  const [editing, setEditing] = useState<PlayerDraft | null>(null);
   const [unpaidOnly, setUnpaidOnly] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -80,20 +72,12 @@ function RosterPlayers() {
     }
   }
 
-  const save = async (d: Draft) => {
-    const body: SaveRosterPlayerRequest = {
-      name: d.name.trim(),
-      number: d.number === "" ? null : Number.parseInt(d.number, 10),
-      position: d.position,
-      userId: d.userId,
-      paid: d.paid,
-    };
-    const ok = await run(() =>
-      callApi(user!, apiUrl(teamId, d.id ? `/roster-players/${encodeURIComponent(d.id)}` : "/roster-players"), {
-        method: d.id ? "PUT" : "POST",
-        body,
-      }),
-    );
+  // The spot and its linked member go in one call: see saveRosterPlayer.
+  const save = async (d: PlayerDraft) => {
+    const ok = await run(async () => {
+      const r = await saveRosterPlayer(user!, teamId, d);
+      if (r.error) throw new ApiError(r.error, 0);
+    });
     if (ok) setEditing(null);
   };
 
@@ -123,7 +107,8 @@ function RosterPlayers() {
         </div>
       )}
       {editing && (
-        <PlayerForm
+        <RosterPlayerForm
+          key={editing.id || "new"}
           draft={editing}
           members={members}
           linkedElsewhere={new Set(roster.filter((p) => p.id !== editing.id && p.userId).map((p) => p.userId!))}
@@ -187,11 +172,6 @@ function RosterPlayers() {
                     </td>
                   )}
                   <td className="st-actions">
-                    {!p.userId && !mine && (
-                      <button type="button" className="text-btn" disabled={busy} onClick={() => link(p, access.uid)}>
-                        This is me
-                      </button>
-                    )}
                     {p.userId === access.uid && (
                       <button type="button" className="text-btn" disabled={busy} onClick={() => link(p, null)}>
                         Unlink me
@@ -215,76 +195,5 @@ function RosterPlayers() {
         </div>
       )}
     </div>
-  );
-}
-
-/** Add or edit a spot (PlayerDialog). */
-function PlayerForm({
-  draft,
-  members,
-  linkedElsewhere,
-  busy,
-  onCancel,
-  onSave,
-}: {
-  draft: Draft;
-  members: Array<{ uid: string; name: string }>;
-  linkedElsewhere: Set<string>;
-  busy: boolean;
-  onCancel: () => void;
-  onSave: (d: Draft) => void;
-}) {
-  const [d, setD] = useState(draft);
-  return (
-    <form
-      className="card settings-form"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (d.name.trim()) onSave(d);
-      }}
-    >
-      <h3 className="card-title">{d.id ? "Edit player" : "Add player"}</h3>
-      <label className="field">
-        <span>Name</span>
-        <input autoFocus value={d.name} maxLength={80} onChange={(e) => setD({ ...d, name: e.target.value })} />
-      </label>
-      <label className="field">
-        <span>Jersey number</span>
-        <input inputMode="numeric" value={d.number} onChange={(e) => setD({ ...d, number: e.target.value.replace(/\D/g, "").slice(0, 3) })} />
-      </label>
-      <div className="segmented" role="radiogroup" aria-label="Position">
-        {positions.map(([k, label]) => (
-          <button key={k} type="button" role="radio" aria-checked={d.position === k} className={d.position === k ? "on" : ""} onClick={() => setD({ ...d, position: k })}>
-            {label}
-          </button>
-        ))}
-      </div>
-      <label className="switch-row">
-        <input type="checkbox" checked={d.paid} onChange={(e) => setD({ ...d, paid: e.target.checked })} /> Paid
-        <small className="muted"> Dues or fees received</small>
-      </label>
-      <label className="field">
-        <span>Linked account</span>
-        <select value={members.some((m) => m.uid === d.userId) ? (d.userId ?? "") : ""} onChange={(e) => setD({ ...d, userId: e.target.value || null })}>
-          <option value="">None</option>
-          {members
-            .filter((m) => !linkedElsewhere.has(m.uid))
-            .map((m) => (
-              <option key={m.uid} value={m.uid}>
-                {m.name}
-              </option>
-            ))}
-        </select>
-        <small className="muted">Their stats show on this member&apos;s profile</small>
-      </label>
-      <div className="form-actions">
-        <button type="button" className="btn btn-small" onClick={onCancel}>
-          Cancel
-        </button>
-        <button type="submit" className="btn btn-small btn-primary" disabled={!d.name.trim() || busy}>
-          Save
-        </button>
-      </div>
-    </form>
   );
 }

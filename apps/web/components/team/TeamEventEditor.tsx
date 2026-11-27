@@ -9,6 +9,8 @@ import { rolesInOrder, useTeamHub } from "./TeamContext";
 import type { TeamEventDoc } from "./TeamSchedule";
 import { fromLocalInput, toLocalInput } from "@/lib/dates";
 import type { Repeat as RepeatRule } from "@stall10/shared";
+import { useConfirm } from "../ui/ConfirmDialog";
+import { findOverlap, overlapMessage, type Span } from "@/lib/overlap";
 import { browserTimeZone, RepeatField, RepeatNote, repeatFormProblem, scopeQuery, useSeriesScope } from "../Repeat";
 
 
@@ -19,12 +21,16 @@ import { browserTimeZone, RepeatField, RepeatNote, repeatFormProblem, scopeQuery
  */
 export function TeamEventEditor({
   event,
+  others = [],
   onDone,
 }: {
   event?: TeamEventDoc & { id: string; audience?: string[] };
+  /** The events already loaded in this schedule, for the overlap warning (nothing more is read). */
+  others?: Span[];
   onDone: (id: string | null) => void;
 }) {
   const { user } = useAuth();
+  const askConfirm = useConfirm();
   const { teamId, viewer, privateGroup } = useTeamHub();
   // A new event may be shared on the member's profile, except in a private
   // group or a team whose public page is off (canShare).
@@ -64,6 +70,10 @@ export function TeamEventEditor({
     if (bad) return setError(bad);
     const which = event?.series ? await scope.ask(`Save changes to "${title.trim()}"?`, "Save") : "one";
     if (!which) return;
+    // Not blocking: an overlap is asked about, and saving anyway is the user's call.
+    const end = fromLocalInput(endsAt);
+    const clash = findOverlap({ id: event?.id, title, startsAt: start, endsAt: end }, others, event?.id);
+    if (clash && !(await askConfirm({ title: "Overlapping event", message: overlapMessage(clash.title, clash.startsAt), confirmLabel: "Save anyway" }))) return;
     setBusy(true);
     setError(null);
     const body: SaveTeamEventRequest = {

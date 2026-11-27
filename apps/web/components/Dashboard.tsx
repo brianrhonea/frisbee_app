@@ -361,7 +361,8 @@ function Greeting({ first }: { first: string }) {
   return (
     <div className="huddle-head">
       <h1 className="huddle-greeting">{text}</h1>
-      {today && <span className="huddle-date">{today}</span>}
+      {/* Always there (a space until the date is set after mounting), so the line does not push the page down. */}
+      <span className="huddle-date">{today || " "}</span>
     </div>
   );
 }

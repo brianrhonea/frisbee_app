@@ -46,10 +46,11 @@ const emulatorEnv = {
   NEXT_PUBLIC_FIREBASE_PROJECT_ID: "demo-stall10",
   NEXT_PUBLIC_FIREBASE_APP_ID: "1:1:web:demo",
   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "localhost",
-  NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST: "127.0.0.1:9099",
-  NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST: "127.0.0.1:8080",
-  NEXT_PUBLIC_API_BASE_URL: "http://localhost:8788",
-  API_BASE_URL: "http://localhost:8788",
+  // Other ports (E2E_AUTH_HOST, E2E_FIRESTORE_HOST, E2E_API_URL) keep a second stack apart from one already running.
+  NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST: process.env.E2E_AUTH_HOST ?? "127.0.0.1:9099",
+  NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST: process.env.E2E_FIRESTORE_HOST ?? "127.0.0.1:8080",
+  NEXT_PUBLIC_API_BASE_URL: process.env.E2E_API_URL ?? "http://localhost:8788",
+  API_BASE_URL: process.env.E2E_API_URL ?? "http://localhost:8788",
 };
 const worldProjects = [375, 1440].map((width) => ({
   name: `world-${width}`,
