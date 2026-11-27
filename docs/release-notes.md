@@ -10,6 +10,10 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.79
+
+- **Navigation:** the breadcrumb at the top of wide screens reads correctly.
+
 ## 0.0.78
 
 - **Chats:** the filter row shows when there are more filters.

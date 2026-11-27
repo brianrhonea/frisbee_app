@@ -744,8 +744,9 @@ class _Breadcrumbs extends StatelessWidget {
                   foregroundColor: c.ink,
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   minimumSize: const Size(0, 32),
-                  textStyle: const TextStyle(
-                    fontSize: 12.5,
+                  // The app font, like the rest of the bar (a bare style
+                  // fell back to the platform font, a block in tests).
+                  textStyle: AppText.caption.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -761,8 +762,7 @@ class _Breadcrumbs extends StatelessWidget {
                   crumb.label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12.5,
+                  style: AppText.caption.copyWith(
                     // Alone, it's the section's name; after links, the page.
                     fontWeight: i == 0 ? FontWeight.w700 : FontWeight.w400,
                     color: i == 0 ? c.ink : c.muted,

@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.79  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.78  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.77  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.76  | 2026-11-27 | `sprint3/17b`                           |                     |
@@ -91,6 +92,10 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.79 — Fix broken first breadcrumb in the top bar
+
+- Top bar breadcrumbs use the app font and type scale (the first link crumb showed as a solid block). H7/H8 chips confirmed 48 px tall by tests.
 
 ## 0.0.78 — H7 fix: chip row scroll cue and chosen chip in view
 
