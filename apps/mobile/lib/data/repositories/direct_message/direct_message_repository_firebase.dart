@@ -11,7 +11,10 @@ import '../../../utils/result.dart';
 import '../../services/api_search.dart';
 import '../../services/attachment_storage.dart';
 import '../../services/firestore_utils.dart';
+import '../../services/api_client.dart';
 import '../../services/shared_streams.dart';
+import '../../services/upload_client.dart';
+import '../outbox/outbox_payloads.dart';
 import '../outbox/outbox_repository.dart';
 import 'direct_message_repository.dart';
 import '../../../domain/models/username.dart';
@@ -34,10 +37,14 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
     SharedStreams? sharedStreams,
     ApiSearch? search,
     OutboxRepository? outbox,
+    ApiClient? api,
+    UploadClient? uploads,
   }) : _files = attachments,
        _db = firestore ?? FirebaseFirestore.instance,
        _shared = sharedStreams ?? SharedStreams.instance,
        _search = search,
+       _api = api,
+       _uploads = uploads ?? UploadClient(api: api),
        _outbox = outbox {
     outbox?.register(
       OutboxKind.directMessage,
@@ -45,15 +52,24 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
         send: (job, files, author) => _send(
           job.target,
           job.id,
-          author: author,
-          text: job.payload['text'] as String? ?? '',
+          message: OutboxPayloads.message(job),
           attachments: files,
-          replyTo: MessageReply.fromMap(job.payload['replyTo']),
+          ledger: outbox,
         ),
         sent: (job) => existsOnServer(_messages(job.target).doc(job.id)),
       ),
     );
   }
+
+  /// The Stall 10 API: conversations and their messages are written through
+  /// it (`/v1/conversations`); there's no direct fallback.
+  final ApiClient? _api;
+
+  final UploadClient _uploads;
+
+  static String _enc(String s) => Uri.encodeComponent(s);
+
+  static String _conv(String id) => '/v1/conversations/${_enc(id)}';
 
   /// Holds messages sent offline until they can go out.
   final OutboxRepository? _outbox;
@@ -193,113 +209,61 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
         (c, reads) => c?.withMine(reads[id]),
       );
 
+  /// `POST /v1/conversations`: the server decides between their inbox, a
+  /// request, or not at all (then its own message, "Sam doesn't take
+  /// messages from you.", comes back as the error).
   @override
   Future<Result<String>> openConversation(AppUser me, UserProfile other) =>
       guard(() async {
-        final id = Conversation.idFor(me.uid, other.uid);
-        final ref = _conversations.doc(id);
-        // Who follows whom is private, so let the rules decide: straight
-        // to their inbox if they follow me, else a request if their
-        // settings allow one, else not at all.
-        for (final request in [false, true]) {
-          try {
-            await _db.runTransaction((tx) async {
-              if ((await tx.get(ref)).exists) return;
-              tx.set(ref, {
-                'participants': id.split('_'),
-                'names': {me.uid: me.label, other.uid: other.name},
-                'lastMessage': '',
-                'lastMessageAt': null,
-                'lastSenderId': '',
-                'readAt': <String, Object>{},
-                'createdAt': FieldValue.serverTimestamp(),
-                'status': request ? 'request' : 'accepted',
-                if (request) 'requestedOf': other.uid,
-              });
-            });
-            return id;
-          } on FirebaseException catch (e) {
-            if (e.code != 'permission-denied') rethrow;
-          }
-        }
-        throw MessagingNotAllowedException(other.name);
+        final r = await _api.required.post('/v1/conversations', {
+          'with': other.uid,
+        });
+        return r['id'] as String? ?? Conversation.idFor(me.uid, other.uid);
       });
 
+  /// `POST /v1/conversations/groups` with the group's id (`g-` and letters),
+  /// so a replay is a 409 rather than a second group.
   @override
   Future<Result<GroupAdded>> createGroup(
     AppUser me,
     String name,
     List<UserProfile> members,
   ) => guard(() async {
-    final ref = _conversations.doc('g-${_conversations.doc().id}');
-    await ref.set({
-      'kind': 'group',
+    final id = 'g-${_conversations.doc().id}';
+    final r = await _api.required.post('/v1/conversations/groups', {
+      'id': id,
       'name': cleanText(name).trim(),
-      'createdBy': me.uid,
-      'participants': [me.uid],
-      'names': {me.uid: me.label},
-      'lastMessage': '',
-      'lastMessageAt': null,
-      'lastSenderId': '',
-      'readAt': <String, Object>{},
-      'createdAt': FieldValue.serverTimestamp(),
+      'members': [for (final m in members) m.uid],
     });
-    return (id: ref.id, notAdded: await _addEach(ref, members));
+    return (id: r['id'] as String? ?? id, notAdded: _names(r['notAdded']));
   });
 
+  /// `POST /v1/conversations/:id/members`; the server adds each person who
+  /// follows the adder and takes messages, and names the rest.
   @override
   Future<Result<GroupAdded>> addToGroup(
     String id,
     AppUser me,
     List<UserProfile> members,
-  ) => guard(
-    () async =>
-        (id: id, notAdded: await _addEach(_conversations.doc(id), members)),
-  );
+  ) => guard(() async {
+    if (members.isEmpty) return (id: id, notAdded: const <String>[]);
+    final r = await _api.required.post('${_conv(id)}/members', {
+      'members': [for (final m in members) m.uid],
+    });
+    return (id: id, notAdded: _names(r['notAdded']));
+  });
 
-  /// The rules check one new member per write (that they follow the
-  /// adder), so people go in one at a time, at the end of the list.
-  Future<List<String>> _addEach(
-    DocumentReference<Map<String, dynamic>> ref,
-    List<UserProfile> members,
-  ) async {
-    final notAdded = <String>[];
-    for (final m in members) {
-      try {
-        await _db.runTransaction((tx) async {
-          final snap = await tx.get(ref);
-          final now = [
-            for (final p in (snap.data()?['participants'] as List?) ?? []) '$p',
-          ];
-          if (now.contains(m.uid)) return;
-          if (now.length >= Conversation.maxGroupSize) {
-            throw const GroupFullException();
-          }
-          tx.update(ref, {
-            'participants': [...now, m.uid],
-            'names.${m.uid}': m.name,
-          });
-        });
-      } on FirebaseException catch (e) {
-        if (e.code != 'permission-denied') rethrow;
-        notAdded.add(m.name);
-      } on GroupFullException {
-        notAdded.add(m.name);
-      }
-    }
-    return notAdded;
-  }
+  static List<String> _names(Object? v) => [
+    for (final n in (v as List?) ?? const []) '$n',
+  ];
 
   @override
-  Future<Result<void>> removeFromGroup(String id, String uid) => guard(
-    () => _conversations.doc(id).update({
-      'participants': FieldValue.arrayRemove([uid]),
-    }),
-  );
+  Future<Result<void>> removeFromGroup(String id, String uid) =>
+      guard(() => _api.required.delete('${_conv(id)}/members/${_enc(uid)}'));
 
   @override
   Future<Result<void>> renameGroup(String id, String name) => guard(
-    () => _conversations.doc(id).update({'name': cleanText(name).trim()}),
+    () => _api.required.patch(_conv(id), {'name': cleanText(name).trim()}),
   );
 
   @override
@@ -323,24 +287,16 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
     }, SetOptions(merge: true)),
   );
 
+  /// `PUT /v1/conversations/:id/request`; declining also clears it for the
+  /// caller (the server does it).
   @override
   Future<Result<void>> answerRequest(
     String id,
     String uid, {
     required bool accept,
-  }) => guard(() async {
-    final batch = _db.batch()
-      ..update(_conversations.doc(id), {
-        'status': accept ? 'accepted' : 'declined',
-      });
-    // Declining also clears it for them, so nothing lingers.
-    if (!accept) {
-      batch.set(_reads(uid).doc(id), {
-        'clearedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-    }
-    await batch.commit();
-  });
+  }) => guard(
+    () => _api.required.put('${_conv(id)}/request', {'accept': accept}),
+  );
 
   @override
   Stream<MessagePolicy> watchMessagePolicy(String uid) => _db
@@ -405,15 +361,15 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
     text = maskSwearing(text);
     // The id is picked now and kept, so a retry can't post it twice.
     final messageId = _messages(id).doc().id;
+    final outbox = _outbox;
+    final message = {'text': text.trim(), 'replyTo': ?replyTo?.id};
     Future<Result<void>> now() => _send(
       id,
       messageId,
-      author: author,
-      text: text,
+      message: message,
       attachments: attachments,
-      replyTo: replyTo,
+      ledger: outbox,
     );
-    final outbox = _outbox;
     if (outbox == null || attachments.any((a) => a.tooLarge)) return now();
     return outbox.submit(
       kind: OutboxKind.directMessage,
@@ -426,66 +382,47 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
     );
   }
 
+  /// Uploads [attachments] (`/v1/uploads`, `chat` files for this
+  /// conversation and message), then `POST /v1/conversations/:id/messages`
+  /// with the message's id and the ready upload ids. The server writes the
+  /// author, time, quote and the inbox preview.
   Future<Result<void>> _send(
     String id,
     String messageId, {
-    required AppUser author,
-    required String text,
+    required Map<String, Object?> message,
     List<NewAttachment> attachments = const [],
-    MessageReply? replyTo,
-  }) => guard(
-    () => muteAware(_db, author.uid, () async {
-      for (final a in attachments) {
-        if (a.tooLarge) {
-          throw AttachmentTooLargeException(
-            a.name,
-            limit: maxBytesFor(a.contentType),
+    UploadLedger? ledger,
+  }) => guard(() async {
+    final api = _api.required;
+    for (final a in attachments) {
+      if (a.tooLarge) {
+        throw AttachmentTooLargeException(
+          a.name,
+          limit: maxBytesFor(a.contentType),
+        );
+      }
+    }
+    final ready = attachments.isEmpty
+        ? const <ReadyUpload>[]
+        : await _uploads.uploadAll(
+            purpose: UploadPurpose.chat,
+            itemId: messageId,
+            targetId: 'conversations/$id',
+            files: attachments,
+            ledger: ledger,
+            ledgerKey: messageId,
           );
-        }
-      }
-      final ref = _messages(id).doc(messageId);
-      final uploaded = await _files.upload(
-        'conversations/$id/${author.uid}/${ref.id}',
-        attachments,
-      );
-      try {
-        await (_db.batch()
-              ..set(ref, {
-                'authorId': author.uid,
-                'authorName': author.label,
-                'text': text.trim(),
-                'attachments': [for (final a in uploaded) a.toMap()],
-                'createdAt': FieldValue.serverTimestamp(),
-                'replyTo': ?replyTo?.toMap(),
-              })
-              ..update(_conversations.doc(id), {
-                'lastMessage': messagePreview(
-                  text,
-                  uploaded.length,
-                  image:
-                      uploaded.isNotEmpty && uploaded.every((a) => a.isImage),
-                  video:
-                      uploaded.isNotEmpty && uploaded.every((a) => a.isVideo),
-                ),
-                'lastMessageAt': FieldValue.serverTimestamp(),
-                'lastSenderId': author.uid,
-                'readAt.${author.uid}': FieldValue.serverTimestamp(),
-                'names.${author.uid}': author.label,
-              }))
-            .commit();
-      } catch (_) {
-        await _files.delete(uploaded.map((a) => a.path));
-        rethrow;
-      }
-    }),
-  );
+    await api.post('${_conv(id)}/messages', {
+      ...message,
+      'id': messageId,
+      'uploadIds': [for (final u in ready) u.id],
+    });
+  });
 
   @override
-  Future<Result<void>> deleteMessage(String id, ChatMessage message) =>
-      guard(() async {
-        await _files.delete(message.attachments.map((a) => a.path));
-        await _messages(id).doc(message.id).delete();
-      });
+  Future<Result<void>> deleteMessage(String id, ChatMessage message) => guard(
+    () => _api.required.delete('${_conv(id)}/messages/${_enc(message.id)}'),
+  );
 
   @override
   Future<Result<void>> setReaction(
@@ -494,27 +431,28 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
     String uid,
     String? emoji,
   ) => guard(
-    () => _messages(
-      id,
-    ).doc(messageId).update({'reactions.$uid': emoji ?? FieldValue.delete()}),
+    () => _api.required.put(
+      '${_conv(id)}/messages/${_enc(messageId)}/reaction',
+      {'emoji': emoji},
+    ),
   );
 
+  /// Your own read time (`dmReads`) stays a direct write (D6). Sharing the
+  /// read receipt writes the conversation, so that goes through
+  /// `POST /v1/conversations/:id/read`, which sets both.
   @override
   Future<Result<void>> markRead(
     String id,
     String uid, {
     required bool shareReceipt,
   }) => guard(() async {
-    final batch = _db.batch()
-      ..set(_reads(uid).doc(id), {
-        'readAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
     if (shareReceipt) {
-      batch.update(_conversations.doc(id), {
-        'readAt.$uid': FieldValue.serverTimestamp(),
-      });
+      await _api.required.send('POST', '${_conv(id)}/read');
+      return;
     }
-    await batch.commit();
+    await _reads(uid).doc(id).set({
+      'readAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   });
 
   @override

@@ -25,8 +25,9 @@ abstract class DirectMessageRepository {
 
   /// Finds or starts the conversation between [me] and [other]; returns
   /// its id. A new one is a message request unless [other] follows [me];
-  /// fails with [MessagingNotAllowedException] if [other]'s
-  /// [MessagePolicy] doesn't let [me] message them at all.
+  /// fails (with the server's own message, "Sam doesn't take messages from
+  /// you.") if [other]'s [MessagePolicy] doesn't let [me] message them at
+  /// all, or one of them blocked the other.
   Future<Result<String>> openConversation(AppUser me, UserProfile other);
 
   /// Starts a group named [name] with [me] and [members]; returns its id
