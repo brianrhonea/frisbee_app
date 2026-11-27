@@ -6,7 +6,7 @@
 
 **Why move:** Codemagic is pay-as-you-go. "Private hosting" here means a self-hosted build machine. Moving the website off Vercel or the API off Cloud Run is out of scope (§9).
 
-**Not yet covered:** a section on the always-on Windows PC (golden tests, bulk test runs, later Android builds) has been requested and will be added.
+**Second machine:** §10 covers the always-on Windows PC: golden tests, bulk test runs, and Android builds later.
 
 ## Summary and recommendation
 
@@ -61,6 +61,8 @@ References are to `codemagic.yaml` unless another file is named.
 | Owner approval for each build | Yes, built in | Yes, built in | Weaker |
 | Attack surface | Smallest | Medium (gem supply chain) | Largest |
 | Fit for January | **Best** | OK | Poor |
+
+A fourth option, **(d)**, runs both the Mac and the Windows PC as runners. It is deferred until after January (§10).
 
 **Recommendation: (a).** Fastlane or a runner can call the same script later, so this closes off nothing. Look at (c) again only after two successful releases, and only as a manual start.
 
@@ -254,3 +256,119 @@ Hosting the website or the API on your own hardware would bring public IP or tun
 | Q-K | The Mac mini's model and macOS version (they decide which Xcode it can run) | Owner to answer |
 | Q-L | The beta runs on dev only until #9 | Yes |
 | Q-M | A self-hosted runner and moving off Vercel or Cloud Run are later decisions | Yes |
+| Q-N | For January: the Mac plus the laptop for golden tests, or also bring up the PC with runners? | The Mac plus the laptop. The PC joins later |
+| Q-O | If the PC joins: a test machine you run by hand, or a registered runner? | A test machine run by hand first |
+| Q-P | Which Windows edition does the PC run, and is a UPS available? | Owner to answer |
+| Q-Q | Android builds (#10): on the PC or the Mac? | Decide when #10 starts. The PC is a good fit |
+| Q-R | Does the PC become the reference machine for golden tests? | Only if its baseline run matches (§10.6 step 7) |
+
+## 10. Second machine: the always-on Windows PC
+
+**Status:** draft. The PC is off today, and nothing here has been run. The app has no Windows desktop version, so "Windows work" means test runs, plus Android builds later.
+
+### 10.1 Who does what
+
+| Machine | Does | Doesn't do |
+|---|---|---|
+| Mac mini | iOS builds, signing, TestFlight, the simulator, iPhone runs over USB, and integration and Maestro tests once they exist | Golden tests (they skip on anything but Windows) |
+| Windows PC | Golden tests, the full `flutter test`, website unit and Playwright tests, API and shared tests, Firebase emulator and rules tests; Android after the beta | Anything iOS |
+| Owner's laptop | Fallback for golden tests, and day-to-day work | Staying on all the time |
+
+The rules tests need Java. Playwright needs its browsers installed.
+
+### 10.2 Are two runners worth it for January?
+
+**Recommendation: no runners for January.** Use the Mac scripts, with the owner's laptop for golden tests, and add the PC later.
+
+**Mac only, plus the laptop for golden tests:**
+- **Setup before the beta:** least. Just the Mac, tomorrow.
+- **Owner time:** least.
+- **When builds and tests run:** only when the owner starts them, which matches "the owner approves each push".
+- **Exposure:** small.
+- **Golden tests:** the owner runs them on the laptop before approving UI changes.
+
+**Mac and PC both as runners:**
+- **Setup:** the most. It competes with R2, R3 and 9-P for the owner's time.
+- **Golden tests:** they run automatically.
+- **Risk:** two machines that are always on and have access to the repo.
+- **Payoff:** this becomes worth it once the test suites grow, or once Android (#10) starts.
+
+**A middle path:** leave the PC on as a test machine you run by hand, over Remote Desktop or SSH, with no runner. You get the always-on machine without the runner security risk. Decide about runners after two Mac releases.
+
+**Android (#10):** the PC is a good build machine for it. It needs an upload key, created only by the owner and kept outside the repo.
+
+### 10.3 Runner security (only if runners are adopted)
+
+**Both machines:**
+- Register runners to this repository only.
+- **Never run them for pull requests or forks.** Allow only manual starts and pushes to protected branches, and require approval for outside collaborators.
+- Run each runner as a dedicated non-admin user.
+- In workflows, use `permissions: contents: read`, actions pinned by SHA, and `persist-credentials: false`, and never print secrets.
+- No prod credentials go on either machine until #9 is done.
+- Start runners only when they're needed.
+
+**Windows PC:**
+- **User:** the standard user `hylitetest`, never running as Administrator.
+- **Disk encryption:** BitLocker, or device encryption on Home edition *(unverified)*. Keep the recovery key in your password manager.
+- **Updates:** keep Windows Update on, with active hours set and restarts scheduled at about 04:00. The runner service restarts on its own.
+- **Network:** Defender and the firewall on, and no ports opened inward. Use Remote Desktop only through your own VPN, never open to the internet.
+
+### 10.4 Power and sleep
+
+**PC:**
+- Never sleep or hibernate while plugged in.
+- Turn off Fast Startup.
+- In the BIOS, turn on "restore on AC power loss".
+- Use wired ethernet with a reserved IP, and turn off the network card's power saving.
+- A UPS is recommended.
+- The services start automatically.
+
+**Mac:**
+- Prevent sleep.
+- Turn on "start up automatically after a power failure" and "wake for network access".
+- FileVault needs the password after a reboot (Q-C).
+
+### 10.5 Labels, so each job goes to the right machine
+
+| Runner | Labels | Used by |
+|---|---|---|
+| Mac mini | `self-hosted`, `macos`, `arm64` *(unverified)*, `hylite-ios`, `hylite-signing` | iOS build and TestFlight only |
+| Windows PC | `self-hosted`, `windows`, `x64`, `hylite-goldens`, `hylite-tests`, and `hylite-android` later | Golden tests, bulk tests, Android |
+
+**Rules:**
+- Every job lists all the labels it needs, never only `self-hosted`.
+- The GitHub-hosted Ubuntu CI stays as the baseline. Self-hosted jobs are extra.
+- A signing workflow uses an environment (for example `ios-release`) with the owner as the required reviewer.
+
+### 10.6 Owner setup checklist for the PC
+
+1. **[OWNER ONLY]** Put the PC in its permanent spot on wired ethernet, then run Windows Update to completion and reboot.
+2. **[OWNER ONLY]** Create the `hylitetest` user, turn on BitLocker or device encryption, and save the recovery key.
+3. **[OWNER ONLY]** Set the power and BIOS options in §10.4, and reserve the IP address on your router.
+4. Install Git, Node, pnpm, Java and Flutter 3.41.2 (pinned), then run `flutter doctor -v`.
+5. Clone the repo as `hylitetest`. Don't push from the PC without approval.
+6. Run `pnpm install` and install the Playwright browsers.
+7. **First runs, by hand. Record the exact counts for each:**
+   - `flutter test` in `apps/mobile`. The golden tests have to match on this PC: if fonts or DPI differ, the laptop stays the reference machine.
+   - the website unit tests and Playwright;
+   - the API and shared tests;
+   - `npm run test:rules`.
+8. **[OWNER ONLY, runners only]** Register the runner, add its labels, and install it as a service running as `hylitetest`. Don't share the registration token.
+9. **[OWNER ONLY, runners only]** Apply the repository settings from §10.3.
+10. **Later, for #10:** install Android Studio and the SDK, and create the upload keystore outside the repo (**[OWNER ONLY]**).
+
+### 10.7 Repo changes I'd prepare (only if they're adopted)
+
+- `.github/workflows/ci-flutter-windows.yml`: golden tests on `[self-hosted, windows, hylite-goldens]`.
+- `.github/workflows/ci-tests-pc.yml`: optional bulk tests.
+- `.github/workflows/ios-mac.yml`: only if option (c) is chosen. Manual start, with environment approval.
+- `scripts/pc/pc-doctor.ps1`: a setup check for the PC.
+- A runner-security section, and "run golden tests on the PC or laptop before approving UI changes" in the release checklist.
+
+### 10.8 Added risks
+
+1. Golden images may not match between two Windows machines. The first runs (§10.6 step 7) decide.
+2. Windows Update restarts can interrupt a run.
+3. An always-on runner gives an attacker a lasting way in if the repo or a pull request is compromised. That's why runners are deferred and pull-request triggers are banned.
+4. The Windows edition is unknown.
+5. An internet or power outage takes the PC offline. The Ubuntu CI stays as the baseline.
