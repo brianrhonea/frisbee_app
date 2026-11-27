@@ -17,7 +17,11 @@ import '../../../routing/push_team_route.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 import '../../core/ui/back_or.dart';
+import '../../core/ui/avatar.dart' show AvatarStack;
 import '../../core/ui/confirm_dialog.dart';
+import '../../core/ui/cover_header.dart';
+import '../../core/ui/event_card.dart';
+import '../../core/ui/scoreboard.dart' show SectionHeader;
 import '../../core/themes/theme.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/layout.dart';
@@ -687,6 +691,9 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
               pinned: true,
               delegate: _TeamHeaderDelegate(
                 topPadding: MediaQuery.paddingOf(context).top,
+                textScale: MediaQuery.textScalerOf(
+                  context,
+                ).scale(1).clamp(1.0, 1.5),
                 summary: summary,
                 meta: _metaLine(vm, summary),
                 colors: AppColors.of(context),
@@ -901,67 +908,74 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
   Widget _about(TeamListing summary) {
     final c = AppColors.of(context);
     final upcoming = vm.upcomingEvents.length;
-    return SectionCard(
-      title: summary.isCommunity ? 'About the community' : 'About the team',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            summary.description.isEmpty
-                ? (vm.canEdit
-                      ? 'Add a description so people know what the '
-                            '${summary.kind.noun} is '
-                            'about.'
-                      : 'No description yet.')
-                : summary.description,
-            style: TextStyle(
-              fontSize: 13.5,
-              height: 1.45,
-              color: summary.description.isEmpty ? c.muted : c.ink,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionHeader(
+          summary.isCommunity ? 'About the community' : 'About the team',
+        ),
+        const SizedBox(height: AppSpace.sm),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              summary.description.isEmpty
+                  ? (vm.canEdit
+                        ? 'Add a description so people know what the '
+                              '${summary.kind.noun} is '
+                              'about.'
+                        : 'No description yet.')
+                  : summary.description,
+              style: AppText.body.copyWith(
+                color: summary.description.isEmpty ? c.muted : c.ink,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              if (summary.isCommunity) ...[
-                Tag(summary.kind.label),
-                Tag(
-                  summary.requiresApproval
-                      ? 'Approval to join'
-                      : 'Open to join',
-                ),
-              ] else ...[
-                Tag(summary.division.label),
-                Tag(summary.level.label),
-              ],
-              if (summary.city.isNotEmpty) Tag(summary.city),
-            ],
-          ),
-          if (vm.isMember) ...[
-            const SizedBox(height: 16),
-            Divider(height: 1, color: c.border),
-            const SizedBox(height: 14),
-            Row(
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
               children: [
-                Expanded(
-                  child: StatBlock(
-                    value: '${vm.memberCount}',
-                    label: summary.isCommunity ? 'Members' : 'Rostered',
+                if (summary.isCommunity) ...[
+                  Tag(summary.kind.label),
+                  Tag(
+                    summary.requiresApproval
+                        ? 'Approval to join'
+                        : 'Open to join',
                   ),
-                ),
-                Expanded(
-                  child: StatBlock(value: '$upcoming', label: 'Upcoming'),
-                ),
-                Expanded(
-                  child: StatBlock(value: '${vm.posts.length}', label: 'Posts'),
-                ),
+                ] else ...[
+                  Tag(summary.division.label),
+                  Tag(summary.level.label),
+                ],
+                if (summary.city.isNotEmpty) Tag(summary.city),
               ],
             ),
+            if (vm.isMember) ...[
+              const SizedBox(height: 16),
+              Divider(height: 1, color: c.border),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: StatBlock(
+                      value: '${vm.memberCount}',
+                      label: summary.isCommunity ? 'Members' : 'Rostered',
+                    ),
+                  ),
+                  Expanded(
+                    child: StatBlock(value: '$upcoming', label: 'Upcoming'),
+                  ),
+                  Expanded(
+                    child: StatBlock(
+                      value: '${vm.posts.length}',
+                      label: 'Posts',
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -1059,19 +1073,18 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
           teamName: vm.summary?.name ?? '',
           onOpen: () => _openEvent(next),
         ),
-      SectionCard(
-        title: next == null ? 'Up next' : 'Coming up',
+      Column(
         key: const ValueKey('coming-up'),
-        action: vm.isMember
-            ? CardLink(
-                label: 'All events',
-                onTap: () =>
-                    goWithinTeam(context, TeamSection.events.route(vm.teamId)),
-              )
-            : null,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SectionHeader(
+            next == null ? 'Up next' : 'Coming up',
+            actionLabel: vm.isMember ? 'All events' : null,
+            onAction: () =>
+                goWithinTeam(context, TeamSection.events.route(vm.teamId)),
+          ),
+          const SizedBox(height: AppSpace.sm),
+          ...[
             if (rest.isEmpty)
               _Note(
                 next == null
@@ -1082,7 +1095,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
             for (final e in rest)
               _EventRow(event: e, onTap: () => _openEvent(e)),
           ],
-        ),
+        ],
       ),
     ];
   }
@@ -1446,109 +1459,63 @@ class _Hero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = AppColors.of(context);
     final vm = viewModel;
     final mobile = ScreenSize.of(context).isMobile;
-    final teamId = vm.teamId;
     final follow = _followOf(vm);
     final actions = <Widget>[
       ..._teamActions(context, vm, summary, follow: mobile ? null : follow),
       ?menu,
     ];
-    return Card(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(mobile ? 16 : 20, 16, 16, 0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 16,
-              runSpacing: 12,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TeamInitials(
-                      name: summary.name,
-                      kind: summary.kind,
-                      size: mobile ? 64 : 72,
-                    ),
-                    const SizedBox(width: 14),
-                    ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: mobile ? 240 : 420),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            summary.name,
-                            style: TextStyle(
-                              fontSize: mobile ? 22 : 28,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.4,
-                              height: 1.15,
-                              color: c.ink,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            _metaLine(vm, summary),
-                            style: TextStyle(fontSize: 13, color: c.muted),
-                          ),
-                          if (summary.official) ...[
-                            const SizedBox(height: 6),
-                            const OfficialBadge(label: 'Official organizer'),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                if (actions.isNotEmpty && !mobile)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      for (var i = 0; i < actions.length; i++) ...[
-                        if (i > 0) const SizedBox(width: 8),
-                        actions[i],
-                      ],
-                    ],
-                  ),
-              ],
-            ),
-            // Phones put the buttons below the name, side by side,
-            // with Follow on its own line.
-            if (follow != null && mobile) ...[
-              const SizedBox(height: 14),
-              Align(alignment: Alignment.centerLeft, child: follow),
-            ],
-            if (actions.isNotEmpty && mobile) ...[
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  for (var i = 0; i < actions.length; i++) ...[
-                    if (i > 0) const SizedBox(width: 8),
-                    Expanded(child: actions[i]),
-                  ],
-                ],
-              ),
-            ],
-            if (vm.isMember) ...[
-              const SizedBox(height: 12),
-              _CountLine(viewModel: vm, summary: summary),
-              const SizedBox(height: 6),
-              _TeamTabs(
-                teamId: teamId,
-                sections: _sectionsOf(vm, summary.kind),
-                tournamentsTab: vm.tournamentsTab,
-                selected: TeamTab.feed,
-              ),
-            ] else
-              const SizedBox(height: 16),
-          ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        CoverHeader(
+          title: summary.name,
+          subtitle: _metaLine(vm, summary),
+          avatar: TeamInitials(
+            name: summary.name,
+            kind: summary.kind,
+            size: 72,
+          ),
+          actions: mobile ? const [] : actions,
         ),
-      ),
+        if (summary.official) ...[
+          const SizedBox(height: AppSpace.sm),
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: OfficialBadge(label: 'Official organizer'),
+          ),
+        ],
+        // Phones put the buttons below the name, side by side, with Follow
+        // on its own line.
+        if (follow != null && mobile) ...[
+          const SizedBox(height: 14),
+          Align(alignment: Alignment.centerLeft, child: follow),
+        ],
+        if (actions.isNotEmpty && mobile) ...[
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              for (var i = 0; i < actions.length; i++) ...[
+                if (i > 0) const SizedBox(width: 8),
+                Expanded(child: actions[i]),
+              ],
+            ],
+          ),
+        ],
+        if (vm.isMember) ...[
+          const SizedBox(height: 12),
+          _CountLine(viewModel: vm, summary: summary),
+          const SizedBox(height: 6),
+          _TeamTabs(
+            teamId: vm.teamId,
+            sections: _sectionsOf(vm, summary.kind),
+            tournamentsTab: vm.tournamentsTab,
+            selected: TeamTab.feed,
+          ),
+        ] else
+          const SizedBox(height: 16),
+      ],
     );
   }
 }
@@ -1641,7 +1608,7 @@ class _CountLine extends StatelessWidget {
         Expanded(
           child: Text(
             '$upcoming upcoming',
-            style: TextStyle(fontSize: 12, color: AppColors.of(context).muted),
+            style: AppText.caption.copyWith(color: AppColors.of(context).muted),
           ),
         ),
         if (vm.myRole case final role?)
@@ -1706,6 +1673,7 @@ class _AllTeamsButton extends StatelessWidget {
 class _TeamHeaderDelegate extends SliverPersistentHeaderDelegate {
   _TeamHeaderDelegate({
     required this.topPadding,
+    required this.textScale,
     required this.summary,
     required this.meta,
     required this.colors,
@@ -1715,11 +1683,14 @@ class _TeamHeaderDelegate extends SliverPersistentHeaderDelegate {
     required this.tabs,
   });
 
-  static const _identity = 64.0;
+  static const _identityBase = 68.0;
   static const _actions = 56.0; // 48 px buttons + 8 px bottom padding
   static const _tabs = 44.0;
 
   final double topPadding;
+
+  /// The text scale (1 to 1.5): the name and meta rows grow with it.
+  final double textScale;
   final TeamListing summary;
 
   /// E.g. "Mixed · Club · Denver · 24 members · Est. 2019".
@@ -1731,6 +1702,8 @@ class _TeamHeaderDelegate extends SliverPersistentHeaderDelegate {
   /// Invite and Message; nothing folds when there are none.
   final List<Widget> actions;
   final Widget tabs;
+
+  double get _identity => _identityBase * textScale;
 
   double get _actionsHeight => actions.isEmpty ? 0 : _actions;
 
@@ -1772,24 +1745,14 @@ class _TeamHeaderDelegate extends SliverPersistentHeaderDelegate {
                         summary.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.4,
-                          height: 1.15,
-                          color: c.ink,
-                        ),
+                        style: AppText.heading3.copyWith(color: c.ink),
                       ),
                       const SizedBox(height: 1),
                       Text(
                         meta,
-                        maxLines: 2,
+                        maxLines: textScale > 1.3 ? 1 : 2,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          height: 1.2,
-                          color: c.muted,
-                        ),
+                        style: AppText.caption.copyWith(color: c.muted),
                       ),
                     ],
                   ),
@@ -2141,7 +2104,7 @@ class _StatTile extends StatelessWidget {
       child: Material(
         color: highlight ? c.highlightSoft : c.card,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(controlRadius),
+          borderRadius: BorderRadius.circular(AppRadius.card),
           side: BorderSide(
             color: highlight ? c.highlight.withValues(alpha: 0.45) : c.border,
           ),
@@ -2158,27 +2121,14 @@ class _StatTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.baseline,
                   textBaseline: TextBaseline.alphabetic,
                   children: [
-                    Text(
-                      value,
-                      style: TextStyle(
-                        fontFamily: scoreFont,
-                        fontSize: 26,
-                        height: 1.05,
-                        fontWeight: FontWeight.w800,
-                        color: ink,
-                      ),
-                    ),
+                    Text(value, style: AppText.score.copyWith(color: ink)),
                     const SizedBox(width: 6),
                     Flexible(
                       child: Text(
                         label,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: ink,
-                        ),
+                        style: AppText.label.copyWith(color: ink),
                       ),
                     ),
                   ],
@@ -2188,7 +2138,7 @@ class _StatTile extends StatelessWidget {
                   detail,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 12, color: c.muted),
+                  style: AppText.caption.copyWith(color: c.muted),
                 ),
               ],
             ),
@@ -2288,30 +2238,18 @@ class _UpNextCard extends StatelessWidget {
         children: [
           Eyebrow('Up next · ${e.type.label}', color: c.onFeatureMuted),
           const SizedBox(height: 12),
-          Text(
-            e.title,
-            style: TextStyle(
-              color: c.onFeature,
-              fontWeight: FontWeight.w800,
-              fontSize: 18,
-              letterSpacing: -0.4,
-            ),
-          ),
+          Text(e.title, style: AppText.heading3.copyWith(color: c.onFeature)),
           const SizedBox(height: 6),
           Text(
             '${DateFormat.MMMEd().format(e.startsAt)} · ${eventTimeRange(e)}',
-            style: TextStyle(
-              color: c.onFeature,
-              fontWeight: FontWeight.w600,
-              fontSize: 12.5,
-            ),
+            style: AppText.label.copyWith(color: c.onFeature),
           ),
           if (e.location.isNotEmpty)
             Text(
               e.location,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: c.onFeatureMuted, fontSize: 12),
+              style: AppText.caption.copyWith(color: c.onFeatureMuted),
             ),
           // Amber is only for what's the user's to do; opening the event
           // is a plain link along the card's foot.
@@ -2323,11 +2261,7 @@ class _UpNextCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   'View details',
-                  style: TextStyle(
-                    color: c.onFeature,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12.5,
-                  ),
+                  style: AppText.label.copyWith(color: c.onFeature),
                 ),
               ),
               Icon(Icons.chevron_right, size: 18, color: c.onFeature),
@@ -2347,48 +2281,20 @@ class _EventRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = AppColors.of(context);
     final e = event;
     final going = e.responders(RsvpStatus.going).length;
-    return InkWell(
-      borderRadius: BorderRadius.circular(8),
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Row(
-          children: [
-            DateBadge(date: e.startsAt),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    e.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      color: c.ink,
-                    ),
-                  ),
-                  Text(
-                    [
-                      e.type.label,
-                      eventTimeRange(e),
-                      if (going > 0) '$going going',
-                    ].join(' · '),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12, color: c.muted),
-                  ),
-                ],
-              ),
-            ),
-            Icon(Icons.chevron_right, size: 18, color: c.muted),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpace.sm),
+      child: EventCard(
+        date: e.startsAt,
+        title: e.title,
+        meta: [
+          e.type.label,
+          eventTimeRange(e),
+          if (going > 0) '$going going',
+        ].join(' \u00b7 '),
+        recurring: e.series != null,
+        onTap: onTap,
       ),
     );
   }
@@ -2414,60 +2320,74 @@ class _MembersCard extends StatelessWidget {
         );
       });
     final count = members.length;
-    return SectionCard(
-      title: team.isCommunity ? 'Meet the community' : 'Meet the sideline',
-      action: CardLink(
-        label: 'All $count ${team.isCommunity ? 'members' : 'players'}',
-        onTap: () => goWithinTeam(context, TeamSection.members.route(team.id)),
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final columns = constraints.maxWidth >= 520 ? 3 : 2;
-          const gap = 10.0;
-          final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
-          return Wrap(
-            spacing: gap,
-            runSpacing: gap,
-            children: [
-              for (final MapEntry(key: uid, value: role) in members.take(
-                _shown,
-              ))
-                SizedBox(
-                  width: width,
-                  child: Container(
-                    padding: const EdgeInsets.all(AppSpace.md),
-                    decoration: BoxDecoration(
-                      color: c.field,
-                      borderRadius: BorderRadius.circular(controlRadius),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        PersonAvatar(
-                          name: team.memberNames[uid] ?? '?',
-                          radius: 17,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          team.memberNames[uid] ?? 'Member',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12.5,
-                            color: c.ink,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionHeader(
+          team.isCommunity ? 'Meet the community' : 'Meet the sideline',
+          actionLabel: 'All $count ${team.isCommunity ? 'members' : 'players'}',
+          onAction: () =>
+              goWithinTeam(context, TeamSection.members.route(team.id)),
+        ),
+        const SizedBox(height: AppSpace.sm),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: AvatarStack(
+            max: 6,
+            total: count,
+            items: [
+              for (final uid in members.map((m) => m.key).take(6))
+                (name: team.memberNames[uid] ?? '?', imageUrl: null),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpace.md),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final columns = constraints.maxWidth >= 520 ? 3 : 2;
+            const gap = 10.0;
+            final width =
+                (constraints.maxWidth - gap * (columns - 1)) / columns;
+            return Wrap(
+              spacing: gap,
+              runSpacing: gap,
+              children: [
+                for (final MapEntry(key: uid, value: role) in members.take(
+                  _shown,
+                ))
+                  SizedBox(
+                    width: width,
+                    child: Container(
+                      padding: const EdgeInsets.all(AppSpace.md),
+                      decoration: BoxDecoration(
+                        color: c.field,
+                        borderRadius: BorderRadius.circular(controlRadius),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          PersonAvatar(
+                            name: team.memberNames[uid] ?? '?',
+                            radius: 17,
                           ),
-                        ),
-                        const SizedBox(height: 2),
-                        Eyebrow(team.roleLabel(role)),
-                      ],
+                          const SizedBox(height: 8),
+                          Text(
+                            team.memberNames[uid] ?? 'Member',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppText.label.copyWith(color: c.ink),
+                          ),
+                          const SizedBox(height: 2),
+                          Eyebrow(team.roleLabel(role)),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-            ],
-          );
-        },
-      ),
+              ],
+            );
+          },
+        ),
+      ],
     );
   }
 }

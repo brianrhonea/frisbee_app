@@ -10,6 +10,10 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.70
+
+- **Teams:** a cleaner team page with a cover, event cards and a face stack of members.
+
 ## 0.0.69
 
 - **Events:** a cleaner event page with a cover, who is going and your answer.

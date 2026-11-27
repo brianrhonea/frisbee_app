@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.70  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.69  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.68  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.67  | 2026-11-27 | `sprint3/lane-b`                        |                     |
@@ -82,6 +83,10 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.70 — H5 Team overview and feed
+
+- Team page: a cover band with the team logo (`CoverHeader`) on wide screens; sections (About, Coming up, Meet the sideline) lose their boxes; upcoming events are `EventCard`s; members show a face stack (`AvatarStack`) beside the existing tiles; type moved to the shared scale. The phone header's rows grow with large text. Tabs, Invite, Message, follow, share box, posts and permissions are unchanged.
 
 ## 0.0.69 — H3 Event details and RSVP
 
