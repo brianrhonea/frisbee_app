@@ -1,0 +1,22 @@
+{
+  "about": "Public links people share (Messages, WhatsApp, email) and what each must open. The app test (apps/mobile/test/routing/shared_links_test.dart) opens every `path` on the app's router and checks the page named in `page`; the website reads this file and checks the same `page` names resolve on its routes. `path` is the path and query of the link on the Hylite host. `appRoute` is where the app lands after any redirect. `web` is the website's matching route. `page` is a logical name: team, group, invite, post, player, explore, rankings, tournament, respond, bracket, liveDraft, meeting, learn. Add a case here when a new shareable link is introduced.",
+  "cases": [
+    { "name": "team", "path": "/teams/t1", "page": "team", "appRoute": "/teams/t1", "web": "/teams/[teamId]" },
+    { "name": "team section", "path": "/teams/t1?section=roster", "page": "team", "appRoute": "/teams/t1?section=roster", "web": "/teams/[teamId]/roster" },
+    { "name": "group", "path": "/g/t1", "page": "team", "appRoute": "/teams/t1", "web": "/g/[id]" },
+    { "name": "invite", "path": "/join/ABC234", "page": "invite", "appRoute": "/join/ABC234", "web": "/join/[code]" },
+    { "name": "post", "path": "/posts/p1", "page": "post", "appRoute": "/posts/p1", "web": "/posts/[postId]" },
+    { "name": "post short link", "path": "/p/p1", "page": "post", "appRoute": "/posts/p1", "web": "/p/[id]" },
+    { "name": "player", "path": "/players/u2", "page": "player", "appRoute": "/players/u2", "web": "/players/[uid]" },
+    { "name": "discover filter", "path": "/explore?only=teams&q=flyers", "page": "explore", "appRoute": "/explore?only=teams&q=flyers", "web": "/explore" },
+    { "name": "rankings", "path": "/rankings?level=club&division=mixed", "page": "rankings", "appRoute": "/rankings?level=club&division=mixed", "web": "/rankings" },
+    { "name": "tournament", "path": "/tournaments/x1", "page": "tournament", "appRoute": "/tournaments/x1", "web": "/tournaments/[id]" },
+    { "name": "tournament tab", "path": "/tournaments/x1?tab=schedule", "page": "tournament", "appRoute": "/tournaments/x1?tab=schedule", "web": "/tournaments/[id]" },
+    { "name": "respond", "path": "/tournaments/x1/respond?team=t1", "page": "respond", "appRoute": "/tournaments/x1/respond?team=t1", "web": "/tournaments/[id]/respond" },
+    { "name": "bracket", "path": "/tournaments/x1/bracket/d1", "page": "bracket", "appRoute": "/tournaments/x1/bracket/d1", "web": "/tournaments/[id]/bracket" },
+    { "name": "live draft", "path": "/tournaments/x1/live-draft/d1", "page": "liveDraft", "appRoute": "/tournaments/x1/live-draft/d1", "web": "/tournaments/[id]/live-draft/[div]" },
+    { "name": "meeting", "path": "/team-meetings/t1/m1", "page": "meeting", "appRoute": "/team-meetings/t1/m1", "web": "/teams/[team]/meetings/[id]" },
+    { "name": "learn rules", "path": "/learn?part=rules", "page": "learn", "appRoute": "/learn?part=rules", "web": "/learn" },
+    { "name": "old rules link", "path": "/rules", "page": "learn", "appRoute": "/learn?part=rules", "web": "/learn" }
+  ]
+}

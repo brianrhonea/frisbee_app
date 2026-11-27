@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 
 import '../../domain/models/payments.dart';
+import '../../firebase_options.dart';
 
 /// What happened in the payment sheet.
 enum PaymentSheetOutcome {
@@ -55,14 +56,56 @@ Future<void> completeStripeReturn(Uri uri) async {
   }
 }
 
+/// The sheet's parameters for [request]: cards and one-tap wallets only.
+///
+/// - No delayed payment methods, so no US bank payments (they take days to
+///   clear); a `processing` status is still handled where the payment is
+///   shown.
+/// - Google Pay always, in Google's test environment unless [production].
+/// - Apple Pay only when [appleMerchantId] (the `STRIPE_MERCHANT_ID`
+///   dart-define) is set: the iOS Apple Pay capability must be enabled in
+///   the app's signing first.
+SetupPaymentSheetParameters buildPaymentSheetParameters(
+  PaymentSheetRequest request, {
+  required bool production,
+  String appleMerchantId = '',
+}) {
+  final currency = request.currency.toUpperCase();
+  return SetupPaymentSheetParameters(
+    paymentIntentClientSecret: request.clientSecret,
+    merchantDisplayName: request.merchantName,
+    allowsDelayedPaymentMethods: false,
+    returnURL: stripeReturnUrl,
+    googlePay: PaymentSheetGooglePay(
+      merchantCountryCode: 'US',
+      currencyCode: currency.isEmpty ? 'USD' : currency,
+      testEnv: !production,
+    ),
+    applePay: appleMerchantId.isEmpty
+        ? null
+        : const PaymentSheetApplePay(merchantCountryCode: 'US'),
+  );
+}
+
 class StripePaymentSheetService implements PaymentSheetService {
   StripePaymentSheetService({
     this.publishableKey = const String.fromEnvironment(
       'STRIPE_PUBLISHABLE_KEY',
     ),
-  });
+    this.appleMerchantId = const String.fromEnvironment('STRIPE_MERCHANT_ID'),
+    bool? production,
+  }) : production =
+           production ?? DefaultFirebaseOptions.env == FirebaseEnv.prod;
 
   final String publishableKey;
+
+  /// Apple Pay's merchant ID (`merchant.…`, `STRIPE_MERCHANT_ID` in the
+  /// secrets file); empty leaves Apple Pay off.
+  final String appleMerchantId;
+
+  /// Whether this is an App Store (prod) build: Google Pay's live
+  /// environment instead of its test one.
+  final bool production;
 
   @override
   bool get available =>
@@ -79,14 +122,15 @@ class StripePaymentSheetService implements PaymentSheetService {
       Stripe.publishableKey = publishableKey;
       Stripe.stripeAccountId = request.account;
       Stripe.urlScheme = 'stall10';
+      if (appleMerchantId.isNotEmpty) {
+        Stripe.merchantIdentifier = appleMerchantId;
+      }
       await Stripe.instance.applySettings();
       await Stripe.instance.initPaymentSheet(
-        paymentSheetParameters: SetupPaymentSheetParameters(
-          paymentIntentClientSecret: request.clientSecret,
-          merchantDisplayName: request.merchantName,
-          // US bank payments, which take days to clear.
-          allowsDelayedPaymentMethods: true,
-          returnURL: stripeReturnUrl,
+        paymentSheetParameters: buildPaymentSheetParameters(
+          request,
+          production: production,
+          appleMerchantId: appleMerchantId,
         ),
       );
       await Stripe.instance.presentPaymentSheet();

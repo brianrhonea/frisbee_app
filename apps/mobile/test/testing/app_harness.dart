@@ -56,6 +56,7 @@ Future<AppFakes> pumpFullApp(
   WidgetTester tester, {
   Size size = const Size(390, 844),
   bool signedIn = true,
+  bool expectHome = true,
 }) async {
   final location = FakeLocationService();
   late FakeUserPostRepository userPosts;
@@ -155,6 +156,6 @@ Future<AppFakes> pumpFullApp(
     ),
   );
   await tester.pumpAndSettle();
-  if (signedIn) expect(find.byType(HomeScreen), findsOneWidget);
+  if (signedIn && expectHome) expect(find.byType(HomeScreen), findsOneWidget);
   return AppFakes(teams, events, auth);
 }
