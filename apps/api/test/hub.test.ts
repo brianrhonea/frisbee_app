@@ -134,6 +134,63 @@ describe("team events", () => {
     expect((await s.call("DELETE", `/v1/teams/t1/events/${id}`)).statusCode).toBe(204);
   });
 
+  describe("poll votes survive edits that don't change the poll", () => {
+    const poll = { question: "Jerseys?", options: [{ id: "a", text: "Dark" }, { id: "b", text: "Light" }] };
+    const make = async () => {
+      const id = (await s.call("POST", "/v1/teams/t1/events", { ...event, poll })).json().id as string;
+      // Stored with its keys in another order (Firestore's order isn't ours) and a null-ish `multiple`.
+      s.store.put(`teams/t1/events/${id}`, {
+        ...s.store.doc(`teams/t1/events/${id}`),
+        poll: { options: [{ text: "Dark", id: "a" }, { text: "Light", id: "b" }], multiple: false, question: "Jerseys?" },
+        votes: { player: ["a"] },
+      });
+      return id;
+    };
+
+    it("a stored poll with its keys in another order keeps its votes when only the notes change", async () => {
+      const id = await make();
+      await s.call("PATCH", `/v1/teams/t1/events/${id}`, { ...event, poll, notes: "Bring water" });
+      expect(s.store.doc(`teams/t1/events/${id}`)?.votes).toEqual({ player: ["a"] });
+    });
+
+    it("a changed option text, a reordered option, or a new question resets them", async () => {
+      for (const changed of [
+        { ...poll, options: [{ id: "a", text: "Navy" }, { id: "b", text: "Light" }] },
+        { ...poll, options: [{ id: "b", text: "Light" }, { id: "a", text: "Dark" }] },
+        { ...poll, question: "Which jerseys?" },
+      ]) {
+        const id = await make();
+        await s.call("PATCH", `/v1/teams/t1/events/${id}`, { ...event, poll: changed });
+        expect(s.store.doc(`teams/t1/events/${id}`)?.votes, JSON.stringify(changed)).toEqual({});
+      }
+    });
+
+    it("a missing poll and a null poll are the same: no votes wiped on an event without one", async () => {
+      const id = (await s.call("POST", "/v1/teams/t1/events", event)).json().id as string;
+      const stored = { ...s.store.doc(`teams/t1/events/${id}`) };
+      delete stored.poll;
+      s.store.put(`teams/t1/events/${id}`, { ...stored, votes: { player: ["x"] } });
+      await s.call("PATCH", `/v1/teams/t1/events/${id}`, { ...event, notes: "n" });
+      expect(s.store.doc(`teams/t1/events/${id}`)?.votes).toEqual({ player: ["x"] });
+    });
+
+    it("a series edit with scope=following and an unchanged poll keeps every later event's votes", async () => {
+      const weekly = { ...event, poll, endsAt: "2026-11-20T20:00:00Z", repeat: { freq: "weekly", until: "2026-12-11" }, timeZone: "America/New_York" };
+      const first = (await s.call("POST", "/v1/teams/t1/events", weekly)).json().id as string;
+      const all = [0, 1, 2, 3].map((i) => first.replace(/_0$/, `_${i}`));
+      for (const id of all) {
+        s.store.put(`teams/t1/events/${id}`, {
+          ...s.store.doc(`teams/t1/events/${id}`),
+          poll: { options: [{ text: "Dark", id: "a" }, { text: "Light", id: "b" }], multiple: false, question: "Jerseys?" },
+          votes: { player: ["b"] },
+        });
+      }
+      const res = await s.call("PATCH", `/v1/teams/t1/events/${all[1]}?scope=following`, { ...weekly, notes: "Bring water", startsAt: "2026-11-27T18:00:00Z", endsAt: "2026-11-27T20:00:00Z" });
+      expect(res.statusCode).toBe(200);
+      for (const id of all.slice(1)) expect(s.store.doc(`teams/t1/events/${id}`)?.votes).toEqual({ player: ["b"] });
+    });
+  });
+
   describe("repeating", () => {
     const weekly = { ...event, endsAt: "2026-11-20T20:00:00Z", repeat: { freq: "weekly", until: "2026-12-11" }, timeZone: "America/New_York" };
     const ids = (first: string) => [0, 1, 2, 3].map((i) => first.replace(/_0$/, `_${i}`));

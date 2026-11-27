@@ -66,6 +66,8 @@ const without = (m: unknown, key: string): Data => {
   return out;
 };
 
+const nameOf = (profile: Data | null) => clip(typeof profile?.name === "string" && profile.name ? profile.name : "Player", 80);
+
 const policyOf = (user: Data | null) => {
   const v = user?.messagePolicy;
   return v === "followers" || v === "following" || v === "nobody" ? v : "everyone";
@@ -89,8 +91,16 @@ export class ConversationService {
     private readonly adults?: AdultVisibility,
   ) {}
 
+  /**
+   * A recipient the rules would refuse (no server-set `adult` marker on their
+   * profile, whatever ACCOUNT_GATE_MODE says) or D-1317 hides (enforce mode):
+   * answered exactly as a "nobody" message policy.
+   */
   private async refuseHidden(uid: string) {
-    if (await this.adults?.isHidden(uid)) throw new ApiError("permission_denied", "You can't message this person.");
+    const profile = await this.store.get(p.profile(uid));
+    if (profile?.adult !== true || (await this.adults?.isHidden(uid))) {
+      throw new ApiError("permission_denied", `${nameOf(profile)} doesn't take messages from you.`);
+    }
   }
 
   private async name(caller: Caller) {
@@ -127,11 +137,11 @@ export class ConversationService {
         : policy === "everyone" || (policy === "followers" && iFollowThem)
           ? "request"
           : null;
-    const theirName = clip(typeof profile.name === "string" && profile.name ? profile.name : "Player", 80);
+    const theirName = nameOf(profile);
     // D-1317: a hidden account answers exactly as one that takes no messages
     // (same code and text), checked after the profile and policy so the
     // refusal can't tell a stranger which it was.
-    if (!status || (await this.adults?.isHidden(other))) {
+    if (!status || profile.adult !== true || (await this.adults?.isHidden(other))) {
       throw new ApiError("permission_denied", `${theirName} doesn't take messages from you.`);
     }
     await checkNotMuted(this.store, caller.uid, this.now());
@@ -196,8 +206,9 @@ export class ConversationService {
       this.store.get(p.user(uid)),
       this.store.get(p.follow(uid, caller.uid)),
     ]);
-    const name = clip(typeof profile?.name === "string" && profile.name ? profile.name : "Player", 80);
-    const ok = !(!profile || !follows || policyOf(user) === "nobody" || (await blockedBetween(this.store, caller.uid, uid)) || (await this.adults?.isHidden(uid)));
+    const name = nameOf(profile);
+    // `adult` is the rules' test too (adultProfile), so it holds in every gate mode.
+    const ok = !(!profile || profile.adult !== true || !follows || policyOf(user) === "nobody" || (await blockedBetween(this.store, caller.uid, uid)) || (await this.adults?.isHidden(uid)));
     return { ok, name };
   }
 

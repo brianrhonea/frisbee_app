@@ -21,7 +21,7 @@ const follow = (follower: string, followed: string) => s.store.put(`users/${foll
 beforeEach(() => {
   s = setup();
   for (const [uid, name] of [["amy", "Amy"], ["ben", "Ben"], ["cal", "Cal"], ["dee", "Dee"]]) {
-    s.store.put(`profiles/${uid}`, { name });
+    s.store.put(`profiles/${uid}`, { name, adult: true });
     s.users.records.set(uid!, { name, email: `${uid}@x.test` });
   }
 });

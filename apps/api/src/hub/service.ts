@@ -60,6 +60,24 @@ export function checkTournamentKey(teamId: string, key: string | undefined): str
 }
 
 /** A per-uid map field without [uid] (FieldValue.delete() on one key). */
+/**
+ * Whether a stored poll and the edit's poll are the same poll: the question,
+ * `multiple` and the options as an ordered list of [id, text]. Field by field,
+ * so the key order Firestore hands back doesn't matter; a missing and a null
+ * poll are equal. A different poll starts its votes over.
+ */
+function samePoll(stored: unknown, next: { question: string; multiple: boolean; options: { id: string; text: string }[] } | null): boolean {
+  const old = stored && typeof stored === "object" ? (stored as Data) : null;
+  if (!old || !next) return !old && !next;
+  const opts = Array.isArray(old.options) ? (old.options as Data[]) : [];
+  return (
+    old.question === next.question &&
+    (old.multiple === true) === (next.multiple === true) &&
+    opts.length === next.options.length &&
+    opts.every((o, i) => o?.id === next.options[i]!.id && o?.text === next.options[i]!.text)
+  );
+}
+
 function without(m: unknown, uid: string): Data {
   const out = { ...mapOf(m) };
   delete out[uid];
@@ -282,7 +300,7 @@ export class HubService {
       const move = later.length ? moveLater(event, details, req.timeZone) : null;
       const write = (eventId: string, stored: Data, fields: typeof details, lead: boolean) => {
         // A changed poll starts its votes over (editors may only reset them).
-        const pollChanged = JSON.stringify(stored.poll ?? null) !== JSON.stringify(poll);
+        const pollChanged = !samePoll(stored.poll, poll);
         tx.update(p.event(teamId, eventId), {
           ...fields,
           poll,

@@ -79,7 +79,7 @@ function setup(mode: AccountGateMode) {
   });
   for (const [uid, name] of [["amy", "Amy"], ["adult", "Ada"], ["legacy", "Lee"]] as const) {
     repo.profileMap.set(uid, { name, username: uid, private: false });
-    store.put(`profiles/${uid}`, { name });
+    store.put(`profiles/${uid}`, { name, adult: true });
     users.records.set(uid, { name, email: `${uid}@x.test` });
   }
   users.adults.add("amy").add("adult");
@@ -166,6 +166,45 @@ describe("enforce mode", () => {
     const res = await s.call("POST", "/v1/conversations/groups", { name: "Crew", members: ["legacy", "adult"] });
     expect(res.statusCode).toBe(201);
     expect(res.json().notAdded).toEqual(["Lee"]);
+  });
+});
+
+// The rules' adultProfile() test, mirrored by the API in every gate mode: a recipient
+// whose profile lacks the server-set `adult: true` is refused like a "nobody" policy.
+describe.each(["report", "enforce"] as const)("recipients without the adult marker (%s mode)", (mode) => {
+  const prep = () => {
+    const s = setup(mode);
+    s.store.put("profiles/kid", { name: "Kid" }); // unmarked (a minor, or not backfilled yet)
+    s.users.adults.add("kid"); // even with the claim, the rules would refuse
+    s.users.records.set("kid", { name: "Kid", email: "kid@x.test" });
+    s.store.put("users/kid/follows/user_amy", { at: new Date(now) });
+    s.store.put("users/adult/follows/user_amy", { at: new Date(now) });
+    return s;
+  };
+
+  it("refuses a DM to them with the 'nobody' words, and allows a marked adult", async () => {
+    const s = prep();
+    const res = await s.call("POST", "/v1/conversations", { with: "kid" });
+    expect(res.statusCode).toBe(403);
+    expect(res.json().error.message).toBe("Kid doesn't take messages from you.");
+    expect(s.store.doc("conversations/amy_kid")).toBeUndefined();
+    expect((await s.call("POST", "/v1/conversations", { with: "adult" })).statusCode).toBe(200);
+  });
+
+  it("refuses to send into an existing direct conversation with them", async () => {
+    const s = prep();
+    s.store.put("conversations/amy_kid", { participants: ["amy", "kid"], names: { amy: "Amy", kid: "Kid" }, status: "accepted" });
+    expect((await s.call("POST", "/v1/conversations/amy_kid/messages", { text: "hi" })).statusCode).toBe(403);
+  });
+
+  it("leaves them out of a group at create, and at add", async () => {
+    const s = prep();
+    const made = await s.call("POST", "/v1/conversations/groups", { name: "Crew", members: ["kid", "adult"] });
+    expect(made.statusCode).toBe(201);
+    expect(made.json().notAdded).toEqual(["Kid"]);
+    expect(s.store.doc(`conversations/${made.json().id}`)?.participants).toEqual(["amy", "adult"]);
+    const add = await s.call("POST", `/v1/conversations/${made.json().id}/members`, { members: ["kid"] });
+    expect(add.json().notAdded).toEqual(["Kid"]);
   });
 });
 
