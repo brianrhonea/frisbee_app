@@ -523,7 +523,8 @@ export class CalendarService {
     if (rawId === caller.uid) await this.ensureDefault(caller.uid);
     const cal = await this.editable(caller, rawId);
     await checkNotMuted(this.store, caller.uid, this.now());
-    const id = this.store.newId(eventsOf(cal));
+    // A client-chosen id makes a replay a 409 (tx.create below); a series' events are `{id}_{index}`.
+    const id = req.id ?? this.store.newId(eventsOf(cal));
     const occurrences = req.repeat
       ? seriesOccurrences(id, { ...req, repeat: req.repeat })
       : [{ id, startsAt: data.startsAt, endsAt: data.endsAt, series: null }];
@@ -551,6 +552,7 @@ export class CalendarService {
     const eventId = docIdParam(rawEventId);
     const scope = scopeOf(query);
     const { req, data } = this.record(body);
+    if (req.id !== undefined && req.id !== eventId) throw new ApiError("invalid_argument", "An event's id can't be changed.");
     const cal = await this.editable(caller, rawId);
     const path = (id: string) => `${eventsOf(cal)}/${id}`;
     const current = scope === "following" ? await this.store.get(path(eventId)) : null;
