@@ -353,16 +353,17 @@ class TeamDetailViewModel extends ChangeNotifier {
     return result;
   }
 
-  /// Saves a roster spot, then links it to (or unlinks it from) a member
-  /// when its [RosterPlayer.userId] changed: the server only links through
-  /// the admin link call, not on create or edit.
+  /// Saves a roster spot. A new spot is created with its member in one
+  /// call (the server checks they're a member and not on another spot: its
+  /// 412 message is the error). Changing the member of an existing spot
+  /// goes through the link call after the save.
   Future<Result<void>> _savePlayer(RosterPlayer p) async {
     final before = p.id.isEmpty
         ? null
         : _roster.where((r) => r.id == p.id).firstOrNull?.userId;
     final saved = await _teams.savePlayer(teamId, p);
     if (saved is! Ok<String>) return Result.error((saved as Error).error);
-    if (p.userId == before) return const Result.ok(null);
+    if (p.id.isEmpty || p.userId == before) return const Result.ok(null);
     return _teams.linkPlayer(teamId, saved.value, p.userId);
   }
 

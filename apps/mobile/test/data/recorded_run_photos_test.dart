@@ -7,49 +7,28 @@ import 'package:frisbee_app/data/services/attachment_storage.dart';
 import 'package:frisbee_app/domain/models/chat.dart';
 import 'package:frisbee_app/domain/models/user_post.dart';
 import 'package:frisbee_app/domain/models/workout.dart';
+import 'package:frisbee_app/domain/models/workout_route.dart';
 import 'package:frisbee_app/utils/result.dart';
 
 import '../testing/api_fakes.dart';
 import '../testing/fakes.dart';
 import '../testing/outbox_harness.dart';
 
-class _Storage extends AttachmentStorage {
-  final folders = <String>[];
-
-  @override
-  Future<List<ChatAttachment>> upload(
-    String folder,
-    List<NewAttachment> attachments,
-  ) async {
-    folders.add(folder);
-    return [
-      for (final (i, a) in attachments.indexed)
-        ChatAttachment(
-          path: '$folder/$i-${a.name}',
-          name: a.name,
-          contentType: 'image/jpeg',
-          size: a.size,
-        ),
-    ];
-  }
-}
-
-/// M1: a recorded run saved directly keeps its photos (17-B regression).
+/// A recorded run with photos goes through the API like any post (it was a
+/// direct Firestore write before API 0.54.0).
 void main() {
   late FakeApi api;
   late FakeFirebaseFirestore db;
-  late _Storage storage;
 
   setUp(() async {
     api = FakeApi();
     db = FakeFirebaseFirestore();
-    storage = _Storage();
-    await db.collection('profiles').doc('u1').set({'private': false});
+    uploadsWork(api);
   });
 
   UserPostRepositoryFirebase repo(OutboxHarness? h) =>
       UserPostRepositoryFirebase(
-        attachments: storage,
+        attachments: AttachmentStorage(),
         firestore: db,
         api: api.client(),
         uploads: api.uploadClient(),
@@ -57,34 +36,47 @@ void main() {
       );
 
   UserPostDraft draft() => UserPostDraft(
-    post: const UserPost(
+    post: UserPost(
       id: '',
-      workout: Workout(durationMinutes: 20, durationSeconds: 1230),
+      workout: Workout(
+        durationMinutes: 20,
+        durationSeconds: 1230,
+        route: WorkoutRoute(
+          path: const [RoutePoint(40, -105), RoutePoint(40.01, -105.01)],
+        ),
+      ),
     ),
     newImages: [NewAttachment(name: 'a.jpg', bytes: Uint8List(4))],
   );
 
-  Future<List<Object?>> imagesOf(String id) async =>
-      (await db.collection('posts').doc(id).get()).data()!['images']
-          as List<Object?>;
-
-  test('saved directly: the photo is uploaded and on the post', () async {
+  test('sent through the API with the photo as an upload id', () async {
     final r = await repo(null).savePost(draft(), testUser);
     final id = (r as Ok<String>).value;
-    final images = await imagesOf(id);
-    expect(images, hasLength(1));
-    expect((images.single as Map)['path'], startsWith('users/u1/posts/$id/'));
-    expect(storage.folders, hasLength(1));
-    expect(api.sent, isEmpty);
+    expect(api.bodyOf('POST /v1/uploads')['itemId'], id);
+    final b = api.bodyOf('POST /v1/posts');
+    expect(b['id'], id);
+    expect(b['uploadIds'], ['up1']);
+    expect((await db.collection('posts').get()).docs, isEmpty);
   });
 
-  test('through the outbox: photos kept, uploaded once', () async {
+  test('through the outbox: a retry reuses the id and uploads once; '
+      'a 409 replay is sent', () async {
     final h = OutboxHarness();
     addTearDown(h.dispose);
+    api.on('POST /v1/posts', [
+      apiError(500, 'internal', 'Boom'),
+      apiError(409, 'already_exists', 'That post already exists.'),
+    ]);
     final r = await repo(h).savePost(draft(), testUser);
     final id = (r as Ok<String>).value;
+    expect(h.outbox.jobs, hasLength(1));
+    h.passTime();
     await h.outbox.drain();
-    expect(await imagesOf(id), hasLength(1));
-    expect(storage.folders, hasLength(1));
+    expect(h.outbox.jobs, isEmpty);
+    expect(api.to('POST /v1/uploads'), hasLength(1));
+    expect(
+      {for (final s in api.to('POST /v1/posts')) (s.body as Map)['id']},
+      {id},
+    );
   });
 }

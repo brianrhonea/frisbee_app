@@ -246,7 +246,9 @@ void main() {
         ),
       );
       expect((r as Ok<String>).value, 'p1');
-      expect(api.bodyOf('POST /v1/calendars/u1/events'), {
+      final posted = api.bodyOf('POST /v1/calendars/u1/events');
+      expect(posted['id'], matches(RegExp(r'^[A-Za-z0-9]{1,40}$')));
+      expect({...posted}..remove('id'), {
         'title': 'Practice',
         'type': 'practice',
         'startsAt': '2027-01-05T18:00:00.000Z',
@@ -256,6 +258,23 @@ void main() {
         'repeat': {'freq': 'daily', 'until': '2027-01-09'},
         'timeZone': 'America/Denver',
       });
+    });
+
+    test('a retry keeps the id; a 409 replay counts as sent', () async {
+      api.on('POST /v1/calendars/u1/events', [
+        apiError(500, 'internal', 'Boom'),
+        apiError(409, 'already_exists', 'That event already exists.'),
+      ]);
+      final first = await repo.saveMyEvent('u1', event());
+      expect(first, isA<Error<String>>());
+      final second = await repo.saveMyEvent('u1', event());
+      final ids = [
+        for (final s in api.to('POST /v1/calendars/u1/events'))
+          (s.body as Map)['id'],
+      ];
+      expect(ids, hasLength(2));
+      expect(ids.toSet(), hasLength(1));
+      expect((second as Ok<String>).value, ids.first);
     });
 
     test('edit and delete, with scope', () async {

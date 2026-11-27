@@ -4,6 +4,7 @@ import 'package:frisbee_app/data/repositories/team/team_repository_firebase.dart
 import 'package:frisbee_app/data/services/api_client.dart';
 import 'package:frisbee_app/data/services/attachment_storage.dart';
 import 'package:frisbee_app/domain/models/roster_player.dart';
+import 'package:frisbee_app/domain/models/team_page.dart';
 import 'package:frisbee_app/utils/result.dart';
 
 import '../testing/api_fakes.dart';
@@ -97,6 +98,58 @@ void main() {
     );
     final r = await repo.linkPlayer('t1', 'p1', 'u1');
     expect(errorOf(r).toString(), 'This spot is linked to someone else.');
+  });
+
+  test(
+    'a new spot with a member: one POST carrying userId; 412 surfaces',
+    () async {
+      api.on(
+        'POST /v1/teams/t1/roster-players',
+        apiError(
+          412,
+          'failed_precondition',
+          'That person is already linked to another spot on this team',
+        ),
+      );
+      final r = await repo.savePlayer(
+        't1',
+        const RosterPlayer(id: '', name: 'Sam', userId: 'u5'),
+      );
+      expect(api.bodyOf('POST /v1/teams/t1/roster-players')['userId'], 'u5');
+      expect(
+        errorOf(r).toString(),
+        'That person is already linked to another spot on this team',
+      );
+    },
+  );
+
+  test('staff come from GET roster: coaches and owner, not players', () async {
+    api.on('GET /v1/teams/t1/roster', {
+      'kind': 'team',
+      'players': [],
+      'teams': [],
+      'members': [
+        {'uid': 'c', 'name': 'Cody', 'tier': 'coach', 'roles': []},
+        {'uid': 'o', 'name': 'Olive', 'tier': 'owner', 'roles': []},
+        {'uid': 'p', 'name': 'Pat', 'tier': 'player', 'roles': []},
+      ],
+    });
+    final r = await repo.teamStaff('t1');
+    expect(
+      [
+        for (final o in (r as Ok<List<CommunityOrganizer>>).value)
+          (o.uid, o.label),
+      ],
+      [('o', 'Owner'), ('c', 'Coach')],
+    );
+  });
+
+  test('a private group refuses its roster: no staff', () async {
+    api.on(
+      'GET /v1/teams/t1/roster',
+      apiError(403, 'permission_denied', 'Members only.'),
+    );
+    expect(await repo.teamStaff('t1'), isA<Error<List<CommunityOrganizer>>>());
   });
 
   test('offline: a retryable error', () async {

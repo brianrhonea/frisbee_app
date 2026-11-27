@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 /// Client-chosen ids for creates, kept per identical request until it
 /// succeeds, so a retry after a lost response sends the same id and the
@@ -18,6 +19,16 @@ class PendingIds {
     }
     return _ids.putIfAbsent(key, mint);
   }
+
+  static final _rng = Random.secure();
+  static const _alphabet =
+      'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+
+  /// A fresh 20-character id (letters and digits: the API's id shape).
+  static String mintId() => String.fromCharCodes([
+    for (var i = 0; i < 20; i++)
+      _alphabet.codeUnitAt(_rng.nextInt(_alphabet.length)),
+  ]);
 
   /// Forget [id] once the request succeeded (or was a 409).
   void done(String id) => _ids.removeWhere((_, v) => v == id);

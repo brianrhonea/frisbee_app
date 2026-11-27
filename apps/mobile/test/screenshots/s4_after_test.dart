@@ -375,4 +375,48 @@ void main() {
     await tester.pumpAndSettle();
     await shotCapture(tester, 'team-message-sheet');
   });
+
+  testWidgets('outsider message sheet', skip: skip != null, (tester) async {
+    await shotSize(tester);
+    final auth = FakeAuthRepository(user: testUser);
+    final teams = FakeTeamRepository();
+    final t =
+        team(
+          members: {
+            'owner': TeamRole.owner,
+            'coach': TeamRole.coach,
+            'sam': TeamRole.player,
+          },
+        ).copyWith(
+          memberNames: {
+            'owner': 'Olive Nguyen',
+            'coach': 'Riley Chen',
+            'sam': 'Sam Ortiz',
+          },
+        );
+    teams.teams['t1'] = t;
+    teams.listings['t1'] = TeamListing.of(t);
+    final vm = TeamHomeViewModel(
+      teamId: 't1',
+      teamRepository: teams,
+      eventRepository: FakeEventRepository(),
+      teamPostRepository: FakeTeamPostRepository(),
+      authRepository: auth,
+      filePicker: FakeFilePickerService(),
+      chatRepository: FakeChatRepository(),
+      directMessageRepository: FakeDirectMessageRepository(),
+      clock: () => now,
+    );
+    addTearDown(vm.dispose);
+    await shotPump(
+      tester,
+      TeamHomeScreen(viewModel: vm),
+      wrap: (app) => providers(app, teams, auth),
+    );
+    await tester.pumpAndSettle();
+    await shotCapture(tester, 'outsider-team-header');
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Message').first);
+    await tester.pumpAndSettle();
+    await shotCapture(tester, 'outsider-message-sheet');
+  });
 }

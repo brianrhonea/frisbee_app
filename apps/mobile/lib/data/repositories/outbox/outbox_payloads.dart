@@ -1,4 +1,5 @@
 import '../../../domain/models/outbox.dart';
+import '../../../domain/models/workout_route.dart';
 
 /// What a queued job sends, as the API's request body, worked out from the
 /// job's saved payload. The one place that knows both payload layouts
@@ -114,13 +115,15 @@ abstract final class OutboxPayloads {
     };
   }
 
-  /// A workout in the API's shape (`workoutSchema`): no seconds and no GPS
-  /// route, which it can't carry. See [workoutNeedsDirect].
+  /// A workout in the API's shape (`workoutSchema`): a recorded run keeps
+  /// its exact seconds and GPS route (thinned to the API's 4000 points).
   static Map<String, Object?> _workout(Map<String, Object?> w) => {
     'activity': w['activity'],
     'durationMinutes': w['durationMinutes'],
-    if (w['distanceKm'] != null) 'distanceKm': w['distanceKm'],
-    if (w['effort'] != null) 'effort': w['effort'],
+    'durationSeconds': ?w['durationSeconds'],
+    'distanceKm': ?w['distanceKm'],
+    'effort': ?w['effort'],
+    'route': ?_route(w['route']),
     'exercises': [
       for (final e in (w['exercises'] as List?) ?? const [])
         if (e is Map)
@@ -133,11 +136,37 @@ abstract final class OutboxPayloads {
     ],
   };
 
-  /// Whether a post's workout carries what the API's `workoutSchema`
-  /// can't: a recorded GPS route or a seconds count. Such a post can't be
-  /// sent through `POST /v1/posts` until the shared schema takes them
-  /// (a request to 17-A); it still goes the old way.
-  static bool workoutNeedsDirect(Map<String, Object?>? workout) =>
-      workout != null &&
-      (workout['route'] != null || workout['durationSeconds'] != null);
+  /// A route in the API's shape: [WorkoutRoute.toMap] with the path thinned
+  /// to at most [WorkoutRoute.maxPoints] points first. Null for none.
+  static Map<String, Object?>? _route(Object? raw) {
+    if (raw is! Map) return null;
+    final route = WorkoutRoute.fromMap(Map<String, dynamic>.from(raw));
+    if (route.path.length <= WorkoutRoute.maxPoints) {
+      return Map<String, Object?>.from(route.toMap());
+    }
+    return Map<String, Object?>.from(
+      WorkoutRoute(
+        path: simplifyPath(route.path, maxPoints: WorkoutRoute.maxPoints),
+        splitsMi: route.splitsMi,
+        splitsKm: route.splitsKm,
+        elevationGainMeters: route.elevationGainMeters,
+      ).toMap(),
+    );
+  }
+
+  /// Why a post's workout can't be sent as it stands, or null: a route
+  /// with under 2 points, or more splits than the API takes. Checked before
+  /// the request so the person sees it at once.
+  static String? workoutProblem(Map<String, Object?>? workout) {
+    final raw = workout?['route'];
+    if (raw is! Map) return null;
+    final r = _route(raw);
+    final route = WorkoutRoute.fromMap(Map<String, dynamic>.from(r!));
+    if (route.path.length < 2) return 'The route is too short to share.';
+    if (route.splitsMi.length > WorkoutRoute.maxSplits ||
+        route.splitsKm.length > WorkoutRoute.maxSplits) {
+      return 'That route is too long to share.';
+    }
+    return null;
+  }
 }

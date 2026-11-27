@@ -14,6 +14,7 @@ import 'package:frisbee_app/domain/models/outbox.dart';
 import 'package:frisbee_app/domain/models/post_comment.dart';
 import 'package:frisbee_app/domain/models/user_post.dart';
 import 'package:frisbee_app/domain/models/workout.dart';
+import 'package:frisbee_app/domain/models/workout_route.dart';
 import 'package:frisbee_app/utils/result.dart';
 
 import '../testing/api_fakes.dart';
@@ -134,28 +135,132 @@ void main() {
       });
     });
 
-    test('a recorded run (route, seconds) still saves directly: the API '
-        "can't carry it yet", () async {
-      await db.collection('profiles').doc('u1').set({'private': false});
+    test('a recorded run: seconds and route go through the API', () async {
       final r = await repo().savePost(
-        const UserPostDraft(
+        UserPostDraft(
           post: UserPost(
             id: '',
             workout: Workout(
               activity: WorkoutActivity.run,
               durationMinutes: 20,
               durationSeconds: 1230,
+              distanceKm: 3,
+              route: WorkoutRoute(
+                path: const [RoutePoint(40, -105), RoutePoint(40.01, -105.01)],
+                splitsKm: const [400, 410],
+                elevationGainMeters: 12,
+              ),
             ),
           ),
         ),
         testUser,
       );
       final id = (r as Ok<String>).value;
-      expect(api.sent, isEmpty);
-      expect(
-        (await db.collection('posts').doc(id).get()).data()?['authorId'],
-        'u1',
+      final b = api.bodyOf('POST /v1/posts');
+      expect(b['id'], id);
+      final w = b['workout'] as Map;
+      expect(w['durationSeconds'], 1230);
+      final route = w['route'] as Map;
+      expect(decodePolyline(route['path'] as String), hasLength(2));
+      expect(route['splitsKm'], [400, 410]);
+      expect(route['elevationGainM'], 12);
+      // No direct Firestore write any more.
+      expect((await db.collection('posts').get()).docs, isEmpty);
+    });
+
+    test('a recorded run with photos uploads them as post uploads', () async {
+      uploadsWork(api);
+      final r = await repo().savePost(
+        UserPostDraft(
+          post: UserPost(
+            id: '',
+            workout: Workout(
+              durationMinutes: 20,
+              durationSeconds: 1230,
+              route: WorkoutRoute(
+                path: const [RoutePoint(40, -105), RoutePoint(40.01, -105.01)],
+              ),
+            ),
+          ),
+          newImages: [NewAttachment(name: 'a.jpg', bytes: Uint8List(5))],
+        ),
+        testUser,
       );
+      final id = (r as Ok<String>).value;
+      expect(api.bodyOf('POST /v1/uploads')['itemId'], id);
+      expect(api.bodyOf('POST /v1/uploads')['purpose'], 'post');
+      expect(api.bodyOf('POST /v1/posts')['uploadIds'], ['up1']);
+    });
+
+    test(
+      'an oversize route is thinned to 4000 points before sending',
+      () async {
+        final path = [
+          for (var i = 0; i < 6000; i++)
+            RoutePoint(40 + i * 0.00005, -105 + (i.isEven ? 0.0002 : 0)),
+        ];
+        await repo().savePost(
+          UserPostDraft(
+            post: UserPost(
+              id: '',
+              workout: Workout(
+                durationMinutes: 60,
+                durationSeconds: 3600,
+                route: WorkoutRoute(path: path),
+              ),
+            ),
+          ),
+          testUser,
+        );
+        final sent =
+            (api.bodyOf('POST /v1/posts')['workout'] as Map)['route'] as Map;
+        expect(
+          decodePolyline(sent['path'] as String).length,
+          lessThanOrEqualTo(WorkoutRoute.maxPoints),
+        );
+      },
+    );
+
+    test('a route too short is refused client-side, nothing sent', () async {
+      final r = await repo().savePost(
+        UserPostDraft(
+          post: UserPost(
+            id: '',
+            workout: Workout(
+              durationMinutes: 5,
+              durationSeconds: 300,
+              route: WorkoutRoute(path: const [RoutePoint(40, -105)]),
+            ),
+          ),
+        ),
+        testUser,
+      );
+      expect(r, isA<Error<String>>());
+      expect(api.sent, isEmpty);
+    });
+
+    test('the server refusing an impossible pace shows its message', () async {
+      api.on(
+        'POST /v1/posts',
+        apiError(400, 'invalid_argument', 'That pace is too fast.'),
+      );
+      final r = await repo().savePost(
+        UserPostDraft(
+          post: UserPost(
+            id: '',
+            workout: Workout(
+              durationMinutes: 1,
+              durationSeconds: 60,
+              distanceKm: 900,
+              route: WorkoutRoute(
+                path: const [RoutePoint(40, -105), RoutePoint(40.01, -105.01)],
+              ),
+            ),
+          ),
+        ),
+        testUser,
+      );
+      expect((r as Error).error.toString(), 'That pace is too fast.');
     });
 
     test('an edit: PATCH with keepImages, new uploads and the tag', () async {

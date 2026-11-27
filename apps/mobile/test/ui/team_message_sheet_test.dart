@@ -141,6 +141,26 @@ void main() {
       expect(vm.showsMessage, isFalse);
     });
 
+    test(
+      'an outsider of a private group has no staff and no Message',
+      () async {
+        add(team({'owner': TeamRole.owner, 'coach': TeamRole.coach}));
+        teams.privateRosters.add('t1');
+        final vm = homeVm();
+        await pumpEventQueue();
+        expect(vm.messageableStaff, isEmpty);
+        expect(vm.showsMessage, isFalse);
+      },
+    );
+
+    test('a member does not ask the roster endpoint', () async {
+      add(team({'owner': TeamRole.owner, testUser.uid: TeamRole.player}));
+      final vm = homeVm();
+      await pumpEventQueue();
+      expect(teams.staffCalls, isEmpty);
+      expect([for (final o in vm.messageableStaff) o.uid], ['owner']);
+    });
+
     test('a signed-out visitor has no Message', () async {
       add(team({'owner': TeamRole.owner}));
       auth = FakeAuthRepository();

@@ -3,6 +3,7 @@ import '../../../domain/models/invite_code.dart';
 import '../../../domain/models/pending_invite.dart';
 import '../../../domain/models/roster_player.dart';
 import '../../../domain/models/team.dart';
+import '../../../domain/models/team_page.dart';
 import '../../../utils/result.dart';
 
 /// How far deleting a team has got: [done] of [total] steps, now on
@@ -219,8 +220,10 @@ abstract class TeamRepository {
   });
 
   /// Creates the player when [RosterPlayer.id] is empty, otherwise updates
-  /// it; the result is the player's id. The server ignores
-  /// [RosterPlayer.userId] here: linking an account is [linkPlayer].
+  /// it; the result is the player's id. A new spot's [RosterPlayer.userId]
+  /// is linked by the same call (admins; the member must not be on another
+  /// spot: `failed_precondition`); changing the link of an existing spot is
+  /// [linkPlayer].
   Future<Result<String>> savePlayer(String teamId, RosterPlayer player);
 
   Future<Result<void>> deletePlayer(String teamId, String playerId);
@@ -239,6 +242,12 @@ abstract class TeamRepository {
 
   /// Takes back the invite to [uid] (someone who may invite people).
   Future<Result<void>> withdrawInvite(String teamId, String uid);
+
+  /// The team's staff (owner, coach, captain tiers), for the Message
+  /// sheet: `GET /v1/teams/:id/roster`, which any signed-in user may read.
+  /// A private group's roster stays with its members, so for anyone else
+  /// that is an error (no staff).
+  Future<Result<List<CommunityOrganizer>>> teamStaff(String teamId);
 
   /// Links roster player [playerId] to the account [uid], or unlinks it
   /// when null, so their stats show on that player's profile. Members may

@@ -38,6 +38,7 @@ import 'package:frisbee_app/domain/models/stats.dart';
 import 'package:frisbee_app/domain/models/team_name.dart';
 import 'package:frisbee_app/domain/models/recurrence.dart';
 import 'package:frisbee_app/domain/models/team.dart';
+import 'package:frisbee_app/domain/models/team_page.dart';
 import 'package:frisbee_app/domain/models/team_event.dart';
 import 'package:frisbee_app/domain/models/team_post.dart';
 import 'package:frisbee_app/utils/result.dart';
@@ -1133,6 +1134,23 @@ class FakeTeamRepository implements TeamRepository {
   @override
   Future<Result<void>> deletePlayer(String teamId, String playerId) async =>
       const Result.ok(null);
+
+  /// Teams whose roster (and so staff) is private to members, as a private
+  /// group's is.
+  final privateRosters = <String>{};
+
+  /// Every call to [teamStaff], by team id.
+  final staffCalls = <String>[];
+
+  @override
+  Future<Result<List<CommunityOrganizer>>> teamStaff(String teamId) async {
+    staffCalls.add(teamId);
+    final t = teams[teamId];
+    if (t == null || privateRosters.contains(teamId)) {
+      return Result.error(Exception('Not allowed'));
+    }
+    return Result.ok(communityOrganizers(t));
+  }
 
   /// Every [setRosterLines] call's lines, in order.
   final lineChanges = <Map<String, RosterLine?>>[];

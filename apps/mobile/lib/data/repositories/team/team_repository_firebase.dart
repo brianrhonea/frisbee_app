@@ -19,6 +19,7 @@ import '../../services/api_search.dart';
 import '../../services/attachment_storage.dart';
 import '../../services/feature_flags.dart';
 import '../../services/firestore_utils.dart';
+import '../../../domain/models/team_page.dart';
 import '../../services/pending_ids.dart';
 import '../../services/shared_streams.dart';
 import '../chat/chat_repository_firebase.dart';
@@ -1130,6 +1131,36 @@ class TeamRepositoryFirebase implements TeamRepository {
       'lines': {for (final e in lines.entries) e.key: e.value?.name},
     }),
   );
+
+  @override
+  Future<Result<List<CommunityOrganizer>>> teamStaff(String teamId) =>
+      guard(() async {
+        final json = await _requireApi().send(
+          'GET',
+          '/v1/teams/${Uri.encodeComponent(teamId)}/roster',
+        );
+        final kind = enumByName(TeamKind.values, json['kind'], TeamKind.team);
+        final out = <CommunityOrganizer>[];
+        for (final m in (json['members'] as List?) ?? const []) {
+          if (m is! Map) continue;
+          final role = TeamRole.values.where((r) => r.name == m['tier']);
+          final uid = m['uid'];
+          if (role.isEmpty || uid is! String) continue;
+          final tier = role.first;
+          if (tier == TeamRole.player) continue;
+          final name = m['name'];
+          out.add((
+            uid: uid,
+            name: name is String && name.isNotEmpty ? name : 'Member',
+            label: tier.labelFor(kind),
+          ));
+        }
+        // The owner first, then by tier.
+        out.sort(
+          (a, b) => (a.label == 'Owner' ? 0 : 1) - (b.label == 'Owner' ? 0 : 1),
+        );
+        return out;
+      });
 
   @override
   Future<Result<List<PendingInvite>>> pendingInvites(String teamId) => guard(

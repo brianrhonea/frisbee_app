@@ -199,15 +199,12 @@ class TeamHomeViewModel extends ChangeNotifier {
         .listen(
           (t) {
             _team = (t?.members.containsKey(uid) ?? false) ? t : null;
-            // Whatever the doc says, for the Message sheet: only members
-            // can read a team, so an outsider normally gets none.
-            _staff = t == null ? const [] : communityOrganizers(t);
+            _staff = _team == null ? _staff : communityOrganizers(_team!);
             _teamLoaded = true;
             _onChange();
           },
           onError: (Object _) {
             _team = null;
-            _staff = const [];
             _teamLoaded = true;
             _onChange();
           },
@@ -215,6 +212,7 @@ class TeamHomeViewModel extends ChangeNotifier {
   }
 
   void _onChange() {
+    _loadStaff();
     _watchChat();
     _watchListings();
     _watchEntered();
@@ -367,6 +365,21 @@ class TeamHomeViewModel extends ChangeNotifier {
   final DirectMessageRepository? _dms;
 
   List<CommunityOrganizer> _staff = const [];
+  bool _staffAsked = false;
+
+  /// A signed-in outsider's staff for the Message sheet comes from the
+  /// roster endpoint (any signed-in user may read it; a private group's
+  /// stays with its members, so there it fails and there is no staff).
+  Future<void> _loadStaff() async {
+    if (_staffAsked || !_teamLoaded || isMember || uid.isEmpty) return;
+    _staffAsked = true;
+    final r = await _teams.teamStaff(teamId);
+    if (_disposed) return;
+    if (r case Ok(:final value)) {
+      _staff = value;
+      notifyListeners();
+    }
+  }
 
   /// The team's staff (owner, admins, coaches) the user can start a direct
   /// conversation with: not themselves, and none when messages can't be
