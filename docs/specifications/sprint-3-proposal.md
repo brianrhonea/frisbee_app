@@ -136,3 +136,13 @@ The owner accepted every recommendation:
 - **D-1317:** hiding uses the `ageOk` claim. The #3a backfill must run before enforcement, so adults aren't hidden.
 - **Website Learn:** stays a bottom tab for signed-out visitors. Members reach it under Discover.
 - **The #17 contract** (`contracts/phase1-writes.md`) is approved. 17-A goes to lane A after its current items.
+
+## Owner decision: security finding H1 (2026-11-26)
+
+Option **(a)** is approved: a server-only `profiles/{uid}.adult` field.
+- **Who writes it:** only the server. The account gate sets it when it issues `ageOk`, and the claims backfill sets it for existing adults. Clients can never write it.
+- **What the rules check:**
+  - `allowedStart` (DMs and message requests), `addsMember` (group adds) and direct message create all require the other person's profile to have `adult == true`.
+  - A list query on `profiles` for anyone other than the caller must filter on `adult == true`.
+- **Clients:** the app and website profile-search queries add the filter, in lanes B and C.
+- **Deploy:** the owner deploys the rules to dev, after the backfill has run.
