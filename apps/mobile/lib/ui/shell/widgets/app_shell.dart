@@ -839,7 +839,15 @@ class MobileTopBar extends StatelessWidget implements PreferredSizeWidget {
       titleSpacing: 16,
       title: InkWell(
         onTap: () => context.go(Routes.home),
-        child: AppWordmark(size: 28, color: c.onSidebar, logo: false),
+        // A 48 px tall tap target around the wordmark.
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            widthFactor: 1,
+            child: AppWordmark(size: 28, color: c.onSidebar, logo: false),
+          ),
+        ),
       ),
       actions: [
         if (search)

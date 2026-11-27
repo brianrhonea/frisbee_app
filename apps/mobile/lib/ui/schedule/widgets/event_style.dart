@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../domain/models/team_event.dart';
+import '../../core/ui/event_card.dart';
 
 extension EventTypeStyle on EventType {
   IconData get icon => switch (this) {
@@ -46,6 +47,16 @@ extension RsvpStyle on RsvpStatus {
     RsvpStatus.notGoing => scheme.outline,
   };
 }
+
+/// How [uid] stands on [e], for an `EventCard`'s chip. A team event the
+/// user hasn't answered "needs RSVP"; a personal one has no RSVP.
+EventRsvp? eventRsvpFor(TeamEvent e, String uid, {required bool team}) =>
+    switch (e.rsvpOf(uid)) {
+      RsvpStatus.going => EventRsvp.going,
+      RsvpStatus.maybe => EventRsvp.maybe,
+      RsvpStatus.notGoing => EventRsvp.declined,
+      null => team ? EventRsvp.needsReply : null,
+    };
 
 /// "6:00 PM" or "6:00 PM – 8:00 PM".
 String eventTimeRange(TeamEvent e) {

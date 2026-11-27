@@ -331,6 +331,12 @@ abstract final class AppTheme {
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: c.accent,
         foregroundColor: c.onAccent,
+        // Flat: the colour carries it, no shadow ring.
+        elevation: 0,
+        focusElevation: 0,
+        hoverElevation: 0,
+        highlightElevation: 0,
+        disabledElevation: 0,
         shape: RoundedSuperellipseBorder(
           borderRadius: BorderRadius.circular(cardRadius),
         ),

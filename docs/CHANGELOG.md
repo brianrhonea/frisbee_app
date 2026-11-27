@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.66  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.65  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.64  | 2026-11-26 | `sprint3/lane-b`                        |                     |
 | 0.0.63  | 2026-11-26 | `sprint3/lane-b`                        |                     |
@@ -78,6 +79,11 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.66 — H1 Home redesign
+
+- Home: a greeting with today's date, summary tiles (coming up, your teams, needs you; each opens its page), Coming up as event cards with the RSVP state, and a flat + button for a new post, an event or a team. The three feed tabs, composer, drafts and pull to refresh are unchanged. Only the screen changed: no view-model, route or permission change.
+- Top-bar wordmark has a 48 px tap target; the team strip grows with the text scale; floating action buttons are flat (no shadow).
 
 ## 0.0.65 — UI review fixes (N13 and components)
 

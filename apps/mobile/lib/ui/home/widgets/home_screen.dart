@@ -14,6 +14,9 @@ import '../../core/themes/theme.dart';
 import '../../core/ui/brand.dart';
 import '../../core/ui/undo_snack_bar.dart';
 import '../../core/ui/error_message.dart';
+import '../../core/ui/event_card.dart';
+import '../../core/ui/list_row.dart';
+import '../../core/ui/summary_tiles.dart';
 import '../../core/ui/layout.dart';
 import '../../core/ui/scoreboard.dart';
 import '../../posts/widgets/post_widgets.dart';
@@ -154,6 +157,44 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// The + button: a post, an event, or a team. (All three already exist;
+  /// this only gathers them in one place.)
+  Future<void> _add() async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      sheetAnimationStyle: AppMotion.sheetStyle(context),
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final (value, icon, label) in [
+              ('post', Icons.edit_outlined, 'New post'),
+              ('event', Icons.event_outlined, 'Add event'),
+              ('team', Icons.group_add_outlined, 'Create or join a team'),
+            ])
+              ListRow(
+                key: Key('add-$value'),
+                leading: Icon(icon, color: AppColors.of(context).muted),
+                title: label,
+                onTap: () => Navigator.pop(context, value),
+              ),
+            const SizedBox(height: AppSpace.sm),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) return;
+    switch (choice) {
+      case 'post':
+        await showPostComposer(context);
+      case 'event':
+        await _newEvent();
+      case 'team':
+        await _newOrJoin();
+    }
+  }
+
   /// A team event for a team the user runs, or a personal one.
   Future<void> _newEvent() async {
     final teams = vm.postableTeams;
@@ -202,6 +243,16 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       // Home has its own search bar on phones, so no search button.
       appBar: mobile ? const MobileTopBar(search: false) : null,
+      // The one primary action: add something (a post, an event, a team).
+      floatingActionButton: Semantics(
+        label: 'Add',
+        button: true,
+        child: FloatingActionButton(
+          tooltip: 'Add',
+          onPressed: _add,
+          child: const Icon(Icons.add),
+        ),
+      ),
       body: ListenableBuilder(
         listenable: Listenable.merge([vm, vm.savePost, vm.joinTeam]),
         builder: (context, _) {
@@ -211,6 +262,30 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               // On bigger screens the top bar has the same box.
               if (mobile) ...[const SearchField(), const SizedBox(height: 12)],
+              _Greeting(name: vm.firstName, now: vm.now),
+              const SizedBox(height: AppSpace.lg),
+              SummaryTiles(
+                loading: !vm.teamsLoaded,
+                tiles: [
+                  SummaryTile(
+                    value:
+                        '${(vm.nextTeamEvent == null ? 0 : 1) + vm.upcomingEvents.length}',
+                    label: 'Coming up',
+                    onTap: () => context.go(Routes.schedule),
+                  ),
+                  SummaryTile(
+                    value: '${vm.teams.length}',
+                    label: 'Your teams',
+                    onTap: () => context.go(Routes.teams),
+                  ),
+                  if (vm.needsYou.isNotEmpty)
+                    SummaryTile(
+                      value: '${vm.needsYou.length}',
+                      label: 'Needs you',
+                    ),
+                ],
+              ),
+              const SizedBox(height: AppSpace.xl),
               // Narrow screens: what's today or next above the tabs, kept
               // light: a tournament-day card, or one Coming up card with
               // the next event first.
@@ -230,7 +305,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             // What's the user's to do comes before what's
                             // coming up.
                             if (vm.needsYou.isNotEmpty) _needsYou(),
-                            _ComingUpCard(
+                            _ComingUp(
+                              uid: vm.user?.uid ?? '',
                               events: [
                                 if (vm.tournamentDays.isEmpty)
                                   ?vm.nextTeamEvent,
@@ -532,7 +608,11 @@ class _HomeScreenState extends State<HomeScreen> {
       for (final d in vm.tournamentDays) TournamentDayCard(day: d)
     else if (vm.nextTeamEvent case final next?)
       _UpNextCard(entry: next),
-    _ComingUpCard(events: vm.upcomingEvents, onAdd: _newEvent),
+    _ComingUp(
+      uid: vm.user?.uid ?? '',
+      events: vm.upcomingEvents,
+      onAdd: _newEvent,
+    ),
     const _Footer(),
   ];
 }
@@ -795,101 +875,95 @@ class _UpNextCard extends StatelessWidget {
   }
 }
 
-class _ComingUpCard extends StatelessWidget {
-  const _ComingUpCard({required this.events, required this.onAdd});
+/// "Good morning, Ana" over today's date.
+class _Greeting extends StatelessWidget {
+  const _Greeting({required this.name, required this.now});
 
+  final String name;
+  final DateTime now;
+
+  static String hello(DateTime now) => now.hour < 12
+      ? 'Good morning'
+      : now.hour < 18
+      ? 'Good afternoon'
+      : 'Good evening';
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Semantics(
+          header: true,
+          child: Text(
+            '${hello(now)}, $name',
+            style: AppText.heading3.copyWith(color: c.ink),
+          ),
+        ),
+        Text(
+          DateFormat.MMMMEEEEd().format(now),
+          style: AppText.secondary.copyWith(color: c.muted),
+        ),
+      ],
+    );
+  }
+}
+
+/// What's coming up: event cards, with a link to the schedule and "Add
+/// event" (no box around the block).
+class _ComingUp extends StatelessWidget {
+  const _ComingUp({
+    required this.uid,
+    required this.events,
+    required this.onAdd,
+  });
+
+  final String uid;
   final List<ScheduleEntry> events;
   final VoidCallback onAdd;
 
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    return SectionCard(
-      title: 'Coming up',
-      action: CardLink(
-        label: 'Schedule',
-        onTap: () => context.go(Routes.schedule),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (events.isEmpty)
-            Text(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionHeader(
+          'Coming up',
+          actionLabel: 'Schedule',
+          onAction: () => context.go(Routes.schedule),
+        ),
+        if (events.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpace.sm),
+            child: Text(
               'Nothing else on the calendar.',
-              style: TextStyle(fontSize: 12.5, color: c.muted),
-            ),
-          for (final entry in events)
-            InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: () => context.push(Routes.scheduleEvent(entry)),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(
-                  children: [
-                    DateBadge(date: entry.event.startsAt, size: 38),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            entry.event.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13.5,
-                              color: c.ink,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Row(
-                            children: [
-                              // Team blue or personal magenta.
-                              TeamDot(
-                                color: entry.team == null ? c.personal : c.team,
-                                size: 7,
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  '${eventTimeRange(entry.event)} · '
-                                  '${entry.team?.name ?? 'Personal'}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    color: c.muted,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          const SizedBox(height: 6),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              // Compact, so the card's padding below it matches the top
-              // (a full 48 dp tap target left a gap under it).
-              style: TextButton.styleFrom(
-                padding: EdgeInsets.zero,
-                minimumSize: const Size(0, 36),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              onPressed: onAdd,
-              icon: const Icon(Icons.add, size: 16),
-              label: const Text('Add event'),
+              style: AppText.secondary.copyWith(color: c.muted),
             ),
           ),
+        for (final entry in events) ...[
+          EventCard(
+            date: entry.event.startsAt,
+            title: entry.event.title,
+            meta:
+                '${eventTimeRange(entry.event)} · '
+                '${entry.team?.name ?? 'Personal'}',
+            rsvp: eventRsvpFor(entry.event, uid, team: entry.team != null),
+            recurring: entry.event.series != null,
+            onTap: () => context.push(Routes.scheduleEvent(entry)),
+          ),
+          const SizedBox(height: AppSpace.sm),
         ],
-      ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: onAdd,
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('Add event'),
+          ),
+        ),
+      ],
     );
   }
 }

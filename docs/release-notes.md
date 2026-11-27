@@ -10,6 +10,10 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.66
+
+- **Home, simpler:** a greeting, three quick numbers, your next events with whether you have replied, and a + button to post, add an event or find a team.
+
 ## 0.0.65
 
 - **Easier to use and read:** form fields have a clearer outline, the side bar fits on a phone turned sideways, small text is a little bigger, and pages move at one steady speed (and not at all with Reduce Motion).
