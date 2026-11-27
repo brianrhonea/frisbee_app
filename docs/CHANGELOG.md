@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.67  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.66  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.65  | 2026-11-27 | `sprint3/lane-b`                        |                     |
 | 0.0.64  | 2026-11-26 | `sprint3/lane-b`                        |                     |
@@ -79,6 +80,10 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.67 — H2 Schedule redesign (Month, Week, List)
+
+- Schedule: Week, Month and the new List view (approved addition UI-Q12; `ScheduleView.list`, remembered like the others). Events are `EventCard`s under a calm day heading with a Today pill; Month shows the picked day's events (it used to list the picked day's week); List shows every day of the month that has events. The week strip runs edge to edge so every day is a 48 px target. Swipe to delete, invites, filters, calendars and pull to refresh are unchanged.
 
 ## 0.0.66 — H1 Home redesign
 

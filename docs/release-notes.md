@@ -10,6 +10,10 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.67
+
+- **Schedule:** a new List view next to Week and Month, and the events are easier to read.
+
 ## 0.0.66
 
 - **Home, simpler:** a greeting, three quick numbers, your next events with whether you have replied, and a + button to post, add an event or find a team.
