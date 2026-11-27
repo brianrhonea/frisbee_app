@@ -9,7 +9,7 @@
 // Then for real:
 //   npx tsx scripts/backfill-fid-owners.ts --project frisbee-app-brianrhonea-dev --apply
 //
-// Runs only against the dev project or a Firestore emulator
+// Runs only against the dev project or a demo-* project on a Firestore emulator
 // (FIRESTORE_EMULATOR_HOST set). Needs Application Default Credentials for
 // dev (`gcloud auth application-default login`).
 
@@ -22,7 +22,8 @@ export const devProject = "frisbee-app-brianrhonea-dev";
 
 /** Throws unless [project] is the dev project or an emulator is in use. */
 export function assertAllowedProject(project: string | undefined, emulatorHost: string | undefined): void {
-  if (emulatorHost) return;
+  // As apps/api/src/scripts/backfill_claims.ts: the dev project, or a demo-* project on an emulator.
+  if (emulatorHost && project?.startsWith("demo-")) return;
   if (project !== devProject) {
     throw new Error(`Refusing to run against "${project ?? ""}": only ${devProject} or a Firestore emulator.`);
   }
