@@ -77,8 +77,8 @@ describe("PUT /v1/me/personal", () => {
       fields: { birthDate: tooYoungMessage },
     });
     expect(s.store.doc(D)).toBeUndefined();
-    // Only the sealed refusal is kept (F3), never anything readable.
-    expect(Object.keys(s.store.doc("ageRefusals/u1")!).sort()).toEqual(["ciphertext", "format", "key", "refusedAt"]);
+    // Only the sealed refusal and the plain under-13 marker are kept (F3), never anything readable.
+    expect(Object.keys(s.store.doc("ageRefusals/u1")!).sort()).toEqual(["ciphertext", "format", "key", "refusedAt", "under13"]);
   });
 
   it("counts 18th birthdays in the furthest-ahead time zone (UTC+14)", async () => {
@@ -275,8 +275,8 @@ describe("PUT /v1/me/personal/birth-date (sign-up)", () => {
       fields: { birthDate: tooYoungMessage },
     });
     expect(s.store.doc(D)).toBeUndefined();
-    // Only the sealed refusal is kept (F3), never anything readable.
-    expect(Object.keys(s.store.doc("ageRefusals/u1")!).sort()).toEqual(["ciphertext", "format", "key", "refusedAt"]);
+    // Only the sealed refusal and the plain under-13 marker are kept (F3), never anything readable.
+    expect(Object.keys(s.store.doc("ageRefusals/u1")!).sort()).toEqual(["ciphertext", "format", "key", "refusedAt", "under13"]);
   });
 
   it.each(["2008-11-22", "2010-01-01", "2013-11-21"])("refuses %s (under 18, adults only) and saves nothing", async (birthDate) => {

@@ -27,6 +27,13 @@ export const dataExportLimits = {
   /** People they blocked, and reports they made (moderation). */
   blocks: 1000,
   reports: 500,
+  /** Posts they liked, their sign-ups, follow requests (each way), calendars and invites, usernames. */
+  likedPosts: 5000,
+  signups: 500,
+  followRequests: 500,
+  calendars: 200,
+  calendarInvites: 200,
+  usernames: 10,
 } as const;
 
 /** What "Download your data" gives, as both apps say it (downloadDataDescription in download_data_group.dart). */
@@ -189,6 +196,54 @@ export interface DataExport {
   blocks: DataExportSection<DataExportBlock>;
   /** Reports they made: what and why, not the reported content. */
   reports: DataExportSection<DataExportReport>;
+  /** Posts they liked: the post's id only, never its content or its author. */
+  likedPosts: DataExportSection<DataExportLikedPost>;
+  /** Requests to follow a private profile: the ones they made, and the ones waiting on them. */
+  followRequests: { sent: DataExportSection<DataExportFollowRequestSent>; received: DataExportSection<DataExportFollowRequestReceived> };
+  /** Their sign-ups to tournaments (tournaments/{t}/signups/{uid}). */
+  signups: DataExportSection<DataExportSignup>;
+  /** Calendars they own or are on, and invites still waiting. */
+  calendars: DataExportSection<DataExportCalendar>;
+  calendarInvites: DataExportSection<Json>;
+  /** The usernames they hold (usernames/{name}). */
+  usernames: DataExportSection<{ username: string }>;
+}
+
+export interface DataExportLikedPost {
+  postId: string;
+}
+
+export interface DataExportFollowRequestSent {
+  /** The private profile asked. */
+  ownerId: string;
+  ownerName?: string;
+  createdAt: string | null;
+}
+
+/** Someone waiting to follow them: the name and username they gave. */
+export interface DataExportFollowRequestReceived {
+  requesterId: string;
+  name?: string;
+  username?: string | null;
+  createdAt: string | null;
+}
+
+export interface DataExportSignup {
+  tournamentId: string;
+  tournamentName: string;
+  name?: string;
+  divisionId?: string;
+  skill?: number;
+  gender?: string | null;
+  status?: string;
+  createdAt: string | null;
+}
+
+export interface DataExportCalendar {
+  id: string;
+  name: string;
+  /** "owner", "edit" or "view". */
+  role: string;
 }
 
 export interface DataExportBlock {

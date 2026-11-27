@@ -1,7 +1,7 @@
 // Follow bookkeeping, exported as the `follows` group:
 //   firebase deploy --only functions:follows
 
-import { FieldValue, getFirestore, type Query, type QueryDocumentSnapshot } from "firebase-admin/firestore";
+import { FieldValue, type Firestore, getFirestore, type Query, type QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { onDocumentCreated, onDocumentDeleted, onDocumentWritten } from "firebase-functions/v2/firestore";
 
@@ -14,13 +14,27 @@ export const followCount = onDocumentWritten("users/{uid}/follows/{key}", async 
   const after = event.data?.after.data() as Data | undefined;
   const changes = followCountChanges(event.params.uid, event.params.key, before, after);
   if (changes.length === 0) return;
-  const db = getFirestore();
-  const batch = db.batch();
+  await applyFollowCounts(getFirestore(), changes);
+});
+
+/**
+ * Adds [changes] to followCounts. A decrement for a person whose profile is
+ * gone is skipped: account deletion removes their counts document, and a
+ * late decrement must not write it back.
+ */
+export async function applyFollowCounts(db: Firestore, changes: ReturnType<typeof followCountChanges>): Promise<void> {
+  const live = [];
   for (const c of changes) {
+    if (c.by < 0 && c.key.startsWith("user_") && !(await db.doc(`profiles/${c.key.slice("user_".length)}`).get()).exists) continue;
+    live.push(c);
+  }
+  if (live.length === 0) return;
+  const batch = db.batch();
+  for (const c of live) {
     batch.set(db.doc(`followCounts/${c.key}`), { [c.field]: FieldValue.increment(c.by) }, { merge: true });
   }
   await batch.commit();
-});
+}
 
 /**
  * Deletes every follow of [key] once the target is gone. followCount then

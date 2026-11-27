@@ -77,6 +77,25 @@ class FakeExportRepository implements ExportRepository {
   async reportsBy(uid: string, limit: number) {
     return this.where((d, s) => s.length === 2 && s[0] === "reports" && d.data.reporterId === uid, limit);
   }
+  async likedPosts(uid: string, limit: number) {
+    return this.where((d, s) => s.length === 2 && s[0] === "posts" && ((d.data.likedBy as string[]) ?? []).includes(uid), limit).map((d) => ({ ...d, data: {} }));
+  }
+  async calendarsOf(uid: string, limit: number) {
+    return this.where((d, s) => s.length === 2 && s[0] === "calendars" && ((d.data.memberIds as string[]) ?? []).includes(uid), limit);
+  }
+  async usernamesOf(uid: string, limit: number) {
+    return this.where((d, s) => s.length === 2 && s[0] === "usernames" && d.data.uid === uid, limit);
+  }
+  async followRequestsSent(uid: string, limit: number) {
+    const owners = this.where((d, s) => s.length === 2 && s[0] === "profiles" && d.data.private === true, 10_000);
+    return owners
+      .flatMap((o) => this.where((d) => d.path === `${o.path}/followRequests/${uid}`, 1).map((r) => ({ ...r, owner: o.data })))
+      .slice(0, limit + 1);
+  }
+  async signupsOf(uid: string, limit: number) {
+    const ts = this.where((d, s) => s.length === 2 && s[0] === "tournaments", 10_000);
+    return ts.flatMap((t) => this.where((d) => d.path === `${t.path}/signups/${uid}`, 1).map((r) => ({ ...r, tournament: t.data }))).slice(0, limit + 1);
+  }
   async joinRequestsOf(uid: string, limit: number) {
     // Groups that approve who joins and teams that allow requests, as the Firestore queries find them.
     const hosts = this.where((d, s) => {
@@ -197,6 +216,48 @@ describe("GET /v1/me/export", () => {
       { id: "tp1", teamId: "t1", authorId: "me", title: "Practice moved", public: true },
     ]);
     expect(data.comments.items).toEqual([{ id: "c1", postId: "p2", body: "Nice", createdAt: new Date(now - 3600_000).toISOString() }]);
+  });
+
+  it("has what they own beyond content: liked posts, follow requests both ways, sign-ups, calendars, invites and usernames (#27)", async () => {
+    const at = new Date(now - 3600_000);
+    s.store.put("posts/lp1", { authorId: "you", body: "Liked it", likedBy: ["me", "you"] });
+    s.store.put("posts/lp2", { authorId: "you", body: "Not liked", likedBy: ["you"] });
+    s.store.put("profiles/you", { name: "Yan", private: true });
+    s.store.put("profiles/you/followRequests/me", { name: "Mia", username: "mia", createdAt: at });
+    s.store.put("profiles/me", { name: "Mia", private: true });
+    s.store.put("profiles/me/followRequests/zed", { name: "Zed", username: null, createdAt: at });
+    s.store.put("tournaments/t9", { name: "Fall Open" });
+    s.store.put("tournaments/t9/signups/me", { name: "Mia", divisionId: "d1", skill: 3, gender: "wmp", status: "accepted", createdAt: at });
+    s.store.put("tournaments/t9/signups/you", { name: "Yan", divisionId: "d1", skill: 2, status: "applied" });
+    s.store.put("calendars/cal1", { ownerId: "me", name: "Mine", members: { me: "owner" }, memberIds: ["me"] });
+    s.store.put("calendars/cal2", { ownerId: "you", name: "Yan's", members: { you: "owner", me: "edit" }, memberIds: ["you", "me"] });
+    s.store.put("calendars/cal3", { ownerId: "you", name: "Not mine", members: { you: "owner" }, memberIds: ["you"] });
+    s.store.put("users/me/calendarInvites/cal4", { calendarId: "cal4", role: "view", fromId: "you" });
+    s.store.put("usernames/mia", { uid: "me" });
+    s.store.put("usernames/yan", { uid: "you" });
+    const data = (await s.get()).json() as DataExport;
+    expect(data.likedPosts.items).toEqual([{ postId: "lp1" }]);
+    expect(data.followRequests.sent.items).toEqual([{ ownerId: "you", ownerName: "Yan", createdAt: at.toISOString() }]);
+    expect(data.followRequests.received.items).toEqual([{ requesterId: "zed", name: "Zed", username: null, createdAt: at.toISOString() }]);
+    expect(data.signups.items).toEqual([
+      { tournamentId: "t9", tournamentName: "Fall Open", name: "Mia", divisionId: "d1", skill: 3, gender: "wmp", status: "accepted", createdAt: at.toISOString() },
+    ]);
+    expect(data.calendars.items).toEqual([
+      { id: "cal1", name: "Mine", role: "owner" },
+      { id: "cal2", name: "Yan's", role: "edit" },
+    ]);
+    expect(data.calendarInvites.items).toEqual([{ id: "cal4", calendarId: "cal4", role: "view", fromId: "you" }]);
+    expect(data.usernames.items).toEqual([{ username: "mia" }]);
+  });
+
+  it("leaves the age-refusal record out of the export (D-AR)", async () => {
+    seed();
+    s.store.put("ageRefusals/me", { ciphertext: "sealed-birth-date", key: "k", refusedAt: new Date(now) });
+    const res = await s.get();
+    const data = res.json() as Record<string, unknown>;
+    expect(Object.keys(data).some((k) => /refusal/i.test(k))).toBe(false);
+    expect(res.body).not.toContain("sealed-birth-date");
+    expect(res.body).not.toMatch(/ageRefusals/);
   });
 
   it("has their notes, clips and comments on team videos (F4, F5)", async () => {

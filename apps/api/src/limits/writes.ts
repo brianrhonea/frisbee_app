@@ -31,6 +31,12 @@ export const routeWriteLimits: Record<string, Limit[]> = {
   "PATCH /v1/teams/:teamId": [{ max: 5, windowMs: minute }, { max: 30, windowMs: day }],
   "POST /v1/conversations": [{ max: 10, windowMs: minute }, { max: 100, windowMs: day }],
   "POST /v1/conversations/groups": [{ max: 5, windowMs: minute }, { max: 30, windowMs: day }],
+  // Phase-1 writes moved to the API (docs/specifications/contracts/phase1-writes.md A4): the social routes the
+  // flood mute and the any-write limit alone were bounding. Tune with the beta's numbers.
+  "POST /v1/posts": [{ max: 10, windowMs: minute }, { max: 200, windowMs: day }],
+  "POST /v1/posts/:id/comments": [{ max: 30, windowMs: minute }],
+  "PUT /v1/posts/:id/repost": [{ max: 20, windowMs: minute }],
+  "PUT /v1/follows": [{ max: 30, windowMs: minute }, { max: 300, windowMs: day }],
   // Publishing a schedule rewrites up to thousands of games.
   "POST /v1/teams/:teamId/group-tournaments/:tournamentId/schedule": [{ max: 5, windowMs: minute }, { max: 50, windowMs: day }],
   "PUT /v1/tournaments/:id/divisions/:divisionId/schedule": [{ max: 5, windowMs: minute }, { max: 50, windowMs: day }],

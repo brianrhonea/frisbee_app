@@ -157,7 +157,16 @@ export class PersonalService {
     await this.store.transact(async (tx) => {
       const [saved, refusal] = await Promise.all([tx.get(personalPath(uid)), tx.get(refusalPath(uid))]);
       await this.requireAllowedDate(uid, saved, refusal, birthDate);
-      if (!refusal) tx.set(refusalPath(uid), { ciphertext: sealed.ciphertext, key: sealed.key, format, refusedAt: serverTime });
+      // `under13` is a plain marker (no birth date in it) so the scheduled purge in the functions, which can't open the sealed date, knows which refusals to act on.
+      if (!refusal) {
+        tx.set(refusalPath(uid), {
+          ciphertext: sealed.ciphertext,
+          key: sealed.key,
+          format,
+          refusedAt: serverTime,
+          ...(message === tooYoungMessage && { under13: true }),
+        });
+      }
     });
     if (message === tooYoungMessage) await this.users.setDisabled?.(uid, true);
     throw new ApiError("failed_precondition", message, { birthDate: message });
@@ -209,7 +218,8 @@ export class PersonalService {
     const refusal = await this.store.get(refusalPath(uid));
     if (!refusal) return false;
     const date = await this.openDate(refusal, refusalPath(uid));
-    if (date === null) return false;
+    // A refusal whose date can't be read can't be shown to be anything but an under-13 one: fail closed (stay disabled).
+    if (date === null) return true;
     // A refusedAt that isn't a Date can't be trusted: judge the age on the birth date itself (age 0, under 13), so the account stays disabled (review 4.1d).
     const at = refusal.refusedAt instanceof Date ? refusal.refusedAt : new Date(`${date}T00:00:00Z`);
     return birthDateProblem(date, at) === tooYoungMessage;

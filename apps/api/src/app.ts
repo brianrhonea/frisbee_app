@@ -30,6 +30,7 @@ import { PublicRankingService } from "./rankings/public_service.js";
 import type { PublicTournamentRepository } from "./tournaments/public_repository.js";
 import { publicTournamentRoutes } from "./tournaments/public_routes.js";
 import { PublicTournamentService } from "./tournaments/public_service.js";
+import { AdultVisibility } from "./account/adult_visibility.js";
 import { type AccountGateMode, registerAuth, type TokenVerifier, type UserLookup } from "./auth.js";
 import { type ClientErrorOptions, clientErrorRoutes } from "./client_errors/routes.js";
 import { registerCors } from "./cors.js";
@@ -205,12 +206,14 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   // without the key, so club joins are refused rather than unchecked.
   const personal = deps.store && deps.personal ? new PersonalService(deps.store, deps.users, deps.personal, deps.now) : undefined;
   const clubAges = new ClubAgeGate(personal, deps.now);
+  // D-1317: legacy accounts without `ageOk` are left out of public results and DMs when enforcing.
+  const adults = new AdultVisibility(deps.users, deps.accountGateMode ?? "enforce", deps.now);
   teamRoutes(app, new TeamService(deps.teams, deps.users, deps.now, clubAges));
   if (deps.me) meRoutes(app, new MeService(deps.me.repo, deps.me.imageUrl, deps.now), deps.writeLimits !== false ? writes : undefined);
   if (deps.browse) {
     const buckets = deps.browse.photoBuckets ?? [];
     const roster = deps.store ? new RosterService(deps.store, buckets) : undefined;
-    browseRoutes(app, new BrowseService(deps.browse.repo, deps.browse.imageUrl, deps.now, buckets), { ...deps.browse, roster });
+    browseRoutes(app, new BrowseService(deps.browse.repo, deps.browse.imageUrl, deps.now, buckets, adults), { ...deps.browse, roster });
   }
   if (deps.browse && deps.publicTournaments) {
     publicTournamentRoutes(app, new PublicTournamentService(deps.publicTournaments, deps.now), deps.browse);
@@ -256,7 +259,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     paymentRoutes(app, payments, deps.writeLimits !== false ? writes : undefined);
     paymentJobRoutes(app, payments, deps.jobs);
     tournamentChatRoutes(app, new TournamentChatService(deps.store), deps.writeLimits !== false ? writes : undefined);
-    const conversations = new ConversationService(deps.store, deps.users, deps.media, deps.now);
+    const conversations = new ConversationService(deps.store, deps.users, deps.media, deps.now, adults);
     conversationRoutes(app, conversations, writes);
     const setDisabled = deps.users.setDisabled?.bind(deps.users);
     moderationRoutes(

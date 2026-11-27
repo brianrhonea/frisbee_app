@@ -398,6 +398,8 @@ export class ModerationService {
     );
     if (keepDisabled) return;
     await this.accounts?.setDisabled(uid, on);
+    // The race (review 4.1b): an under-13 refusal may have landed between the check above and the re-enable. Check again and disable it again.
+    if (!on && (await this.disabledForAge(uid))) await this.accounts?.setDisabled(uid, true);
   }
 
   // Blocks -----------------------------------------------------------------

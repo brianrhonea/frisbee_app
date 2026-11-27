@@ -7,13 +7,15 @@ describe("assertAllowedProject", () => {
     expect(() => assertAllowedProject(devProject, undefined)).not.toThrow();
   });
 
-  it("allows any project name when a Firestore emulator is in use", () => {
+  it("allows a demo-* project when a Firestore emulator is in use", () => {
     expect(() => assertAllowedProject("demo-frisbee", "127.0.0.1:8080")).not.toThrow();
   });
 
   it("refuses anything else, including prod-looking and missing projects", () => {
     expect(() => assertAllowedProject("frisbee-app-prod", undefined)).toThrow(/Refusing/);
     expect(() => assertAllowedProject("demo-frisbee", undefined)).toThrow(/Refusing/);
+    // An emulator host doesn't make a real-looking project name safe (as backfill_claims.ts).
+    expect(() => assertAllowedProject("frisbee-app-prod", "127.0.0.1:8080")).toThrow(/Refusing/);
     expect(() => assertAllowedProject(undefined, undefined)).toThrow(/Refusing/);
   });
 });

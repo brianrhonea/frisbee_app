@@ -13,9 +13,11 @@ import { HttpsError, onCall, type CallableRequest } from "firebase-functions/v2/
 
 import { overLimit } from "../api/functions";
 import { isMuted, searchKey, searchLimit } from "../api/model";
+import { projectBuckets } from "../media/photo_url";
 import { enforceAppCheck } from "../options";
 import {
   clientIp,
+  configureImageBuckets,
   eventLimit,
   eventView,
   isPrivateGroup,
@@ -34,6 +36,9 @@ import {
 } from "./model";
 
 type Data = Record<string, unknown>;
+
+// Profile pictures only from this project's buckets (and Google account photos).
+configureImageBuckets(projectBuckets());
 
 /** Visitors have no account, so no App Check either on the website yet. */
 const options = { enforceAppCheck, cors: true, maxInstances: 5 };

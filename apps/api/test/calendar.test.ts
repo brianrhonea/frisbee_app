@@ -93,7 +93,7 @@ let s: ReturnType<typeof setup>;
 beforeEach(() => {
   s = setup();
   s.store.put("profiles/me", { name: "Mia Member", username: "mia" });
-  s.store.put("profiles/pat", { name: "Pat Player", username: "pat", photoUrl: "https://img/p.jpg" });
+  s.store.put("profiles/pat", { name: "Pat Player", username: "pat", photoUrl: "https://lh3.googleusercontent.com/a/p" });
   s.store.put("profiles/sam", { name: "Sam Sub" });
 });
 
@@ -196,7 +196,11 @@ describe("invites", () => {
       },
     ]);
     const owner = (await s.call("GET", "/v1/me/calendars")).json().calendars.find((c: { id: string }) => c.id === id);
-    expect(owner.pending).toEqual([{ uid: "pat", name: "Pat Player", username: "pat", photoUrl: "https://img/p.jpg", role: "edit" }]);
+    expect(owner.pending).toEqual([{ uid: "pat", name: "Pat Player", username: "pat", photoUrl: "https://lh3.googleusercontent.com/a/p", role: "edit" }]);
+    // 3a-F: a profile photo that isn't ours or Google's is not passed on.
+    s.store.put("profiles/pat", { name: "Pat Player", username: "pat", photoUrl: "https://tracker.example/p.gif" });
+    const again = (await s.call("GET", "/v1/me/calendars")).json().calendars.find((c: { id: string }) => c.id === id);
+    expect(again.pending[0].photoUrl).toBeNull();
 
     expect((await s.call("POST", `/v1/me/calendar-invites/${id}/accept`, undefined, "pat")).statusCode).toBe(204);
     expect(s.store.doc(`users/pat/calendarInvites/${id}`)).toBeUndefined();

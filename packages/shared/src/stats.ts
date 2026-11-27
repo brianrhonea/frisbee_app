@@ -333,6 +333,11 @@ export type SaveStatsTournamentInput = z.output<typeof saveStatsTournamentSchema
  * admins (RosterPlayer.toMap, and toStatusMap's paid when given).
  */
 export const saveRosterPlayerSchema = z.strictObject({
+  /** New spots only (a replay of the same id is a 409); the server mints one when absent. Refused on an edit that names another. */
+  id: z
+    .string()
+    .regex(/^[A-Za-z0-9]{1,40}$/, "Invalid id.")
+    .optional(),
   name: z.string().trim().min(1, "Enter a name.").max(statsLimits.playerName, `Keep the name under ${statsLimits.playerName} characters.`),
   number: z.number().int().min(0).max(99_999).nullable().default(null),
   position: z.enum(["handler", "cutter", "hybrid"]).default("hybrid"),

@@ -15,6 +15,7 @@ import {
 import { onSchedule } from "firebase-functions/v2/scheduler";
 
 import { invitees, type MeetingDoc, meetingChange, type MeetingTeam, startedRecipients } from "../meetings/model";
+import { trustedProfilePhoto } from "../media/photo_url";
 import { isLeagueGameEvent } from "../tournaments/model";
 import { deliver, removeEntry, retract } from "./deliver";
 import { draftDeliveries, signupDecisionNotice } from "./league";
@@ -407,10 +408,10 @@ async function notifyingFollowers(keys: string[]): Promise<string[]> {
   return snap.docs.map((d) => d.ref.parent.parent?.id).filter((uid): uid is string => !!uid);
 }
 
-/** A person's name and photo from their public profile. */
-async function profileOf(uid: string): Promise<{ name: string; photoUrl?: string | null }> {
+/** A person's name and photo from their public profile (the photo only when trusted: 3a-F). Exported for test/server. */
+export async function profileOf(uid: string): Promise<{ name: string; photoUrl?: string | null }> {
   const p = (await getFirestore().doc(`profiles/${uid}`).get()).data();
-  return { name: String(p?.name ?? ""), photoUrl: (p?.photoUrl as string | undefined) ?? null };
+  return { name: String(p?.name ?? ""), photoUrl: trustedProfilePhoto(p?.photoUrl, uid) };
 }
 
 /**

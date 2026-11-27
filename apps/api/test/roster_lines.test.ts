@@ -118,6 +118,16 @@ describe("pending invites", () => {
     });
   });
 
+  it("passes on only a trusted profile photo (3a-F)", async () => {
+    s.store.put("teams/t1", { ...s.store.doc("teams/t1"), memberPerms: { cap: ["manageMembers"] } });
+    s.store.put("profiles/new", { name: "Nina New", username: "nina", photoUrl: "https://tracker.example/p.gif" });
+    const bad = (await s.call("GET", url, "cap")).json().invites.find((i: { uid: string }) => i.uid === "new");
+    expect(bad).not.toHaveProperty("photoUrl");
+    s.store.put("profiles/new", { name: "Nina New", username: "nina", photoUrl: "https://lh3.googleusercontent.com/a/n" });
+    const good = (await s.call("GET", url, "cap")).json().invites.find((i: { uid: string }) => i.uid === "new");
+    expect(good.photoUrl).toBe("https://lh3.googleusercontent.com/a/n");
+  });
+
   it("players can't see or withdraw them", async () => {
     expect((await s.call("GET", url, "pat")).statusCode).toBe(403);
     expect((await s.call("DELETE", `${url}/new`, "pat")).statusCode).toBe(403);

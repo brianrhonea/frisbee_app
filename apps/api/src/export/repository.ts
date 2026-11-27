@@ -1,4 +1,4 @@
-import { type DocumentSnapshot, FieldPath, type Firestore, type Query } from "firebase-admin/firestore";
+import { type DocumentReference, type DocumentSnapshot, FieldPath, type Firestore, type Query } from "firebase-admin/firestore";
 import { type Data, plain } from "../browse/repository.js";
 
 /** A document with its full path (where it lives says what it is: a DM, a team chat, …). */
@@ -46,6 +46,16 @@ export interface ExportRepository {
   joinRequestsOf(uid: string, limit: number): Promise<Array<PathDoc & { team: Data }>>;
   /** Reports [uid] made (reports where reporterId). */
   reportsBy(uid: string, limit: number): Promise<PathDoc[]>;
+  /** Posts whose likedBy lists [uid] (the documents carry no fields). */
+  likedPosts(uid: string, limit: number): Promise<PathDoc[]>;
+  /** [uid]'s requests to follow private profiles (profiles/{owner}/followRequests/{uid}), each with the owner's name. */
+  followRequestsSent(uid: string, limit: number): Promise<Array<PathDoc & { owner: Data }>>;
+  /** [uid]'s sign-ups (tournaments/{t}/signups/{uid}), each with its tournament's name. */
+  signupsOf(uid: string, limit: number): Promise<Array<PathDoc & { tournament: Data }>>;
+  /** Calendars listing [uid] in memberIds. */
+  calendarsOf(uid: string, limit: number): Promise<PathDoc[]>;
+  /** usernames/{name} claimed by [uid]. */
+  usernamesOf(uid: string, limit: number): Promise<PathDoc[]>;
 }
 
 /** Documents read per round trip while paging through a long list. */
@@ -122,6 +132,44 @@ export class FirestoreExportRepository implements ExportRepository {
       });
     }
     return out.slice(0, limit + 1);
+  }
+
+  // Collection-scope array-contains and equality queries: automatic indexes only.
+  likedPosts(uid: string, limit: number) {
+    return this.paged(this.db.collection("posts").where("likedBy", "array-contains", uid).select(), limit + 1);
+  }
+
+  calendarsOf(uid: string, limit: number) {
+    return this.paged(this.db.collection("calendars").where("memberIds", "array-contains", uid), limit + 1);
+  }
+
+  usernamesOf(uid: string, limit: number) {
+    return this.paged(this.db.collection("usernames").where("uid", "==", uid), limit + 1);
+  }
+
+  /** [uid]'s document under each of [parents] (a parent's subcollection `child`), as deleteAccount looks for them: nothing names the person in a query. */
+  private async underEach(parents: Array<{ ref: DocumentReference; data: Data }>, child: string, uid: string, limit: number) {
+    const out: Array<PathDoc & { parent: Data }> = [];
+    for (let i = 0; i < parents.length && out.length <= limit; i += 300) {
+      const chunk = parents.slice(i, i + 300);
+      const found = await this.db.getAll(...chunk.map((h) => h.ref.collection(child).doc(uid)));
+      found.forEach((r, j) => {
+        if (r.exists) out.push({ ...pathDoc(r), parent: chunk[j]!.data });
+      });
+    }
+    return out.slice(0, limit + 1);
+  }
+
+  async followRequestsSent(uid: string, limit: number) {
+    const owners = await this.db.collection("profiles").where("private", "==", true).select("name").get();
+    const found = await this.underEach(owners.docs.map((d) => ({ ref: d.ref, data: plain(d.data()) as Data })), "followRequests", uid, limit);
+    return found.map(({ parent, ...d }) => ({ ...d, owner: parent }));
+  }
+
+  async signupsOf(uid: string, limit: number) {
+    const tournaments = await this.db.collection("tournaments").select("name").get();
+    const found = await this.underEach(tournaments.docs.map((d) => ({ ref: d.ref, data: plain(d.data()) as Data })), "signups", uid, limit);
+    return found.map(({ parent, ...d }) => ({ ...d, tournament: parent }));
   }
 
   // Room by room (collection scope, poll.voterIds' automatic index): no
