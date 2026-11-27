@@ -59,9 +59,9 @@ export function pinnedImageUrl(v: unknown, buckets: readonly string[]): string |
     return undefined;
   }
   if (u.protocol !== "https:" || u.username || u.password || u.port) return undefined;
-  if (u.hostname === "lh3.googleusercontent.com") return v;
+  if (u.hostname === "lh3.googleusercontent.com") return u.href;
   let bucket: string | undefined;
   if (u.hostname === "firebasestorage.googleapis.com") bucket = /^\/v0\/b\/([^/]+)\/o\//.exec(u.pathname)?.[1];
   else if (u.hostname === "storage.googleapis.com") bucket = /^\/([^/]+)\//.exec(u.pathname)?.[1];
-  return bucket && buckets.includes(bucket) ? v : undefined;
+  return bucket && buckets.includes(bucket) ? u.href : undefined;
 }

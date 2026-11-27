@@ -81,6 +81,8 @@ beforeEach(async () => {
     // Video uploads on, so the video case tests only the account gate
     // (the flag itself: storage.rules.test.ts).
     await setDoc(doc(f, "meta", "flags"), { videoUploads: true });
+    // The person a direct message goes to is a listed adult (D-1317).
+    await setDoc(doc(f, "profiles", OWNER), { name: "Olive Owner", keywords: ["olive"], photoUrl: null, adult: true });
     await setDoc(doc(f, "teams", TEAM), {
       name: "Team",
       division: "mixed",

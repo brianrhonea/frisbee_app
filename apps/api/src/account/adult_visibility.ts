@@ -53,15 +53,24 @@ export class AdultVisibility {
 
   /**
    * Which of [uids] to leave out: those without `ageOk` in enforce mode.
-   * In report mode, none (the ones that would be are logged, uids only).
+   * In report mode, none (how many would be is logged, a count only).
    */
   async hidden(uids: string[]): Promise<Set<string>> {
     if (!this.active || uids.length === 0) return new Set();
-    const claims = await this.withClaims(uids);
+    let claims: Map<string, boolean>;
+    try {
+      claims = await this.withClaims(uids);
+    } catch (e) {
+      // Enforcing fails closed (the request fails). Reporting must never
+      // break a request: log how many were unchecked, never who.
+      if (this.mode !== "report") throw e;
+      this.log({ severity: "WARNING", event: "adult_visibility_report_error", unchecked: new Set(uids).size });
+      return new Set();
+    }
     const without = [...claims].filter(([, ok]) => !ok).map(([u]) => u);
     if (without.length === 0) return new Set();
     if (this.mode === "report") {
-      this.log({ severity: "WARNING", event: "adult_visibility_report", wouldHide: without.length, uids: without.slice(0, 20) });
+      this.log({ severity: "WARNING", event: "adult_visibility_report", wouldHide: without.length });
       return new Set();
     }
     return new Set(without);

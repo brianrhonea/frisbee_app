@@ -238,6 +238,27 @@ describe("review 4.1: lifting a suspension fails closed", () => {
     expect(s.users.disabled.has("pat")).toBe(true);
   });
 
+  it("if the second age check throws, the account is disabled again and the error surfaces (L5)", async () => {
+    let arrive: () => void = () => {};
+    class RacyUsers extends FakeUsers {
+      override async setDisabled(uid: string, disabled: boolean) {
+        await super.setDisabled(uid, disabled);
+        if (!disabled) arrive();
+      }
+    }
+    const s = setup(new FakeCipher(), new RacyUsers());
+    const lift = await suspended(s);
+    arrive = () => {
+      const get = s.store.get.bind(s.store);
+      s.store.get = async (path: string) => {
+        if (path === "ageRefusals/pat") throw new Error("store down");
+        return get(path);
+      };
+    };
+    expect((await lift()).statusCode).toBe(500);
+    expect(s.users.disabled.has("pat")).toBe(true);
+  });
+
   it("an under-13 refusal whose refusedAt isn't a Date keeps the account disabled", async () => {
     const s = setup(new FakeCipher());
     await s.call("PUT", "/v1/me/personal", { ...details, birthDate: "2018-01-01" }, "pat");

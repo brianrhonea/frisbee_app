@@ -34,7 +34,7 @@ beforeEach(async () => {
   await env.withSecurityRulesDisabled(async (ctx) => {
     const fs = ctx.firestore();
     for (const [uid, name] of [[ME, "Amy"], [THEM, "Zed"], [FRIEND, "Kim"]]) {
-      await setDoc(doc(fs, "profiles", uid), { name });
+      await setDoc(doc(fs, "profiles", uid), { name, adult: true });
     }
     await setDoc(doc(fs, "profiles", "quiet"), { name: "Quiet", private: true });
     await setDoc(doc(fs, "users", ME, "blocks", THEM), { mine: true, name: "Zed" });

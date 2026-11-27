@@ -103,6 +103,20 @@ describe("enforce mode", () => {
     expect((res.json().players as Array<{ id: string }>).map((p) => p.id).sort()).toEqual(["adult", "amy"]);
   });
 
+  it("a profile already marked adult:true costs no claim lookup; only the unmarked are asked", async () => {
+    s.repo.profileMap.get("adult")!.adult = true;
+    s.repo.profileMap.get("amy")!.adult = true;
+    const res = await s.get("/v1/public/search?q=lee");
+    expect((res.json().players as Array<{ id: string }>).map((p) => p.id).sort()).toEqual(["adult", "amy"]);
+    expect(s.users.calls).toEqual([["legacy"]]);
+    s.users.calls.length = 0;
+    expect((await s.get("/v1/public/players/adult")).statusCode).toBe(200);
+    expect(s.users.calls).toEqual([]);
+    // The claim is still the source of truth for everyone unmarked.
+    expect((await s.get("/v1/public/players/legacy")).statusCode).toBe(404);
+    expect(s.users.calls).toEqual([]); // its claim answer is still cached from the search
+  });
+
   it("answers 404 for their public profile, and keeps the adult's", async () => {
     expect((await s.get("/v1/public/players/legacy")).statusCode).toBe(404);
     expect((await s.get("/v1/public/players/adult")).statusCode).toBe(200);
@@ -129,6 +143,23 @@ describe("enforce mode", () => {
     expect(s.store.docs.has("conversations/amy_legacy/messages/x")).toBe(false);
   });
 
+  it("refuses a hidden account with exactly the words of a 'nobody' policy", async () => {
+    // Same name, so the text matches too; one hidden, one adult who takes no messages.
+    s.repo.profileMap.set("quiet", { name: "Lee", private: false });
+    s.store.put("profiles/quiet", { name: "Lee" });
+    s.store.put("users/quiet", { messagePolicy: "nobody" });
+    s.users.adults.add("quiet");
+    const hidden = await s.call("POST", "/v1/conversations", { with: "legacy" });
+    const nobody = await s.call("POST", "/v1/conversations", { with: "quiet" });
+    expect(hidden.statusCode).toBe(403);
+    expect(hidden.json()).toEqual(nobody.json());
+    // A hidden account that takes no messages anyway answers the same, too.
+    s.store.put("users/legacy", { messagePolicy: "nobody" });
+    expect((await s.call("POST", "/v1/conversations", { with: "legacy" })).json()).toEqual(nobody.json());
+    // And a missing profile is still its own answer, hidden or not.
+    expect((await s.call("POST", "/v1/conversations", { with: "ghost" })).statusCode).toBe(404);
+  });
+
   it("does not add them to a group", async () => {
     s.store.put("users/legacy/follows/user_amy", { at: new Date(now) });
     s.store.put("users/adult/follows/user_amy", { at: new Date(now) });
@@ -138,13 +169,59 @@ describe("enforce mode", () => {
   });
 });
 
+describe("public roster", () => {
+  const seed = (s: ReturnType<typeof setup>) => {
+    s.store.put("teams/t", { ownerId: "amy", memberIds: ["amy"], members: { amy: "owner" }, name: "Haze", division: "open", level: "club" });
+    s.store.put("teamDirectory/t", { name: "Haze", division: "open", level: "club" });
+    s.store.put("teams/t/roster/a", { name: "Ada Adult", number: 7, position: "handler", userId: "adult" });
+    s.store.put("teams/t/roster/b", { name: "Lee Legacy", number: 3, position: "cutter", userId: "legacy" });
+    s.repo.profileMap.get("adult")!.photoUrl = "https://lh3.googleusercontent.com/a/x";
+    s.store.put("profiles/adult", { name: "Ada", username: "adult", photoUrl: "https://lh3.googleusercontent.com/a/x" });
+    s.store.put("profiles/legacy", { name: "Lee", username: "legacy", photoUrl: "https://lh3.googleusercontent.com/a/y" });
+  };
+
+  it("shows a linked account without ageOk as Player: number and position only", async () => {
+    const s = setup("enforce");
+    seed(s);
+    const res = await s.get("/v1/public/teams/t/roster");
+    expect(res.statusCode).toBe(200);
+    expect(res.json().players).toEqual([
+      { name: "Player", number: 3, position: "cutter" },
+      { name: "Ada Adult", number: 7, position: "handler", username: "adult", photoUrl: "https://lh3.googleusercontent.com/a/x" },
+    ]);
+    for (const leak of ["Lee", "legacy", "/a/y"]) expect(res.body).not.toContain(leak);
+  });
+
+  it("report mode leaves the roster as it was", async () => {
+    const s = setup("report");
+    seed(s);
+    const res = await s.get("/v1/public/teams/t/roster");
+    expect(res.json().players[0]).toMatchObject({ name: "Lee Legacy", username: "legacy" });
+  });
+});
+
 describe("report mode", () => {
-  it("hides nothing and logs who it would", async () => {
+  it("survives a claim lookup failure: nothing hidden, a count logged, never a uid", async () => {
+    const users = new ClaimUsers();
+    users.ageOkOf = async () => {
+      throw new Error("getUsers down");
+    };
+    const logged: Record<string, unknown>[] = [];
+    const v = new AdultVisibility(users, "report", () => now, (e) => logged.push(e));
+    expect([...(await v.hidden(["secretuid", "other"]))]).toEqual([]);
+    expect(logged).toEqual([{ severity: "WARNING", event: "adult_visibility_report_error", unchecked: 2 }]);
+    expect(JSON.stringify(logged)).not.toContain("secretuid");
+    // Enforce mode fails closed.
+    await expect(new AdultVisibility(users, "enforce", () => now, () => {}).hidden(["x"])).rejects.toThrow("getUsers down");
+  });
+
+  it("hides nothing and logs how many it would", async () => {
     const logged: Record<string, unknown>[] = [];
     const s = setup("report");
     const adults = new AdultVisibility(s.users, "report", () => now, (e) => logged.push(e));
     expect([...(await adults.hidden(["legacy", "adult"]))]).toEqual([]);
-    expect(logged).toMatchObject([{ event: "adult_visibility_report", wouldHide: 1, uids: ["legacy"] }]);
+    expect(logged).toEqual([{ severity: "WARNING", event: "adult_visibility_report", wouldHide: 1 }]);
+    expect(JSON.stringify(logged)).not.toContain("legacy");
     // Through the app too: everything still shows, DMs allowed.
     expect((await s.get("/v1/public/players/legacy")).statusCode).toBe(200);
     expect((await s.get("/v1/public/search?q=lee")).json().players).toHaveLength(3);

@@ -23,6 +23,19 @@ describe("imageUrl", () => {
     expect(imageUrl("https://storage.googleapis.com/theirs/p.jpg")).toBeUndefined();
   });
 
+  it("trusts no bucket until some are configured (an empty list is lh3 only)", () => {
+    configureImageBuckets([]);
+    expect(imageUrl("https://firebasestorage.googleapis.com/v0/b/mine/o/p.jpg")).toBeUndefined();
+    expect(imageUrl("https://storage.googleapis.com/mine/p.jpg")).toBeUndefined();
+    expect(imageUrl("https://lh3.googleusercontent.com/a/p")).toBeDefined();
+  });
+
+  it("returns the parsed URL, not the typed string", () => {
+    expect(imageUrl("https://lh3.googleusercontent.com/a/\tp\n.jpg")).toBe("https://lh3.googleusercontent.com/a/p.jpg");
+    configureImageBuckets(["mine"]);
+    expect(imageUrl("https://storage.googleapis.com/mine/a b.jpg")).toBe("https://storage.googleapis.com/mine/a%20b.jpg");
+  });
+
   it("refuses other hosts, ports, credentials and long values", () => {
     for (const u of ["https://tracker.example/p.gif", "https://user:pw@lh3.googleusercontent.com/p", "https://lh3.googleusercontent.com:8443/p", "not a url", `https://lh3.googleusercontent.com/${"a".repeat(2000)}`]) {
       expect(imageUrl(u), u).toBeUndefined();

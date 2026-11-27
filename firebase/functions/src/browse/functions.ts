@@ -15,6 +15,7 @@ import { overLimit } from "../api/functions";
 import { isMuted, searchKey, searchLimit } from "../api/model";
 import { projectBuckets } from "../media/photo_url";
 import { enforceAppCheck } from "../options";
+import { adults } from "./adults";
 import {
   clientIp,
   configureImageBuckets,
@@ -86,9 +87,10 @@ async function profiles(ids: Iterable<string>): Promise<Map<string, Data>> {
 
 /** [docs] as public posts: those whose authors (and reposts' originals) aren't private. */
 async function publicPosts(docs: { id: string; data: () => DocumentData }[]) {
-  const people = await profiles(docs.flatMap((d) => postAuthors(d.data())));
+  const ids = docs.flatMap((d) => postAuthors(d.data()));
+  const [people, hidden] = await Promise.all([profiles(ids), adults.hidden(ids)]);
   return docs
-    .filter((d) => postAuthors(d.data()).every((id) => !isPrivateProfile(people.get(id))))
+    .filter((d) => postAuthors(d.data()).every((id) => !isPrivateProfile(people.get(id)) && !hidden.has(id)))
     .map((d) => ({ id: d.id, data: plain(postView(d.data())) }));
 }
 
@@ -131,6 +133,9 @@ export const profile = onCall(options, async (req) => {
   const db = getFirestore();
   const snap = await db.doc(`profiles/${uid}`).get();
   if (!snap.exists) throw new HttpsError("not-found", "No such player.");
+  // D-1317: an account without the adult claim has no public profile (the
+  // same answer as a profile that doesn't exist).
+  if ((await adults.hidden([uid])).has(uid)) throw new HttpsError("not-found", "No such player.");
   const data = snap.data() as Data;
   if (data.private === true) return { profile: profileView(data), posts: [], next: null };
   const posts = await page(db.collection("posts").where("authorId", "==", uid), parseBefore(before)).get();
@@ -238,5 +243,8 @@ export const search = onCall(options, async (req) => {
   }
   // Names only: a private profile's search tags are behind its follow wall.
   const snap = await db.collection("profiles").where("keywords", "array-contains", key).limit(searchLimit).get();
-  return { results: snap.docs.map((d) => ({ id: d.id, data: plain(searchProfileView(d.data())) })) };
+  const hidden = await adults.hidden(snap.docs.map((d) => d.id));
+  return {
+    results: snap.docs.filter((d) => !hidden.has(d.id)).map((d) => ({ id: d.id, data: plain(searchProfileView(d.data())) })),
+  };
 });

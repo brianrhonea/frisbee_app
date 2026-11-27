@@ -24,6 +24,10 @@ export interface BackfillReport {
   /** Of those, how many gain each claim. */
   grantsAgeOk: number;
   grantsTerms: number;
+  /** Adults whose profile lacks `adult: true`: would get (dry run) or got (apply) it (D-1317). */
+  adultMarked: number;
+  /** Adults with no profile yet: nothing to mark (the next sync does it). */
+  adultNoProfile: number;
   /** Users whose claims already hold everything their records earn. */
   unchanged: number;
   /** Saved birth dates under 18: they get no `ageOk`; counted, never named. */
@@ -49,7 +53,7 @@ export async function backfillClaims(opts: {
   apply: boolean;
 }): Promise<BackfillReport> {
   const report: BackfillReport = {
-    scanned: 0, changed: 0, grantsAgeOk: 0, grantsTerms: 0, unchanged: 0, minors: 0,
+    scanned: 0, changed: 0, grantsAgeOk: 0, grantsTerms: 0, unchanged: 0, minors: 0, adultMarked: 0, adultNoProfile: 0,
     decryptFailures: [], writeFailures: [], applied: opts.apply,
   };
   for await (const user of opts.users) {
@@ -61,6 +65,16 @@ export async function backfillClaims(opts: {
     };
     const { claims, ageClass } = await opts.gate.evaluate(callerOf(user), log);
     if (ageClass === "under18" || ageClass === "under13") report.minors++;
+    // D-1317: every adult (the claim already held, or earned by this run) gets `adult: true` on their profile.
+    if (callerOf(user).ageOk === true || claims.ageOk === true) {
+      try {
+        const marked = await opts.gate.markAdult(user.uid, opts.apply);
+        if (marked === "set") report.adultMarked++;
+        else if (marked === "noProfile") report.adultNoProfile++;
+      } catch {
+        report.writeFailures.push(user.uid);
+      }
+    }
     if (Object.keys(claims).length === 0) {
       report.unchanged++;
       continue;

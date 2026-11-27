@@ -45,7 +45,8 @@ async function world() {
   claims.set("done", { ageOk: true, terms: termsVersion });
   await seed("staff", "1990-01-01", false);
   claims.set("staff", { staff: true });
-  return { gate, auth, claims, writes, list, cipher };
+  for (const uid of ["adult", "done", "minor", "agreed"]) store.put(`profiles/${uid}`, { name: uid });
+  return { gate, auth, claims, writes, list, cipher, store };
 }
 
 describe("claim backfill", () => {
@@ -65,6 +66,22 @@ describe("claim backfill", () => {
     expect(w.claims.get("minor")).toEqual({ terms: termsVersion });
     expect(w.claims.has("nothing")).toBe(false);
     expect(w.claims.get("staff")).toEqual({ staff: true, ageOk: true });
+  });
+
+  it("D-1317: marks adult:true on the profile of everyone who has or earns ageOk, nobody else", async () => {
+    const w = await world();
+    const dry = await backfillClaims({ users: w.list(), gate: w.gate, auth: w.auth, apply: false });
+    expect(dry).toMatchObject({ adultMarked: 2, adultNoProfile: 1 });
+    expect(w.store.doc("profiles/adult")).toEqual({ name: "adult" });
+    const r = await backfillClaims({ users: w.list(), gate: w.gate, auth: w.auth, apply: true });
+    expect(r).toMatchObject({ adultMarked: 2, adultNoProfile: 1, writeFailures: [] });
+    expect(w.store.doc("profiles/adult")).toEqual({ name: "adult", adult: true });
+    expect(w.store.doc("profiles/done")).toEqual({ name: "done", adult: true });
+    expect(w.store.doc("profiles/minor")).toEqual({ name: "minor" });
+    expect(w.store.doc("profiles/agreed")).toEqual({ name: "agreed" });
+    expect(w.store.doc("profiles/staff")).toBeUndefined();
+    const again = await backfillClaims({ users: w.list(), gate: w.gate, auth: w.auth, apply: true });
+    expect(again).toMatchObject({ adultMarked: 0, adultNoProfile: 1 });
   });
 
   it("is idempotent: a second run changes and writes nothing", async () => {

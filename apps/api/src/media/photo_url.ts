@@ -7,6 +7,19 @@
 // person's own `users/{uid}/profile/` folder, or the Google account photo
 // that sign-in copies, is trusted; anything else is treated as no picture.
 
+/**
+ * The URL as the parser writes it (what a browser would fetch), so a value
+ * with stripped whitespace or odd escapes is never passed on as typed; null
+ * when it doesn't parse.
+ */
+function normal(url: string): string | null {
+  try {
+    return new URL(url).href;
+  } catch {
+    return null;
+  }
+}
+
 /** A file name that smuggles in a folder or a traversal. */
 const unsafeName = /[/\\]|%2f|%5c|%2e%2e|^\.|[^A-Za-z0-9._%-]/i;
 
@@ -21,7 +34,7 @@ const googlePhotoHost = "https://lh3.googleusercontent.com/";
  */
 export function trustedPhotoUrl(url: string | null | undefined, uid: string, buckets: readonly string[], emulatorHost?: string): string | null {
   if (!url || url.length > 2000) return null;
-  if (url.startsWith(googlePhotoHost)) return url;
+  if (url.startsWith(googlePhotoHost)) return normal(url);
   const hosts = ["https://firebasestorage.googleapis.com", ...(emulatorHost ? [`http://${emulatorHost}`] : [])];
   const own = `users%2F${encodeURIComponent(uid)}%2Fprofile%2F`;
   for (const host of hosts) {
@@ -30,7 +43,7 @@ export function trustedPhotoUrl(url: string | null | undefined, uid: string, buc
       if (!url.startsWith(prefix)) continue;
       // What follows is one file name (no further folders), with an optional query.
       const rest = url.slice(prefix.length).split("?")[0]!;
-      if (rest.length > 0 && !unsafeName.test(rest)) return url;
+      if (rest.length > 0 && !unsafeName.test(rest)) return normal(url);
     }
   }
   return null;

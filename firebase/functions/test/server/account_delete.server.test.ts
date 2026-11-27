@@ -56,6 +56,13 @@ beforeAll(async () => {
   b.set(db.doc(`tournaments/delT/signups/${gone}`), { name: "Gone", gender: "mmp", divisionId: "d1", skill: 3, status: "accepted" });
   b.set(db.doc(`tournaments/delT/signups/${other}`), { name: "Other", gender: "wmp", divisionId: "d1", skill: 2, status: "accepted" });
   b.set(db.doc(`tournaments/delT/payments/${gone}`), { paid: true, note: "Paid online through Stall 10" });
+  // A captains' draft pool (server-only skill and gender), and a follower of Gone.
+  b.set(db.doc(`tournaments/delT/drafts/d1`), { pool: {} });
+  b.set(db.doc(`tournaments/delT/drafts/d1/details/pool`), {
+    players: { [gone]: { skill: 3, gender: "mmp" }, [other]: { skill: 2, gender: "wmp" } },
+  });
+  b.set(db.doc(`users/${other}/follows/user_${gone}`), { key: `user_${gone}`, type: "user", targetId: gone, name: "G", notify: false });
+  b.set(db.doc(`users/${other}/follows/user_keepme`), { key: "user_keepme", type: "user", targetId: "keepme", name: "K", notify: false });
   // Moderation and payment records kept for accounting.
   b.set(db.doc(`reports/delR1`), { reporterId: gone, reason: "spam", status: "open" });
   b.set(db.doc(`payerCharges/delT~${gone}`), { payerId: gone });
@@ -108,6 +115,14 @@ describe("deleteAccountFully", () => {
     const signup = (await db.doc(`tournaments/delT/signups/${gone}`).get()).data()!;
     expect(signup).toMatchObject({ name: "Deleted user", gender: null, divisionId: "d1", skill: 3, status: "accepted" });
     expect((await db.doc(`tournaments/delT/signups/${other}`).get()).data()!.name).toBe("Other");
+
+    // Their skill and gender leave the draft pool; others' stay.
+    expect((await db.doc("tournaments/delT/drafts/d1/details/pool").get()).data()).toEqual({
+      players: { [other]: { skill: 2, gender: "wmp" } },
+    });
+    // Other people's follows of them go; their other follows stay.
+    expect(await exists(`users/${other}/follows/user_${gone}`)).toBe(false);
+    expect(await exists(`users/${other}/follows/user_keepme`)).toBe(true);
 
     // Kept for accounting and moderation.
     expect(await exists(`tournaments/delT/payments/${gone}`)).toBe(true);

@@ -32,6 +32,11 @@ describe("trustedPhotoUrl (F5: a client can set its own Auth photoURL)", () => {
     expect(trustedPhotoUrl(url, "u1", buckets)).toBeNull();
   });
 
+  it("returns the parsed URL, so stripped whitespace never reaches a page", () => {
+    expect(trustedPhotoUrl("https://lh3.googleusercontent.com/a/\tx", "u1", buckets)).toBe("https://lh3.googleusercontent.com/a/x");
+    expect(trustedPhotoUrl(raw("m\ne.jpg"), "u1", buckets)).toBeNull();
+  });
+
   it("refuses null and undefined", () => {
     expect(trustedPhotoUrl(null, "u1", buckets)).toBeNull();
     expect(trustedPhotoUrl(undefined, "u1", buckets)).toBeNull();

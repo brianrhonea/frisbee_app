@@ -557,7 +557,7 @@ describe("visitor access to events, the team finder and rosters", () => {
     t.store.put("profiles/pat", {
       name: "Pat P",
       username: "pat",
-      photoUrl: "https://firebasestorage.googleapis.com/v0/b/x/o/p.jpg",
+      photoUrl: "https://lh3.googleusercontent.com/a/pat",
       email: "pat@x.test",
     });
     t.store.put("profiles/sam", { name: "Sam S", username: "sam", photoUrl: "https://firebasestorage.googleapis.com/s.jpg", private: true });
@@ -569,7 +569,7 @@ describe("visitor access to events, the team finder and rosters", () => {
       players: [
         // Linked to a private profile: not named at all.
         { name: "Player", number: 3, position: "cutter" },
-        { name: "Pat Public", number: 7, position: "handler", username: "pat", photoUrl: "https://firebasestorage.googleapis.com/v0/b/x/o/p.jpg" },
+        { name: "Pat Public", number: 7, position: "handler", username: "pat", photoUrl: "https://lh3.googleusercontent.com/a/pat" },
         { name: "Una Unlinked" },
       ],
     });
@@ -596,6 +596,9 @@ describe("visitor access to events, the team finder and rosters", () => {
       "https://tracker.example/p.jpg",
       "https://firebasestorage.googleapis.com/v0/b/someone-elses-bucket/o/p.jpg",
       "https://storage.googleapis.com/someone-elses-bucket/p.jpg",
+      // A bucket picture that isn't their own profile folder's is dropped too.
+      "https://storage.googleapis.com/x/p.jpg",
+      "https://firebasestorage.googleapis.com/v0/b/x/o/p.jpg",
       "https://evil.googleusercontent.com/p.jpg",
       "http://lh3.googleusercontent.com/p.jpg",
     ]) {
@@ -603,7 +606,7 @@ describe("visitor access to events, the team finder and rosters", () => {
       const [, pat] = (await t.get("/v1/public/teams/t/roster")).json().players;
       expect(pat, url).toEqual({ name: "Pat Public", number: 7, position: "handler" });
     }
-    for (const url of ["https://storage.googleapis.com/x/p.jpg", "https://lh3.googleusercontent.com/a/p"]) {
+    for (const url of ["https://lh3.googleusercontent.com/a/p"]) {
       t.store.put("profiles/pat", { name: "Pat", photoUrl: url });
       const [, pat] = (await t.get("/v1/public/teams/t/roster")).json().players;
       expect(pat.photoUrl, url).toBe(url);

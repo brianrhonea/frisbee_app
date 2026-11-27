@@ -65,9 +65,16 @@ export class BrowseService {
     private readonly adults?: AdultVisibility,
   ) {}
 
-  /** Of [uids], those D-1317 leaves out (no `ageOk`, when enforcing). */
-  private async hiddenAdults(uids: string[]): Promise<Set<string>> {
-    return this.adults ? this.adults.hidden(uids) : new Set();
+  /**
+   * Of [uids], those D-1317 leaves out (no `ageOk`, when enforcing). A
+   * profile already carrying the server-set `adult: true` marker (in
+   * [profiles], when the caller has them) is known to be an adult and costs
+   * no claim lookup; everyone else is asked of the claims, the source of truth.
+   */
+  private async hiddenAdults(uids: string[], profiles?: ReadonlyMap<string, Data | undefined>): Promise<Set<string>> {
+    if (!this.adults) return new Set();
+    const ask = profiles ? uids.filter((u) => profiles.get(u)?.adult !== true) : uids;
+    return ask.length > 0 ? this.adults.hidden(ask) : new Set();
   }
 
   /** [view]'s photo and header, dropped unless pinnedImageUrl allows them. */
@@ -125,7 +132,8 @@ export class BrowseService {
    */
   private async publicPosts(docs: Doc[]): Promise<PublicPost[]> {
     const authors = docs.flatMap((d) => postAuthors(d.data));
-    const [people, hidden] = await Promise.all([this.repo.profiles(authors), this.hiddenAdults(authors)]);
+    const people = await this.repo.profiles(authors);
+    const hidden = await this.hiddenAdults(authors, people);
     const shown = docs.filter((d) => postAuthors(d.data).every((id) => !isPrivateProfile(people.get(id)) && !hidden.has(id)));
     const originals = await originalsOf(shown, (id) => this.repo.post(id));
     return shown.map((d) => withOriginal(this.post(d), d, originals, (o) => this.post(o)));
@@ -166,7 +174,7 @@ export class BrowseService {
   async profile(uid: unknown): Promise<ProfilePage> {
     if (!validId(uid)) throw new ApiError("not_found", "No such player.");
     const data = (await this.repo.profiles([uid])).get(uid);
-    if (!data || (await this.hiddenAdults([uid])).has(uid)) throw new ApiError("not_found", "No such player.");
+    if (!data || (await this.hiddenAdults([uid], new Map([[uid, data]]))).has(uid)) throw new ApiError("not_found", "No such player.");
     const profile = { ...this.pinPhotos(profileView(data)), id: uid } as PublicProfile;
     if (data.private === true) return { profile, posts: [], next: null };
     const docs = await this.repo.posts(null, uid);
@@ -201,7 +209,8 @@ export class BrowseService {
     const shown = [...pinned, ...rest];
     const authorOf = (d: Doc) => (typeof d.data.authorId === "string" && d.data.authorId ? d.data.authorId : null);
     const authors = shown.flatMap((d) => authorOf(d) ?? []);
-    const [people, hidden] = await Promise.all([this.repo.profiles(authors), this.hiddenAdults(authors)]);
+    const people = await this.repo.profiles(authors);
+    const hidden = await this.hiddenAdults(authors, people);
     return {
       team,
       posts: shown.map((d) => {
@@ -249,7 +258,7 @@ export class BrowseService {
     const key = queryKey(query);
     if (!key) return { players: [], teams: [] };
     const [found, listings] = await Promise.all([this.repo.searchProfiles(key), this.repo.searchListings(key)]);
-    const hidden = await this.hiddenAdults(found.map((d) => d.id));
+    const hidden = await this.hiddenAdults(found.map((d) => d.id), new Map(found.map((d) => [d.id, d.data])));
     const profiles = found.filter((d) => !hidden.has(d.id));
     return {
       players: profiles.map((d) => ({ ...this.pinPhotos(searchProfileView(d.data)), id: d.id }) as PublicProfile),

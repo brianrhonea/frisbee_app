@@ -5,7 +5,7 @@ import { initializeApp } from "firebase-admin/app";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { type PurgeDeps, purgePerRun, purgeUnderThirteen, under13RetentionMs } from "../../src/account/functions";
+import { type PurgeDeps, purgeFailuresPerRun, purgePerRun, purgeUnderThirteen, under13RetentionMs } from "../../src/account/functions";
 
 initializeApp({ projectId: "demo-frisbee" });
 const db = getFirestore();
@@ -80,9 +80,35 @@ describe("purgeUnderThirteen", () => {
     const failing: PurgeDeps = { ...deps, deleteAuthUser: async () => Promise.reject(new Error("auth down")) };
     expect(await purgeUnderThirteen(db, now, failing)).toMatchObject({ deleted: 0, failed: 1 });
     expect(await exists("ageRefusals/pRetry")).toBe(true);
-    expect(await purgeUnderThirteen(db, now, deps)).toMatchObject({ deleted: 1, failed: 0 });
+    // A failed record waits out purgeRetryAfterMs (so it can't starve others), then is retried.
+    expect(await purgeUnderThirteen(db, now + 1000, deps)).toMatchObject({ deleted: 0, failed: 0 });
+    expect(await purgeUnderThirteen(db, now + day, deps)).toMatchObject({ deleted: 1, failed: 0 });
     expect(await exists("ageRefusals/pRetry")).toBe(false);
   });
+
+  it("is not starved by purgeFailuresPerRun failing records ahead of a good one", async () => {
+    const ids = Array.from({ length: purgeFailuresPerRun }, (_, i) => `aFail${String(i).padStart(3, "0")}`);
+    const b = db.batch();
+    for (const id of [...ids, "zGood"]) {
+      b.set(db.doc(`ageRefusals/${id}`), { under13: true, refusedAt: at(50) });
+      auth.set(id, "disabled");
+    }
+    await b.commit();
+    const flaky: PurgeDeps = {
+      ...deps,
+      deleteAuthUser: async (u) => (u.startsWith("aFail") ? Promise.reject(new Error("auth down")) : deps.deleteAuthUser(u)),
+    };
+    const t = now + 10 * day;
+    // Run 1 spends its failure budget on the failing ones and never reaches the good one.
+    expect(await purgeUnderThirteen(db, t, flaky)).toMatchObject({ deleted: 0, failed: purgeFailuresPerRun });
+    expect(await exists("ageRefusals/zGood")).toBe(true);
+    // Run 2: they are marked, so they wait and the good one is deleted.
+    expect(await purgeUnderThirteen(db, t + 3600_000, flaky)).toMatchObject({ deleted: 1, failed: 0 });
+    expect(await exists("ageRefusals/zGood")).toBe(false);
+    // A day later they are tried again.
+    expect(await purgeUnderThirteen(db, t + day, flaky)).toMatchObject({ deleted: 0, failed: purgeFailuresPerRun });
+    await Promise.all(ids.map((id) => db.doc(`ageRefusals/${id}`).delete()));
+  }, 240_000);
 
   it("deletes at most purgePerRun accounts a run", async () => {
     const b = db.batch();

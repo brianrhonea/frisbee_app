@@ -14,6 +14,11 @@ describe("trustedPhotoUrl", () => {
     expect(trustedPhotoUrl("https://lh3.googleusercontent.com/a/x", "u1", buckets)).toBe("https://lh3.googleusercontent.com/a/x");
   });
 
+  it("returns the parsed URL, so stripped whitespace never reaches a page or a notification", () => {
+    expect(trustedPhotoUrl("https://lh3.googleusercontent.com/a/\tx", "u1", buckets)).toBe("https://lh3.googleusercontent.com/a/x");
+    expect(trustedPhotoUrl(own.replace("me.jpg", "m\ne.jpg"), "u1", buckets)).toBeNull();
+  });
+
   it("refuses someone else's folder, other buckets, other hosts, traversal and long values", () => {
     expect(trustedPhotoUrl(own, "u2", buckets)).toBeNull();
     expect(trustedPhotoUrl(own, "u1", ["other"])).toBeNull();

@@ -224,4 +224,24 @@ export class PersonalService {
     const at = refusal.refusedAt instanceof Date ? refusal.refusedAt : new Date(`${date}T00:00:00Z`);
     return birthDateProblem(date, at) === tooYoungMessage;
   }
+
+  /**
+   * What [uid]'s refusal record says, judged as disabledForAge does but
+   * telling an unreadable one apart (for the under-13 marker backfill, which
+   * must not mark what it can't read): "none", "under13", "under18" (an
+   * adult-only refusal), or "unreadable" (no date inside, or it can't be opened).
+   */
+  async refusalKind(uid: string): Promise<"none" | "under13" | "under18" | "unreadable"> {
+    const refusal = await this.store.get(refusalPath(uid));
+    if (!refusal) return "none";
+    let date: string | null;
+    try {
+      date = await this.openDate(refusal, refusalPath(uid));
+    } catch {
+      return "unreadable";
+    }
+    if (date === null) return "unreadable";
+    const at = refusal.refusedAt instanceof Date ? refusal.refusedAt : new Date(`${date}T00:00:00Z`);
+    return birthDateProblem(date, at) === tooYoungMessage ? "under13" : "under18";
+  }
 }
