@@ -62,6 +62,7 @@
 | PL-A17 | Redesign leftovers: anonymous polls, vote removal, team-post likes and pushes, roster search, clinic type, opening `/tournaments` links in the app | No | All | M | P3 (the `/tournaments` link claim is P2) |
 | PL-A18 | CSV roster import and assisted setup | Discord import exists | All | M | P2 |
 | PL-A19 | Profile and Discover items the owner liked (2026-11-27, board Q7): career highlights and achievements (with PL-A1), a verified badge with a review process, team trend charts and career stats tiles (with PL-A2 and deeper analytics), suggested athletes with Follow and Near you (with PL-A4) | Partial | App + Web + API | L | P1/P2. Each needs its own design and approval |
+| PL-A20 | **Seasons by team level** (owner, 2026-11-27: shortly after launch, first post-launch batch; board SEA1). Club teams of every division, masters included, use the calendar year (season about May to October); college uses July 1 to June 30, labelled '2026–27' (season about August to May); leagues use their own season; pickup has no season stats; youth split still to decide. One shared rule and fixture for server, app and website; profile stats, Team history and team season stats; read old year keys during the change. Later: admin-defined team seasons | Partial (calendar-year seasons today) | App + Web + API | M | **P1** |
 
 ### B. Deferred security and hardening
 
