@@ -20,6 +20,7 @@ import '../../follow/widgets/follow_button.dart';
 import '../../posts/widgets/post_widgets.dart';
 import '../../workouts/widgets/record_button.dart';
 import '../view_models/player_profile_viewmodel.dart';
+import 'team_history_section.dart';
 import '../../posts/widgets/post_composer.dart';
 import '../../core/ui/skeleton.dart';
 import '../../../domain/models/moderation.dart';
@@ -250,7 +251,10 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
       ],
       _Tab.teams => [
         SideColumnLayout(
-          main: [_TeamsCard(viewModel: vm, wide: true)],
+          main: [
+            _TeamsCard(viewModel: vm, wide: true),
+            TeamHistorySection(uid: vm.uid, isMe: vm.isMe),
+          ],
           side: [
             if (vm.isMe && vm.linkedSpots.isNotEmpty)
               _RosterSpotsCard(viewModel: vm),

@@ -450,7 +450,8 @@ class PlayerProfileViewModel extends ChangeNotifier {
         final p = StatSheet.fromPoints(g.points).players[mine.id];
         if (p == null || (p.pointsPlayed == 0 && p.touches == 0)) continue;
         final line = StatTotals.fromPlayer(p);
-        final year = '${g.date.year}';
+        // The UTC year, as the API's team history counts seasons.
+        final year = '${g.date.toUtc().year}';
         seasons[year] = (seasons[year] ?? const StatTotals()) + line;
         final mineByYear = teamSeasons[t.id] ??= {};
         mineByYear[year] = (mineByYear[year] ?? const StatTotals()) + line;
