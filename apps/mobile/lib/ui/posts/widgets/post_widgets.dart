@@ -110,43 +110,48 @@ class UserPostCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  InkWell(
-                    borderRadius: BorderRadius.circular(24),
-                    onTap: () =>
-                        openPage(context, Routes.player(post.authorId)),
-                    child: Padding(
-                      padding: const EdgeInsets.all(2),
-                      child: UserAvatar(
-                        uid: post.authorId,
-                        name: post.authorName,
-                        photoUrl: post.authorPhotoUrl,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
+                  // The picture and the name open the author's profile as one
+                  // 48 px target.
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        InkWell(
-                          onTap: () =>
-                              openPage(context, Routes.player(post.authorId)),
-                          child: Text(
-                            post.authorName.isEmpty
-                                ? 'Someone'
-                                : post.authorName,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: c.ink,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(AppRadius.control),
+                      onTap: () =>
+                          openPage(context, Routes.player(post.authorId)),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 48),
+                        child: Row(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(2),
+                              child: UserAvatar(
+                                uid: post.authorId,
+                                name: post.authorName,
+                                photoUrl: post.authorPhotoUrl,
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    post.authorName.isEmpty
+                                        ? 'Someone'
+                                        : post.authorName,
+                                    style: AppText.label.copyWith(color: c.ink),
+                                  ),
+                                  Text(
+                                    subtitle,
+                                    style: AppText.caption.copyWith(
+                                      color: c.muted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
-                        Text(
-                          subtitle,
-                          style: TextStyle(fontSize: 12.5, color: c.muted),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                   if (onEdit != null || onDelete != null)
@@ -881,7 +886,7 @@ class WorkoutSummary extends StatelessWidget {
       if (workout.effort case final e?) ('Effort', '$e/10'),
     ];
     final c = AppColors.of(context);
-    final muted = TextStyle(fontSize: 11.5, color: c.muted);
+    final muted = AppText.caption.copyWith(color: c.muted);
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppRadius.control),
@@ -918,8 +923,7 @@ class WorkoutSummary extends StatelessWidget {
                         const SizedBox(width: 5),
                         Text(
                           workout.activity.label,
-                          style: TextStyle(
-                            fontSize: 12,
+                          style: AppText.caption.copyWith(
                             fontWeight: FontWeight.w700,
                             color: c.ink2,
                           ),

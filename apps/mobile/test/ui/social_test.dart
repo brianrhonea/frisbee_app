@@ -406,7 +406,9 @@ void main() {
       );
       await tester.pump();
       expect(find.text('Sam Lee'), findsWidgets);
-      expect(find.text('0 followers · 0 following'), findsOneWidget);
+      // The counts are summary tiles: a number over its label.
+      expect(find.text('FOLLOWERS'), findsOneWidget);
+      expect(find.text('FOLLOWING'), findsOneWidget);
       expect(find.text('Message'), findsOneWidget);
 
       await tester.tap(find.text('Posts'));
@@ -417,7 +419,8 @@ void main() {
       await tester.pump();
       await tester.pump();
       expect(find.text('Following'), findsOneWidget);
-      expect(find.text('1 follower · 0 following'), findsOneWidget);
+      expect(find.text('FOLLOWER'), findsOneWidget);
+      expect(find.text('1'), findsOneWidget);
       expect(tester.takeException(), isNull);
       vm.dispose();
     });

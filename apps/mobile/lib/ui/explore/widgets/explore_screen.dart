@@ -12,6 +12,7 @@ import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/error_message.dart';
+import '../../core/ui/filter_chips.dart';
 import '../../core/ui/list_row.dart';
 import '../../core/ui/status_pill.dart';
 import '../../core/ui/layout.dart';
@@ -456,19 +457,14 @@ class _LiveCard extends StatelessWidget {
             t.name,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: c.onFeature,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.4,
-            ),
+            style: AppText.section.copyWith(color: c.onFeature),
           ),
           const SizedBox(height: 4),
           Text(
             [hostedDates(t), if (divisions.isNotEmpty) divisions].join(' · '),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: c.onFeatureMuted, fontSize: 12.5),
+            style: AppText.secondary.copyWith(color: c.onFeatureMuted),
           ),
           if (games.isNotEmpty) ...[
             const SizedBox(height: 10),
@@ -482,7 +478,7 @@ class _LiveCard extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
                   '+${games.length - shown} more live',
-                  style: TextStyle(color: c.onFeatureMuted, fontSize: 12.5),
+                  style: AppText.secondary.copyWith(color: c.onFeatureMuted),
                 ),
               ),
           ],
@@ -502,11 +498,7 @@ class _LiveGameLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    final name = TextStyle(
-      color: c.onFeature,
-      fontSize: 13.5,
-      fontWeight: FontWeight.w700,
-    );
+    final name = AppText.label.copyWith(color: c.onFeature);
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
       decoration: BoxDecoration(
@@ -545,7 +537,7 @@ class _LiveGameLine extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             'Field ${row.game.field}',
-            style: TextStyle(color: c.onFeatureMuted, fontSize: 11.5),
+            style: AppText.caption.copyWith(color: c.onFeatureMuted),
           ),
         ],
       ),
@@ -588,8 +580,7 @@ class _ComingUp extends StatelessWidget {
             if (list.isEmpty && list.length < vm.tournaments.length)
               Text(
                 'Nothing else coming up yet.',
-                style: TextStyle(
-                  fontSize: 12.5,
+                style: AppText.secondary.copyWith(
                   color: AppColors.of(context).muted,
                 ),
               )
@@ -690,13 +681,15 @@ class _FilterChipsState extends State<_FilterChips> {
     child: Row(
       children: [
         for (final (i, (label, filter)) in widget.filters.indexed) ...[
-          if (i > 0) const SizedBox(width: 8),
-          ChoiceChip(
+          if (i > 0) const SizedBox(width: AppSpace.sm),
+          // The shared chip: indigo fill plus a check, 48 px tall.
+          KeyedSubtree(
             key: _keyOf(filter),
-            label: Text(label),
-            showCheckmark: false,
-            selected: widget.selected == filter,
-            onSelected: (_) => widget.onSelect(filter),
+            child: AppFilterChip(
+              label: label,
+              selected: widget.selected == filter,
+              onSelected: () => widget.onSelect(filter),
+            ),
           ),
         ],
       ],
@@ -710,6 +703,9 @@ class _ResultTile extends StatelessWidget {
   final TeamListing listing;
   final TeamSearchViewModel vm;
 
+  /// Widest the Join button or pill gets, so the name keeps room.
+  static const _trailingMax = 140.0;
+
   @override
   Widget build(BuildContext context) {
     final t = listing;
@@ -721,15 +717,28 @@ class _ResultTile extends StatelessWidget {
                 '${t.requiresApproval ? 'Approval required' : 'Open to join'}'
           : t.subtitle,
       trailing: vm.isMine(t.id)
-          ? Tag(t.isCommunity ? 'Your community' : 'Your team')
+          ? StatusPill(
+              t.isCommunity ? 'Your community' : 'Your team',
+              tone: PillTone.success,
+              icon: Icons.check,
+              maxWidth: _trailingMax,
+            )
           : vm.requested(t.id)
-          ? const StatusPill('Requested', icon: Icons.hourglass_top)
+          ? const StatusPill(
+              'Requested',
+              icon: Icons.hourglass_top,
+              maxWidth: _trailingMax,
+            )
           : vm.canJoin(t)
           ? ListenableBuilder(
               listenable: vm.join,
-              builder: (context, _) => FilledButton(
-                onPressed: vm.join.running ? null : () => vm.join.execute(t),
-                child: Text(vm.joinLabel(t)),
+              // Capped so big text wraps the label, not the row.
+              builder: (context, _) => ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: _trailingMax),
+                child: FilledButton(
+                  onPressed: vm.join.running ? null : () => vm.join.execute(t),
+                  child: Text(vm.joinLabel(t), textAlign: TextAlign.center),
+                ),
               ),
             )
           : Icon(Icons.chevron_right, color: AppColors.of(context).muted),
@@ -821,14 +830,8 @@ class _Shortcuts extends StatelessWidget {
                 ),
                 child: Icon(icon, size: 19, color: c.ink),
               ),
-              title: Text(
-                title,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13.5,
-                ),
-              ),
-              subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
+              title: Text(title, style: AppText.label),
+              subtitle: Text(subtitle, style: AppText.caption),
               onTap: onTap,
             ),
         ],
