@@ -72,7 +72,13 @@ jobs:
         run: DOCKER_BUILDKIT=1 docker build -f apps/api/Dockerfile --target api -t stall10-api .
       - name: Smoke test
         run: |
-          docker run -d --name api -p 8080:8080 -e FIREBASE_PROJECT_ID=demo-stall10 stall10-api
+          # A deployed (NODE_ENV=production) API refuses to start without these
+          # (src/startup_env.ts). The KMS key is a placeholder name: the client
+          # makes no call until a birth date is encrypted, which this test never does.
+          docker run -d --name api -p 8080:8080 -e FIREBASE_PROJECT_ID=demo-stall10 \
+            -e ACCOUNT_GATE_MODE=report \
+            -e PERSONAL_DETAILS_KMS_KEY=projects/demo-stall10/locations/us/keyRings/ci/cryptoKeys/ci \
+            stall10-api
           curl -fsS --retry 10 --retry-all-errors --retry-delay 1 localhost:8080/health
           code=$(curl -s -o body.json -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{}' localhost:8080/v1/teams)
           cat body.json
