@@ -80,4 +80,51 @@ void main() {
       vm.dispose();
     });
   }
+
+  // A date outside 1900-2100 (UTC) counts toward no season, as on the API.
+  test('season years are bounded to 1900-2100', () async {
+    final base = Map<String, dynamic>.from((doc['games'] as List)[1] as Map);
+    final spotCase = (doc['cases'] as List).cast<Map>().firstWhere(
+      (c) => (c['seasons'] as Map).isNotEmpty,
+    );
+    final spot = spotCase['spot'] as String;
+    final dates = {
+      '1899-12-31T23:59:59Z': false,
+      '1900-01-01T00:00:00Z': true,
+      '2100-12-31T23:59:59Z': true,
+      '2101-01-01T00:00:00Z': false,
+      '0001-06-01T00:00:00Z': false,
+    };
+    for (final e in dates.entries) {
+      final teams = FakeTeamRepository();
+      teams.teams['t1'] = teamWith({
+        'owner': TeamRole.owner,
+        testUser.uid: TeamRole.player,
+      });
+      teams.roster['t1'] = [
+        RosterPlayer(id: spot, name: 'Spot', userId: testUser.uid),
+      ];
+      final stats = FakeStatsRepository()
+        ..games['t1'] = [
+          StatsGame.fromMap('g', {...base, 'date': e.key}),
+        ];
+      final vm = PlayerProfileViewModel(
+        uid: testUser.uid,
+        profileRepository: FakeProfileRepository(),
+        authRepository: FakeAuthRepository(user: testUser),
+        teamRepository: teams,
+        statsRepository: stats,
+        directMessageRepository: FakeDirectMessageRepository(),
+      );
+      await pumpEventQueue();
+      final seasons = vm.summary.teamSeasons['t1'] ?? const {};
+      expect(
+        seasons.keys.toList(),
+        e.value ? [e.key.substring(0, 4)] : isEmpty,
+        reason: e.key,
+      );
+      expect(vm.summary.games, e.value ? isNotEmpty : isEmpty, reason: e.key);
+      vm.dispose();
+    }
+  });
 }

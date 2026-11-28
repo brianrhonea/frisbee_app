@@ -42,6 +42,14 @@ const gamePage = 20;
 const cacheMs = 60_000;
 /** Most cached histories per instance; the oldest goes first. */
 const cacheMax = 500;
+/** Most season entries (across a response's teams) a cached answer may hold; a bigger one is served but not kept. */
+const cacheMaxSeasons = 200;
+/** Most history builds running at once on an instance, whoever asks. */
+const maxBuilds = 3;
+/** The fields of a team document the history reads (rosterIsPublic, isMember, kindOf, inYouthLeague and the name). */
+const teamFields = ["name", "kind", "level", "publicPage", "memberIds", "leagueId"] as const;
+/** The fields of a roster spot the history shows. */
+const spotFields = ["name", "number"] as const;
 
 /** Lets the event loop serve other requests between pages. */
 const yieldLoop = () => new Promise<void>((resolve) => setImmediate(resolve));
@@ -51,6 +59,8 @@ const str = (v: unknown) => (typeof v === "string" ? v : "");
 export class TeamHistoryService {
   /** Callers with a history request running on this instance. */
   private readonly running = new Set<string>();
+  /** History builds running on this instance, all callers. */
+  private builds = 0;
   /** `caller:target` to a recent answer. */
   private readonly cache = new Map<string, { at: number; value: TeamHistory }>();
 
@@ -77,6 +87,7 @@ export class TeamHistoryService {
   /**
    * The history of [rawUid] as [caller] may see it. One request per caller
    * runs at a time on an instance (a second answers resource_exhausted),
+   * and at most three run at once on an instance (a fourth answers the same),
    * and an answer is kept for a minute per (caller, player), so a block
    * placed in that minute shows from the next one.
    */
@@ -89,16 +100,30 @@ export class TeamHistoryService {
     if (this.running.has(caller.uid)) {
       throw new ApiError("resource_exhausted", "Too many requests. Try again in a few minutes.");
     }
+    if (this.builds >= maxBuilds) {
+      throw new ApiError("resource_exhausted", "Too many requests. Try again in a few minutes.");
+    }
     this.running.add(caller.uid);
+    this.builds++;
     try {
       const value = await this.build(caller, rawUid);
-      this.cache.delete(key);
-      this.cache.set(key, { at: Date.now(), value });
-      if (this.cache.size > cacheMax) this.cache.delete(this.cache.keys().next().value!);
+      this.remember(key, value);
       return value;
     } finally {
+      this.builds--;
       this.running.delete(caller.uid);
     }
+  }
+
+  /** Keeps [value] for a minute: expired answers go first, then the oldest past the cap; a huge answer isn't kept. */
+  private remember(key: string, value: TeamHistory) {
+    const now = Date.now();
+    for (const [k, e] of this.cache) if (now - e.at >= cacheMs) this.cache.delete(k);
+    this.cache.delete(key);
+    const seasons = value.teams.reduce((n, t) => n + Object.keys(t.seasons).length, 0);
+    if (seasons > cacheMaxSeasons) return;
+    this.cache.set(key, { at: now, value });
+    if (this.cache.size > cacheMax) this.cache.delete(this.cache.keys().next().value!);
   }
 
   private async build(caller: Caller, uid: string): Promise<TeamHistory> {
@@ -110,7 +135,7 @@ export class TeamHistoryService {
     }
 
     if (!this.queries.group) throw new ApiError("failed_precondition", "Team history isn't available here.");
-    const found = await this.queries.group("roster", teamHistoryMaxSpots + 1, { userId: uid });
+    const found = await this.queries.group("roster", teamHistoryMaxSpots + 1, { userId: uid }, spotFields);
     const spots = found
       .map((s) => ({ ...s, parts: s.path.split("/") }))
       .filter((s) => s.parts.length === 4 && s.parts[0] === "teams" && s.parts[2] === "roster")
@@ -119,7 +144,10 @@ export class TeamHistoryService {
     if (spots.length === 0) return { teams: [] };
 
     const teamIds = [...new Set(spots.map((s) => s.parts[1]!))];
-    const docs = await this.store.getAll(teamIds.map((t) => `teams/${t}`));
+    const docs = await this.store.getAll(
+      teamIds.map((t) => `teams/${t}`),
+      teamFields,
+    );
     const teams = new Map(teamIds.map((t, i) => [t, docs[i]] as const));
 
     const shown: Array<{ teamId: string; team: Data; spotId: string; spot: Data }> = [];

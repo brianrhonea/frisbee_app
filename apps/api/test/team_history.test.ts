@@ -412,6 +412,121 @@ describe("bounds", () => {
     });
   });
 
+  describe("instance-wide cap and cache hygiene", () => {
+    afterEach(() => vi.useRealTimers());
+
+    /** The service over [s]'s store with a gate on game reads, and a switch to make them fail. */
+    function gated() {
+      const base = listDocQueries(s.store);
+      const state = { calls: 0, gate: undefined as undefined | Promise<void>, fail: false, groupFields: [] as unknown[] };
+      const queries: DocQueries = {
+        ...base,
+        async fields(c, f, l, w, a) {
+          state.calls++;
+          if (state.gate) await state.gate;
+          if (state.fail) throw new Error("boom");
+          return base.fields(c, f, l, w, a);
+        },
+        group: async (collectionId, limit, where, fields) => {
+          state.groupFields.push(fields);
+          return [...s.store.docs.entries()]
+            .filter(([path]) => path.split("/").slice(-2, -1)[0] === collectionId)
+            .filter(([, d]) => Object.entries(where).every(([k, v]) => d[k] === v))
+            .slice(0, limit)
+            .map(([path, data]) => ({ path, data: structuredClone(data) }));
+        },
+      };
+      const svc = new TeamHistoryService(s.store, queries, { inYouthLeague: async () => false } as never);
+      for (let i = 1; i <= 6; i++) {
+        s.store.put(`profiles/u${i}`, { name: `U${i}` });
+        s.store.put(`teams/g${i}`, team(`G ${i}`, { memberIds: ["o", `u${i}`] }));
+        s.store.put(`teams/g${i}/roster/r`, { name: `U${i}`, userId: `u${i}` });
+        s.store.put(`teams/g${i}/statsGames/g1`, game("r", "2026-01-01T12:00:00Z"));
+      }
+      const run = (i: number) => svc.history({ uid: `u${i}` } as never, `u${i}`);
+      return { svc, state, run };
+    }
+
+    it("lets three builds run at once, answers more with resource_exhausted, and frees slots after completion", async () => {
+      const { state, run } = gated();
+      let release!: () => void;
+      state.gate = new Promise<void>((r) => (release = r));
+      const running = [run(1), run(2), run(3)];
+      await vi.waitFor(() => expect(state.calls).toBe(3));
+      for (const i of [4, 5, 6]) await expect(run(i)).rejects.toMatchObject({ code: "resource_exhausted" });
+      release();
+      for (const r of await Promise.all(running)) expect(r.teams).toHaveLength(1);
+      // Every slot is free again.
+      const again = await Promise.all([run(4), run(5), run(6)]);
+      for (const r of again) expect(r.teams).toHaveLength(1);
+    });
+
+    it("frees a slot when a build fails", async () => {
+      const { state, run } = gated();
+      state.fail = true;
+      for (let n = 0; n < 4; n++) await expect(run(1 + (n % 3))).rejects.toThrow("boom");
+      state.fail = false;
+      const ok = await Promise.all([run(1), run(2), run(3)]);
+      for (const r of ok) expect(r.teams).toHaveLength(1);
+    });
+
+    it("serves a cached answer even when every build slot is taken", async () => {
+      const { state, run } = gated();
+      await run(6);
+      let release!: () => void;
+      state.gate = new Promise<void>((r) => (release = r));
+      const running = [run(1), run(2), run(3)];
+      await vi.waitFor(() => expect(state.calls).toBe(4));
+      expect((await run(6)).teams).toHaveLength(1);
+      release();
+      await Promise.all(running);
+    });
+
+    it("reads only the fields it needs from teams and roster spots", async () => {
+      const { state, run } = gated();
+      s.store.put("teams/g1", { ...team("G 1", { memberIds: ["o", "u1"] }), secretNotes: "x", description: "d" });
+      const spy = vi.spyOn(s.store, "getAll");
+      const out = await run(1);
+      expect(out.teams[0]).toMatchObject({ teamName: "G 1", current: true, spot: { id: "r", name: "U1", number: null } });
+      const teamRead = spy.mock.calls.find(([paths]) => paths.some((p) => p.startsWith("teams/g1")));
+      expect(teamRead?.[1]).toEqual(["name", "kind", "level", "publicPage", "memberIds", "leagueId"]);
+      expect(state.groupFields).toEqual([["name", "number"]]);
+    });
+
+    it("keeps the same answers for a non-member viewer with the narrowed reads", async () => {
+      const { svc } = gated();
+      s.store.put("teams/g1", team("G 1", { memberIds: ["o", "u1"], publicPage: false }));
+      s.store.put("teams/g2", team("G 2", { memberIds: ["o", "u2"], level: "youth" }));
+      expect((await svc.history({ uid: "viewer" } as never, "u1")).teams).toEqual([]);
+      expect((await svc.history({ uid: "viewer" } as never, "u2")).teams).toEqual([]);
+      expect((await svc.history({ uid: "viewer" } as never, "u3")).teams.map((t) => t.teamName)).toEqual(["G 3"]);
+    });
+
+    it("sweeps expired cache entries when it stores a new one", async () => {
+      const { svc, run } = gated();
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-06-01T12:00:00Z"));
+      await run(1);
+      await run(2);
+      const cache = (svc as unknown as { cache: Map<string, unknown> }).cache;
+      expect(cache.size).toBe(2);
+      vi.setSystemTime(new Date("2026-06-01T12:02:00Z"));
+      await run(3);
+      expect([...cache.keys()]).toEqual(["u3:u3"]);
+    });
+
+    it("serves but does not cache an answer with more than 200 season entries", async () => {
+      const { svc, run } = gated();
+      for (let y = 1900; y <= 2100; y++) s.store.put(`teams/g1/statsGames/y${y}`, game("r", `${y}-06-01T12:00:00Z`));
+      const out = await run(1);
+      expect(Object.keys(out.teams[0]!.seasons)).toHaveLength(201);
+      const cache = (svc as unknown as { cache: Map<string, unknown> }).cache;
+      expect(cache.size).toBe(0);
+      await run(2);
+      expect(cache.size).toBe(1);
+    });
+  });
+
   it("is rate limited per member", async () => {
     for (let i = 0; i < readLimits.teamHistory.max; i++) expect((await s.get("pat", "pat")).statusCode).toBe(200);
     expect((await s.get("pat", "pat")).statusCode).toBe(429);

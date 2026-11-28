@@ -18,6 +18,10 @@ export const teamHistoryMaxGames = 1000;
  */
 export const teamHistoryGameBudget = 400;
 
+/** Games dated outside these UTC years count toward no season. */
+export const teamHistoryMinYear = 1900;
+export const teamHistoryMaxYear = 2100;
+
 export const teamHistoryKinds = ["team", "community", "organization"] as const;
 
 /** Every total present (StatTotals with no gaps). */
@@ -105,7 +109,10 @@ export function seasonTotalsForSpots(
     const g = statsGameFrom(raw.id ?? "", raw);
     if (g.points.length === 0) continue;
     const sheet = statSheet(g.points);
-    const year = `${new Date(g.date).getUTCFullYear()}`;
+    const yearNumber = new Date(g.date).getUTCFullYear();
+    // A date outside these years is bad data: it counts nothing, so every season key is four digits.
+    if (!(yearNumber >= teamHistoryMinYear && yearNumber <= teamHistoryMaxYear)) continue;
+    const year = `${yearNumber}`;
     for (const [spotId, seasons] of out) {
       const p = sheet.players.get(spotId);
       if (!p || (p.pointsPlayed === 0 && p.touches === 0)) continue;

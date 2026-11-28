@@ -245,7 +245,14 @@ class ApiClient {
       !_isPaymentPath(path);
 
   static bool _isPaymentPath(String path) => Uri.parse(path).pathSegments.any(
-    (s) => const {'pay', 'payments', 'payouts', 'refund'}.contains(s),
+    (s) => const {
+      'pay',
+      'payments',
+      'payouts',
+      'refund',
+      'checkout',
+      'earnings',
+    }.contains(s),
   );
 
   static Map<String, Object?> _decode(http.Response response) {
