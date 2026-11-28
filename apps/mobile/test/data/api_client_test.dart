@@ -163,6 +163,75 @@ void main() {
       expect(calls, 1, reason: 'the offline queue retries writes safely');
     });
 
+    test(
+      'a DELETE resent after a dropped connection treats 404 as done',
+      () async {
+        var calls = 0;
+        final api = _client((_) async {
+          if (++calls == 1) throw http.ClientException('Connection closed');
+          return _json({
+            'error': {'code': 'not_found', 'message': 'Gone.'},
+          }, 404);
+        });
+        expect(await api.delete('/v1/teams/t1/roster/p1'), isEmpty);
+        expect(calls, 2);
+      },
+    );
+
+    test('a 404 on a DELETE that was not resent is still an error', () async {
+      final api = _client(
+        (_) async => _json({
+          'error': {'code': 'not_found', 'message': 'Gone.'},
+        }, 404),
+      );
+      await expectLater(
+        api.delete('/v1/teams/t1/roster/p1'),
+        throwsA(isA<ApiException>().having((e) => e.code, 'code', 'not_found')),
+      );
+    });
+
+    test('a 404 on a resent PUT or GET is still an error', () async {
+      for (final method in ['PUT', 'GET']) {
+        var calls = 0;
+        final api = _client((_) async {
+          if (++calls == 1) throw http.ClientException('Connection closed');
+          return _json({
+            'error': {'code': 'not_found', 'message': 'Gone.'},
+          }, 404);
+        });
+        await expectLater(
+          api.send(method, '/v1/teams/t1'),
+          throwsA(
+            isA<ApiException>().having((e) => e.code, 'code', 'not_found'),
+          ),
+        );
+        expect(calls, 2);
+      }
+    });
+
+    test('a payment route is never resent', () async {
+      for (final call in <(String, String)>[
+        ('PUT', '/v1/tournaments/t1/payments/u2'),
+        ('DELETE', '/v1/tournaments/t1/payments/u2'),
+        ('GET', '/v1/payments/fees'),
+        ('PUT', '/v1/tournaments/t1/pay/offline'),
+      ]) {
+        var calls = 0;
+        final api = _client((_) async {
+          calls++;
+          throw http.ClientException('Connection closed');
+        });
+        await expectLater(
+          api.send(call.$1, call.$2),
+          throwsA(
+            isA<ApiException>().having((e) => e.code, 'code', 'unavailable'),
+          ),
+          reason: '$call',
+        );
+        expect(calls, 1, reason: '$call');
+      }
+    });
+
     test('needs someone signed in', () async {
       var called = false;
       final api = _client((_) async {

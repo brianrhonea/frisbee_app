@@ -1,10 +1,12 @@
 // GET /v1/players/:uid/team-history against FakeStore: the person sees every
 // team they're linked to (left ones too), others only what their profile
 // shows, and youth teams, closed pages and groups stay with members.
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildApp } from "../src/app.js";
 import { type DocQueries, listDocQueries } from "../src/queries.js";
+import { TeamHistoryService } from "../src/teams/history.js";
 import { readLimits } from "../src/limits/reads.js";
+import { teamHistoryGameBudget } from "@stall10/shared";
 import { FakeStore, FakeTeamRepository, FakeUsers, FakeVerifier } from "./fakes.js";
 
 class ClaimUsers extends FakeUsers {
@@ -18,8 +20,20 @@ function setup(mode?: "enforce" | "report") {
   const store = new FakeStore();
   const users = mode ? new ClaimUsers() : new FakeUsers();
   const base = listDocQueries(store);
+  // What the history reads from statsGames: documents and their bytes.
+  const reads = { docs: 0, bytes: 0, calls: 0, delay: undefined as undefined | Promise<void> };
   const queries: DocQueries = {
     ...base,
+    async fields(collection, fields, limit, where, after) {
+      reads.calls++;
+      const hold = reads.delay;
+      reads.delay = undefined; // holds only the first read
+      if (hold) await hold;
+      const out = await base.fields(collection, fields, limit, where, after);
+      reads.docs += out.length;
+      reads.bytes += out.reduce((n, d) => n + JSON.stringify(d.data).length, 0);
+      return out;
+    },
     // A collection group query over the in-memory documents.
     async group(collectionId, limit, where) {
       return [...store.docs.entries()]
@@ -35,7 +49,7 @@ function setup(mode?: "enforce" | "report") {
   const app = buildApp({ verifier: new FakeVerifier(), users, accountGateMode: mode, teams: new FakeTeamRepository(), store, queries });
   const get = (uid: string, as: string | null = "viewer") =>
     app.inject({ method: "GET", url: `/v1/players/${uid}/team-history`, headers: as ? { authorization: `Bearer token:${as}` } : {} });
-  return { store, users, get };
+  return { store, users, get, reads };
 }
 
 const point = (spot: string, goal = true) => ({
@@ -174,9 +188,10 @@ describe("someone else", () => {
     s.store.put("teams/league_abc/roster/d1", { name: "Pat D", userId: "pat" });
     expect(names(await s.get("pat")).sort()).toEqual(["Current Club", "Old College"]);
     // A member of the youth and closed teams sees them.
-    s.store.put("teams/youth", team("Youth Team", { level: "youth", memberIds: ["o", "viewer"], members: { o: "owner", viewer: "player" } }));
-    s.store.put("teams/closed", team("Closed Page", { publicPage: false, memberIds: ["o", "viewer"], members: { o: "owner", viewer: "player" } }));
-    expect(names(await s.get("pat")).sort()).toEqual(["Closed Page", "Current Club", "Old College", "Youth Team"]);
+    s.store.put("teams/youth", team("Youth Team", { level: "youth", memberIds: ["o", "member"], members: { o: "owner", member: "player" } }));
+    s.store.put("teams/closed", team("Closed Page", { publicPage: false, memberIds: ["o", "member"], members: { o: "owner", member: "player" } }));
+    // (A different caller: the first one's answer is kept for a minute.)
+    expect(names(await s.get("pat", "member")).sort()).toEqual(["Closed Page", "Current Club", "Old College", "Youth Team"]);
   });
 
   it("hides a team in a youth division of a league", async () => {
@@ -186,6 +201,46 @@ describe("someone else", () => {
     s.store.put("tournaments/L1/entries/lg", { divisionId: "d1" });
     expect(names(await s.get("pat"))).not.toContain("League Side");
     expect(names(await s.get("pat", "pat"))).toContain("League Side");
+  });
+});
+
+describe("blocks", () => {
+  // A block writes both sides' documents (PUT /v1/me/blocks/:uid).
+  it("gives the blocker an empty history of the person they blocked", async () => {
+    s.store.put("users/viewer/blocks/pat", { mine: true });
+    s.store.put("users/pat/blocks/viewer", { mine: false });
+    expect((await s.get("pat")).json()).toEqual({ teams: [] });
+  });
+
+  it("gives the blocked person an empty history of whoever blocked them", async () => {
+    s.store.put("users/pat/blocks/viewer", { mine: true });
+    s.store.put("users/viewer/blocks/pat", { mine: false });
+    const res = await s.get("pat");
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ teams: [] });
+  });
+
+  it("does not hide a person's own history", async () => {
+    s.store.put("users/pat/blocks/viewer", { mine: true });
+    expect((await s.get("pat", "pat")).json().teams).toHaveLength(2);
+  });
+});
+
+describe("teams without a public roster level", () => {
+  it("hides a team with no level from strangers, but not from members or the person", async () => {
+    const { level: _level, ...noLevel } = team("No Level");
+    s.store.put("teams/nolevel", noLevel);
+    s.store.put("teams/nolevel/roster/n1", { name: "Pat N", userId: "pat" });
+    expect(names(await s.get("pat"))).not.toContain("No Level");
+    expect(names(await s.get("pat", "pat"))).toContain("No Level");
+    s.store.put("teams/nolevel", { ...noLevel, memberIds: ["o", "member"], members: { o: "owner", member: "player" } });
+    expect(names(await s.get("pat", "member"))).toContain("No Level");
+  });
+
+  it("hides a team with an unknown level from strangers", async () => {
+    s.store.put("teams/odd", team("Odd Level", { level: "mystery" }));
+    s.store.put("teams/odd/roster/n1", { name: "Pat N", userId: "pat" });
+    expect(names(await s.get("pat"))).not.toContain("Odd Level");
   });
 });
 
@@ -225,19 +280,136 @@ describe("bounds", () => {
   };
   const oldTeam = async () => (await s.get("pat", "pat")).json().teams.find((t: { teamId: string }) => t.teamId === "old");
 
-  it("pages through a team's games past one page, with no partial flag at exactly 1000", async () => {
-    seedGames(999); // plus g1 = 1000
+  it("pages through a team's games past one page, with no partial flag when all fit the budget", async () => {
+    seedGames(299); // plus g1 = 300; Current Club's 3 games come first
     const old = await oldTeam();
-    expect(old.seasons["2023"].games + old.seasons["2024"].games).toBe(1000);
+    expect(old.seasons["2023"].games + old.seasons["2024"].games).toBe(300);
     expect(old).not.toHaveProperty("partial");
+    expect(s.reads.docs).toBe(3 + 300);
   });
 
-  it("counts the first 1000 games and flags a team with more as partial", async () => {
+  it("stops at the request's game budget and flags the team partial", async () => {
     seedGames(1000); // plus g1 = 1001
     const old = await oldTeam();
-    expect(old.seasons["2024"].games).toBe(1);
-    expect(old.seasons["2023"].games).toBe(999);
+    const counted = teamHistoryGameBudget - 3; // Current Club's games are read first
+    expect(old.seasons["2024"].games).toBe(1); // g1 sorts before h0000
+    expect(old.seasons["2023"].games).toBe(counted - 1);
     expect(old.partial).toBe(true);
+    expect(s.reads.docs).toBeLessThanOrEqual(teamHistoryGameBudget + 1);
+  });
+
+  it("flags a team with exactly the remaining budget as complete, and the next team as not reached", async () => {
+    seedGames(teamHistoryGameBudget - 3 - 1); // plus g1: exactly the budget left after Current Club
+    s.store.put("teams/zzz", team("Zzz Last"));
+    s.store.put("teams/zzz/roster/z1", { name: "Pat Z", userId: "pat" });
+    s.store.put("teams/zzz/statsGames/g1", game("z1", "2022-01-01T12:00:00Z"));
+    const { teams } = (await s.get("pat", "pat")).json();
+    const by = (id: string) => teams.find((t: { teamId: string }) => t.teamId === id);
+    expect(by("cur")).not.toHaveProperty("partial");
+    expect(by("old")).not.toHaveProperty("partial");
+    expect(by("zzz").partial).toBe(true);
+    expect(by("zzz").seasons).toEqual({});
+  });
+
+  describe("heavy history", () => {
+    afterEach(() => vi.useRealTimers());
+
+    it("reads at most the game budget for 50 teams of 1001 large games each", { timeout: 120_000 }, async () => {
+      const bigPoints = Array.from({ length: 30 }, () => point("r", false));
+      for (let t = 0; t < 50; t++) {
+        const id = `big${String(t).padStart(2, "0")}`;
+        s.store.put(`teams/${id}`, team(`Big ${id}`));
+        s.store.put(`teams/${id}/roster/r`, { name: "Pat", userId: "pat" });
+        for (let g = 0; g < 1001; g++) {
+          s.store.put(`teams/${id}/statsGames/g${String(g).padStart(4, "0")}`, {
+            opponent: "Them",
+            date: new Date("2026-01-01T12:00:00Z"),
+            gameTo: 15,
+            points: bigPoints,
+          });
+        }
+      }
+      const res = await s.get("pat", "pat");
+      expect(res.statusCode).toBe(200);
+      const { teams } = res.json();
+      expect(teams).toHaveLength(50);
+      // The 3-game and 1-game teams of the fixtures come first and fit; every Big team is partial.
+      expect(teams.filter((t: { teamId: string }) => t.teamId.startsWith("big")).every((t: { partial?: boolean }) => t.partial === true)).toBe(true);
+      expect(s.reads.docs).toBeLessThanOrEqual(teamHistoryGameBudget + 1);
+      const perDoc = s.reads.bytes / s.reads.docs;
+      expect(s.reads.bytes).toBeLessThanOrEqual((teamHistoryGameBudget + 1) * Math.ceil(perDoc));
+      // 20 games a page, never the old 100.
+      expect(s.reads.calls).toBeGreaterThanOrEqual(Math.ceil(teamHistoryGameBudget / 20));
+    });
+
+    it("answers a second request of the same caller made while one runs with 429, and lets others through", async () => {
+      let release!: () => void;
+      s.reads.delay = new Promise<void>((r) => (release = r));
+      const first = s.get("pat", "pat");
+      await vi.waitFor(() => expect(s.reads.calls).toBeGreaterThan(0));
+      const second = await s.get("pat", "pat");
+      expect(second.statusCode).toBe(429);
+      expect(second.json().error?.code ?? second.json().code).toBe("resource_exhausted");
+      // Another caller isn't held up by it.
+      expect((await s.get("pat", "someoneelse")).statusCode).toBe(200);
+      release();
+      expect((await first).statusCode).toBe(200);
+      // Free again once it ends.
+      expect((await s.get("pat", "pat")).statusCode).toBe(200);
+    });
+
+    it("serves a repeat within 60 seconds from memory, then reads again", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-06-01T12:00:00Z"));
+      const first = await s.get("pat", "pat");
+      const docs = s.reads.docs;
+      expect(docs).toBeGreaterThan(0);
+      vi.setSystemTime(new Date("2026-06-01T12:00:59Z"));
+      const again = await s.get("pat", "pat");
+      expect(again.json()).toEqual(first.json());
+      expect(again.headers["cache-control"]).toBe("private, no-store");
+      expect(s.reads.docs).toBe(docs);
+      vi.setSystemTime(new Date("2026-06-01T12:01:01Z"));
+      await s.get("pat", "pat");
+      expect(s.reads.docs).toBe(docs * 2);
+    });
+
+    it("keeps at most 500 cached answers, dropping the oldest", async () => {
+      // The service directly (the route's rate limit would stop 500 requests).
+      const queries = listDocQueries(s.store);
+      let docs = 0;
+      const counted: DocQueries = {
+        ...queries,
+        async fields(c, f, l, w, a) {
+          const out = await queries.fields(c, f, l, w, a);
+          docs += out.length;
+          return out;
+        },
+        group: async (collectionId, limit, where) =>
+          [...s.store.docs.entries()]
+            .filter(([path]) => path.split("/").slice(-2, -1)[0] === collectionId)
+            .filter(([, d]) => Object.entries(where).every(([k, v]) => d[k] === v))
+            .slice(0, limit)
+            .map(([path, data]) => ({ path, data: structuredClone(data) })),
+      };
+      const svc = new TeamHistoryService(s.store, counted, { inYouthLeague: async () => false } as never);
+      for (const who of ["a", "b"]) {
+        s.store.put(`profiles/${who}`, { name: who });
+        s.store.put(`teams/t${who}`, team(`T ${who}`));
+        s.store.put(`teams/t${who}/roster/r`, { name: who, userId: who });
+        s.store.put(`teams/t${who}/statsGames/g1`, game("r", "2026-01-01T12:00:00Z"));
+        await svc.history({ uid: "viewer" } as never, who);
+      }
+      for (let i = 0; i < 499; i++) {
+        s.store.put(`profiles/f${i}`, { name: "F" });
+        await svc.history({ uid: "viewer" } as never, `f${i}`);
+      }
+      const before = docs;
+      await svc.history({ uid: "viewer" } as never, "b"); // still cached
+      expect(docs).toBe(before);
+      await svc.history({ uid: "viewer" } as never, "a"); // the oldest was dropped
+      expect(docs).toBeGreaterThan(before);
+    });
   });
 
   it("is rate limited per member", async () => {
