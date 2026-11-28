@@ -10,6 +10,14 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.87
+
+- **Chats:** team chats open over the Chats tab and slide back step by step.
+- **Profile:** new look, Posts and Media, a "…" menu, and your team history with past teams and season stats.
+- **Discover:** Athletes and Events filters.
+- **Reliability:** no more false "You're offline"; smoother pull-to-refresh on Home.
+- **Payments:** Apple Pay and Google Pay; bank payments are no longer offered.
+
 ## 0.0.86
 
 - **Teams:** Message on a team page lists the owner, coaches and captains. Admins who manage the roster can add members.

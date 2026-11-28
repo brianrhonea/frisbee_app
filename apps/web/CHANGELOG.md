@@ -4,6 +4,16 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.77.0 — 2026-11-28
+
+Sprint 5 (parity with app 0.0.87).
+
+- Profile, Discover, communities and post pages restyled (Q1–Q4): cover header with a designed default cover, Posts count tile, summary tiles, list rows, "Needs RSVP" and "No comments yet. Start the conversation."
+- Profile "…" menu over the cover (Report, Block, Share; Share only on your own), Posts / Media switch with your photo posts.
+- Discover: "Athletes" chip, new "Events" chip, "Joined" pill on your teams and groups.
+- Team history card on the player profile, with past teams and season stats.
+- Team roster for non-members no longer mixes up people without an account; app links with `?section=` open the right team section; a repeating event's retry returns the series id.
+
 ## 0.76.0 — 2026-11-27
 
 Sprint 4 fix round (parity with app 0.0.86).

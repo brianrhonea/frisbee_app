@@ -7,6 +7,14 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.55.0 - 2026-11-28
+
+Sprint 5.
+
+- **Team history:** new `GET /v1/players/:uid/team-history` (signed in; `Cache-Control: private, no-store`): every roster spot linked to the person, current teams first, with season totals per team (UTC year). You always see your own; others only when the profile is public and shows stats and teams, and never across a block. Youth teams, teams whose public page is off, league-drafted teams and youth league divisions stay hidden from non-members, and strangers see only teams the public roster would show. Reads are bounded: a per-request budget of 400 games across all teams (entries cut short carry `partial: true`), pages of 20 read one team at a time with only the fields needed, one request in flight per caller and at most three builds per instance (429 `resource_exhausted` otherwise), and a 60-second per-instance cache. Games dated outside 1900–2100 are ignored. Rate limit 30 per minute. A block or privacy change can take up to 60 seconds to reach a history the same person just viewed.
+- **Payments:** Checkout Sessions and PaymentIntents exclude US bank account payments (`excluded_payment_method_types: ["us_bank_account"]`); cards and wallets are unchanged. Sessions opened before this version can still take a bank payment until they expire.
+- `DocQueries.fields` takes an optional `after` document id for paging.
+
 ## 0.54.1 - 2026-11-27
 
 Security review F1 (privacy).
