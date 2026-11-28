@@ -215,6 +215,10 @@ void main() {
         ('DELETE', '/v1/tournaments/t1/payments/u2'),
         ('GET', '/v1/payments/fees'),
         ('PUT', '/v1/tournaments/t1/pay/offline'),
+        ('GET', '/v1/teams/t1/checkout'),
+        ('DELETE', '/v1/tournaments/t1/checkout/c1'),
+        ('GET', '/v1/me/earnings'),
+        ('PUT', '/v1/teams/t1/earnings/e1'),
       ]) {
         var calls = 0;
         final api = _client((_) async {
