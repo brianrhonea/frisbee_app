@@ -420,7 +420,17 @@ void main() {
       await tester.pump();
       expect(find.text('Following'), findsOneWidget);
       expect(find.text('FOLLOWER'), findsOneWidget);
-      expect(find.text('1'), findsOneWidget);
+      // The Followers tile counts one (the Posts tile has a count too).
+      expect(
+        find.descendant(
+          of: find.ancestor(
+            of: find.text('FOLLOWER'),
+            matching: find.byType(Card),
+          ),
+          matching: find.text('1'),
+        ),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
       vm.dispose();
     });
