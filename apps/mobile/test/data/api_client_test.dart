@@ -163,17 +163,20 @@ void main() {
       expect(calls, 1, reason: 'the offline queue retries writes safely');
     });
 
-    test('a DELETE resent after a dropped connection treats 404 as done', () async {
-      var calls = 0;
-      final api = _client((_) async {
-        if (++calls == 1) throw http.ClientException('Connection closed');
-        return _json({
-          'error': {'code': 'not_found', 'message': 'Gone.'},
-        }, 404);
-      });
-      expect(await api.delete('/v1/teams/t1/roster/p1'), isEmpty);
-      expect(calls, 2);
-    });
+    test(
+      'a DELETE resent after a dropped connection treats 404 as done',
+      () async {
+        var calls = 0;
+        final api = _client((_) async {
+          if (++calls == 1) throw http.ClientException('Connection closed');
+          return _json({
+            'error': {'code': 'not_found', 'message': 'Gone.'},
+          }, 404);
+        });
+        expect(await api.delete('/v1/teams/t1/roster/p1'), isEmpty);
+        expect(calls, 2);
+      },
+    );
 
     test('a 404 on a DELETE that was not resent is still an error', () async {
       final api = _client(
