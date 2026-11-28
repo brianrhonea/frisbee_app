@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
@@ -52,7 +54,8 @@ class ApiClient {
   ApiClient({required Uri baseUrl, FirebaseAuth? auth, http.Client? client})
     : _base = baseUrl,
       _auth = auth,
-      _client = client ?? http.Client();
+      _client = client ?? http.Client(),
+      _ownsClient = client == null;
 
   static const _baseUrl = String.fromEnvironment('API_BASE_URL');
 
@@ -67,7 +70,8 @@ class ApiClient {
 
   final Uri _base;
   final FirebaseAuth? _auth;
-  final http.Client _client;
+  http.Client _client;
+  final bool _ownsClient;
 
   static const _timeout = Duration(seconds: 20);
 
@@ -75,6 +79,17 @@ class ApiClient {
     'unavailable',
     "Couldn't reach the server. Check your connection and try again.",
   );
+
+  /// Drops the connections kept alive from before (after the app returns
+  /// from the background they may be dead); the next request opens new
+  /// ones. A client given to the constructor is left alone.
+  void resetConnections() {
+    if (!_ownsClient) return;
+    final old = _client;
+    _client = http.Client();
+    // Requests still going on the old connections finish first.
+    Timer(const Duration(seconds: 30), old.close);
+  }
 
   /// The API's address, for the connection check (`GET /health`).
   Uri get baseUrl => _base;
@@ -168,20 +183,37 @@ class ApiClient {
       if (e.code == 'network-request-failed') throw _offline;
       rethrow;
     }
-    final request = http.Request(method, _base.resolve(path))
-      ..headers.addAll({'Authorization': 'Bearer $idToken', ...appCheck});
-    if (body != null) {
-      request
-        ..headers['Content-Type'] = 'application/json'
-        ..body = jsonEncode(body);
+    http.Request build() {
+      final request = http.Request(method, _base.resolve(path))
+        ..headers.addAll({'Authorization': 'Bearer $idToken', ...appCheck});
+      if (body != null) {
+        request
+          ..headers['Content-Type'] = 'application/json'
+          ..body = jsonEncode(body);
+      }
+      return request;
     }
-    final http.Response response;
+
+    Future<http.Response> sendIt() async => http.Response.fromStream(
+      await _client.send(build()).timeout(timeout),
+    ).timeout(timeout);
+
+    http.Response response;
     try {
-      response = await http.Response.fromStream(
-        await _client.send(request).timeout(timeout),
-      ).timeout(timeout);
-    } on Exception {
-      throw _offline;
+      response = await sendIt();
+    } on Exception catch (e) {
+      if (!_staleConnection(e)) throw _offline;
+      // A kept-alive connection that died (after the app was in the
+      // background): open a new one. Only for requests that are safe to
+      // send twice; the offline queue retries the others itself, with its
+      // own duplicate checks.
+      resetConnections();
+      if (!_safeToRepeat(method)) throw _offline;
+      try {
+        response = await sendIt();
+      } on Exception {
+        throw _offline;
+      }
     }
     final answer = _decode(response);
     if (answer['refreshToken'] == true) {
@@ -195,6 +227,12 @@ class ApiClient {
     }
     return answer;
   }
+
+  static bool _staleConnection(Exception e) =>
+      e is SocketException || e is http.ClientException;
+
+  static bool _safeToRepeat(String method) =>
+      method == 'GET' || method == 'PUT' || method == 'DELETE';
 
   static Map<String, Object?> _decode(http.Response response) {
     final ok = response.statusCode >= 200 && response.statusCode < 300;

@@ -134,7 +134,10 @@ List<SingleChildWidget> get firebaseProviders => [
   ),
   // Whether Stall 10 can be reached, and what waits to go out until it can.
   ChangeNotifierProvider<ConnectivityService>(
-    create: (context) => ConnectivityService.device(context.read<ApiClient?>()),
+    create: (context) {
+      final api = context.read<ApiClient?>();
+      return ConnectivityService.device(api, onResumed: api?.resetConnections);
+    },
   ),
   ChangeNotifierProvider<OutboxRepository>(
     lazy: false,

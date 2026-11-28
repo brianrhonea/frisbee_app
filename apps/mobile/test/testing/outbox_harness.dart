@@ -16,6 +16,7 @@ class OutboxHarness {
       networkChanges: const Stream.empty(),
       probe: () async => true,
       probeEvery: const Duration(hours: 1),
+      grace: Duration.zero,
     );
     outbox = OutboxRepository(
       store: store,

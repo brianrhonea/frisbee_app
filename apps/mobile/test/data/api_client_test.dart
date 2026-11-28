@@ -123,6 +123,46 @@ void main() {
       );
     });
 
+    test('a dead kept-alive connection is retried once on a read', () async {
+      var calls = 0;
+      final api = _client((_) async {
+        if (++calls == 1) throw http.ClientException('Connection closed');
+        return _json({'ok': true}, 200);
+      });
+      expect(await api.send('GET', '/v1/me'), {'ok': true});
+      expect(calls, 2);
+    });
+
+    test('a read that fails twice says unavailable, after one retry', () async {
+      var calls = 0;
+      final api = _client((_) async {
+        calls++;
+        throw const SocketException('down');
+      });
+      await expectLater(
+        api.send('GET', '/v1/me'),
+        throwsA(
+          isA<ApiException>().having((e) => e.code, 'code', 'unavailable'),
+        ),
+      );
+      expect(calls, 2);
+    });
+
+    test('a write is never sent twice by the client itself', () async {
+      var calls = 0;
+      final api = _client((_) async {
+        calls++;
+        throw http.ClientException('Connection closed');
+      });
+      await expectLater(
+        api.post('/v1/teams', {}),
+        throwsA(
+          isA<ApiException>().having((e) => e.code, 'code', 'unavailable'),
+        ),
+      );
+      expect(calls, 1, reason: 'the offline queue retries writes safely');
+    });
+
     test('needs someone signed in', () async {
       var called = false;
       final api = _client((_) async {
