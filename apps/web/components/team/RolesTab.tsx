@@ -1,5 +1,5 @@
 "use client";
-import type { RosterMember, TeamRoster } from "@stall10/shared";
+import type { OutsiderTeamRoster, RosterMember, TeamRoster } from "@stall10/shared";
 import Link from "next/link";
 import { Avatar } from "../Avatar";
 import { roleLabel } from "../ProfileDashboard";
@@ -18,12 +18,14 @@ const tierOrder = ["owner", "coach", "captain", "stats"] as const;
  * the tier, as in the app. Only the owner gets "Edit roles" (the app's canSetRoles), which opens the roles editor
  * in Settings.
  */
-export function RolesTab({ roster }: { roster: TeamRoster }) {
+export function RolesTab({ roster: full }: { roster: TeamRoster | OutsiderTeamRoster }) {
   const { teamId, kind, viewer } = useTeamHub();
   if (viewer.state !== "member") return null;
   const team = viewer.team;
   const custom = rolesInOrder(team.roles);
   const memberRoles = team.memberRoles ?? {};
+  // Members get the full roster; an outsider's has no uid on non-staff, and has no Roles tab anyway.
+  const roster = { members: full.members.flatMap((m): RosterMember[] => (m.uid ? [{ ...m, uid: m.uid }] : [])) };
   const holdersOfTier = (t: string) => roster.members.filter((m) => m.tier === t);
   // As the app: Owner (and Stats, on a team) always; Coach and Captain are older tiers, listed only while someone holds one.
   const tiers = tierOrder.filter((t) => (t === "stats" ? kind === "team" : t === "owner" || holdersOfTier(t).length > 0));

@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { version } from "./package.json";
+import { teamSectionRedirects } from "./lib/teamSections";
 
 const config: NextConfig = {
   // Reads and writes go through apps/api (API_BASE_URL on the server).
@@ -14,6 +15,8 @@ const config: NextConfig = {
     // Discover (/explore) replaced Explore and Events; old links and the
     // new name land there, with any ?q= and ?only= kept.
     return [
+      // The app's /teams/:id?section=roster (Routes.teamSection) opens that section here.
+      ...teamSectionRedirects,
       { source: "/events", destination: "/explore#coming-up", permanent: false },
       { source: "/discover", destination: "/explore", permanent: false },
       // The rules are part of Learn to play (the app's Routes.rules does the same).

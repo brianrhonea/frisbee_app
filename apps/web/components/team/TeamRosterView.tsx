@@ -1,13 +1,15 @@
 "use client";
 import {
   groupByLine,
+  type OutsiderRosterMember,
+  type OutsiderRosterPlayer,
+  type OutsiderTeamRoster,
   type PendingInvites,
   type PublicRoster,
   type RosterLine,
   rosterLineLabels,
   rosterLines,
   type RosterMember,
-  type RosterPlayer,
   type SetRosterLinesRequest,
   type TeamRoster,
   unassignedLineLabel,
@@ -47,7 +49,7 @@ const lineShort: Record<RosterLine, string> = { o: "O", d: "D", both: "Both" };
 export function TeamRosterView({ publicRoster = null, youth = false }: { publicRoster?: PublicRoster | null; youth?: boolean }) {
   const { teamId, kind, viewer } = useTeamHub();
   const { user } = useAuth();
-  const [roster, setRoster] = useState<TeamRoster | null>(null);
+  const [roster, setRoster] = useState<TeamRoster | OutsiderTeamRoster | null>(null);
   const [error, setError] = useState("");
   // A youth team's roster is its members' (and its school or club's admins'): the API refuses anyone else.
   const [youthPrivate, setYouthPrivate] = useState(false);
@@ -70,7 +72,7 @@ export function TeamRosterView({ publicRoster = null, youth = false }: { publicR
     setYouthPrivate(false);
     // A moment's wait: subscribing fires every signal at once.
     const timer = setTimeout(() => {
-      callApi<TeamRoster>(user, `/v1/teams/${encodeURIComponent(teamId)}/roster`).then(
+      callApi<TeamRoster | OutsiderTeamRoster>(user, `/v1/teams/${encodeURIComponent(teamId)}/roster`).then(
         (r) => {
           if (live) setRoster(r);
         },
@@ -182,7 +184,7 @@ export function TeamRosterView({ publicRoster = null, youth = false }: { publicR
         ) : (
           <ul className="roster-rows">
             {members.map((m, i) => (
-              <MemberCard key={m.uid ?? `${i}:${m.name}`} member={m} kind={roster.kind} me={m.uid === user.uid} />
+              <MemberCard key={m.uid ?? `${i}:${m.name}`} member={m} kind={roster.kind} me={!!m.uid && m.uid === user.uid} />
             ))}
           </ul>
         )}
@@ -271,8 +273,8 @@ function PlayersCard({
   canEditLines,
   onSaved,
 }: {
-  roster: TeamRoster;
-  players: RosterPlayer[];
+  roster: TeamRoster | OutsiderTeamRoster;
+  players: OutsiderRosterPlayer[];
   canEditLines: boolean;
   onSaved: () => void;
 }) {
@@ -281,9 +283,10 @@ function PlayersCard({
   const [draft, setDraft] = useState<Record<string, RosterLine | null> | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const members = new Map(roster.members.map((m) => [m.uid, m]));
+  // Only members with a uid can be looked up: an outsider's roster has none on non-staff.
+  const members = new Map(roster.members.flatMap((m) => (m.uid ? [[m.uid, m] as const] : [])));
   const editing = draft !== null;
-  const lineOf = (p: RosterPlayer): RosterLine | undefined => (draft && p.id in draft ? (draft[p.id] ?? undefined) : p.line);
+  const lineOf = (p: OutsiderRosterPlayer): RosterLine | undefined => (draft && p.id in draft ? (draft[p.id] ?? undefined) : p.line);
   const groups = editing ? [] : groupByLine(players);
 
   async function save() {
@@ -304,7 +307,7 @@ function PlayersCard({
     }
   }
 
-  const table = (rows: RosterPlayer[]) => (
+  const table = (rows: OutsiderRosterPlayer[]) => (
     <div className="table-scroll">
       <table className="data-table roster-table">
         <thead>
@@ -318,13 +321,14 @@ function PlayersCard({
         </thead>
         <tbody>
           {rows.map((p) => {
-            const m = p.person ? members.get(p.person.uid) : undefined;
+            const personUid = p.person?.uid;
+            const m = personUid ? members.get(personUid) : undefined;
             return (
               <tr key={p.id}>
                 <td className="num">{p.number ?? "–"}</td>
                 <td>
-                  {p.person ? (
-                    <Link className="person" href={`/players/${p.person.uid}`}>
+                  {p.person && personUid ? (
+                    <Link className="person" href={`/players/${personUid}`}>
                       <Avatar name={p.person.name} url={p.person.photoUrl} size={28} />
                       <span>
                         {p.name}
@@ -490,7 +494,7 @@ function PendingInvitesCard({ teamId, version }: { teamId: string; version: numb
  * A member's row (a ListRow, C3): who they are, then their role as a pill (accent for those who run the
  * team, so captains and coaches stand out; neutral otherwise) and custom roles.
  */
-function MemberCard({ member, kind, me }: { member: RosterMember; kind: string; me: boolean }) {
+function MemberCard({ member, kind, me }: { member: RosterMember | OutsiderRosterMember; kind: string; me: boolean }) {
   const tier = roleLabel(member.tier, kind);
   return (
     <li>

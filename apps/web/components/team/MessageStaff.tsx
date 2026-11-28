@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import type { TeamRoster } from "@stall10/shared";
+import type { OutsiderTeamRoster, TeamRoster } from "@stall10/shared";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { callApi, problem } from "@/lib/client";
@@ -80,8 +80,8 @@ function StaffList({ teamId, kind, onClose }: { teamId: string; kind: string; on
   useEffect(() => {
     if (member || !user) return;
     let live = true;
-    callApi<TeamRoster>(user, `/v1/teams/${encodeURIComponent(teamId)}/roster`).then(
-      (r) => live && setFetched(r.members as StaffPerson[]),
+    callApi<TeamRoster | OutsiderTeamRoster>(user, `/v1/teams/${encodeURIComponent(teamId)}/roster`).then(
+      (r) => live && setFetched(r.members),
       (e) => live && setLoadError(problem(e, "Couldn't load the team's staff. Try again.")),
     );
     return () => {

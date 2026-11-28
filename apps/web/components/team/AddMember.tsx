@@ -1,5 +1,5 @@
 "use client";
-import type { TeamRoster } from "@stall10/shared";
+import type { OutsiderTeamRoster, TeamRoster } from "@stall10/shared";
 import { useEffect, useRef, useState } from "react";
 import { Dialog } from "../Dialog";
 import { useAuth } from "../AuthProvider";
@@ -14,7 +14,7 @@ import "./roster_actions.css";
  * dialog) and, on a team with a roster and for those who manage the team, "Add player to roster" (the roster
  * spot form, with the link-to-a-member picker). Nobody who can do neither sees it.
  */
-export function AddMember({ roster, onAdded }: { roster: TeamRoster; onAdded: () => void }) {
+export function AddMember({ roster, onAdded }: { roster: TeamRoster | OutsiderTeamRoster; onAdded: () => void }) {
   const { teamId, kind, viewer } = useTeamHub();
   const { user } = useAuth();
   const invite = useInvite();
@@ -43,8 +43,9 @@ export function AddMember({ roster, onAdded }: { roster: TeamRoster; onAdded: ()
   const canAddPlayer = viewer.state === "member" && kind === "team" && viewer.can("manageTeam");
   if (!canInvite && !canAddPlayer) return null;
 
-  const linked = new Set(roster.players.flatMap((p) => (p.person ? [p.person.uid] : [])));
-  const members = roster.members.map((m) => ({ uid: m.uid, name: m.name }));
+  // An outsider's roster has no uid on non-staff members or linked persons: only people with one can be linked.
+  const linked = new Set(roster.players.flatMap((p) => (p.person?.uid ? [p.person.uid] : [])));
+  const members = roster.members.flatMap((m) => (m.uid ? [{ uid: m.uid, name: m.name }] : []));
 
   async function save(d: PlayerDraft) {
     if (!user) return;
