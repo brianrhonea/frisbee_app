@@ -117,6 +117,7 @@ void main() {
       networkChanges: network.stream,
       probe: () async => probeOk,
       probeEvery: const Duration(hours: 1),
+      grace: Duration.zero,
     );
     auth = FakeAuthRepository(user: _me);
     now = DateTime.utc(2026, 11, 16, 12);
@@ -156,16 +157,43 @@ void main() {
     repo.dispose();
   });
 
-  test('a send that fails for want of a connection is queued', () async {
+  test(
+    'one failed send queues, but the app stays online and resends',
+    () async {
+      final repo = make();
+      server.next.add((_) => const ApiException('unavailable', 'Stale socket'));
+      expect(await submit(repo, 'm1'), isA<Ok<void>>());
+      expect(repo.jobs.single.id, 'm1');
+      // The server answers the check: not offline, and the queue tries again
+      // by itself.
+      await pumpEventQueue();
+      await repo.drain();
+      await pumpEventQueue();
+      expect(connectivity.online, isTrue);
+      expect(server.written.keys, ['m1']);
+      expect(repo.jobs, isEmpty);
+      repo.dispose();
+    },
+  );
+
+  test('a send that fails with the server down is queued, offline', () async {
     final repo = make();
+    probeOk = false;
     server.next.add((_) => const ApiException('unavailable', 'No network'));
     expect(await submit(repo, 'm1'), isA<Ok<void>>());
     expect(repo.jobs.single.id, 'm1');
+    await pumpEventQueue();
     expect(connectivity.online, isFalse);
+    expect(connectivity.status, ConnectionStatus.serverUnreachable);
+    // Offline, the next send is queued without trying.
+    await submit(repo, 'm2');
+    expect(server.sendsSeen, ['m1']);
+    expect(repo.jobs.map((j) => j.id), ['m1', 'm2']);
+    probeOk = true;
 
     await connectivity.check();
     await repo.drain();
-    expect(server.written.keys, ['m1']);
+    expect(server.written.keys, ['m1', 'm2']);
     repo.dispose();
   });
 

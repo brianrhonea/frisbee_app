@@ -14,8 +14,14 @@ import '../../../utils/result.dart';
 /// reposts, edits and deletions show as they happen. Nothing loads until
 /// [start], the first time the tab is opened.
 class CommunityFeed extends ChangeNotifier {
-  CommunityFeed({required UserPostRepository userPostRepository})
-    : _posts = userPostRepository;
+  CommunityFeed({
+    required UserPostRepository userPostRepository,
+    this.refreshTimeout = const Duration(seconds: 10),
+  }) : _posts = userPostRepository;
+
+  /// How long [refresh] waits for the new first page before it returns
+  /// (the page still swaps in when it arrives).
+  final Duration refreshTimeout;
 
   final UserPostRepository _posts;
 
@@ -73,20 +79,87 @@ class CommunityFeed extends ChangeNotifier {
   }
 
   /// Back to the newest posts, if the tab has been opened.
-  Future<void> refresh() async {
-    if (!_started) return;
-    _generation++;
-    _cancel();
-    _ids.clear();
-    _byId.clear();
-    _next = null;
-    _lastBefore = null;
-    _waiting = 0;
-    _loaded = false;
+  ///
+  /// The posts on screen stay until the new first page and its posts have
+  /// arrived, then swap in at once. Completes then, or after
+  /// [refreshTimeout] (the swap still happens when the page arrives).
+  Future<void> refresh() {
+    if (!_started) return Future.value();
+    return _refresh().timeout(refreshTimeout, onTimeout: () {});
+  }
+
+  StreamSubscription<List<UserPost>>? _staged;
+  Completer<void>? _stagedFirst;
+
+  Future<void> _refresh() async {
+    final generation = ++_generation;
+    _dropStaged();
+    // A page being loaded for "older" is dropped by the generation check.
     _loading = false;
-    _error = false;
-    notifyListeners();
-    await _load();
+    if (!available) {
+      _loaded = true;
+      notifyListeners();
+      return;
+    }
+    final result = await _posts.fetchCommunityPage();
+    if (_disposed || generation != _generation) return;
+    switch (result) {
+      case Error():
+        // Keep what's showing; the error note offers to try again.
+        _error = true;
+        notifyListeners();
+      case Ok(:final value):
+        final ids = value.ids;
+        if (ids.isNotEmpty) {
+          final first = _stagedFirst = Completer<void>();
+          var got = false;
+          void arrived() {
+            if (!got) {
+              got = true;
+              if (!first.isCompleted) first.complete();
+            }
+          }
+
+          _staged = _posts.watchPostsByIds(ids).listen((list) {
+            for (final id in ids) {
+              _byId.remove(id);
+            }
+            for (final p in list) {
+              _byId[p.id] = p;
+            }
+            arrived();
+            notifyListeners();
+          }, onError: (Object _) => arrived());
+          await first.future;
+          if (_disposed || generation != _generation) return;
+        }
+        _cancel();
+        if (_staged case final staged?) {
+          _subs.add(staged);
+          _staged = null;
+          _stagedFirst = null;
+        }
+        final keep = ids.toSet();
+        _byId.removeWhere((id, _) => !keep.contains(id));
+        _ids
+          ..clear()
+          ..addAll(ids);
+        _next = value.next;
+        _lastBefore = null;
+        _waiting = 0;
+        _loaded = true;
+        _error = false;
+        notifyListeners();
+    }
+  }
+
+  void _dropStaged() {
+    final staged = _staged;
+    _staged = null;
+    if (staged != null) unawaited(staged.cancel());
+    final first = _stagedFirst;
+    _stagedFirst = null;
+    if (first != null && !first.isCompleted) first.complete();
   }
 
   Future<void> _load({int? before}) async {
@@ -163,6 +236,7 @@ class CommunityFeed extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _dropStaged();
     _cancel();
     super.dispose();
   }

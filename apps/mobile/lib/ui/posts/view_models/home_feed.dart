@@ -33,6 +33,7 @@ class HomeFeed extends ChangeNotifier {
     required TeamPostRepository teamPostRepository,
     required UserPostRepository userPostRepository,
     this.teamsOnly = false,
+    this.refreshTimeout = const Duration(seconds: 10),
   }) : _teamPosts = teamPostRepository,
        _userPosts = userPostRepository,
        _followRepo = followRepository,
@@ -99,6 +100,10 @@ class HomeFeed extends ChangeNotifier {
 
   /// Only the user's teams' posts.
   final bool teamsOnly;
+
+  /// How long [refresh] waits for the new first page before it returns
+  /// (the page still swaps in when it arrives).
+  final Duration refreshTimeout;
   final FollowRepository _followRepo;
   final TeamRepository _teamRepo;
   final TeamPostRepository _teamPosts;
@@ -162,18 +167,52 @@ class HomeFeed extends ChangeNotifier {
 
   bool get loadingMore => _loadingMore;
 
+  /// Bumped by [refresh]; a refresh that isn't the latest gives up.
+  int _refreshGeneration = 0;
+  Map<String, _FeedSource> _pending = {};
+
   /// Starts over from the newest page of every source (Home tapped again,
   /// or pulled down): older pages are dropped and the live queries reopen.
-  Future<void> refresh() async {
-    if (_disposed) return;
-    for (final s in _sources.values) {
-      s.dispose();
-    }
-    _sources.clear();
+  ///
+  /// The posts on screen stay until every new source has delivered its
+  /// first page, then swap in at once, so the list never blanks or shrinks
+  /// while it loads. Completes when they have, or after [refreshTimeout]
+  /// (the swap still happens when the page arrives).
+  Future<void> refresh() {
+    if (_disposed) return Future.value();
+    return _refresh().timeout(refreshTimeout, onTimeout: () {});
+  }
+
+  Future<void> _refresh() async {
+    final generation = ++_refreshGeneration;
+    _disposePending();
     if (uid.isNotEmpty && (_followsError || _teamsError)) {
       _listen();
     }
+    final fresh = {
+      for (final MapEntry(:key, value: open) in _wanted().entries) key: open(),
+    };
+    _pending = fresh;
+    await Future.wait([for (final s in fresh.values) s.firstLoad]);
+    if (_disposed || generation != _refreshGeneration) {
+      return;
+    }
+    _pending = {};
+    for (final s in _sources.values) {
+      s.dispose();
+    }
+    _sources
+      ..clear()
+      ..addAll(fresh);
+    // Follows or teams may have changed meanwhile.
     _sync();
+  }
+
+  void _disposePending() {
+    for (final s in _pending.values) {
+      s.dispose();
+    }
+    _pending = {};
   }
 
   /// Shows older posts: fetches the next page from the sources holding the
@@ -247,15 +286,17 @@ class HomeFeed extends ChangeNotifier {
         Error() => null,
       };
 
-  void _sync() {
+  void _sync() => _replaceSources(_wanted());
+
+  /// The sources the feed needs now, by key, each opened on demand.
+  Map<String, _FeedSource Function()> _wanted() {
     final myTeams = {for (final t in _teams) t.id: t};
     final wanted = <String, _FeedSource Function()>{};
     if (teamsOnly) {
       for (final t in _teams) {
         wanted['team:${t.id}'] = () => _teamSource(t);
       }
-      _replaceSources(wanted);
-      return;
+      return wanted;
     }
 
     final authors = [
@@ -354,7 +395,7 @@ class HomeFeed extends ChangeNotifier {
       }
     }
 
-    _replaceSources(wanted);
+    return wanted;
   }
 
   /// Every post of [t], a team the user is on.
@@ -393,6 +434,7 @@ class HomeFeed extends ChangeNotifier {
     for (final s in _sources.values) {
       s.dispose();
     }
+    _disposePending();
     super.dispose();
   }
 }
@@ -412,6 +454,7 @@ class _FeedSource {
         _live = const [];
         _liveLoaded = true;
         failed = true;
+        _completeFirst();
         onChange();
       },
     );
@@ -421,6 +464,11 @@ class _FeedSource {
   final Future<List<FeedItem>?> Function(DateTime before, int limit)? fetch;
   final VoidCallback onChange;
   late final StreamSubscription<List<FeedItem>> _sub;
+  final _first = Completer<void>();
+
+  /// Completes when the live query first answers (or fails), or the source
+  /// is disposed.
+  Future<void> get firstLoad => _first.future;
   List<FeedItem> _live = const [];
   bool _liveLoaded = false;
   final _older = <String, FeedItem>{};
@@ -473,7 +521,12 @@ class _FeedSource {
     _live = next;
     _liveLoaded = true;
     failed = false;
+    _completeFirst();
     onChange();
+  }
+
+  void _completeFirst() {
+    if (!_first.isCompleted) _first.complete();
   }
 
   Future<void> fetchMore(int limit) async {
@@ -494,5 +547,8 @@ class _FeedSource {
     onChange();
   }
 
-  void dispose() => _sub.cancel();
+  void dispose() {
+    unawaited(_sub.cancel());
+    _completeFirst();
+  }
 }

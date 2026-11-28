@@ -26,6 +26,9 @@ class OutboxViewModel extends ChangeNotifier {
   late final Command1<void, String> discard;
 
   bool get online => _outbox.online;
+
+  /// Offline with a network: the server is the one that can't be reached.
+  bool get serverUnreachable => !online && _outbox.hasNetwork;
   List<OutboxJob> get jobs => _outbox.jobs;
   int get waitingCount => _outbox.waitingCount;
   int get failedCount => _outbox.failedCount;
@@ -38,9 +41,12 @@ class OutboxViewModel extends ChangeNotifier {
     final waiting = waitingCount;
     final things = waiting == 1 ? '1 item' : '$waiting items';
     if (!online) {
+      final lead = serverUnreachable
+          ? "Can't reach Stall 10 right now."
+          : "You're offline.";
       return waiting == 0
-          ? "You're offline. What you send will go out when you're back."
-          : "You're offline. $things will send when you're back.";
+          ? "$lead What you send will go out when you're back."
+          : "$lead $things will send when you're back.";
     }
     if (waiting > 0) return 'Sending $things…';
     return failedCount == 1

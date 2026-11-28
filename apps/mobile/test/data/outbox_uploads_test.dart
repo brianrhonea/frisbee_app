@@ -33,6 +33,7 @@ void main() {
       networkChanges: const Stream.empty(),
       probe: () async => true,
       probeEvery: const Duration(hours: 1),
+      grace: Duration.zero,
     );
     outbox = make();
   });

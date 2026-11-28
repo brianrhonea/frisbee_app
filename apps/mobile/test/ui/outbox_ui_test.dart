@@ -106,6 +106,7 @@ void main() {
         networkChanges: network.stream,
         probe: () async => false,
         probeEvery: const Duration(hours: 1),
+        grace: Duration.zero,
       );
       auth = FakeAuthRepository(user: testUser);
       outbox = OutboxRepository(
@@ -179,6 +180,50 @@ void main() {
       dms.emit();
       await pumpEventQueue();
       expect(vm.messages.where((m) => m.id == 'q1'), hasLength(1));
+    });
+
+    test(
+      'the banner copy tells no network from an unreachable server',
+      () async {
+        final vm = OutboxViewModel(outbox: outbox);
+        addTearDown(vm.dispose);
+        expect(vm.showBanner, isFalse, reason: 'online: no banner');
+
+        network.add(false);
+        await pumpEventQueue();
+        expect(
+          vm.bannerText,
+          "You're offline. What you send will go out when you're back.",
+        );
+        expect(vm.serverUnreachable, isFalse);
+
+        // The network is back but the server doesn't answer.
+        network.add(true);
+        await pumpEventQueue();
+        expect(vm.online, isFalse);
+        expect(vm.serverUnreachable, isTrue);
+        expect(
+          vm.bannerText,
+          "Can't reach Stall 10 right now. What you send will go out when "
+          "you're back.",
+        );
+      },
+    );
+
+    test('queued items use the same wording in both states', () async {
+      await queueMessage('q1');
+      final vm = OutboxViewModel(outbox: outbox);
+      addTearDown(vm.dispose);
+      expect(
+        vm.bannerText,
+        "You're offline. 1 item will send when you're back.",
+      );
+      network.add(true);
+      await pumpEventQueue();
+      expect(
+        vm.bannerText,
+        "Can't reach Stall 10 right now. 1 item will send when you're back.",
+      );
     });
 
     testWidgets('the banner says offline, lists what waits and discards', (

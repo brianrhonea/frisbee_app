@@ -87,6 +87,7 @@ class OutboxRepository extends ChangeNotifier implements UploadLedger {
   bool _disposed = false;
   Timer? _timer;
   bool _wasOnline = true;
+  int _seenRecoveries = 0;
 
   /// Done once the saved queue is read.
   Future<void> get loaded => _loaded;
@@ -94,6 +95,10 @@ class OutboxRepository extends ChangeNotifier implements UploadLedger {
   String get _uid => _auth.currentUser?.uid ?? '';
 
   bool get online => _connectivity.online;
+
+  /// Whether the device has a network (when offline, tells "no network"
+  /// from "Stall 10 can't be reached").
+  bool get hasNetwork => _connectivity.hasNetwork;
 
   /// The signed-in user's queued items, oldest first.
   List<OutboxJob> get jobs => [
@@ -157,7 +162,11 @@ class OutboxRepository extends ChangeNotifier implements UploadLedger {
 
   void _onConnectivity() {
     final online = _connectivity.online;
-    if (online && !_wasOnline) unawaited(drain());
+    // Back online, or a check found the server fine after a failed send
+    // (which queued that item without the app ever going offline).
+    final recovered = _connectivity.recoveries != _seenRecoveries;
+    _seenRecoveries = _connectivity.recoveries;
+    if (online && (!_wasOnline || recovered)) unawaited(drain());
     _wasOnline = online;
     _notify();
   }
@@ -236,7 +245,7 @@ class OutboxRepository extends ChangeNotifier implements UploadLedger {
         files.isEmpty ? OutboxLimits.sendTimeout : const Duration(minutes: 2),
       );
     } on TimeoutException {
-      _connectivity.reportOffline();
+      _connectivity.reportFailure();
       return queue(OutboxFailure.network);
     }
     switch (result) {
@@ -247,7 +256,7 @@ class OutboxRepository extends ChangeNotifier implements UploadLedger {
         final failure = outboxFailureFor(error);
         switch (failure) {
           case OutboxFailure.network:
-            _connectivity.reportOffline();
+            _connectivity.reportFailure();
             return queue(failure);
           case OutboxFailure.retry:
             return queue(failure);
@@ -439,7 +448,7 @@ class OutboxRepository extends ChangeNotifier implements UploadLedger {
     await _save();
     _notify();
     if (failure == OutboxFailure.network) {
-      _connectivity.reportOffline();
+      _connectivity.reportFailure();
       return false;
     }
     if (failure == null || failure == OutboxFailure.sent) {

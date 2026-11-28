@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoSliverRefreshControl;
 import 'package:flutter/material.dart';
 
 import 'package:intl/intl.dart';
@@ -105,31 +106,50 @@ class _PageScrollState extends State<PageScroll> {
   Widget build(BuildContext context) {
     final size = ScreenSize.of(context);
     final controller = _controller;
-    final scroll = SingleChildScrollView(
-      controller: controller,
-      physics: widget.onRefresh == null
-          ? null
-          : const AlwaysScrollableScrollPhysics(),
-      padding: pagePadding(
-        size,
-      ).add(EdgeInsets.only(bottom: widget.bottomInset)),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: maxPageWidth),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: widget.children,
-          ),
+    final onRefresh = widget.onRefresh;
+    final padding = pagePadding(
+      size,
+    ).add(EdgeInsets.only(bottom: widget.bottomInset));
+    final content = Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: maxPageWidth),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: widget.children,
         ),
       ),
     );
-    final onRefresh = widget.onRefresh;
-    return ScrollToTop(
-      controller: controller,
-      child: onRefresh == null
-          ? scroll
-          : RefreshIndicator(onRefresh: onRefresh, child: scroll),
-    );
+    final Widget scroll;
+    if (onRefresh != null && Theme.of(context).platform == TargetPlatform.iOS) {
+      // iOS: the pull is the system's own, a bouncing list with the
+      // spinner opening above the content.
+      scroll = CustomScrollView(
+        controller: controller,
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        slivers: [
+          CupertinoSliverRefreshControl(onRefresh: onRefresh),
+          SliverPadding(
+            padding: padding,
+            sliver: SliverToBoxAdapter(child: content),
+          ),
+        ],
+      );
+    } else {
+      final plain = SingleChildScrollView(
+        controller: controller,
+        physics: onRefresh == null
+            ? null
+            : const AlwaysScrollableScrollPhysics(),
+        padding: padding,
+        child: content,
+      );
+      scroll = onRefresh == null
+          ? plain
+          : RefreshIndicator(onRefresh: onRefresh, child: plain);
+    }
+    return ScrollToTop(controller: controller, child: scroll);
   }
 }
 
