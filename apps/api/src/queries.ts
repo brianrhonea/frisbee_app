@@ -20,9 +20,9 @@ export interface DocQueries {
    * Up to [limit] documents of every collection named [collectionId]
    * matching [where], with their full paths (a collection group query;
    * each filtered field needs its collection-group index in
-   * firestore.indexes.json). Optional: without it the caller says so.
+   * firestore.indexes.json), with only [fields] when given. Optional: without it the caller says so.
    */
-  group?(collectionId: string, limit: number, where: Where): Promise<Array<{ path: string; data: Data }>>;
+  group?(collectionId: string, limit: number, where: Where, fields?: readonly string[]): Promise<Array<{ path: string; data: Data }>>;
 }
 
 export class FirestoreDocQueries implements DocQueries {
@@ -51,9 +51,10 @@ export class FirestoreDocQueries implements DocQueries {
     return snap.docs.map((d) => ({ id: d.id, data: fromFirestore(d.data()) as Data }));
   }
 
-  async group(collectionId: string, limit: number, where: Where) {
+  async group(collectionId: string, limit: number, where: Where, fields?: readonly string[]) {
     let q: Query = this.db.collectionGroup(collectionId);
     for (const [field, value] of Object.entries(where)) q = q.where(field, "==", value);
+    if (fields) q = q.select(...fields);
     const snap = await q.limit(limit).get();
     return snap.docs.map((d) => ({ path: d.ref.path, data: fromFirestore(d.data()) as Data }));
   }

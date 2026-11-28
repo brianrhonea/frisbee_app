@@ -128,9 +128,11 @@ export class FakeStore implements DocStore {
   }
 
   getAllCalls = 0;
-  async getAll(paths: string[]) {
+  async getAll(paths: string[], fields?: readonly string[]) {
     this.getAllCalls++;
-    return Promise.all(paths.map((p) => this.get(p)));
+    const docs = await Promise.all(paths.map((p) => this.get(p)));
+    if (!fields) return docs;
+    return docs.map((d) => (d ? Object.fromEntries(fields.filter((f) => f in d).map((f) => [f, d[f]])) : d));
   }
 
   async list(collection: string, limit: number) {

@@ -35,11 +35,12 @@ export class FirestoreDocStore implements DocStore {
     return snap.exists ? (fromFirestore(snap.data()) as Data) : null;
   }
 
-  async getAll(paths: string[]): Promise<Array<Data | null>> {
+  async getAll(paths: string[], fields?: readonly string[]): Promise<Array<Data | null>> {
     const out: Array<Data | null> = [];
     // A few hundred documents a call keeps each request small.
     for (let i = 0; i < paths.length; i += 300) {
-      const snaps = await this.db.getAll(...paths.slice(i, i + 300).map((p) => this.db.doc(p)));
+      const refs = paths.slice(i, i + 300).map((p) => this.db.doc(p));
+      const snaps = await (fields ? this.db.getAll(...refs, { fieldMask: [...fields] }) : this.db.getAll(...refs));
       out.push(...snaps.map((s) => (s.exists ? (fromFirestore(s.data()) as Data) : null)));
     }
     return out;
