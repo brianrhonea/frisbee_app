@@ -19,19 +19,22 @@ export interface CoverHeaderProps {
   /** @handle, place, kind. */
   subtitle?: ReactNode;
   actions?: ReactNode;
+  /** A CoverMenu drawn over the cover's top right corner. */
+  menu?: ReactNode;
   /** Heading level of the name; the page's own h1 is the default. */
   as?: "h1" | "h2" | "h3";
   /** Under the name: a bio, a row of SummaryTiles. */
   children?: ReactNode;
 }
 
-export function CoverHeader({ coverUrl, watermark, avatar, title, subtitle, actions, as: Heading = "h1", children }: CoverHeaderProps) {
+export function CoverHeader({ coverUrl, watermark, avatar, title, subtitle, actions, menu, as: Heading = "h1", children }: CoverHeaderProps) {
   return (
     <header className="ui-cover">
       <div className={`ui-cover-photo${!coverUrl && watermark ? " ui-cover-default" : ""}`} data-initials={!coverUrl ? watermark : undefined}>
         {/* eslint-disable-next-line @next/next/no-img-element -- a user's uploaded cover, already sized */}
         {coverUrl ? <img src={coverUrl} alt="" loading="lazy" /> : null}
       </div>
+      {menu}
       <div className="ui-cover-body">
         <div className="ui-cover-avatar">{avatar}</div>
         <div className="ui-cover-actions">{actions}</div>

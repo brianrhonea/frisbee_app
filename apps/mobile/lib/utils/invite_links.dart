@@ -33,6 +33,11 @@ abstract final class InviteLinks {
   static Uri post(String postId) =>
       Uri.https(host, '/p/${Uri.encodeComponent(postId)}');
 
+  /// A player's page on the website (`/players/<uid>`), for the profile's
+  /// Share. The website's Share sends the same link.
+  static Uri player(String uid) =>
+      Uri.https(host, '/players/${Uri.encodeComponent(uid)}');
+
   /// A hosted tournament or league's public page on the website (anyone
   /// can read a published one). The app doesn't claim these links yet, so
   /// they open the website.

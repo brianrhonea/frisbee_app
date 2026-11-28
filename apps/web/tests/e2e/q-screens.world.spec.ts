@@ -30,9 +30,12 @@ test("Q1 athlete profile: cover header, Follow and Message, quiet Report and Blo
   await expect(head.getByText("@benokafor")).toBeVisible();
   await expect(head.locator(".ui-cover-actions").getByRole("button", { name: "Follow" })).toBeVisible();
   await expect(head.locator(".ui-cover-actions").getByRole("button", { name: "Message" })).toBeVisible();
-  const safety = head.locator(".profile-secondary");
-  await expect(safety.getByRole("button", { name: "Report" })).toBeVisible();
-  await expect(safety.getByRole("button", { name: "Block" })).toBeVisible();
+  // Q6: Report, Block and Share are in the menu over the cover, no longer buttons under the details.
+  await head.getByRole("button", { name: "More options" }).click();
+  await expect(page.getByRole("menuitem", { name: "Report" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Block" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Share" })).toBeVisible();
+  await page.keyboard.press("Escape");
   // Stats and teams stay beside the posts; with no games yet the stat card says so.
   await expect(page.getByText("No stats yet. Stats come from games kept in the app.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Posts" })).toBeVisible();
@@ -52,7 +55,9 @@ test("Q1 athlete profile: your own page keeps Edit profile and the Roster spots 
   await expect(page.locator(".ui-cover").getByRole("heading", { level: 1, name: "Ada Rivers" })).toBeVisible();
   await expect(page.locator(".ui-cover").getByRole("link", { name: "Edit profile" })).toBeVisible();
   // Nobody reports or blocks themselves.
-  await expect(page.locator(".profile-secondary")).toHaveCount(0);
+  await page.locator(".ui-cover").getByRole("button", { name: "More options" }).click();
+  await expect(page.getByRole("menuitem")).toHaveText(["Share"]);
+  await page.keyboard.press("Escape");
   await expect(page.getByRole("region", { name: "Roster spots" })).toBeVisible({ timeout: 15_000 });
   await noSideScroll(page);
   await axeBothThemes(page, "Q1 own profile");
@@ -81,13 +86,13 @@ test("Q2 Discover: search results are list rows, empty and hint states are the s
   await axeBothThemes(page, "Q2 discover nothing found");
 });
 
-test("Q2 Discover as a visitor: public lists and search, no Players chip", async ({ browser, baseURL, page }) => {
+test("Q2 Discover as a visitor: public lists and search, no Athletes chip", async ({ browser, baseURL, page }) => {
   const ctx = await browser.newContext({ baseURL: baseURL!, viewport: page.viewportSize()!, storageState: { cookies: [], origins: [] } });
   const visitor = await ctx.newPage();
   await visitor.goto("/explore", { waitUntil: "domcontentloaded" });
   await expect(visitor.getByRole("searchbox", { name: "Search Stall 10" })).toBeVisible({ timeout: 30_000 });
   await expect(visitor.getByText("Log in to search people")).toBeVisible();
-  await expect(visitor.getByRole("radio", { name: "Players" })).toHaveCount(0);
+  await expect(visitor.getByRole("radio", { name: "Athletes" })).toHaveCount(0);
   await noSideScroll(visitor);
   await axeBothThemes(visitor, "Q2 visitor");
   await ctx.close();

@@ -6,6 +6,7 @@ import 'package:frisbee_app/domain/models/discover.dart';
 import 'package:frisbee_app/domain/models/hosted_tournament.dart';
 import 'package:frisbee_app/domain/models/team_event.dart';
 import 'package:frisbee_app/routing/routes.dart' show ExploreFilter;
+import 'package:frisbee_app/ui/core/ui/layout.dart' show SectionCard;
 import 'package:frisbee_app/ui/explore/view_models/explore_viewmodel.dart';
 import 'package:frisbee_app/ui/explore/view_models/player_search_viewmodel.dart';
 import 'package:frisbee_app/ui/explore/widgets/explore_screen.dart';
@@ -200,7 +201,14 @@ void main() {
       await tester.enterText(find.byType(TextField), 'sunday');
       await tester.pump(const Duration(milliseconds: 400));
       await tester.pumpAndSettle();
-      expect(find.text('Events'), findsOneWidget);
+      // The group's title (the Events chip has the same word).
+      expect(
+        find.descendant(
+          of: find.byType(SectionCard),
+          matching: find.text('Events'),
+        ),
+        findsOneWidget,
+      );
       expect(find.text('Sunday pickup'), findsOneWidget);
     });
 

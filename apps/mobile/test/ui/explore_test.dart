@@ -12,12 +12,14 @@ import 'package:frisbee_app/ui/explore/view_models/explore_viewmodel.dart';
 import 'package:frisbee_app/ui/explore/view_models/player_search_viewmodel.dart';
 import 'package:frisbee_app/ui/explore/widgets/explore_screen.dart';
 import 'package:frisbee_app/ui/explore/widgets/rankings_screen.dart';
+import 'package:frisbee_app/ui/core/ui/filter_chips.dart';
 import 'package:frisbee_app/ui/core/ui/layout.dart' show SectionCard;
 import 'package:frisbee_app/ui/teams/view_models/team_search_viewmodel.dart';
 import 'package:frisbee_app/ui/tournaments/view_models/hosted_tournaments_viewmodel.dart';
 
 import '../testing/fakes.dart';
 import '../testing/hosted_tournament_fakes.dart';
+import '../ui_harness/harness.dart';
 
 class FakeRankingRepository implements RankingRepository {
   final rankings = StreamController<List<DivisionRanking>>.broadcast();
@@ -456,7 +458,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final chips = find.byType(ChoiceChip);
-      expect(chips, findsNWidgets(7));
+      expect(chips, findsNWidgets(8));
       expect(
         [
           for (final e in chips.evaluate())
@@ -464,12 +466,13 @@ void main() {
         ],
         [
           'All',
+          'Events',
           'Tournaments',
           'Leagues',
           'Pickup',
           'Teams',
           'Communities',
-          'Players',
+          'Athletes',
         ],
       );
       final rows = {
@@ -486,7 +489,10 @@ void main() {
       expect(selected.right, lessThanOrEqualTo(320));
 
       // A chip scrolled out of view comes back when it's picked.
-      await tester.drag(find.byType(ChoiceChip).last, const Offset(600, 0));
+      await tester.drag(
+        find.widgetWithText(ChoiceChip, 'Tournaments'),
+        const Offset(1000, 0),
+      );
       await tester.pumpAndSettle();
       expect(
         tester.getRect(find.widgetWithText(ChoiceChip, 'All')).left,
@@ -737,5 +743,88 @@ void main() {
     expect(vm.kind, RankingKind.players);
     expect(vm.rankingLink, {'kind': 'players'});
     expect(vm.playersLoaded, isTrue);
+  });
+
+  group('Q6 Discover chips', () {
+    Widget screen(ExploreFilter? filter) {
+      final teamSearch = TeamSearchViewModel(
+        teamRepository: FakeTeamRepository(),
+        authRepository: FakeAuthRepository(user: testUser),
+      );
+      final players = PlayerSearchViewModel(
+        profileRepository: FakeProfileRepository(),
+      );
+      addTearDown(teamSearch.dispose);
+      addTearDown(players.dispose);
+      return ExploreScreen(
+        viewModel: teamSearch,
+        players: players,
+        explore: build(),
+        initialQuery: '',
+        initialFilter: filter,
+      );
+    }
+
+    testWidgets('Events is added after All; people are called Athletes', (
+      tester,
+    ) async {
+      await pumpInApp(tester, screen(null), height: 900);
+      final labels = [
+        for (final w in tester.widgetList<AppFilterChip>(
+          find.byType(AppFilterChip),
+        ))
+          w.label,
+      ];
+      expect(labels.take(3), ['All', 'Events', 'Tournaments']);
+      expect(
+        labels,
+        containsAll(['Leagues', 'Pickup', 'Teams', 'Communities', 'Athletes']),
+      );
+      expect(labels, isNot(contains('Players')));
+    });
+
+    testWidgets('picking Events marks it and keeps the events list', (
+      tester,
+    ) async {
+      await pumpInApp(tester, screen(null), height: 900);
+      await tester.tap(find.widgetWithText(AppFilterChip, 'Events'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<AppFilterChip>(find.widgetWithText(AppFilterChip, 'Events'))
+            .selected,
+        isTrue,
+      );
+      // The same upcoming list Discover shows under All, not a search hint.
+      expect(find.textContaining('letters to search'), findsNothing);
+      expect(find.text('Tournaments & leagues'), findsOneWidget);
+    });
+
+    testWidgets('a link with only=events starts on Events', (tester) async {
+      await pumpInApp(tester, screen(ExploreFilter.events), height: 900);
+      expect(
+        tester
+            .widget<AppFilterChip>(find.widgetWithText(AppFilterChip, 'Events'))
+            .selected,
+        isTrue,
+      );
+    });
+
+    testWidgets('large text does not overflow', (tester) async {
+      await expectNoOverflowWithLargeText(
+        tester,
+        screen(ExploreFilter.events),
+        height: 900,
+      );
+    });
+
+    testWidgets('golden: chips with Events picked', (tester) async {
+      await expectGoldens(
+        tester,
+        screen(ExploreFilter.events),
+        'q6_discover_events',
+        height: 900,
+      );
+    }, skip: goldenSkip != null);
   });
 }

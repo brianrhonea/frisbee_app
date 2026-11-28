@@ -5,14 +5,15 @@ import { hostedType, type PublicListing, type TournamentDoc } from "@stall10/sha
 /**
  * The chips under the search box, by their `?only=` names (the app's
  * ExploreFilter, so links work on both); null is All. `groups` is shown
- * as Communities; `players` (People) is members only, as visitors can't
- * search players.
+ * as Communities; `players` (shown as Athletes) is members only, as
+ * visitors can't search players; `events` is every event Discover lists
+ * (tournaments, leagues and public team events).
  */
-export type ExploreFilter = "tournaments" | "leagues" | "pickup" | "teams" | "groups" | "players";
-export const exploreFilters: ExploreFilter[] = ["tournaments", "leagues", "pickup", "teams", "groups", "players"];
+export type ExploreFilter = "events" | "tournaments" | "leagues" | "pickup" | "teams" | "groups" | "players";
+export const exploreFilters: ExploreFilter[] = ["events", "tournaments", "leagues", "pickup", "teams", "groups", "players"];
 
 /** Other names the chips answer to in a link. */
-const aliases: Record<string, ExploreFilter> = { communities: "groups", people: "players" };
+const aliases: Record<string, ExploreFilter> = { communities: "groups", people: "players", athletes: "players" };
 
 /** The filter a `?only=` value names, or null (All) for none or an unknown one. */
 export function parseFilter(raw: string | null | undefined): ExploreFilter | null {
@@ -48,9 +49,9 @@ export function matchText<T>(list: T[], query: string, text: (item: T) => string
 
 type Hosted = Pick<TournamentDoc, "kind" | "entryType" | "teamEntry">;
 
-/** Hosted events a chip shows: leagues for Leagues, tournaments and hat tournaments for Tournaments. */
+/** Hosted events a chip shows: every one for All and Events, leagues for Leagues, tournaments and hat tournaments for Tournaments. */
 export function hostedFor<T extends Hosted>(list: T[], only: ExploreFilter | null): T[] {
-  if (only === null) return list;
+  if (only === null || only === "events") return list;
   if (only === "leagues") return list.filter((t) => hostedType(t) === "league");
   if (only === "tournaments") return list.filter((t) => hostedType(t) !== "league");
   return [];
@@ -68,9 +69,9 @@ export function listingsFor(teams: PublicListing[], only: ExploreFilter | null):
   return [];
 }
 
-/** Public team events a chip shows: every one for All, pickup games for Pickup. */
+/** Public team events a chip shows: every one for All and Events, pickup games for Pickup. */
 export function eventsFor<T extends { type?: string }>(events: T[], only: ExploreFilter | null): T[] {
-  if (only === null) return events;
+  if (only === null || only === "events") return events;
   if (only === "pickup") return events.filter((e) => e.type === "pickup");
   return [];
 }

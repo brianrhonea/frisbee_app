@@ -25,8 +25,12 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push, replace: vi.fn() }
 vi.mock("@/components/FollowButton", () => ({ FollowButton: () => <button type="button">Follow</button> }));
 vi.mock("@/components/MessageButton", () => ({ MessageButton: () => <button type="button">Message</button> }));
 vi.mock("@/components/Report", () => ({
-  ReportButton: ({ className }: { className?: string }) => <button type="button" className={className}>Report</button>,
-  BlockButton: ({ label, className }: { label?: string; className?: string }) => <button type="button" className={className}>{label ?? "Block"}</button>,
+  ReportDialog: ({ onClose }: { onClose: () => void }) => (
+    <div role="dialog" aria-label="Report this profile">
+      <button type="button" onClick={onClose}>Close report</button>
+    </div>
+  ),
+  useBlockPerson: () => ({ block: vi.fn(), busy: false }),
 }));
 vi.mock("@/components/RosterSpots", () => ({ RosterSpots: () => <section aria-label="Roster spots">spots</section> }));
 vi.mock("@/components/TeamHistory", () => ({ TeamHistory: ({ isMe }: { isMe: boolean }) => <section aria-label="Team history">{isMe ? "mine" : "theirs"}</section> }));
@@ -80,10 +84,11 @@ describe("Q1 athlete profile", () => {
     expect(screen.getByRole("list", { name: "Activity" })).toHaveTextContent("7 Posts");
   });
 
-  it("keeps the actions beside the picture and the quieter safety actions under the details", () => {
-    render(<ProfileCard profile={profile} actions={<button type="button">Follow</button>} secondary={<button type="button">Report</button>} />);
+  it("keeps the actions beside the picture and the menu over the cover", () => {
+    render(<ProfileCard profile={profile} actions={<button type="button">Follow</button>} menu={<button type="button">More options</button>} />);
     expect(document.querySelector(".ui-cover-actions")).toContainElement(screen.getByRole("button", { name: "Follow" }));
-    expect(document.querySelector(".profile-secondary")).toContainElement(screen.getByRole("button", { name: "Report" }));
+    expect(document.querySelector(".ui-cover")).toContainElement(screen.getByRole("button", { name: "More options" }));
+    expect(document.querySelector(".ui-cover-actions")).not.toContainElement(screen.getByRole("button", { name: "More options" }));
   });
 
   it("says Stall 10 staff and Private profile in words (pills), never colour alone", () => {
@@ -131,8 +136,9 @@ describe("Q1 the whole player page", () => {
     render(<PlayerView uid="me" page={page()} locked={false} />);
     expect(screen.getByRole("region", { name: "Roster spots" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Team history" })).toHaveTextContent("mine");
-    expect(screen.queryByRole("button", { name: "Report" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Block" })).toBeNull();
+    // Your own menu holds Share only.
+    fireEvent.click(screen.getByRole("button", { name: "More options" }));
+    expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Share"]);
   });
 
   it("hides stats and teams when the player's visibility switches say so", () => {

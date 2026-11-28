@@ -27,15 +27,15 @@ export function DashboardLayout({ side, children }: { side: ReactNode; children:
 export function ProfileCard({
   profile,
   actions,
-  secondary,
+  menu,
   counts,
   staff = false,
 }: {
   profile: PublicProfile;
   /** Follow, Message: beside the picture. */
   actions?: ReactNode;
-  /** Report, Block: quieter, under the details. */
-  secondary?: ReactNode;
+  /** The "…" menu (Report, Block, Share) over the cover. */
+  menu?: ReactNode;
   /** A row of SummaryTiles (Posts) under the details. */
   counts?: ReactNode;
   /** Stall 10 staff (`staff/{uid}`): the badge under the name, as in the app. */
@@ -54,7 +54,7 @@ export function ProfileCard({
   const handle = [profile.username && `@${profile.username}`, profile.pronouns].filter(Boolean).join(" · ");
   // The shared cover header (the app's CoverHeader): cover, picture on its edge, name, handle, actions.
   return (
-    <CoverHeader coverUrl={profile.headerUrl} watermark={initials(name, 2)} avatar={<Avatar name={name} url={profile.photoUrl} size={96} />} title={name} subtitle={handle || undefined} actions={actions}>
+    <CoverHeader coverUrl={profile.headerUrl} watermark={initials(name, 2)} avatar={<Avatar name={name} url={profile.photoUrl} size={96} />} title={name} subtitle={handle || undefined} actions={actions} menu={menu}>
       {(staff || profile.private) && (
         <div className="profile-badges">
           {staff && (
@@ -81,7 +81,6 @@ export function ProfileCard({
         </div>
       )}
       {counts && <div className="profile-counts">{counts}</div>}
-      {secondary && <div className="profile-secondary">{secondary}</div>}
     </CoverHeader>
   );
 }
