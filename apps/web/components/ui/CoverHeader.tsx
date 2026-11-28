@@ -12,6 +12,8 @@ import "./ui.css";
  */
 export interface CoverHeaderProps {
   coverUrl?: string | null;
+  /** Without a cover photo: letters (initials) drawn faintly across the default band. Decoration only. */
+  watermark?: string;
   avatar: ReactNode;
   title: ReactNode;
   /** @handle, place, kind. */
@@ -23,10 +25,10 @@ export interface CoverHeaderProps {
   children?: ReactNode;
 }
 
-export function CoverHeader({ coverUrl, avatar, title, subtitle, actions, as: Heading = "h1", children }: CoverHeaderProps) {
+export function CoverHeader({ coverUrl, watermark, avatar, title, subtitle, actions, as: Heading = "h1", children }: CoverHeaderProps) {
   return (
     <header className="ui-cover">
-      <div className="ui-cover-photo">
+      <div className={`ui-cover-photo${!coverUrl && watermark ? " ui-cover-default" : ""}`} data-initials={!coverUrl ? watermark : undefined}>
         {/* eslint-disable-next-line @next/next/no-img-element -- a user's uploaded cover, already sized */}
         {coverUrl ? <img src={coverUrl} alt="" loading="lazy" /> : null}
       </div>

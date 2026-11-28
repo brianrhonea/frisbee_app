@@ -21,6 +21,8 @@ import { SectionsHint } from "./SectionsHint";
 import { TeamStatTiles, useTeamChatRooms } from "./TeamStatTiles";
 import { CommunityChat, CommunityOrganizers, NextPickupCard } from "./CommunitySections";
 import { EventCard } from "../ui/EventCard";
+import { ListRow } from "../ui/ListRow";
+import { StatusPill } from "../ui/StatusPill";
 import { needsRsvp } from "../RsvpPill";
 import { useTeamEvents, useYouthOutsiderPublic, youthVisitorNote } from "./TeamSchedule";
 import { TournamentDayCard } from "../tournaments/TournamentDayCard";
@@ -225,14 +227,17 @@ function MemberPreview() {
       <ul className="member-preview-list">
         {people.slice(0, 6).map((p) => (
           <li key={p.uid}>
-            <Link className="person" href={`/players/${p.uid}`}>
-              <Avatar name={p.name} size={32} />
-              <span>
-                {p.name}
-                {p.uid === viewer.uid && <small className="muted"> (you)</small>}
-              </span>
-            </Link>
-            <span className={`role-pill${leads.has(p.tier) ? " lead" : ""}`}>{roleLabel(p.tier, kind)}</span>
+            <ListRow
+              href={`/players/${p.uid}`}
+              leading={<Avatar name={p.name} size={40} />}
+              title={
+                <>
+                  {p.name}
+                  {p.uid === viewer.uid && <span className="muted"> (you)</span>}
+                </>
+              }
+              trailing={<StatusPill tone={leads.has(p.tier) ? "accent" : "neutral"}>{roleLabel(p.tier, kind)}</StatusPill>}
+            />
           </li>
         ))}
       </ul>

@@ -1,6 +1,10 @@
 /* Explore: search with filter chips, then tournaments, rankings, results and shortcuts. */
 .explore { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
-.explore-search-form { margin-bottom: 12px; }
+.explore-search-form { display: flex; gap: var(--space-sm); align-items: center; margin-bottom: var(--space-md); }
+.explore-search-form .ui-search { flex: 1 1 auto; min-width: 0; }
+.explore-search-form .btn { flex: none; }
+.explore-rows { list-style: none; margin: 0; padding: 0; }
+.explore-rows .ui-row:last-child { border-bottom: 0; }
 .explore-chips { margin-bottom: 12px; }
 .explore-results { display: grid; gap: 8px; }
 .explore-hint { text-align: center; padding: 14px 0; margin: 0; }
@@ -9,7 +13,6 @@
 }
 .explore-list { gap: 8px; }
 .explore-list .row-card { box-shadow: none; }
-.explore-mine { margin: 0 0 0 auto; flex: none; }
 .explore-card-link { font-weight: 600; font-size: 0.9rem; text-decoration: none; }
 .explore-card-link:hover { text-decoration: underline; }
 
@@ -48,8 +51,6 @@
 .explore-section-head .section-title, .explore-section-head p { margin: 0; }
 
 /* Restyle (Turf & Disc): search and chips, Live now on the scoreboard navy. */
-.explore-search .search-form input { background: var(--field); }
-.explore-search .search-form .btn { min-width: 96px; }
 .explore-heading { font-weight: 800; }
 .explore-division { background: var(--card); border-color: var(--line-2); color: var(--ink); }
 .explore-division.on { background: var(--chip-on); color: var(--on-chip-on); border-color: var(--chip-on); }
@@ -79,13 +80,7 @@
 .explore-live-games li.explore-live-more { background: none; padding: 0 10px; color: var(--board-muted); }
 
 /* Discover's entry to Learn (Learn lives under Discover). */
-.learn-entry {
-  display: flex; align-items: center; justify-content: space-between; gap: var(--space-lg); margin-bottom: var(--space-lg);
-  padding: var(--space-lg); min-height: 56px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--card);
-  color: var(--ink); text-decoration: none;
-}
-.learn-entry:hover { border-color: var(--line-2); }
-.learn-entry > span:first-child { display: grid; gap: 2px; min-width: 0; }
-.learn-entry small { color: var(--muted); font-size: var(--text-secondary-size); }
-.learn-entry > span:last-child { flex: none; color: var(--accent-ink); font-weight: 700; font-size: var(--text-secondary-size); }
-@media (max-width: 599px) { .learn-entry > span:last-child { display: none; } }
+.learn-entry { margin-bottom: var(--space-lg); border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); padding: 0 var(--space-lg); }
+.learn-entry .ui-row { border-bottom: 0; }
+.learn-entry-go { color: var(--accent-ink); font-weight: 700; font-size: var(--text-secondary-size); white-space: nowrap; }
+@media (max-width: 599px) { .learn-entry-go { display: none; } }

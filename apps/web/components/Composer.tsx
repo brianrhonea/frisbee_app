@@ -27,7 +27,8 @@ import { Avatar } from "./Avatar";
 import { ComposerPhotos } from "./ComposerPhotos";
 import { NavIcon } from "./NavIcons";
 import "./composer_tag.css";
-import { ErrorNote } from "@/components/StatusViews";
+import { Button } from "@/components/ui/Button";
+import { ErrorState } from "@/components/ui/States";
 
 /** Which prompt the next composer shows; goes round within a visit. */
 let promptTurn = 0;
@@ -515,11 +516,7 @@ export function Composer({
           </label>
         )}
 
-        {error && (
-          <ErrorNote>
-            {error}
-          </ErrorNote>
-        )}
+        {error && <ErrorState>{error}</ErrorState>}
         {queued && (
           <p className="muted small" role="status">
             {queued}
@@ -577,14 +574,14 @@ export function Composer({
           <span className="composer-spacer" />
           {left < 300 && <span className={`composer-count${left < 0 ? " over" : ""}`}>{left}</span>}
           {onCancel && (
-            <button type="button" className="btn btn-small" onClick={onCancel}>
+            <Button size="small" onClick={onCancel}>
               Cancel
-            </button>
+            </Button>
           )}
-          <button className="btn btn-primary btn-small" type="submit" disabled={!canPost} title="Ctrl+Enter">
+          <Button variant="primary" size="small" type="submit" disabled={!canPost} title="Ctrl+Enter" className="composer-send">
             {busy ? (editing ? "Saving…" : "Sending…") : editing ? "Save" : "Send"}
             {!busy && !editing && <NavIcon name="arrow" size={16} />}
-          </button>
+          </Button>
         </div>
       </div>
     </form>
@@ -691,17 +688,13 @@ function WorkoutFields({
       )}
       <div className="workout-actions">
         {draft.exercises.length < workoutExercisesMax && (
-          <button
-            type="button"
-            className="btn btn-small"
-            onClick={() => set({ exercises: [...draft.exercises, { name: "", sets: "", reps: "", weight: "" }] })}
-          >
+          <Button size="small" onClick={() => set({ exercises: [...draft.exercises, { name: "", sets: "", reps: "", weight: "" }] })}>
             Add an exercise
-          </button>
+          </Button>
         )}
-        <button type="button" className="btn btn-small" onClick={onRemove}>
+        <Button size="small" onClick={onRemove}>
           Remove workout
-        </button>
+        </Button>
       </div>
     </fieldset>
   );

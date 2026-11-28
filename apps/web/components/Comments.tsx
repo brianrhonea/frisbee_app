@@ -13,7 +13,8 @@ import { Avatar } from "./Avatar";
 import { LocalTime } from "./LocalTime";
 import { ReportButton } from "./Report";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-import { ErrorNote } from "@/components/StatusViews";
+import { Button } from "@/components/ui/Button";
+import { EmptyState, ErrorState, LoadingState } from "@/components/ui/States";
 
 /** A comment as stored (PostComment in the app). */
 interface Comment {
@@ -69,8 +70,9 @@ export function Comments({ postId, postAuthorId, autoFocus = false }: {
 
   return (
     <section className="comments" aria-label="Comments">
-      {error && <ErrorNote>{error}</ErrorNote>}
-      {data === undefined && !error && <p className="muted small">Loading comments…</p>}
+      {error && <ErrorState>{error}</ErrorState>}
+      {data === undefined && !error && <LoadingState label="Loading comments…" />}
+      {data !== undefined && top.length === 0 && <EmptyState quiet>No comments yet. Start the conversation.</EmptyState>}
       {top.map((c) => (
         <div key={c.id} className="comment-thread">
           <CommentRow comment={c} postId={postId} postAuthorId={postAuthorId} onReply={() => setReplyTo(c)} />
@@ -289,13 +291,13 @@ function CommentBox({
           if (e.key === "Escape") onCancel?.();
         }}
       />
-      <button className="btn btn-primary btn-small" type="submit" disabled={busy || !body.trim()}>
+      <Button variant="primary" size="small" type="submit" disabled={busy || !body.trim()}>
         {editing ? "Save" : replyTo ? "Reply" : "Comment"}
-      </button>
+      </Button>
       {onCancel && (
-        <button className="btn btn-small" type="button" onClick={onCancel}>
+        <Button size="small" onClick={onCancel}>
           Cancel
-        </button>
+        </Button>
       )}
       {error && <p className="post-error">{error}</p>}
       {queued && (

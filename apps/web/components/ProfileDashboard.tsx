@@ -1,10 +1,13 @@
 import type { PublicProfile, StatTotals } from "@stall10/shared";
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { Avatar } from "./Avatar";
+import { initials } from "@/lib/text";
 import { NavIcon, type NavIconName } from "./NavIcons";
 import "./member.css";
+import { CoverHeader } from "./ui/CoverHeader";
 import { ListRow } from "./ui/ListRow";
+import { EmptyState } from "./ui/States";
+import { SummaryTiles } from "./ui/SummaryTiles";
 import { StatusPill } from "./ui/StatusPill";
 
 /**
@@ -24,10 +27,17 @@ export function DashboardLayout({ side, children }: { side: ReactNode; children:
 export function ProfileCard({
   profile,
   actions,
+  secondary,
+  counts,
   staff = false,
 }: {
   profile: PublicProfile;
+  /** Follow, Message: beside the picture. */
   actions?: ReactNode;
+  /** Report, Block: quieter, under the details. */
+  secondary?: ReactNode;
+  /** A row of SummaryTiles (Posts) under the details. */
+  counts?: ReactNode;
   /** Stall 10 staff (`staff/{uid}`): the badge under the name, as in the app. */
   staff?: boolean;
 }) {
@@ -42,18 +52,15 @@ export function ProfileCard({
     ] as Array<[NavIconName, string | undefined | false]>
   ).filter((f): f is [NavIconName, string] => Boolean(f[1]));
   const handle = [profile.username && `@${profile.username}`, profile.pronouns].filter(Boolean).join(" · ");
+  // The shared cover header (the app's CoverHeader): cover, picture on its edge, name, handle, actions.
   return (
-    <div className={`card profile-card${profile.headerUrl ? " has-header" : ""}`}>
-      {profile.headerUrl && <div className="profile-header" style={{ backgroundImage: `url(${JSON.stringify(profile.headerUrl)})` }} />}
-      <Avatar name={name} url={profile.photoUrl} size={96} />
-      <h1>{name}</h1>
-      {handle && <p className="muted handle">{handle}</p>}
+    <CoverHeader coverUrl={profile.headerUrl} watermark={initials(name, 2)} avatar={<Avatar name={name} url={profile.photoUrl} size={96} />} title={name} subtitle={handle || undefined} actions={actions}>
       {(staff || profile.private) && (
         <div className="profile-badges">
           {staff && (
-            <span className="staff-badge" title="Stall 10 staff">
-              <span aria-hidden="true">✓</span> Stall 10 staff
-            </span>
+            <StatusPill tone="accent" icon="check">
+              Stall 10 staff
+            </StatusPill>
           )}
           {profile.private && <StatusPill tone="accent">Private profile</StatusPill>}
         </div>
@@ -73,8 +80,9 @@ export function ProfileCard({
           )}
         </div>
       )}
-      {actions && <div className="profile-actions">{actions}</div>}
-    </div>
+      {counts && <div className="profile-counts">{counts}</div>}
+      {secondary && <div className="profile-secondary">{secondary}</div>}
+    </CoverHeader>
   );
 }
 
@@ -95,16 +103,9 @@ export function StatTiles({ stats, teamName }: { stats?: Record<string, StatTota
     <div className="card">
       <h2 className="card-title">{teamName ? `${title} · ${teamName}` : title}</h2>
       {s ? (
-        <div className="tiles">
-          {tiles.map(([k, label]) => (
-            <div key={k} className="tile">
-              <b>{s[k] ?? 0}</b>
-              <small>{label}</small>
-            </div>
-          ))}
-        </div>
+        <SummaryTiles label={title} items={tiles.map(([k, label]) => ({ id: k, label, value: s[k] ?? 0 }))} />
       ) : (
-        <p className="muted small">No stats yet. Stats come from games kept in the app.</p>
+        <EmptyState quiet>No stats yet. Stats come from games kept in the app.</EmptyState>
       )}
     </div>
   );
@@ -140,18 +141,12 @@ export function TeamList({ title = "Teams", teams, empty, plain = false }: { tit
     <div className="card">
       <h2 className="card-title">{title}</h2>
       {teams.length === 0 ? (
-        (empty ?? <p className="muted small">No teams yet.</p>)
+        (empty ?? <EmptyState quiet>No teams yet.</EmptyState>)
       ) : (
-        <ul className="team-list">
+        <ul className="teams-rows">
           {teams.map((t) => (
             <li key={t.id}>
-              <Link href={`/teams/${encodeURIComponent(t.id)}`}>
-                <Avatar name={t.name} size={32} />
-                <span>
-                  <b>{t.name}</b>
-                  {t.subtitle && <small>{t.subtitle}</small>}
-                </span>
-              </Link>
+              <ListRow href={`/teams/${encodeURIComponent(t.id)}`} leading={<Avatar name={t.name} size={40} />} title={t.name} subtitle={t.subtitle} />
             </li>
           ))}
         </ul>

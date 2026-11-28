@@ -33,7 +33,6 @@ import { type Doc, useLiveDoc, useLiveQuery } from "@/lib/live";
 import { listingSubtitle } from "@/lib/site";
 import { useAuth } from "../AuthProvider";
 import { Avatar } from "../Avatar";
-import { EventItem } from "../EventItem";
 import { EventsBrowser } from "../EventsBrowser";
 import { LocalTime } from "../LocalTime";
 import { type DivisionRanking, isShownRanking, type PlayerRanking, rankingLabel, whole } from "../Rankings";
@@ -45,7 +44,11 @@ import "./explore.css";
 import { useMyTeams } from "../useMyTeams";
 import { StatusPill } from "../ui/StatusPill";
 import { FilterChips } from "../ui/FilterChips";
-import { ErrorNote } from "@/components/StatusViews";
+import { EventCard } from "../ui/EventCard";
+import { SearchField } from "../ui/Fields";
+import { Button } from "../ui/Button";
+import { ListRow } from "../ui/ListRow";
+import { EmptyState, ErrorState, LoadingState } from "../ui/States";
 
 const chips: Array<[string, ExploreFilter | null]> = [
   ["All", null],
@@ -249,22 +252,23 @@ function SearchCard({
   const what = searchHint(only, !!user);
   const heading = (title: string) => (sections > 1 ? <h3 className="explore-heading">{title}</h3> : null);
   const listingRows = (list: PublicListing[]) => (
-    <div className="stack explore-list">
+    <ul className="explore-rows">
       {list.map((t) => {
         const group = (t.kind ?? "team") !== "team";
         const sub = listingSubtitle(t);
         return (
-          <Link key={t.id} className="row-card" href={`/teams/${encodeURIComponent(t.id)}`}>
-            <Avatar name={t.name} />
-            <span>
-              <b>{t.name || "Team"}</b>
-              <small>{group ? [sub, t.requiresApproval ? "Approval required" : "Open to join"].filter(Boolean).join(" · ") : sub}</small>
-            </span>
-            {myIds.has(t.id) && <StatusPill className="explore-mine">{group ? "Your group" : "Your team"}</StatusPill>}
-          </Link>
+          <li key={t.id}>
+            <ListRow
+              href={`/teams/${encodeURIComponent(t.id)}`}
+              leading={<Avatar name={t.name} size={40} />}
+              title={t.name || "Team"}
+              subtitle={group ? [sub, t.requiresApproval ? "Approval required" : "Open to join"].filter(Boolean).join(" · ") : sub}
+              trailing={myIds.has(t.id) ? <StatusPill tone="success" icon="check">Joined</StatusPill> : undefined}
+            />
+          </li>
         );
       })}
-    </div>
+    </ul>
   );
 
   return (
@@ -273,20 +277,17 @@ function SearchCard({
         Search
       </h2>
       <form
-        className="search-form explore-search-form"
+        className="explore-search-form"
         role="search"
         onSubmit={(e) => {
           e.preventDefault();
           search(text);
         }}
       >
-        <label className="visually-hidden" htmlFor="q">
-          Search Stall 10
-        </label>
-        <input id="q" name="q" type="search" value={text} onChange={(e) => onType(e.target.value)} placeholder="Search Stall 10" autoComplete="off" enterKeyHint="search" />
-        <button className="btn btn-primary" type="submit">
+        <SearchField id="q" name="q" label="Search Stall 10" value={text} onChange={onType} placeholder="Search Stall 10" />
+        <Button variant="primary" type="submit">
           Search
-        </button>
+        </Button>
       </form>
       <FilterChips
         className="explore-chips"
@@ -302,17 +303,13 @@ function SearchCard({
       )}
       <div className="explore-results" aria-live="polite">
         {running && nothing ? (
-          <p className="muted" aria-busy="true">
-            Searching…
-          </p>
+          <LoadingState label="Searching…" />
         ) : failed && nothing ? (
-          <ErrorNote>Couldn&apos;t search. Try again.</ErrorNote>
+          <ErrorState onRetry={() => search(text)}>Couldn&apos;t search. Try again.</ErrorState>
         ) : ready && nothing ? (
-          <div className="empty">
-            <b>Nothing found</b>
-            <br />
+          <EmptyState quiet title="Nothing found">
             Try another word from a name, {user ? "username, " : ""}city, school, team, tournament or league.
-          </div>
+          </EmptyState>
         ) : nothing ? (
           <p className="muted explore-hint">
             Type at least {minQueryLength} letters to search {what}.
@@ -356,17 +353,13 @@ function SearchCard({
         {people.length > 0 && (
           <>
             {heading("Players")}
-            <div className="stack explore-list">
+            <ul className="explore-rows">
               {people.map((p) => (
-                <Link key={p.id} className="row-card" href={`/players/${encodeURIComponent(p.id)}`}>
-                  <Avatar name={p.name} url={p.photoUrl} />
-                  <span>
-                    <b>{p.name || "Player"}</b>
-                    {p.username && <small>@{p.username}</small>}
-                  </span>
-                </Link>
+                <li key={p.id}>
+                  <ListRow href={`/players/${encodeURIComponent(p.id)}`} leading={<Avatar name={p.name} url={p.photoUrl} size={40} />} title={p.name || "Player"} subtitle={p.username ? `@${p.username}` : undefined} />
+                </li>
               ))}
-            </div>
+            </ul>
           </>
         )}
         {teamEvents.length > 0 && (
@@ -394,33 +387,38 @@ function GroupTournamentRow({ t }: { t: EventsPage["tournaments"][number] }) {
         ? `/teams/${encodeURIComponent(t.groupId)}`
         : "/explore#coming-up";
   return (
-    <Link className="row-card" href={href}>
-      <span>
-        <b>{t.name || "Tournament"}</b>
-        <small>
+    <EventCard
+      href={href}
+      startsAt={t.startsAt}
+      title={t.name || "Tournament"}
+      meta={
+        <>
           <LocalTime iso={t.startsAt} />
           {t.endsOn && t.endsOn !== t.startsAt?.slice(0, 10) ? ` – ${t.endsOn}` : ""}
-        </small>
-      </span>
-    </Link>
+        </>
+      }
+    />
   );
 }
 
 /** A public team event (a pickup game, a practice open to all) in the results. */
 function TeamEventRow({ e }: { e: PublicTeamEvent }) {
   return (
-    <EventItem startsAt={e.startsAt}>
-      <Link href={`/teams/${encodeURIComponent(e.teamId)}/schedule?event=${encodeURIComponent(e.id)}`}>
-        <b>{e.title || "Event"}</b>
+    <EventCard
+      href={`/teams/${encodeURIComponent(e.teamId)}/schedule?event=${encodeURIComponent(e.id)}`}
+      startsAt={e.startsAt}
+      title={e.title || "Event"}
+      meta={
+        <>
+          <LocalTime iso={e.startsAt} style="dateTime" />
+          {e.location ? ` · ${e.location}` : ""}
+        </>
+      }
+    >
+      <Link className="explore-event-team" href={`/teams/${encodeURIComponent(e.teamId)}`}>
+        {e.teamName}
       </Link>
-      <small>
-        <LocalTime iso={e.startsAt} style="dateTime" />
-        {e.location ? ` · ${e.location}` : ""}
-      </small>
-      <small>
-        <Link href={`/teams/${encodeURIComponent(e.teamId)}`}>{e.teamName}</Link>
-      </small>
-    </EventItem>
+    </EventCard>
   );
 }
 
@@ -553,13 +551,11 @@ function ComingUp({
             </Link>
           </div>
           {error && !hosted ? (
-            <ErrorNote>{error}</ErrorNote>
+            <ErrorState>{error}</ErrorState>
           ) : !hosted ? (
-            <p className="muted" aria-busy="true">
-              Loading…
-            </p>
+            <LoadingState />
           ) : shown.length === 0 ? (
-            <p className="muted small">Nothing coming up yet. Communities and clubs host tournaments and leagues from their Tournaments tab.</p>
+            <EmptyState quiet>Nothing coming up yet. Communities and clubs host tournaments and leagues from their Tournaments tab.</EmptyState>
           ) : (
             <div className="stack explore-list">
               {shown.map((t) => (
@@ -571,11 +567,9 @@ function ComingUp({
       )}
       {showEvents &&
         (events === undefined ? (
-          <p className="muted" aria-busy="true">
-            Loading events…
-          </p>
+          <LoadingState label="Loading events…" />
         ) : events === null ? (
-          <ErrorNote>Couldn&apos;t load events. Try again.</ErrorNote>
+          <ErrorState>Couldn&apos;t load events. Try again.</ErrorState>
         ) : (
           <EventsBrowser
             events={eventsFor(events.events, only)}
@@ -688,13 +682,11 @@ function RankingsPreview({ mine }: { mine: MyTeam[] }) {
       </div>
       {kind === "teams" ? (
         rankings.error ? (
-          <ErrorNote>{rankings.error}</ErrorNote>
+          <ErrorState>{rankings.error}</ErrorState>
         ) : !rankings.data ? (
-          <p className="muted" aria-busy="true">
-            Loading…
-          </p>
+          <LoadingState />
         ) : !ranking ? (
-          <p className="muted small">Teams get ranked once they play 5 games in public tournaments hosted on Stall 10.</p>
+          <EmptyState quiet>Teams get ranked once they play 5 games in public tournaments hosted on Stall 10.</EmptyState>
         ) : (
           <>
             {ranked.length > 1 ? (
@@ -723,15 +715,11 @@ function RankingsPreview({ mine }: { mine: MyTeam[] }) {
           </>
         )
       ) : players.error ? (
-        <ErrorNote>{players.error}</ErrorNote>
+        <ErrorState>{players.error}</ErrorState>
       ) : players.data === undefined ? (
-        <p className="muted" aria-busy="true">
-          Loading…
-        </p>
+        <LoadingState />
       ) : (players.data?.players ?? []).length === 0 ? (
-        <p className="muted small">
-          Players get rated once their team logs 10 of their games with the stat tracker. Only public profiles that show stats are rated.
-        </p>
+        <EmptyState quiet>Players get rated once their team logs 10 of their games with the stat tracker. Only public profiles that show stats are rated.</EmptyState>
       ) : (
         <ol className="explore-ranks">
           {(players.data?.players ?? []).slice(0, previewTeams).map((p) => (
@@ -764,16 +752,13 @@ function JumpIn() {
   return (
     <section className="card">
       <h2 className="card-title">Jump in</h2>
-      <div className="stack explore-list">
+      <ul className="explore-rows">
         {shortcuts.map((s) => (
-          <Link key={s.title} className="row-card" href={s.href}>
-            <span>
-              <b>{s.title}</b>
-              <small>{s.sub}</small>
-            </span>
-          </Link>
+          <li key={s.title}>
+            <ListRow href={s.href} title={s.title} subtitle={s.sub} />
+          </li>
         ))}
-      </div>
+      </ul>
     </section>
   );
 }

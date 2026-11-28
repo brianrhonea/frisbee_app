@@ -1,8 +1,8 @@
 "use client";
 import type { EventsPage } from "@stall10/shared";
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { EventItem } from "./EventItem";
+import { EventCard } from "./ui/EventCard";
+import { EmptyState } from "./ui/States";
 import { LocalTime } from "./LocalTime";
 import { NavIcon } from "./NavIcons";
 import { formatDate as fmt, startOfToday } from "@/lib/dates";
@@ -90,13 +90,14 @@ export function EventsBrowser({ events, tournaments }: EventsPage) {
                     type="button"
                     className={["week-day", isToday ? "today" : "", selected ? "selected" : ""].filter(Boolean).join(" ")}
                     aria-pressed={selected}
-                    aria-label={`${fmt(d, { weekday: "long", month: "long", day: "numeric" })}: ${
-                      kinds.length === 1 ? "1 event" : `${kinds.length} events`
-                    }`}
                     onClick={() => setPicked(selected ? null : k)}
                   >
                     <small>{fmt(d, { weekday: "short" })}</small>
                     <b>{d.getDate()}</b>
+                    {/* The name is the visible "Sun 29" plus the whole date and the count, said in text (label in name). */}
+                    <span className="sr-only">
+                      , {fmt(d, { weekday: "long", month: "long", day: "numeric" })}: {kinds.length === 1 ? "1 event" : `${kinds.length} events`}
+                    </span>
                     <span className="week-dots" aria-hidden="true">
                       {kinds.slice(0, 3).map((kind, i) => (
                         <i key={i} className={kind} />
@@ -136,38 +137,42 @@ export function EventsBrowser({ events, tournaments }: EventsPage) {
           <h2 className="section-title">Tournaments</h2>
           <div className="stack">
             {shownTournaments.map((t) => (
-              <EventItem key={t.id} startsAt={t.startsAt}>
-                <b>{t.name || "Tournament"}</b>
-                <small>
-                  <LocalTime iso={t.startsAt} />
-                  {t.endsOn && t.endsOn !== t.startsAt?.slice(0, 10) ? ` – ${t.endsOn}` : ""}
-                </small>
-                {t.groupId && (
-                  <small>
-                    <Link href={`/teams/${encodeURIComponent(t.groupId)}`}>Hosted by a community on Stall 10</Link>
-                  </small>
-                )}
-              </EventItem>
+              <EventCard
+                key={t.id}
+                startsAt={t.startsAt}
+                title={t.name || "Tournament"}
+                href={t.groupId ? `/teams/${encodeURIComponent(t.groupId)}` : undefined}
+                meta={
+                  <>
+                    <LocalTime iso={t.startsAt} />
+                    {t.endsOn && t.endsOn !== t.startsAt?.slice(0, 10) ? ` – ${t.endsOn}` : ""}
+                    {t.groupId ? " · Hosted by a community on Stall 10" : ""}
+                  </>
+                }
+              />
             ))}
           </div>
         </>
       )}
       <h2 className="section-title">Team events</h2>
       {shownEvents.length === 0 ? (
-        <p className="empty">{picked ? "Nothing on this day." : "Nothing coming up."}</p>
+        <EmptyState>{picked ? "Nothing on this day." : "Nothing coming up."}</EmptyState>
       ) : (
         <div className="stack">
           {shownEvents.map((e) => (
-            <EventItem key={`${e.teamId}/${e.id}`} startsAt={e.startsAt}>
-              <b>{e.title || "Event"}</b>
-              <small>
-                <LocalTime iso={e.startsAt} style="dateTime" />
-                {e.location ? ` · ${e.location}` : ""}
-              </small>
-              <small>
-                <Link href={`/teams/${encodeURIComponent(e.teamId)}`}>{e.teamName}</Link>
-              </small>
-            </EventItem>
+            <EventCard
+              key={`${e.teamId}/${e.id}`}
+              startsAt={e.startsAt}
+              title={e.title || "Event"}
+              href={`/teams/${encodeURIComponent(e.teamId)}`}
+              meta={
+                <>
+                  <LocalTime iso={e.startsAt} style="dateTime" />
+                  {e.location ? ` · ${e.location}` : ""}
+                  {e.teamName ? ` · ${e.teamName}` : ""}
+                </>
+              }
+            />
           ))}
         </div>
       )}
