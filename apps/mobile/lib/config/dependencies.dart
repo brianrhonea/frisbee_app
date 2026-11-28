@@ -39,6 +39,7 @@ import '../data/repositories/meeting/meeting_repository_firebase.dart';
 import '../data/repositories/meeting/meeting_settings_repository.dart';
 import '../data/repositories/schedule/schedule_settings_repository.dart';
 import '../data/repositories/team/team_hints_repository.dart';
+import '../data/repositories/team_history/team_history_repository.dart';
 import '../data/repositories/discover/discover_repository.dart';
 import '../data/repositories/learn/learn_progress_repository.dart';
 import '../data/repositories/notification/notification_repository.dart';
@@ -320,6 +321,10 @@ List<SingleChildWidget> get firebaseProviders => [
   ),
   Provider<DiscoverRepository>(
     create: (context) => DiscoverRepositoryApi(api: context.read<ApiClient?>()),
+  ),
+  Provider<TeamHistoryRepository>(
+    create: (context) =>
+        TeamHistoryRepositoryApi(api: context.read<ApiClient?>()),
   ),
   Provider<ScheduleSettingsRepository>(
     create: (_) => ScheduleSettingsRepositoryPrefs(),
