@@ -415,7 +415,10 @@ void main() {
       tester.element(find.byType(HomeScreen)),
     ).push('/posts/p1?comment=1');
     await tester.pumpAndSettle();
-    expect(find.text('No comments yet. Be the first.'), findsOneWidget);
+    expect(
+      find.text('No comments yet. Start the conversation.'),
+      findsOneWidget,
+    );
     final box = find.widgetWithText(TextField, 'Add a comment…');
     expect(tester.widget<TextField>(box).focusNode!.hasFocus, isTrue);
 

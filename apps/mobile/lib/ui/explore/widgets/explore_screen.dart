@@ -718,7 +718,7 @@ class _ResultTile extends StatelessWidget {
           : t.subtitle,
       trailing: vm.isMine(t.id)
           ? StatusPill(
-              t.isCommunity ? 'Your community' : 'Your team',
+              'Joined',
               tone: PillTone.success,
               icon: Icons.check,
               maxWidth: _trailingMax,

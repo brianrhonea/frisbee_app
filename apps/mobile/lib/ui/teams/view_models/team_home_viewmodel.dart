@@ -321,7 +321,7 @@ class TeamHomeViewModel extends ChangeNotifier {
   /// The viewer's answer to [nextEvent]; null when unanswered.
   RsvpStatus? get myNextRsvp => nextEvent?.rsvpOf(uid);
 
-  /// Amber "RSVP needed" on the pickup card: a member who hasn't answered
+  /// Amber "Needs RSVP" on the pickup card: a member who hasn't answered
   /// [nextEvent] (which isn't over: [upcomingEvents] leaves those out).
   bool get nextNeedsRsvp => isMember && nextEvent != null && myNextRsvp == null;
 

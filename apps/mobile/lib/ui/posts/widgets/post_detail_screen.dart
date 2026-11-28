@@ -269,7 +269,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                     vertical: 16,
                                   ),
                                   child: Text(
-                                    'No comments yet. Be the first.',
+                                    'No comments yet. Start the conversation.',
                                     textAlign: TextAlign.center,
                                     style: AppText.secondary.copyWith(
                                       color: AppColors.of(context).muted,

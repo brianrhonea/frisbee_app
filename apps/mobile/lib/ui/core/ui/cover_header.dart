@@ -24,6 +24,7 @@ class CoverHeader extends StatelessWidget {
     this.coverHeight = 120,
     this.avatarSize = 72,
     this.roundAvatar = true,
+    this.watermark,
   });
 
   final String title;
@@ -42,11 +43,22 @@ class CoverHeader extends StatelessWidget {
   /// date badge).
   final bool roundAvatar;
 
+  /// Opt-in designed default band (profiles): without a cover photo, an
+  /// accent wash into the field colour, a faint diagonal stripe and these
+  /// letters (the initials, at most two) drawn large and faint. Null keeps
+  /// the plain band. Decoration only: never read aloud.
+  final String? watermark;
+
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     final url = coverUrl;
-    final band = ColoredBox(color: c.accentSoft);
+    final mark = watermark?.trim();
+    final band = mark == null || mark.isEmpty
+        ? ColoredBox(color: c.accentSoft)
+        : DefaultCoverBand(
+            watermark: mark.length > 2 ? mark.substring(0, 2) : mark,
+          );
     final wrapActions = MediaQuery.textScalerOf(context).scale(14) > 14 * 1.3;
     final titleBlock = Semantics(
       header: true,
@@ -152,4 +164,87 @@ class CoverHeader extends StatelessWidget {
       ],
     );
   }
+}
+
+/// The designed default band behind a profile without a header photo, from
+/// colour tokens only: the accent mixed ~30% into the card colour fading to
+/// the field colour at 135 degrees, a faint diagonal stripe (accent ~9%),
+/// and the [watermark] letters as a large Barlow Condensed mark (accent
+/// ~16%) at the lower right. Excluded from semantics.
+///
+/// Website counterpart: `.ui-cover-default` (apps/web ui.css).
+class DefaultCoverBand extends StatelessWidget {
+  const DefaultCoverBand({super.key, required this.watermark});
+
+  final String watermark;
+
+  static const _fontSize = 100.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return ExcludeSemantics(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color.lerp(c.card, c.accent, 0.3)!, c.field],
+              ),
+            ),
+          ),
+          CustomPaint(
+            painter: _StripePainter(c.accent.withValues(alpha: 0.09)),
+          ),
+          Positioned(
+            right: AppSpace.lg,
+            bottom: -_fontSize * 0.18,
+            child: Text(
+              watermark,
+              maxLines: 1,
+              softWrap: false,
+              textScaler: TextScaler.noScaling,
+              style: TextStyle(
+                fontFamily: scoreFont,
+                fontWeight: FontWeight.w800,
+                fontSize: _fontSize,
+                height: 1,
+                letterSpacing: 2,
+                color: c.accent.withValues(alpha: 0.16),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 2 px stripes every 18 px, running up and to the right (perpendicular to
+/// a 135 degree gradient).
+class _StripePainter extends CustomPainter {
+  const _StripePainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 2;
+    const step = 18 * 1.4142;
+    for (var k = 0.0; k < size.width + size.height; k += step) {
+      canvas.drawLine(
+        Offset(k, 0),
+        Offset(k - size.height, size.height),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_StripePainter old) => old.color != color;
 }

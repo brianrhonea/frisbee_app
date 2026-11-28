@@ -247,7 +247,7 @@ void main() {
       expect(find.text('Join'), findsOneWidget);
       expect(find.text('Ask to join'), findsOneWidget);
       // What you already belong to is a pill, not a button.
-      expect(find.widgetWithText(StatusPill, 'Your community'), findsOneWidget);
+      expect(find.widgetWithText(StatusPill, 'Joined'), findsOneWidget);
     });
 
     testWidgets('large text does not overflow', (tester) async {

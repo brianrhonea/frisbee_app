@@ -348,7 +348,7 @@ void main() {
       await tester.pump();
       expect(find.text('Practice: zone O'), findsOneWidget);
       expect(find.text('1 going'), findsOneWidget);
-      expect(find.text('RSVP needed'), findsOneWidget);
+      expect(find.text('Needs RSVP'), findsOneWidget);
       await tester.tap(find.widgetWithText(FilledButton, 'Going'));
       await tester.pump();
       await tester.pump();

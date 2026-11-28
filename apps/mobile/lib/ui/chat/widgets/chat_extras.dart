@@ -292,7 +292,7 @@ class _EventCardBody extends StatelessWidget {
                       if (vm.needsAnswer)
                         const Padding(
                           padding: EdgeInsets.only(right: 4),
-                          child: NeedsYouPill('RSVP needed'),
+                          child: NeedsYouPill('Needs RSVP'),
                         ),
                       for (final s in RsvpStatus.values)
                         _RsvpButton(

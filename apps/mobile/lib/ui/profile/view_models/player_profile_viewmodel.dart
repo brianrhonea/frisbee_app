@@ -582,6 +582,22 @@ class PlayerProfileViewModel extends ChangeNotifier {
   PostActions? actions;
   bool get postsLoaded => _postsLoaded;
   Object? get postsError => _postsError;
+
+  /// How many posts the Posts tile counts: the posts the list shows, which
+  /// the query caps at [postCountCap] (the rules' list limit).
+  static const postCountCap = 50;
+
+  /// The Posts tile's number ("50+" at the cap), or null to hide the tile:
+  /// still loading, failed, no posts here, or a locked profile.
+  String? get postCountLabel {
+    if (!social || locked || !_postsLoaded || _postsError != null) return null;
+    final n = _posts.length;
+    return n >= postCountCap ? '$postCountCap+' : '$n';
+  }
+
+  /// "Post" or "Posts" for [postCountLabel].
+  String get postCountCaption => _posts.length == 1 ? 'Post' : 'Posts';
+
   int get followers => _counts.followers;
   int get following => _counts.following;
 
