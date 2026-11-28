@@ -113,7 +113,7 @@ async function fsMerge(path, data) {
 
 /** Sets one member's tier on the team doc, leaving the rest of it as it is. */
 async function fsSetMember(teamId, uid, tier) {
-  const res = await fetch(`http://${FS}/v1/projects/${PROJECT}/databases/(default)/documents/teams/${teamId}?updateMask.fieldPaths=members.${uid}`, {
+  const res = await fetch(`http://${FS}/v1/projects/${PROJECT}/databases/(default)/documents/teams/${teamId}?updateMask.fieldPaths=${encodeURIComponent("members.`" + uid + "`")}`, {
     method: "PATCH",
     headers: { authorization: "Bearer owner", "content-type": "application/json" },
     body: JSON.stringify({ fields: { members: enc({ [uid]: tier }) } }),

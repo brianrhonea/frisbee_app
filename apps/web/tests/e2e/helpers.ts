@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page } from "@playwright/test";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 export type Theme = "light" | "dark";
 
@@ -32,17 +33,31 @@ export async function open(page: Page, path: string, theme: Theme = "light") {
 // The API limits "who am I" checks to 10 a minute per account (personal/routes.ts statusLimits), and
 // every full page load of a member page makes one. Signed-in tests therefore space page loads
 // out (run them with --workers=1) instead of loosening a production limit.
-let lastLoad = 0;
-const loadGapMs = 6500;
+// (The status call also has a cap of 200 a day per account, so a run that loads many pages as one person
+// should use another seeded person for part of them: n8-routes.world.spec.ts signs Ben in for that.)
+// The time of the last load is kept in a file, so a worker that Playwright restarts after a failure does not start a burst.
+const loadStamp = "review/web/.auth/last-member-load.txt";
+const loadGapMs = 7000;
 
 /**
  * Opens a member page in [theme]. Signed-in pages hold live Firestore connections, so the
  * network never goes idle: wait for the DOM, then for [settle] ms (dev-server hydration, data).
  */
 export async function openMember(page: Page, path: string, theme: Theme = "light", settle = 4500) {
+  let lastLoad = 0;
+  try {
+    lastLoad = Number(readFileSync(loadStamp, "utf8")) || 0;
+  } catch {
+    // none yet
+  }
   const wait = lastLoad + loadGapMs - Date.now();
   if (wait > 0) await page.waitForTimeout(wait);
-  lastLoad = Date.now();
+  try {
+    mkdirSync("review/web/.auth", { recursive: true });
+    writeFileSync(loadStamp, String(Date.now()));
+  } catch {
+    // the gap is a courtesy to the API's limit; a missing stamp only loses it
+  }
   await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
   const res = await page.goto(path, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(settle);
