@@ -29,6 +29,7 @@ vi.mock("@/components/Report", () => ({
   BlockButton: ({ label, className }: { label?: string; className?: string }) => <button type="button" className={className}>{label ?? "Block"}</button>,
 }));
 vi.mock("@/components/RosterSpots", () => ({ RosterSpots: () => <section aria-label="Roster spots">spots</section> }));
+vi.mock("@/components/TeamHistory", () => ({ TeamHistory: ({ isMe }: { isMe: boolean }) => <section aria-label="Team history">{isMe ? "mine" : "theirs"}</section> }));
 vi.mock("@/components/ForVisitors", () => ({ ForVisitors: () => null }));
 vi.mock("@/components/ui/ConfirmDialog", () => ({ useConfirm: () => vi.fn().mockResolvedValue(false) }));
 vi.mock("@/components/PostCard", () => ({ PostCard: ({ post }: { post: { id: string } }) => <article>post {post.id}</article> }));
@@ -122,11 +123,14 @@ describe("Q1 the whole player page", () => {
     expect(screen.getByText("No posts yet.")).toBeInTheDocument();
     // Another player: no Roster spots card (it is only on your own page).
     expect(screen.queryByRole("region", { name: "Roster spots" })).toBeNull();
+    // R1: the Team history card follows the Teams card, told whose page it is.
+    expect(screen.getByRole("region", { name: "Team history" })).toHaveTextContent("theirs");
   });
 
   it("keeps the Roster spots card on your own page, and gives yourself no Report or Block", () => {
     render(<PlayerView uid="me" page={page()} locked={false} />);
     expect(screen.getByRole("region", { name: "Roster spots" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Team history" })).toHaveTextContent("mine");
     expect(screen.queryByRole("button", { name: "Report" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Block" })).toBeNull();
   });
@@ -142,6 +146,7 @@ describe("Q1 the whole player page", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Jamie Carter" })).toBeInTheDocument();
     expect(screen.getByText("Private profile")).toBeInTheDocument();
     expect(screen.getByText("This profile is private")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Team history" })).toBeNull();
     expect(screen.getByText(/shares their stats, teams and posts with the people they approve/)).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Posts" })).toBeNull();
     expect(screen.queryByRole("link", { name: /Sidewinders/ })).toBeNull();
