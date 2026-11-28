@@ -1,8 +1,7 @@
-import { readdirSync } from "node:fs";
 import { createServer, type Server } from "node:http";
-import { join, relative } from "node:path";
 import { expect, test } from "@playwright/test";
 import { open, watchErrors } from "./helpers";
+import { routesWith, syntheticIds } from "./routeMap";
 
 // N8: every website route in the route map (docs/specifications/navigation-route-map.md)
 // opens signed out. The list is read from app/**/page.tsx, so a new page is covered
@@ -11,22 +10,7 @@ import { open, watchErrors } from "./helpers";
 // ("Something went wrong") is not shown and the page has a main region. Member pages
 // show their sign-in prompt or "not found" for a made-up id; that is a load.
 // Signed-in loads need the Firebase emulators and fixtures (not run here).
-const appDir = join(__dirname, "../../app");
-
-function pages(dir: string, out: string[] = []): string[] {
-  for (const e of readdirSync(dir, { withFileTypes: true })) {
-    const p = join(dir, e.name);
-    if (e.isDirectory()) pages(p, out);
-    else if (e.name === "page.tsx") out.push("/" + relative(appDir, dir).replace(/\\/g, "/"));
-  }
-  return out;
-}
-
-const synthetic: Record<string, string> = { slug: "about", id: "t1", code: "ABC123", uid: "u1", teamId: "t1", tournamentId: "tn1", divisionId: "d1", meetingId: "m1", playId: "p1", videoId: "v1", gameId: "g1", postId: "post1" };
-const routes = pages(appDir)
-  .map((r) => (r === "/." ? "/" : r))
-  .map((r) => r.replace(/\[(\w+)\]/g, (_m, k: string) => synthetic[k] ?? "x"))
-  .sort();
+const routes = routesWith(syntheticIds);
 
 // Server-rendered pages ask the API (port 8787) for public data. With none running they
 // would show the error page, so a stub answers 404 "not found" to everything (synthetic;

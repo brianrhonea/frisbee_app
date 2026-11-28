@@ -1,0 +1,17 @@
+[
+  { "path": "/teams/{teamId}", "page": "team" },
+  { "path": "/teams/{teamId}/roster", "page": "team-roster" },
+  { "path": "/g/{groupId}", "page": "group" },
+  { "path": "/join/{code}", "page": "invite" },
+  { "path": "/posts/{postId}", "page": "post" },
+  { "path": "/p/{postId}", "page": "post-short" },
+  { "path": "/players/{uid}", "page": "player" },
+  { "path": "/explore?only=teams&q=", "page": "discover" },
+  { "path": "/rankings?level=club&division=open", "page": "rankings" },
+  { "path": "/tournaments/{tournamentId}", "page": "tournament" },
+  { "path": "/tournaments/{tournamentId}/respond?team={teamId}&step=roster", "page": "tournament-respond" },
+  { "path": "/tournaments/{tournamentId}/bracket?division={divisionId}", "page": "tournament-bracket" },
+  { "path": "/tournaments/{tournamentId}/live-draft/{divisionId}", "page": "tournament-live-draft" },
+  { "path": "/teams/{teamId}/meetings/{meetingId}", "page": "meeting" },
+  { "path": "/learn", "page": "learn" }
+]

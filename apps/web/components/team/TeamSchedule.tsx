@@ -419,10 +419,11 @@ function EventDetail({ event, onEdit }: { event: Doc<TeamEventDoc>; onEdit?: () 
         }
       />
       {event.location && (
-        <p className="event-place">
+        // A div, not a p: the Directions menu is a details element, which may not sit inside a paragraph (hydration error).
+        <div className="event-place">
           <span>{event.location}</span>
           <Directions to={event.location} />
-        </p>
+        </div>
       )}
       {event.notes && (
         <div className="event-notes">
