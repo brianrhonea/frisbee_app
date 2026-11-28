@@ -87,10 +87,7 @@ class TournamentTile extends StatelessWidget {
       title: Row(
         children: [
           Flexible(
-            child: Text(
-              t.name,
-              style: AppText.label.copyWith(color: c.ink),
-            ),
+            child: Text(t.name, style: AppText.label.copyWith(color: c.ink)),
           ),
           if (t.hostOfficial) ...[
             const SizedBox(width: 6),
@@ -503,10 +500,7 @@ class RankingRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
-                t.record,
-                style: AppText.secondary.copyWith(color: c.muted),
-              ),
+              Text(t.record, style: AppText.secondary.copyWith(color: c.muted)),
               SizedBox(
                 width: 56,
                 child: Align(
@@ -633,7 +627,10 @@ class PublicEventRow extends StatelessWidget {
           ? null
           : Text(
               e.type!.label,
-              style: AppText.caption.copyWith(fontWeight: FontWeight.w600, color: c.muted),
+              style: AppText.caption.copyWith(
+                fontWeight: FontWeight.w600,
+                color: c.muted,
+              ),
             ),
       onTap: () => context.push(
         viewModel.isMine(e.teamId)

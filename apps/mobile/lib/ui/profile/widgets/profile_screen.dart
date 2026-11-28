@@ -829,14 +829,18 @@ class _NumbersCard extends StatelessWidget {
                                   label,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: AppText.caption.copyWith(color: c.ink2),
+                                  style: AppText.caption.copyWith(
+                                    color: c.ink2,
+                                  ),
                                 ),
                                 if (note.isNotEmpty)
                                   Text(
                                     note,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: AppText.caption.copyWith(color: c.muted),
+                                    style: AppText.caption.copyWith(
+                                      color: c.muted,
+                                    ),
                                   ),
                               ],
                             ),
@@ -911,7 +915,10 @@ class _SeasonsCard extends StatelessWidget {
           dataRowMaxHeight: 40,
           horizontalMargin: 0,
           columnSpacing: 22,
-          headingTextStyle: AppText.caption.copyWith(fontWeight: FontWeight.w700, color: c.muted),
+          headingTextStyle: AppText.caption.copyWith(
+            fontWeight: FontWeight.w700,
+            color: c.muted,
+          ),
           columns: [for (final h in columns) DataColumn(label: Text(h))],
           rows: [
             for (final r in rows)

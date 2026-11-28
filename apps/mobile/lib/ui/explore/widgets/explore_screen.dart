@@ -580,7 +580,9 @@ class _ComingUp extends StatelessWidget {
             if (list.isEmpty && list.length < vm.tournaments.length)
               Text(
                 'Nothing else coming up yet.',
-                style: AppText.secondary.copyWith(color: AppColors.of(context).muted),
+                style: AppText.secondary.copyWith(
+                  color: AppColors.of(context).muted,
+                ),
               )
             else if (list.isEmpty)
               EmptyState(
@@ -828,10 +830,7 @@ class _Shortcuts extends StatelessWidget {
                 ),
                 child: Icon(icon, size: 19, color: c.ink),
               ),
-              title: Text(
-                title,
-                style: AppText.label,
-              ),
+              title: Text(title, style: AppText.label),
               subtitle: Text(subtitle, style: AppText.caption),
               onTap: onTap,
             ),

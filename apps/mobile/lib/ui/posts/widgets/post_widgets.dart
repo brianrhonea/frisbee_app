@@ -138,9 +138,7 @@ class UserPostCard extends StatelessWidget {
                                     post.authorName.isEmpty
                                         ? 'Someone'
                                         : post.authorName,
-                                    style: AppText.label.copyWith(
-                                      color: c.ink,
-                                    ),
+                                    style: AppText.label.copyWith(color: c.ink),
                                   ),
                                   Text(
                                     subtitle,

@@ -10,7 +10,6 @@ import 'package:frisbee_app/data/repositories/team/team_repository.dart';
 import 'package:frisbee_app/data/repositories/user_post/user_post_repository.dart';
 import 'package:frisbee_app/domain/models/player_profile.dart';
 import 'package:frisbee_app/domain/models/post_comment.dart';
-import 'package:frisbee_app/domain/models/stats.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/domain/models/user_post.dart';
 import 'package:frisbee_app/ui/core/ui/cover_header.dart';
@@ -248,10 +247,7 @@ void main() {
       expect(find.text('Join'), findsOneWidget);
       expect(find.text('Ask to join'), findsOneWidget);
       // What you already belong to is a pill, not a button.
-      expect(
-        find.widgetWithText(StatusPill, 'Your community'),
-        findsOneWidget,
-      );
+      expect(find.widgetWithText(StatusPill, 'Your community'), findsOneWidget);
     });
 
     testWidgets('large text does not overflow', (tester) async {
