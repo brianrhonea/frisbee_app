@@ -15,13 +15,13 @@
 // Nothing here names another person: no uids, no roster, no members.
 import {
   addSeasonTotals,
-  isYouthTeam,
   orderTeamHistory,
-  publicPageOn,
+  rosterIsPublic,
   type SeasonTotals,
-  seasonTotalsFor,
+  seasonTotalsForSpots,
   type TeamHistory,
   type TeamHistoryEntry,
+  teamHistoryGameBudget,
   teamHistoryMaxGames,
   teamHistoryMaxSpots,
 } from "@stall10/shared";
@@ -30,19 +30,30 @@ import { type Caller } from "../auth.js";
 import { isPrivateProfile, validId } from "../browse/model.js";
 import { isDraftedLeagueTeam } from "../browse/visibility.js";
 import { ApiError } from "../errors.js";
+import { blockedBetween } from "../moderation/service.js";
 import type { DocQueries } from "../queries.js";
 import type { Data, DocStore } from "../store.js";
 import { isMember, kindOf, mapOf } from "./access.js";
 import type { RosterService } from "./roster.js";
 
-/** Teams whose games are read at once. */
-const gameReads = 5;
-/** Games read per query. */
-const gamePage = 100;
+/** Games read per query (a stats game can be ~900 KB). */
+const gamePage = 20;
+/** How long a caller's history of one player is served from memory. */
+const cacheMs = 60_000;
+/** Most cached histories per instance; the oldest goes first. */
+const cacheMax = 500;
+
+/** Lets the event loop serve other requests between pages. */
+const yieldLoop = () => new Promise<void>((resolve) => setImmediate(resolve));
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 
 export class TeamHistoryService {
+  /** Callers with a history request running on this instance. */
+  private readonly running = new Set<string>();
+  /** `caller:target` to a recent answer. */
+  private readonly cache = new Map<string, { at: number; value: TeamHistory }>();
+
   constructor(
     private readonly store: DocStore,
     private readonly queries: DocQueries,
@@ -63,11 +74,40 @@ export class TeamHistoryService {
     return visibility.stats !== false && visibility.teams !== false;
   }
 
+  /**
+   * The history of [rawUid] as [caller] may see it. One request per caller
+   * runs at a time on an instance (a second answers resource_exhausted),
+   * and an answer is kept for a minute per (caller, player), so a block
+   * placed in that minute shows from the next one.
+   */
   async history(caller: Caller, rawUid: unknown): Promise<TeamHistory> {
     if (!validId(rawUid)) throw new ApiError("not_found", "No such player.");
-    const uid = rawUid;
+    const key = `${caller.uid}:${rawUid}`;
+    const hit = this.cache.get(key);
+    if (hit && Date.now() - hit.at < cacheMs) return hit.value;
+    if (hit) this.cache.delete(key);
+    if (this.running.has(caller.uid)) {
+      throw new ApiError("resource_exhausted", "Too many requests. Try again in a few minutes.");
+    }
+    this.running.add(caller.uid);
+    try {
+      const value = await this.build(caller, rawUid);
+      this.cache.delete(key);
+      this.cache.set(key, { at: Date.now(), value });
+      if (this.cache.size > cacheMax) this.cache.delete(this.cache.keys().next().value!);
+      return value;
+    } finally {
+      this.running.delete(caller.uid);
+    }
+  }
+
+  private async build(caller: Caller, uid: string): Promise<TeamHistory> {
     const self = caller.uid === uid;
-    if (!self && !(await this.shownToOthers(uid))) return { teams: [] };
+    if (!self) {
+      // Blocked either way: the same as a player who shows nothing.
+      if (await blockedBetween(this.store, caller.uid, uid)) return { teams: [] };
+      if (!(await this.shownToOthers(uid))) return { teams: [] };
+    }
 
     if (!this.queries.group) throw new ApiError("failed_precondition", "Team history isn't available here.");
     const found = await this.queries.group("roster", teamHistoryMaxSpots + 1, { userId: uid });
@@ -89,37 +129,50 @@ export class TeamHistoryService {
       // Communities and groups keep no roster; a deleted team has no name to show.
       if (!team || kindOf(team) !== "team") continue;
       if (!self && !isMember(team, caller.uid)) {
-        if (isYouthTeam(team) || !publicPageOn(team) || isDraftedLeagueTeam(teamId)) continue;
+        // The public-roster rule: an adult team with its page on (a team with no level stays private).
+        if (!rosterIsPublic(team) || isDraftedLeagueTeam(teamId)) continue;
         if (await this.roster.inYouthLeague(team, teamId)) continue;
       }
       shown.push({ teamId, team, spotId: s.parts[3]!, spot: s.data });
     }
 
+    // Current teams first (the order they're shown in), one at a time, until
+    // the request's game budget is spent. A team cut short, or never reached,
+    // is partial.
+    const nameOf = (t: string) => str(teams.get(t)!.name);
+    const need = [...new Set(shown.map((s) => s.teamId))].sort(
+      (a, b) =>
+        Number(isMember(teams.get(b)!, uid)) - Number(isMember(teams.get(a)!, uid)) ||
+        (nameOf(a) < nameOf(b) ? -1 : nameOf(a) > nameOf(b) ? 1 : 0) ||
+        (a < b ? -1 : 1),
+    );
     const totals = new Map<string, { sums: Map<string, Record<string, SeasonTotals>>; partial: boolean }>();
-    const need = [...new Set(shown.map((s) => s.teamId))];
-    for (let i = 0; i < need.length; i += gameReads) {
-      await Promise.all(
-        need.slice(i, i + gameReads).map(async (teamId) => {
-          const spotIds = shown.filter((s) => s.teamId === teamId).map((s) => s.spotId);
-          const sums = new Map(spotIds.map((id) => [id, {} as Record<string, SeasonTotals>]));
-          // Pages in id order; one game past the cap says there are more.
-          let read = 0;
-          let after: string | undefined;
-          let partial = false;
-          for (;;) {
-            const size = Math.min(gamePage, teamHistoryMaxGames + 1 - read);
-            const page = await this.queries.fields(`teams/${teamId}/statsGames`, ["date", "points"], size, undefined, after);
-            read += page.length;
-            partial = read > teamHistoryMaxGames;
-            if (page.length > 0) after = page[page.length - 1]!.id;
-            const counted = partial ? page.slice(0, page.length - 1) : page;
-            const games = counted.map((d) => ({ ...d.data, id: d.id }));
-            for (const [id, into] of sums) addSeasonTotals(into, seasonTotalsFor(id, games));
-            if (partial || page.length < size) break;
-          }
-          totals.set(teamId, { sums, partial });
-        }),
-      );
+    let budget = teamHistoryGameBudget;
+    for (const teamId of need) {
+      const spotIds = shown.filter((s) => s.teamId === teamId).map((s) => s.spotId);
+      const sums = new Map(spotIds.map((id) => [id, {} as Record<string, SeasonTotals>]));
+      totals.set(teamId, { sums, partial: true });
+      if (budget <= 0) continue;
+      // Games counted for this team; one more says there are more.
+      const limit = Math.min(teamHistoryMaxGames, budget);
+      let read = 0;
+      let after: string | undefined;
+      let partial = false;
+      for (;;) {
+        const size = Math.min(gamePage, limit + 1 - read);
+        const page = await this.queries.fields(`teams/${teamId}/statsGames`, ["date", "points"], size, undefined, after);
+        read += page.length;
+        partial = read > limit;
+        if (page.length > 0) after = page[page.length - 1]!.id;
+        const counted = partial ? page.slice(0, page.length - 1) : page;
+        const games = counted.map((d) => ({ ...d.data, id: d.id }));
+        for (const [id, more] of seasonTotalsForSpots(spotIds, games)) addSeasonTotals(sums.get(id)!, more);
+        if (partial || page.length < size) break;
+        await yieldLoop();
+      }
+      budget -= partial ? limit : read;
+      totals.get(teamId)!.partial = partial;
+      await yieldLoop();
     }
 
     const entries: TeamHistoryEntry[] = shown.map(({ teamId, team, spotId, spot }) => ({

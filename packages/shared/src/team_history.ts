@@ -12,6 +12,11 @@ import { statsGameFrom, statSheet } from "./stats.js";
 export const teamHistoryMaxSpots = 50;
 /** Most games read per team, in document-id order, a page at a time (a stats game can be ~900 KB). */
 export const teamHistoryMaxGames = 1000;
+/**
+ * Most games read in one history request, across all its teams (current teams first).
+ * A team cut short by it, or not reached, is flagged `partial`.
+ */
+export const teamHistoryGameBudget = 400;
 
 export const teamHistoryKinds = ["team", "community", "organization"] as const;
 
@@ -27,7 +32,7 @@ export interface TeamHistoryEntry {
   spot: { id: string; name: string; number: number | null };
   /** Season (the year of the game's date, UTC, e.g. "2026") to their totals; empty without games. */
   seasons: Record<string, SeasonTotals>;
-  /** True when the team has more than teamHistoryMaxGames games: totals cover only the first of them. Absent otherwise. */
+  /** True when totals may not cover every game of the team (more than teamHistoryMaxGames, or the request's teamHistoryGameBudget ran out). Absent otherwise. */
   partial?: boolean;
 }
 
@@ -84,25 +89,39 @@ const empty = (): SeasonTotals => ({
  * game within hours of New Year can differ (fixture case "near New Year").
  */
 export function seasonTotalsFor(spotId: string, games: ReadonlyArray<{ id?: string; [k: string]: unknown }>): Record<string, SeasonTotals> {
-  const seasons: Record<string, SeasonTotals> = {};
+  return seasonTotalsForSpots([spotId], games).get(spotId)!;
+}
+
+/**
+ * seasonTotalsFor for several spots of the same team at once: each game's
+ * stat sheet is built once and applied to every spot.
+ */
+export function seasonTotalsForSpots(
+  spotIds: readonly string[],
+  games: ReadonlyArray<{ id?: string; [k: string]: unknown }>,
+): Map<string, Record<string, SeasonTotals>> {
+  const out = new Map(spotIds.map((id) => [id, {} as Record<string, SeasonTotals>]));
   for (const raw of games) {
     const g = statsGameFrom(raw.id ?? "", raw);
     if (g.points.length === 0) continue;
-    const p = statSheet(g.points).players.get(spotId);
-    if (!p || (p.pointsPlayed === 0 && p.touches === 0)) continue;
+    const sheet = statSheet(g.points);
     const year = `${new Date(g.date).getUTCFullYear()}`;
-    const s = (seasons[year] ??= empty());
-    s.games += 1;
-    s.points += p.pointsPlayed;
-    s.goals += p.goals;
-    s.assists += p.assists;
-    s.blocks += p.handBlocks + p.breakups;
-    s.completions += p.completions;
-    s.throwaways += p.throwaways;
-    s.catches += p.catches + p.goals;
-    s.drops += p.drops;
+    for (const [spotId, seasons] of out) {
+      const p = sheet.players.get(spotId);
+      if (!p || (p.pointsPlayed === 0 && p.touches === 0)) continue;
+      const s = (seasons[year] ??= empty());
+      s.games += 1;
+      s.points += p.pointsPlayed;
+      s.goals += p.goals;
+      s.assists += p.assists;
+      s.blocks += p.handBlocks + p.breakups;
+      s.completions += p.completions;
+      s.throwaways += p.throwaways;
+      s.catches += p.catches + p.goals;
+      s.drops += p.drops;
+    }
   }
-  return seasons;
+  return out;
 }
 
 /** [into] plus [more], season by season (totals are sums, so games can be added a page at a time). */
