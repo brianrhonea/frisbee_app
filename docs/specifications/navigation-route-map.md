@@ -107,7 +107,8 @@ The board's N2 said "come back to the same page after sign-in". That is **not** 
 | `/teams/new` (`?kind=community`, `?kind=organization`) | Create team, group or community | Tab |
 | `/teams/search` | → `/explore?only=teams` | Redirect |
 | `/teams/:teamId?section=` | Team page and its sections:<br>`teams`, `events`, `chat`, `roster`, `playbook`, `videos`, `stats`, `tournaments`, `members`<br>Old `/teams/:id/<section>` paths redirect here | Tab |
-| `/over/teams/:teamId` | Team page over a full-screen page (a tournament) | Over |
+| `/over/teams/:teamId` | Team page over a full-screen page (a tournament, or the Chats tab) | Over |
+| `/over/teams/:teamId/chats/new`, `/chats/:roomId`, `/chats/:roomId/settings` | The team's chat pages in the same "over" context: from Chats, back goes room, then the team's chat list, then Chats; the tab bar stays on Chats (NAV1) | Over |
 | `/teams/:teamId/roles`, `/discord` | Roles, Discord import | Over |
 | `/teams/:teamId/chats/new` (`?folder=`), `/chats/:roomId`, `/chats/:roomId/settings` | Team chat rooms | Over |
 | `/teams/:teamId/plays/new`, `/plays/:playId`, `/whiteboards/new`, `/whiteboards/:playId` | Playbook | Over |

@@ -9,6 +9,7 @@ import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/chat_room_settings_viewmodel.dart';
+import '../../../routing/team_chat_links.dart';
 
 /// Creates a chat room or edits its name and access.
 class ChatRoomSettingsScreen extends StatefulWidget {
@@ -44,7 +45,9 @@ class _ChatRoomSettingsScreenState extends State<ChatRoomSettingsScreen> {
       case Ok(:final value):
         vm.save.clearResult();
         if (vm.isNew) {
-          context.pushReplacement(Routes.chatRoom(vm.teamId, value));
+          context.pushReplacement(
+            inSameContext(context, Routes.chatRoom(vm.teamId, value)),
+          );
         } else {
           context.pop();
         }
@@ -59,7 +62,7 @@ class _ChatRoomSettingsScreenState extends State<ChatRoomSettingsScreen> {
   void _onDelete() {
     if (vm.delete.completed) {
       vm.delete.clearResult();
-      context.go(Routes.teamChat(vm.teamId));
+      popToTeamChatList(context, vm.teamId);
     } else if (vm.delete.error) {
       showErrorSnackBar(context, vm.delete.result);
       vm.delete.clearResult();

@@ -47,6 +47,7 @@ import 'team_community_sheet.dart';
 import 'team_section_screen.dart';
 import 'team_settings_screen.dart';
 import '../../core/ui/app_segmented_button.dart';
+import '../../../routing/team_chat_links.dart';
 
 enum _MenuAction { edit, settings, community, leave, delete }
 
@@ -153,8 +154,14 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
     if (_wasFeed == feed) return;
     final animate = _wasFeed != null;
     _wasFeed = feed;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    void settle(Duration _) {
       if (!mounted || !_scroll.hasClients) return;
+      // A page covered before it was laid out (a chat room opened over it
+      // at once) has no extent yet: wait for the frame that shows it.
+      if (!_scroll.position.hasContentDimensions) {
+        WidgetsBinding.instance.addPostFrameCallback(settle);
+        return;
+      }
       final to = feed ? 0.0 : _scroll.position.maxScrollExtent;
       if (animate) {
         _scroll.animateTo(
@@ -165,7 +172,9 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
       } else {
         _scroll.jumpTo(to);
       }
-    });
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback(settle);
   }
 
   /// The "Deleting…" dialog, while it's up.
@@ -1151,7 +1160,9 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
       CommunityChatSection(
         rooms: chat.rooms,
         more: chat.more,
-        onOpenRoom: (r) => context.push(Routes.chatRoom(team.id, r.id)),
+        onOpenRoom: (r) => context.push(
+          inSameContext(context, Routes.chatRoom(team.id, r.id)),
+        ),
         onOpenChat: () =>
             goWithinTeam(context, TeamSection.chat.route(team.id)),
       ),
