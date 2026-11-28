@@ -61,6 +61,7 @@
 | PL-A16 | Team colour field | No (schema) | All | S–M | P3. Needs approval for the field |
 | PL-A17 | Redesign leftovers: anonymous polls, vote removal, team-post likes and pushes, roster search, clinic type, opening `/tournaments` links in the app | No | All | M | P3 (the `/tournaments` link claim is P2) |
 | PL-A18 | CSV roster import and assisted setup | Discord import exists | All | M | P2 |
+| PL-A19 | Profile and Discover items the owner liked (2026-11-27, board Q7): career highlights and achievements (with PL-A1), a verified badge with a review process, team trend charts and career stats tiles (with PL-A2 and deeper analytics), suggested athletes with Follow and Near you (with PL-A4) | Partial | App + Web + API | L | P1/P2. Each needs its own design and approval |
 
 ### B. Deferred security and hardening
 
@@ -108,6 +109,8 @@
 | PL-D7 | Logo and app icon, held until the name is decided | S–M | P2 |
 | PL-D8 | Localisation, a token generator, shared breakpoints | L | P3 |
 | PL-D9 | Option B screens: discovery hub, career-first profile, organisation and host consoles | L | P3 |
+| PL-D10 | **Website-native rework** (owner, 2026-11-27: keep today's style for January, rework quickly after launch). Same features as the app, laid out like a website: persistent side menu with your teams; breadcrumb and Ctrl K search; team header with sections as top links and every action in one row; roster and stats as sortable tables with hover row actions; side columns (roles, invite link, next event, Needs you, your teams, season stats); a Home week strip and a reading-width feed; three-pane team chat (rooms, messages, members) with hover message actions and a new-messages line; keyboard shortcuts; ⋯ menus instead of bottom sheets; side panels instead of full pages; a shareable URL for every view. Mock-ups: https://claude.ai/artifact/WL8jtM5sasNacNBbBi39SV. Online status and the chat team-switcher rail are new features (see PL-A7). Board task W1 | L | **P1** |
+| PL-D11 | Website team header: the Settings gear on the same row as the other actions at phone width (owner prefers one row; board FX2) | S | P2 |
 
 ### E. Low follow-ups from the reviews
 
