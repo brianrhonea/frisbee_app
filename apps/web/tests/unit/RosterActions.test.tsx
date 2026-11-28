@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const callApi = vi.fn();
@@ -19,7 +19,7 @@ vi.mock("@/components/team/TeamContext", async () => {
 vi.mock("@/components/team/InviteDialog", () => ({ useInvite: () => invite }));
 vi.mock("@/components/ProfileDashboard", () => ({ roleLabel: (t: string) => t[0]!.toUpperCase() + t.slice(1) }));
 
-import type { TeamRoster } from "@stall10/shared";
+import type { OutsiderTeamRoster, TeamRoster } from "@stall10/shared";
 import { ApiError } from "@/lib/client";
 import { AddMember } from "@/components/team/AddMember";
 import { RolesTab } from "@/components/team/RolesTab";
@@ -225,5 +225,82 @@ describe("Roles tab (S4 C2)", () => {
     hub = { ...hub, viewer: { state: "outsider", uid: "x" } };
     const b = render(<RolesTab roster={roster} />);
     expect(b.container).toBeEmptyDOMElement();
+  });
+});
+
+describe("Add member by permission (S5 FX1)", () => {
+  it("a roster-only admin (manageTeam, not manageMembers) gets the player editor directly, with no menu and no invite", () => {
+    invite = { ...invite, canInvite: false };
+    hub = { ...hub, viewer: viewerWith("captain", ["manageTeam"]) };
+    render(<AddMember roster={roster} onAdded={() => undefined} />);
+    fireEvent.click(screen.getByRole("button", { name: "Add member" }));
+    expect(screen.queryByRole("menuitem")).toBeNull();
+    expect(screen.getByRole("dialog", { name: "Add player to roster" })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Link to a member/)).toBeInTheDocument();
+    expect(openInvite).not.toHaveBeenCalled();
+  });
+
+  it("a member manager without manageTeam sees only Invite: no menu, no player editor", () => {
+    hub = { ...hub, viewer: viewerWith("captain", ["manageMembers"]) };
+    render(<AddMember roster={roster} onAdded={() => undefined} />);
+    fireEvent.click(screen.getByRole("button", { name: "Add member" }));
+    expect(openInvite).toHaveBeenCalledWith("people");
+    expect(screen.queryByRole("menuitem")).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Add player to roster" })).toBeNull();
+  });
+
+  it("Edit roles is absent for a non-owner admin who holds every permission", () => {
+    hub = { ...hub, viewer: viewerWith("captain", ["manageTeam", "manageMembers", "manageEvents"]) };
+    render(<RolesTab roster={roster} />);
+    expect(screen.getByRole("heading", { level: 3, name: /Handlers/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Edit roles" })).toBeNull();
+  });
+});
+
+describe("An outsider's roster has no uid on non-staff (S5 FX1, L-1)", () => {
+  // As the API gives a non-member: uid only on staff; a spot's person never has one.
+  const outsider: OutsiderTeamRoster = {
+    kind: "team",
+    players: [
+      { id: "p1", name: "Ada L", person: { name: "Ada Lovelace", username: "ada" } },
+      { id: "p2", name: "Walk-on" },
+    ],
+    members: [
+      { uid: "own", name: "Olive Owner", tier: "owner", roles: [] },
+      { name: "Ben Okafor", tier: "player", roles: [] },
+      { name: "Cam Reyes", tier: "captain", roles: ["Handlers"] },
+    ],
+    teams: [],
+  };
+
+  it("lists every member (no collision on undefined), linking only the one with a uid", async () => {
+    hub = { ...hub, viewer: { state: "outsider", uid: "me" } };
+    callApi.mockResolvedValue(outsider);
+    const { TeamRosterView } = await import("@/components/team/TeamRosterView");
+    render(<TeamRosterView />);
+    expect(await screen.findByText("Ben Okafor")).toBeInTheDocument();
+    expect(screen.getByText("Cam Reyes")).toBeInTheDocument();
+    const owner = screen.getByRole("link", { name: /Olive Owner/ });
+    expect(owner).toHaveAttribute("href", "/players/own");
+    const hrefs = screen.getAllByRole("link").map((a) => a.getAttribute("href"));
+    expect(hrefs.some((h) => h?.includes("undefined"))).toBe(false);
+  });
+
+  it("shows a linked player with no uid as plain text, with no pills borrowed from another member", async () => {
+    hub = { ...hub, viewer: { state: "outsider", uid: "me" } };
+    callApi.mockResolvedValue(outsider);
+    const { TeamRosterView } = await import("@/components/team/TeamRosterView");
+    render(<TeamRosterView />);
+    const row = (await screen.findByText("Ada L")).closest("tr")!;
+    expect(within(row).queryByRole("link")).toBeNull();
+    expect(row).not.toHaveTextContent(/Captain|Owner|Handlers/);
+  });
+
+  it("AddMember skips members and linked persons without a uid", () => {
+    render(<AddMember roster={outsider} onAdded={() => undefined} />);
+    fireEvent.click(screen.getByRole("button", { name: "Add member" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Add player to roster" }));
+    const picker = screen.getByLabelText(/Link to a member/) as HTMLSelectElement;
+    expect(Array.from(picker.options).map((o) => o.textContent)).toEqual(["Not linked (no account)", "Olive Owner"]);
   });
 });

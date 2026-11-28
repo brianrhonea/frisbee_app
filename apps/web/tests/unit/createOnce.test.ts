@@ -30,6 +30,16 @@ describe("client ids for new events (S4 fix D1)", () => {
     await expect(postNewEvent(user, "/p", {}, "abc123")).resolves.toEqual({ id: "abc123" });
   });
 
+  it("returns the first occurrence's id when a replayed body repeats (the series' events are `${id}_n`)", async () => {
+    callApi.mockRejectedValueOnce(new ApiError("Already there.", 409, "already_exists"));
+    await expect(postNewEvent(user, "/p", { repeat: { freq: "weekly", until: "2027-02-01" } }, "abc123")).resolves.toEqual({ id: "abc123_0" });
+  });
+
+  it("a 409 with no code is an error, not a replay", async () => {
+    callApi.mockRejectedValueOnce(new ApiError("Busy.", 409));
+    await expect(postNewEvent(user, "/p", {}, "abc123")).rejects.toThrow("Busy.");
+  });
+
   it("still fails for any other error, including a 409 with another code", async () => {
     callApi.mockRejectedValueOnce(new ApiError("Nope.", 403, "forbidden"));
     await expect(postNewEvent(user, "/p", {}, "abc123")).rejects.toThrow("Nope.");
