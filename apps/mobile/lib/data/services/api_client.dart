@@ -199,6 +199,7 @@ class ApiClient {
     ).timeout(timeout);
 
     http.Response response;
+    var resent = false;
     try {
       response = await sendIt();
     } on Exception catch (e) {
@@ -208,12 +209,18 @@ class ApiClient {
       // send twice; the offline queue retries the others itself, with its
       // own duplicate checks.
       resetConnections();
-      if (!_safeToRepeat(method)) throw _offline;
+      if (!_safeToRepeat(method, path)) throw _offline;
       try {
+        resent = true;
         response = await sendIt();
       } on Exception {
         throw _offline;
       }
+    }
+    // The first DELETE may have reached the server before the connection
+    // dropped: "not found" on the resent one means it is already gone.
+    if (resent && method == 'DELETE' && response.statusCode == 404) {
+      return const {};
     }
     final answer = _decode(response);
     if (answer['refreshToken'] == true) {
@@ -231,8 +238,15 @@ class ApiClient {
   static bool _staleConnection(Exception e) =>
       e is SocketException || e is http.ClientException;
 
-  static bool _safeToRepeat(String method) =>
-      method == 'GET' || method == 'PUT' || method == 'DELETE';
+  /// Never for payment routes (fees, payments, refunds, payouts): a repeat
+  /// there is the server's idempotency to decide, not the client's.
+  static bool _safeToRepeat(String method, String path) =>
+      (method == 'GET' || method == 'PUT' || method == 'DELETE') &&
+      !_isPaymentPath(path);
+
+  static bool _isPaymentPath(String path) => Uri.parse(path).pathSegments.any(
+    (s) => const {'pay', 'payments', 'payouts', 'refund'}.contains(s),
+  );
 
   static Map<String, Object?> _decode(http.Response response) {
     final ok = response.statusCode >= 200 && response.statusCode < 300;
