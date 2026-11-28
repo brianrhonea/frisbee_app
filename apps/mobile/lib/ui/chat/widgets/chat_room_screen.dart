@@ -21,6 +21,7 @@ import 'chat_tab.dart';
 import 'message_thread_view.dart';
 import 'voice_channel_view.dart';
 import '../../../domain/models/moderation.dart';
+import '../../../routing/team_chat_links.dart';
 
 /// A team chat room opened as its own page. Phones show it full screen
 /// with the chat panel (the room list) behind the top-left Chats button;
@@ -46,7 +47,9 @@ class ChatRoomScreen extends StatelessWidget {
         // Switching rooms replaces this page, so back still leaves chat.
         void open(String id) {
           if (id != vm.roomId) {
-            context.pushReplacement(Routes.chatRoom(vm.teamId, id));
+            context.pushReplacement(
+              inSameContext(context, Routes.chatRoom(vm.teamId, id)),
+            );
           }
         }
 
@@ -116,8 +119,9 @@ class ChatRoomView extends StatelessWidget {
       listenable: vm,
       builder: (context, _) {
         final room = vm.room;
-        void openSettings() =>
-            context.push(Routes.chatRoomSettings(vm.teamId, vm.roomId));
+        void openSettings() => context.push(
+          inSameContext(context, Routes.chatRoomSettings(vm.teamId, vm.roomId)),
+        );
         final team = vm.team;
         final count = team?.members.length ?? 0;
         final readable = room != null && vm.access.canRead;

@@ -10,6 +10,7 @@ import '../../../data/repositories/notification/notification_repository.dart';
 import '../../../data/repositories/people/people_repository.dart';
 import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
+import '../../../routing/team_chat_links.dart';
 import '../../../utils/command.dart';
 import '../../chat/widgets/chat_layout.dart';
 import '../../core/themes/theme.dart';
@@ -449,10 +450,12 @@ class _InboxListState extends State<InboxList> {
                             onTap: () {
                               _openSwipe.value = null;
                               final room = s.openRoom;
-                              context.push(
-                                room == null
-                                    ? Routes.teamChat(s.team.id)
-                                    : Routes.chatRoom(s.team.id, room.id),
+                              // Over the Chats tab, so the tab bar stays and
+                              // back slides: room, chat list, Chats.
+                              openTeamChatOverChats(
+                                context,
+                                s.team.id,
+                                roomId: room?.id,
                               );
                             },
                           );

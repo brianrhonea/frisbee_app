@@ -21,6 +21,7 @@ import 'chat_room_screen.dart';
 import 'chat_room_settings_screen.dart';
 import '../../../utils/result.dart';
 import '../../core/ui/error_message.dart';
+import '../../../routing/team_chat_links.dart';
 
 /// Team chat. Wide screens list rooms on the left and open the picked one
 /// on the right; phones list rooms and slide the picked one in full screen.
@@ -39,7 +40,9 @@ class ChatTab extends StatelessWidget {
           if (!isChatSplit(constraints)) {
             return RoomList(
               viewModel: vm,
-              onOpen: (id) => context.push(Routes.chatRoom(vm.teamId, id)),
+              onOpen: (id) => context.push(
+                inSameContext(context, Routes.chatRoom(vm.teamId, id)),
+              ),
             );
           }
           final selected = vm.selectedId;
@@ -129,8 +132,9 @@ class _RoomListState extends State<RoomList> {
                       style: FilledButton.styleFrom(
                         minimumSize: const Size(0, 44),
                       ),
-                      onPressed: () =>
-                          context.push(Routes.newChatRoom(vm.teamId)),
+                      onPressed: () => context.push(
+                        inSameContext(context, Routes.newChatRoom(vm.teamId)),
+                      ),
                       icon: const Icon(Icons.add, size: 20),
                       label: const Text('New channel'),
                     ),
@@ -517,7 +521,10 @@ class _FolderHeader extends StatelessWidget {
               color: c.muted,
               icon: const Icon(Icons.add),
               onPressed: () => context.push(
-                Routes.newChatRoom(vm.teamId, folderId: folder.id),
+                inSameContext(
+                  context,
+                  Routes.newChatRoom(vm.teamId, folderId: folder.id),
+                ),
               ),
             ),
             PopupMenuButton<_FolderAction>(
@@ -528,7 +535,10 @@ class _FolderHeader extends StatelessWidget {
                 switch (a) {
                   case _FolderAction.newRoom:
                     context.push(
-                      Routes.newChatRoom(vm.teamId, folderId: folder.id),
+                      inSameContext(
+                        context,
+                        Routes.newChatRoom(vm.teamId, folderId: folder.id),
+                      ),
                     );
                   case _FolderAction.edit:
                     await _editFolder(context, vm, folder);
@@ -709,7 +719,9 @@ Future<void> _runRoomAction(
         );
       }
     case _RoomAction.settings:
-      context.push(Routes.chatRoomSettings(vm.teamId, room.id));
+      context.push(
+        inSameContext(context, Routes.chatRoomSettings(vm.teamId, room.id)),
+      );
     case _RoomAction.up:
       vm.shiftRoom.execute((id: room.id, by: -1));
     case _RoomAction.down:

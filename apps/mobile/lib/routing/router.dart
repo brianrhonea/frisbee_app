@@ -93,6 +93,7 @@ import '../ui/workouts/widgets/record_workout_screen.dart';
 import '../ui/workouts/widgets/route_widgets.dart';
 import 'route_builders.dart';
 import 'routes.dart';
+import 'team_chat_links.dart';
 import '../ui/learn/widgets/guide_screens.dart';
 
 const splashPath = '/splash';
@@ -180,10 +181,42 @@ GoRouter router(
     ),
     // A team or group opened from a tournament, over it, so back returns
     // there (see Routes.teamOver).
+    // Opened from the Chats tab with a room, it's pushed first with
+    // [stackedUnder] so it sits under the room without sliding in itself.
     GoRoute(
       path: '${Routes.teamsOverPath}/:teamId',
       parentNavigatorKey: _rootKey,
-      builder: (_, state) => teamPage(state),
+      pageBuilder: (context, state) => chatPage(
+        context,
+        state.pageKey,
+        teamPage(state),
+        instant: state.extra == stackedUnder,
+      ),
+    ),
+    // A team's chat pages over the page they were opened from (the Chats
+    // tab): Chats > the team's chat list > the room, so each back slides one
+    // step and the tab bar never changes tab. Siblings, not children, of
+    // the team page above, so the list is pushed once, then the room.
+    GoRoute(
+      path: '${Routes.teamsOverPath}/:teamId/chats/new',
+      parentNavigatorKey: _rootKey,
+      pageBuilder: (context, state) =>
+          chatPage(context, state.pageKey, _chatRoomSettings(state, null)),
+    ),
+    GoRoute(
+      path: '${Routes.teamsOverPath}/:teamId/chats/:roomId',
+      parentNavigatorKey: _rootKey,
+      pageBuilder: (context, state) =>
+          chatPage(context, state.pageKey, _chatRoom(state)),
+    ),
+    GoRoute(
+      path: '${Routes.teamsOverPath}/:teamId/chats/:roomId/settings',
+      parentNavigatorKey: _rootKey,
+      pageBuilder: (context, state) => chatPage(
+        context,
+        state.pageKey,
+        _chatRoomSettings(state, state.pathParameters['roomId']),
+      ),
     ),
     // People's posts, over the shell. `/posts` alone goes Home, where the
     // feed is. The composer is an overlay, not a route.
@@ -841,31 +874,8 @@ GoRouter router(
                     GoRoute(
                       path: 'chats/:roomId',
                       parentNavigatorKey: _rootKey,
-                      pageBuilder: (context, state) {
-                        final teamId = state.pathParameters['teamId']!;
-                        final roomId = state.pathParameters['roomId']!;
-                        return chatPage(
-                          context,
-                          state.pageKey,
-                          ViewModelHost(
-                            key: ValueKey('chat-$teamId-$roomId'),
-                            create: (c) => ChatRoomViewModel(
-                              outbox: c.read(),
-                              teamId: teamId,
-                              roomId: roomId,
-                              teamRepository: c.read(),
-                              chatRepository: c.read(),
-                              notificationRepository: c.read(),
-                              authRepository: c.read(),
-                              filePicker: c.read(),
-                              peopleRepository: c.read<PeopleRepository?>(),
-                              draftRepository: c
-                                  .read<MessageDraftRepository?>(),
-                            ),
-                            builder: (_, vm) => ChatRoomScreen(viewModel: vm),
-                          ),
-                        );
-                      },
+                      pageBuilder: (context, state) =>
+                          chatPage(context, state.pageKey, _chatRoom(state)),
                       routes: [
                         GoRoute(
                           path: 'settings',
@@ -1290,6 +1300,28 @@ Widget _videoEditor(GoRouterState state, String? videoId) {
           : null,
     ),
     builder: (_, vm) => VideoEditorScreen(viewModel: vm),
+  );
+}
+
+/// A team chat room's page.
+Widget _chatRoom(GoRouterState state) {
+  final teamId = state.pathParameters['teamId']!;
+  final roomId = state.pathParameters['roomId']!;
+  return ViewModelHost(
+    key: ValueKey('chat-$teamId-$roomId'),
+    create: (c) => ChatRoomViewModel(
+      outbox: c.read(),
+      teamId: teamId,
+      roomId: roomId,
+      teamRepository: c.read(),
+      chatRepository: c.read(),
+      notificationRepository: c.read(),
+      authRepository: c.read(),
+      filePicker: c.read(),
+      peopleRepository: c.read<PeopleRepository?>(),
+      draftRepository: c.read<MessageDraftRepository?>(),
+    ),
+    builder: (_, vm) => ChatRoomScreen(viewModel: vm),
   );
 }
 

@@ -933,8 +933,14 @@ void main() {
             path: '/messages',
             builder: (_, _) => InboxScreen(viewModel: vm),
           ),
+          // The team's chat list and room open over Chats (NAV1).
           GoRoute(
-            path: '/teams/:t/chats/:r',
+            path: '/over/teams/:t',
+            builder: (_, s) =>
+                Scaffold(appBar: AppBar(), body: const Text('chat list')),
+          ),
+          GoRoute(
+            path: '/over/teams/:t/chats/:r',
             builder: (_, s) => Scaffold(
               appBar: AppBar(),
               body: Text('room ${s.pathParameters['r']}'),
@@ -959,6 +965,10 @@ void main() {
       await tester.pumpAndSettle();
       // Two unread rooms: the newest.
       expect(find.text('room rides'), findsOneWidget);
+      // Back goes to the team's chat list, then to Chats.
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.text('chat list'), findsOneWidget);
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(find.text('Team chats'), findsOneWidget);

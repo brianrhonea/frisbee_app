@@ -122,39 +122,82 @@ class ChatDrawer extends StatelessWidget {
   }
 }
 
-/// Slides a chat in from the right, the way a phone opens a conversation.
-/// iOS and macOS get the native page, so swiping from the left edge goes
-/// back, following the finger.
-Page<void> chatPage(BuildContext context, LocalKey key, Widget child) =>
-    switch (defaultTargetPlatform) {
-      TargetPlatform.iOS ||
-      TargetPlatform.macOS => CupertinoPage(key: key, child: child),
-      _ => _slidePage(context, key, child),
-    };
+/// Slides a chat in from the right, the way a phone opens a conversation
+/// (Discord-style): the page under it shifts a little left as it arrives
+/// ([chatPageParallax]) and back reverses it. iOS and macOS get the native
+/// page, so swiping from the left edge drags it back with the finger and
+/// can be cancelled; Android goes back with its system gesture.
+///
+/// [instant] shows the page without sliding in (on iOS the native page
+/// always slides), for one a chat page covers at the same moment.
+Page<void> chatPage(
+  BuildContext context,
+  LocalKey key,
+  Widget child, {
+  bool instant = false,
+}) => switch (defaultTargetPlatform) {
+  TargetPlatform.iOS ||
+  TargetPlatform.macOS => CupertinoPage(key: key, child: child),
+  _ => _slidePage(context, key, child, instant: instant),
+};
+
+/// How far a chat page pushes the page under it left, as a share of its
+/// width (the native iOS page uses a third).
+const chatPageParallax = 0.3;
 
 CustomTransitionPage<void> _slidePage(
   BuildContext context,
   LocalKey key,
-  Widget child,
-) => CustomTransitionPage(
+  Widget child, {
+  bool instant = false,
+}) => CustomTransitionPage(
   key: key,
   child: child,
-  transitionDuration: AppMotion.of(context, AppMotion.pageIn),
+  transitionDuration: instant
+      ? Duration.zero
+      : AppMotion.of(context, AppMotion.pageIn),
   reverseTransitionDuration: AppMotion.of(context, AppMotion.pageOut),
-  transitionsBuilder: (context, animation, _, child) =>
-      // Reduce motion: the page just appears.
-      MediaQuery.disableAnimationsOf(context)
-      ? child
-      : SlideTransition(
-          position: Tween(begin: const Offset(1, 0), end: Offset.zero).animate(
-            CurvedAnimation(
-              parent: animation,
-              curve: AppMotion.easing,
-              reverseCurve: AppMotion.easing,
-            ),
+  transitionsBuilder: (context, animation, secondaryAnimation, child) {
+    // Reduce motion: the page just appears.
+    if (MediaQuery.disableAnimationsOf(context)) return child;
+    final enter = CurvedAnimation(
+      parent: animation,
+      curve: AppMotion.easing,
+      reverseCurve: AppMotion.easing,
+    );
+    final under = CurvedAnimation(
+      parent: secondaryAnimation,
+      curve: AppMotion.easing,
+      reverseCurve: AppMotion.easing,
+    );
+    return SlideTransition(
+      // This page, shifting left as another chat page covers it.
+      position: Tween(
+        begin: Offset.zero,
+        end: const Offset(-chatPageParallax, 0),
+      ).animate(under),
+      child: SlideTransition(
+        position: Tween(
+          begin: const Offset(1, 0),
+          end: Offset.zero,
+        ).animate(enter),
+        // A shadow along the leading edge, so the page reads as on top
+        // while it moves.
+        child: DecoratedBox(
+          decoration: const BoxDecoration(
+            boxShadow: [
+              BoxShadow(
+                color: AppMotion.pageShadow,
+                blurRadius: 16,
+                offset: Offset(-2, 0),
+              ),
+            ],
           ),
           child: child,
         ),
+      ),
+    );
+  },
 );
 
 /// The bar above an open conversation: [avatar], [title] over [subtitle],
