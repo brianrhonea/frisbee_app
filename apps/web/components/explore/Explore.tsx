@@ -52,14 +52,15 @@ import { EmptyState, ErrorState, LoadingState } from "../ui/States";
 
 const chips: Array<[string, ExploreFilter | null]> = [
   ["All", null],
+  ["Events", "events"],
   ["Tournaments", "tournaments"],
   ["Leagues", "leagues"],
   ["Pickup", "pickup"],
   ["Teams", "teams"],
   ["Communities", "groups"],
 ];
-/** Members also search players. */
-const playersChip: [string, ExploreFilter] = ["Players", "players"];
+/** Members also search athletes. */
+const playersChip: [string, ExploreFilter] = ["Athletes", "players"];
 
 /** What a chip searches, for the hint before typing (the app's Discover hint). */
 function searchHint(only: ExploreFilter | null, member: boolean): string {
@@ -75,9 +76,11 @@ function searchHint(only: ExploreFilter | null, member: boolean): string {
     case "groups":
       return "communities, schools and clubs";
     case "players":
-      return "players by name or username";
+      return "athletes by name or username";
+    case "events":
+      return "tournaments, leagues and events";
     default:
-      return member ? "players, teams, communities, tournaments and leagues" : "tournaments, leagues, pickup, teams and communities";
+      return member ? "athletes, teams, communities, tournaments and leagues" : "tournaments, leagues, pickup, teams and communities";
   }
 }
 
@@ -130,7 +133,7 @@ export function Discover({
         events={publicEvents ?? null}
         mine={mine.data ?? []}
       />
-      <LiveNow list={filter === null || filter === "tournaments" || filter === "leagues" ? hostedFor(hosted ?? [], filter) : []} initial={tournaments} />
+      <LiveNow list={filter === null || filter === "events" || filter === "tournaments" || filter === "leagues" ? hostedFor(hosted ?? [], filter) : []} initial={tournaments} />
       <ComingUp only={filter} hosted={hosted} error={hostedError} events={publicEvents} />
       {user ? <RankingsPreview mine={mine.data ?? []} /> : <RankingsLink />}
       <RecentResults />
@@ -232,7 +235,7 @@ function SearchCard({
   const teams: PublicListing[] = ready && listingsShown && current && !("failed" in current) ? listingsFor(current.teams, only) : [];
   const tournaments = useMemo(() => (ready ? matchTournaments(hostedFor(hosted, only), query) : []), [ready, hosted, only, query]);
   const groupTournaments = useMemo(
-    () => (ready && (all || only === "tournaments") ? matchText(events?.tournaments ?? [], query, (t) => t.name ?? "") : []),
+    () => (ready && (all || only === "tournaments" || only === "events") ? matchText(events?.tournaments ?? [], query, (t) => t.name ?? "") : []),
     [ready, all, only, events, query],
   );
   const teamEvents = useMemo(
@@ -352,7 +355,7 @@ function SearchCard({
         )}
         {people.length > 0 && (
           <>
-            {heading("Players")}
+            {heading("Athletes")}
             <ul className="explore-rows">
               {people.map((p) => (
                 <li key={p.id}>
@@ -526,8 +529,8 @@ function ComingUp({
   error: string | null;
   events: EventsPage | null | undefined;
 }) {
-  const showHosted = only === null || only === "tournaments" || only === "leagues";
-  const showEvents = only === null || only === "pickup";
+  const showHosted = only === null || only === "events" || only === "tournaments" || only === "leagues";
+  const showEvents = only === null || only === "events" || only === "pickup";
   if (!showHosted && !showEvents) return null;
   // Live ones are under Live now.
   const shown = hostedFor(hosted ?? [], only)

@@ -50,6 +50,8 @@
 .ui-tabs-segmented { width: fit-content; padding: 0 var(--space-xs); gap: 0; background: var(--field); border: 1px solid var(--line); border-radius: var(--radius-pill); }
 .ui-tabs-segmented .ui-face { margin: var(--space-xs) 0; }
 .ui-tabs-segmented > button[aria-selected="true"] { color: var(--on-chip-on); font-weight: 700; }
+/* The pointer left over the selected tab must not turn its label to ink on the indigo fill (contrast). */
+.ui-tabs-segmented > button[aria-selected="true"]:hover:not(:disabled) { color: var(--on-chip-on); }
 .ui-tabs-segmented > button[aria-selected="true"] .ui-face { background: var(--chip-on); }
 
 /* Underline: a line under the tabs, the selected one in accent. */
@@ -119,7 +121,7 @@ a.ui-event-main:hover .ui-event-title { text-decoration: underline; }
 .ui-event-cancelled .ui-event-title { text-decoration: line-through; color: var(--muted); }
 
 /* --- CoverHeader ------------------------------------------------------------ */
-.ui-cover { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.ui-cover { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
 .ui-cover-photo { height: 140px; background: linear-gradient(135deg, var(--accent-soft), var(--field)); }
 /* The default band (no cover photo), from tokens only: an accent wash into the band colour, a faint diagonal pattern, and the initials as a watermark. */
 .ui-cover-default {
@@ -143,6 +145,25 @@ a.ui-event-main:hover .ui-event-title { text-decoration: underline; }
 .ui-cover-sub { margin: 2px 0 0; color: var(--muted); font-size: var(--text-secondary-size); }
 .ui-cover-extra { grid-column: 1 / -1; margin-top: var(--space-md); }
 @media (min-width: 900px) { .ui-cover-photo { height: 200px; } }
+/* The "…" menu over the cover's top right (CoverMenu): a solid card-coloured disc so it reads on any photo, a 48px target. */
+.ui-cover-menu { position: absolute; top: var(--space-sm); right: var(--space-sm); z-index: 3; display: flex; align-items: center; gap: var(--space-sm); }
+.ui-cover-menu-btn {
+  display: inline-grid; place-items: center; width: 48px; height: 48px; padding: 0; border-radius: 50%; cursor: pointer;
+  color: var(--ink); background: color-mix(in srgb, var(--card) 92%, transparent); border: 1px solid var(--line);
+}
+.ui-cover-menu-btn:hover { background: var(--field); }
+.ui-cover-menu-btn:focus-visible, .ui-cover-menu-list button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ui-cover-menu-status { padding: var(--space-xs) var(--space-md); border-radius: var(--radius-control); background: var(--card); border: 1px solid var(--line); color: var(--ink); font-size: var(--text-secondary-size); }
+.ui-cover-menu-list {
+  position: absolute; right: 0; top: calc(100% + 4px); min-width: 160px; display: grid; padding: 6px;
+  border-radius: var(--radius-control); background: var(--card); border: 1px solid var(--line); box-shadow: 0 10px 30px rgb(0 0 0 / 0.25);
+}
+.ui-cover-menu-list button {
+  min-height: 44px; text-align: left; padding: var(--space-sm) var(--space-md); border-radius: 8px; border: 0; background: none;
+  color: var(--ink); font: inherit; cursor: pointer;
+}
+.ui-cover-menu-list button:hover { background: var(--field); }
+.ui-cover-menu-list button.danger { font-weight: 700; }
 
 /* --- SummaryTiles ------------------------------------------------------------- */
 .ui-tiles { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-md); }

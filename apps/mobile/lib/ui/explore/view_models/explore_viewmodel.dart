@@ -292,9 +292,9 @@ class ExploreViewModel extends ChangeNotifier {
   List<PublicTeamEvent> get publicEvents => _publicEvents;
 
   /// Public team events a chip shows (eventsFor on the website): every one
-  /// for All, pickup games for Pickup, none for the others.
+  /// for All and Events, pickup games for Pickup, none for the others.
   List<PublicTeamEvent> publicEventsFor(ExploreFilter? only) => switch (only) {
-    null => _publicEvents,
+    null || ExploreFilter.events => _publicEvents,
     ExploreFilter.pickup => [
       for (final e in _publicEvents)
         if (e.isPickup) e,

@@ -25,7 +25,11 @@ class CoverHeader extends StatelessWidget {
     this.avatarSize = 72,
     this.roundAvatar = true,
     this.watermark,
+    this.menu,
   });
+
+  /// A [CoverMenuButton] drawn over the cover's top right corner.
+  final Widget? menu;
 
   final String title;
   final String? subtitle;
@@ -102,6 +106,7 @@ class CoverHeader extends StatelessWidget {
                 ),
               ),
             ),
+            if (menu case final m?) Positioned(top: 0, right: 0, child: m),
             Positioned(
               left: AppSpace.lg,
               bottom: -avatarSize / 2,

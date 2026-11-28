@@ -157,7 +157,12 @@ Widget explorePage(GoRouterState state) => ViewModelHost(
           events: events,
           initialQuery: state.uri.queryParameters['q'] ?? '',
           initialFilter: ExploreFilter.values
-              .where((f) => f.name == state.uri.queryParameters['only'])
+              .where(
+                (f) =>
+                    f.name == state.uri.queryParameters['only'] ||
+                    (f == ExploreFilter.players &&
+                        state.uri.queryParameters['only'] == 'athletes'),
+              )
               .firstOrNull,
         ),
       ),

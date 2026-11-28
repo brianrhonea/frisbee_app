@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../data/repositories/profile/profile_repository.dart';
 import '../../../domain/models/player_profile.dart';
 import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
+import '../../../utils/invite_links.dart';
 import '../../../utils/result.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
@@ -17,7 +19,9 @@ import '../../core/ui/scoreboard.dart';
 import '../../core/ui/tone.dart';
 import '../../core/ui/status_views.dart';
 import '../../follow/widgets/follow_button.dart';
+import '../../../domain/models/chat.dart';
 import '../../posts/widgets/post_widgets.dart';
+import '../../teams/widgets/team_post_widgets.dart' show ImageLoader;
 import '../../workouts/widgets/record_button.dart';
 import '../view_models/player_profile_viewmodel.dart';
 import 'team_history_section.dart';
@@ -28,20 +32,47 @@ import '../../moderation/widgets/report_sheet.dart';
 import '../../core/ui/app_segmented_button.dart';
 import '../../core/ui/avatar.dart';
 import '../../core/ui/cover_header.dart';
+import '../../core/ui/cover_menu_button.dart';
 import '../../core/ui/segmented_tabs.dart';
 import '../../core/ui/summary_tiles.dart';
 
-enum _Tab { overview, posts, stats, teams }
+enum _Tab { overview, posts, media, stats, teams }
 
 enum _SafetyAction { report, block, unblock }
+
+/// Hands a profile's link to the share sheet.
+typedef ShareProfile =
+    Future<void> Function(BuildContext context, String text, Uri link);
+
+/// The platform share sheet with [text] (which ends with [link]).
+Future<void> shareProfile(BuildContext context, String text, Uri link) async {
+  final box = context.findRenderObject() as RenderBox?;
+  await SharePlus.instance.share(
+    ShareParams(
+      text: text,
+      subject: text.split('\n').first,
+      // iPad anchors the sheet here.
+      sharePositionOrigin: box == null
+          ? null
+          : box.localToGlobal(Offset.zero) & box.size,
+    ),
+  );
+}
 
 /// A player's profile: who they are, their numbers, recent games and
 /// teams. On the user's own profile they can edit it, link their roster
 /// spots, and open Settings from the gear at the top right.
 class PlayerProfileScreen extends StatefulWidget {
-  const PlayerProfileScreen({super.key, required this.viewModel});
+  const PlayerProfileScreen({
+    super.key,
+    required this.viewModel,
+    this.share = shareProfile,
+  });
 
   final PlayerProfileViewModel viewModel;
+
+  /// Hands the profile's link to the share sheet. Tests pass their own.
+  final ShareProfile share;
 
   @override
   State<PlayerProfileScreen> createState() => _PlayerProfileScreenState();
@@ -132,13 +163,16 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
     final mobile = ScreenSize.of(context).isMobile;
     final blocks = watchBlocks(context);
     final safety = !vm.isMe && canReport(context, vm.uid);
+    // Report and Block live in the menu over the cover. A blocked profile
+    // has no cover, so its top bar keeps Report and Unblock.
+    final blockedView = !vm.isMe && vm.loaded && blocks.hides(vm.uid);
     return Scaffold(
       appBar: mobile || !vm.isMe
           ? AppBar(
               title: Text(vm.isMe ? 'My profile' : 'Player profile'),
               actions: [
                 if (vm.isMe) const SettingsButton(),
-                if (safety)
+                if (safety && blockedView)
                   PopupMenuButton<_SafetyAction>(
                     tooltip: 'More',
                     onSelected: (a) => switch (a) {
@@ -217,6 +251,7 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
                 onEdit: _edit,
                 tab: _tab,
                 onTab: (t) => setState(() => _tab = t),
+                menu: _coverMenu(blocks),
               ),
               const SizedBox(height: 16),
               if (vm.locked) _PrivateNotice(name: vm.name) else ..._body(),
@@ -224,6 +259,41 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
           );
         },
       ),
+    );
+  }
+
+  /// Report, Block and Share over the cover; your own profile: Share only.
+  Widget _coverMenu(BlockList blocks) {
+    final report = !vm.isMe && canReport(context, vm.uid);
+    return CoverMenuButton(
+      items: [
+        if (report)
+          CoverMenuItem(
+            label: 'Report',
+            icon: Icons.flag_outlined,
+            onSelected: () => showReportSheet(
+              context,
+              target: PersonReport(vm.uid),
+              authorName: vm.name,
+              authorId: vm.uid,
+            ),
+          ),
+        if (report && !blocks.hides(vm.uid))
+          CoverMenuItem(
+            label: 'Block',
+            icon: Icons.block,
+            destructive: true,
+            onSelected: () => confirmBlock(context, uid: vm.uid, name: vm.name),
+          ),
+        CoverMenuItem(
+          label: 'Share',
+          icon: Icons.ios_share,
+          onSelected: () {
+            final link = InviteLinks.player(vm.uid);
+            widget.share(context, '${vm.name}\n$link', link);
+          },
+        ),
+      ],
     );
   }
 
@@ -244,6 +314,7 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
         ),
       ],
       _Tab.posts => _posts(),
+      _Tab.media => _media(),
       _Tab.stats => [
         _NumbersCard(viewModel: vm),
         const SizedBox(height: 14),
@@ -333,6 +404,56 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
     ];
   }
 
+  /// The photos in the posts this profile already lists (same query, same
+  /// privacy filter), newest first; each opens its post.
+  List<Widget> _media() {
+    final c = AppColors.of(context);
+    if (!vm.postsLoaded) return const [Skeleton(child: SkeletonPost())];
+    if (vm.postsError != null) return [ErrorState(error: vm.postsError)];
+    final photos = [
+      for (final p in vm.posts)
+        for (final i in p.images)
+          if (i.isImage) (post: p, image: i),
+    ];
+    if (photos.isEmpty) {
+      return [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          child: Text(
+            'No photos or videos yet.',
+            textAlign: TextAlign.center,
+            style: AppText.secondary.copyWith(color: c.muted),
+          ),
+        ),
+      ];
+    }
+    final whose = vm.isMe ? 'your' : "${vm.name}'s";
+    return [
+      LayoutBuilder(
+        builder: (context, box) {
+          const gap = 6.0;
+          final cols = box.maxWidth >= 600 ? 4 : 3;
+          final size = (box.maxWidth - gap * (cols - 1)) / cols;
+          return Wrap(
+            spacing: gap,
+            runSpacing: gap,
+            children: [
+              for (final m in photos)
+                _MediaTile(
+                  key: ValueKey('${m.post.id}/${m.image.path}'),
+                  image: m.image,
+                  loadImage: vm.imageData,
+                  size: size,
+                  label: 'Photo from $whose post',
+                  onOpen: () => context.push(Routes.post(m.post.id)),
+                ),
+            ],
+          );
+        },
+      ),
+    ];
+  }
+
   List<Widget> _games() {
     final c = AppColors.of(context);
     final games = vm.summary.games;
@@ -369,12 +490,14 @@ class _Hero extends StatelessWidget {
     required this.onEdit,
     required this.tab,
     required this.onTab,
+    this.menu,
   });
 
   final PlayerProfileViewModel viewModel;
   final VoidCallback onEdit;
   final _Tab tab;
   final ValueChanged<_Tab> onTab;
+  final Widget? menu;
 
   @override
   Widget build(BuildContext context) {
@@ -404,7 +527,7 @@ class _Hero extends StatelessWidget {
     ];
     final tabs = [
       _Tab.overview,
-      if (vm.social) _Tab.posts,
+      if (vm.social) ...[_Tab.posts, _Tab.media],
       _Tab.stats,
       _Tab.teams,
     ];
@@ -433,6 +556,7 @@ class _Hero extends StatelessWidget {
             decorative: true,
           ),
           actions: mobile ? const [] : buttons,
+          menu: menu,
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
@@ -513,6 +637,75 @@ class _Hero extends StatelessWidget {
       ],
     );
   }
+}
+
+/// One photo in the Media grid: a square thumbnail that opens its post.
+class _MediaTile extends StatefulWidget {
+  const _MediaTile({
+    super.key,
+    required this.image,
+    required this.loadImage,
+    required this.size,
+    required this.label,
+    required this.onOpen,
+  });
+
+  final ChatAttachment image;
+  final ImageLoader loadImage;
+  final double size;
+  final String label;
+  final VoidCallback onOpen;
+
+  @override
+  State<_MediaTile> createState() => _MediaTileState();
+}
+
+class _MediaTileState extends State<_MediaTile> {
+  late final _data = widget.loadImage(widget.image);
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Semantics(
+      button: true,
+      label: widget.label,
+      excludeSemantics: true,
+      onTap: widget.onOpen,
+      child: SizedBox.square(
+        dimension: widget.size,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadius.control),
+          child: Material(
+            color: c.field,
+            child: InkWell(
+              onTap: widget.onOpen,
+              child: FutureBuilder(
+                future: _data,
+                builder: (context, snap) => switch (snap.data) {
+                  Ok(:final value) when value.isNotEmpty => Image.memory(
+                    value,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const _MediaFallback(),
+                  ),
+                  null => const SizedBox.shrink(),
+                  _ => const _MediaFallback(),
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MediaFallback extends StatelessWidget {
+  const _MediaFallback();
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Icon(Icons.image_outlined, color: AppColors.of(context).muted),
+  );
 }
 
 /// The header photo, or [fallback] (the default banner) when there's none
@@ -658,6 +851,7 @@ extension on _Tab {
   String get label => switch (this) {
     _Tab.overview => 'Overview',
     _Tab.posts => 'Posts',
+    _Tab.media => 'Media',
     _Tab.stats => 'Stats',
     _Tab.teams => 'Teams',
   };

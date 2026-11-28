@@ -338,5 +338,15 @@ abstract final class Routes {
 /// Discover's filters, by their `?only=` names (kept for old links):
 /// [tournaments] (tournaments and hat tournaments), [leagues], [pickup]
 /// (pickup communities), [teams], [groups] (shown as Communities: pickup
-/// communities, schools and clubs) and [players].
-enum ExploreFilter { teams, groups, players, tournaments, leagues, pickup }
+/// communities, schools and clubs), [players] (shown as Athletes; `athletes`
+/// opens it too) and [events] (every event Discover lists: tournaments,
+/// leagues and public team events).
+enum ExploreFilter {
+  teams,
+  groups,
+  players,
+  tournaments,
+  leagues,
+  pickup,
+  events,
+}

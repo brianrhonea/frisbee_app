@@ -13,7 +13,12 @@ import { ForVisitors } from "./ForVisitors";
 import { LocalTime } from "./LocalTime";
 import { MessageButton } from "./MessageButton";
 import { unblockPerson, useBlocks } from "@/lib/moderation";
-import { BlockButton, ReportButton } from "./Report";
+import { ReportDialog, useBlockPerson } from "./Report";
+import { CoverMenu, type CoverMenuItem } from "@/components/ui/CoverMenu";
+import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
+import { playerUrl, shareLink } from "./ShareButton";
+import { MemberImage } from "./MemberImage";
+import Link from "next/link";
 import { PostCard } from "./PostCard";
 import { DashboardLayout, ProfileCard, StatTiles, TeamList } from "./ProfileDashboard";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
@@ -155,6 +160,26 @@ function usePostCount(uid: string, all: boolean, enabled: boolean, refetchOn: st
   return count;
 }
 
+/**
+ * The Media tab: the photos in the posts this page already lists (the same posts, the same privacy filter),
+ * newest first, each opening its post. Posts have photos only, so there is no video to list.
+ */
+export function MediaGrid({ posts, first }: { posts: ProfilePage["posts"]; first: string }) {
+  const photos = posts.flatMap((p) => (p.images ?? []).map((img) => ({ post: p.id, img })));
+  if (photos.length === 0) return <EmptyState>No photos or videos yet.</EmptyState>;
+  return (
+    <ul className="media-grid">
+      {photos.map(({ post, img }) => (
+        <li key={`${post}/${img.path}`}>
+          <Link href={`/posts/${encodeURIComponent(post)}`} className="media-tile">
+            <MemberImage path={img.path} url={img.url} alt={`Photo from ${first}'s post`} />
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** The page for one player once loaded (exported for the component tests). */
 export function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePage; locked: boolean }) {
   const askConfirm = useConfirm();
@@ -187,12 +212,31 @@ export function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePa
   const postCount = usePostCount(uid, user?.uid === uid || profile.private === true, !!user && !locked && !blocks.hides(uid), posts.map((p) => p.id).join(","));
   const follow = <FollowButton targetId={uid} isPrivate={profile.private === true} signUpNext={`/players/${uid}`} />;
   const someoneElse = !!user && user.uid !== uid;
-  // Report and Block, for anyone else's profile (the app's ⋯ menu).
-  const safety = someoneElse && (
-    <span className="profile-safety">
-      <ReportButton target={{ kind: "user", uid }} authorName={name} className="btn btn-ghost btn-small" />
-      {!blocks.hides(uid) && <BlockButton uid={uid} name={name} label="Block" className="btn btn-ghost btn-small danger" />}
-    </span>
+  // The "…" menu over the cover (the app's CoverMenuButton): Report, Block and Share for someone else's
+  // profile, Share only for your own.
+  const [reporting, setReporting] = useState(false);
+  const [shareNote, setShareNote] = useState<string | undefined>();
+  const blocking = useBlockPerson(uid, name);
+  const [tab, setTab] = useState<"posts" | "media">("posts");
+  const menuItems: CoverMenuItem[] = [
+    ...(someoneElse ? [{ id: "report", label: "Report", onSelect: () => setReporting(true) }] : []),
+    ...(someoneElse && !blocks.hides(uid) ? [{ id: "block", label: "Block", danger: true, onSelect: () => void blocking.block() }] : []),
+    {
+      id: "share",
+      label: "Share",
+      onSelect: () =>
+        void shareLink(playerUrl(uid), `${name} on Stall 10`).then((r) => {
+          if (r !== "copied") return;
+          setShareNote("Link copied");
+          setTimeout(() => setShareNote(undefined), 2500);
+        }),
+    },
+  ];
+  const menu = (
+    <>
+      <CoverMenu items={menuItems} status={shareNote} />
+      {reporting && <ReportDialog target={{ kind: "user", uid }} authorName={name} onClose={() => setReporting(false)} />}
+    </>
   );
   // Follow and Message, as the app's profile header has them.
   const actions = (
@@ -207,7 +251,7 @@ export function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePa
     const mine = blocks.blockedByMe(uid);
     return (
       <div className="page page-wide player-page">
-        <ProfileCard profile={{ ...profile, bio: undefined, teams: [] }} secondary={safety} />
+        <ProfileCard profile={{ ...profile, bio: undefined, teams: [] }} menu={menu} />
         <EmptyState
           title={mine ? `You blocked ${first}` : "You can't see this profile"}
           action={
@@ -235,7 +279,7 @@ export function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePa
   if (locked) {
     return (
       <div className="page page-wide player-page">
-        <ProfileCard profile={profile} actions={actions} secondary={safety} staff={staff} />
+        <ProfileCard profile={profile} actions={actions} menu={menu} staff={staff} />
         <EmptyState title="This profile is private">
           {first} shares their stats, teams and posts with the people they approve. Ask to follow, and {first} can accept you.
         </EmptyState>
@@ -260,7 +304,7 @@ export function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePa
       <ProfileCard
         profile={profile}
         actions={actions}
-        secondary={safety}
+        menu={menu}
         staff={staff}
         counts={postCount === null ? undefined : <SummaryTiles label="Activity" items={[{ id: "posts", label: postCount === 1 ? "Post" : "Posts", value: postCount >= postCountCap ? `${postCountCap}+` : postCount }]} />}
       />
@@ -336,16 +380,31 @@ export function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePa
           </div>
         )}
 
-        <h2 className="section-title">Posts</h2>
-        {posts.length === 0 ? (
-          <EmptyState>No posts yet.</EmptyState>
-        ) : (
-          <div className="stack">
-            {posts.map((p) => (
-              <PostCard key={p.id} post={p} />
-            ))}
-          </div>
-        )}
+        <h2 className="section-title">{tab === "media" ? "Media" : "Posts"}</h2>
+        <SegmentedTabs
+          label="Posts or media"
+          items={[
+            { id: "posts", label: "Posts" },
+            { id: "media", label: "Media" },
+          ]}
+          value={tab}
+          onChange={(id) => setTab(id === "media" ? "media" : "posts")}
+          tabId={(id) => `profile-tab-${id}`}
+          panelId={(id) => `profile-panel-${id}`}
+        />
+        <div role="tabpanel" id={`profile-panel-${tab}`} aria-labelledby={`profile-tab-${tab}`}>
+          {tab === "media" ? (
+            <MediaGrid posts={posts} first={first} />
+          ) : posts.length === 0 ? (
+            <EmptyState>No posts yet.</EmptyState>
+          ) : (
+            <div className="stack">
+              {posts.map((p) => (
+                <PostCard key={p.id} post={p} />
+              ))}
+            </div>
+          )}
+        </div>
         <ForVisitors>
           <div className="cta-card">
             <p>Sign up to see more from {first} and follow along.</p>

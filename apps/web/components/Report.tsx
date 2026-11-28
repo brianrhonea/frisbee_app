@@ -155,21 +155,8 @@ export function ReportButton({
   );
 }
 
-/** Block [uid] after asking; [onDone] once they're blocked. */
-export function BlockButton({
-  uid,
-  name,
-  className = "text-btn danger",
-  label,
-  onDone,
-}: {
-  uid: string;
-  name: string;
-  className?: string;
-  /** The button's text; "Block {name}" when not given. */
-  label?: string;
-  onDone?: () => void;
-}) {
+/** Block [uid] after asking: the action behind [BlockButton], for a menu item. [onDone] once they're blocked. */
+export function useBlockPerson(uid: string, name: string, onDone?: () => void) {
   const askConfirm = useConfirm();
   const { user } = useAuth();
   const [busy, setBusy] = useState(false);
@@ -189,6 +176,25 @@ export function BlockButton({
       setBusy(false);
     }
   }
+  return { block, busy };
+}
+
+/** Block [uid] after asking; [onDone] once they're blocked. */
+export function BlockButton({
+  uid,
+  name,
+  className = "text-btn danger",
+  label,
+  onDone,
+}: {
+  uid: string;
+  name: string;
+  className?: string;
+  /** The button's text; "Block {name}" when not given. */
+  label?: string;
+  onDone?: () => void;
+}) {
+  const { block, busy } = useBlockPerson(uid, name, onDone);
   return (
     <button type="button" className={className} disabled={busy} onClick={() => void block()}>
       {label ?? `Block ${name}`}

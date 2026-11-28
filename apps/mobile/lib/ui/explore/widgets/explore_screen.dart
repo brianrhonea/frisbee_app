@@ -150,10 +150,17 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   /// Whether the chip picked shows [f]'s results (All shows every kind).
-  bool _shows(ExploreFilter f) => _only == null || _only == f;
+  /// Events shows tournaments and leagues too.
+  bool _shows(ExploreFilter f) =>
+      _only == null ||
+      _only == f ||
+      (_only == ExploreFilter.events &&
+          (f == ExploreFilter.tournaments || f == ExploreFilter.leagues));
 
   bool _showsKind(HostedType type) =>
-      _only == null || (_eventKinds[_only]?.contains(type) ?? false);
+      _only == null ||
+      _only == ExploreFilter.events ||
+      (_eventKinds[_only]?.contains(type) ?? false);
 
   @override
   Widget build(BuildContext context) {
@@ -232,13 +239,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
         filters: [
           ('All', null),
           if (_hasEvents) ...[
+            ('Events', ExploreFilter.events),
             ('Tournaments', ExploreFilter.tournaments),
             ('Leagues', ExploreFilter.leagues),
           ],
           ('Pickup', ExploreFilter.pickup),
           ('Teams', ExploreFilter.teams),
           ('Communities', ExploreFilter.groups),
-          ('Players', ExploreFilter.players),
+          ('Athletes', ExploreFilter.players),
         ],
         selected: _only,
         onSelect: (f) => setState(() => _applyFilter(f)),
@@ -254,6 +262,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     final events = widget.events;
     final eventsShown =
         _only == null ||
+        _only == ExploreFilter.events ||
         _only == ExploreFilter.tournaments ||
         _only == ExploreFilter.leagues;
     // Public team events (pickup games) under All and Pickup, as the
@@ -261,14 +270,17 @@ class _ExploreScreenState extends State<ExploreScreen> {
     final publicShown =
         x != null &&
         x.discoversPublicEvents &&
-        (_only == null || _only == ExploreFilter.pickup);
+        (_only == null ||
+            _only == ExploreFilter.events ||
+            _only == ExploreFilter.pickup);
     if (!_hasEvents || !eventsShown) {
       final what = switch (_only) {
         ExploreFilter.pickup => 'pickup communities and pickup games',
         ExploreFilter.teams => 'teams',
         ExploreFilter.groups => 'communities, schools and clubs',
-        ExploreFilter.players => 'players by name or username',
-        _ => 'players, teams, communities and tournaments',
+        ExploreFilter.players => 'athletes by name or username',
+        ExploreFilter.events => 'tournaments, leagues and events',
+        _ => 'athletes, teams, communities and tournaments',
       };
       return [
         Padding(
@@ -304,7 +316,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
       else if (x != null)
         UpcomingTournamentsCard(viewModel: x),
       if (publicShown) PublicEventsCard(viewModel: x, only: _only),
-      if (x != null && _only != ExploreFilter.leagues)
+      if (x != null &&
+          _only != ExploreFilter.leagues &&
+          _only != ExploreFilter.events)
         RecentResultsCard(viewModel: x),
     ];
   }
@@ -410,7 +424,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
           for (final t in groups) _ResultTile(listing: t, vm: vm),
         ]),
       if (people.isNotEmpty)
-        group('Players', [for (final p in people) PlayerTile(profile: p)]),
+        group('Athletes', [for (final p in people) PlayerTile(profile: p)]),
       if (teamEvents.isNotEmpty)
         group(pickup ? 'Pickup games' : 'Events', [
           for (final e in teamEvents)
