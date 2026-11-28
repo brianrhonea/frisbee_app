@@ -20,6 +20,7 @@ import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/States";
 import { Button } from "@/components/ui/Button";
 import { RosterSpots } from "./RosterSpots";
+import { TeamHistory } from "./TeamHistory";
 
 const statColumns: Array<[keyof StatTotals, string]> = [
   ["games", "Games"],
@@ -248,6 +249,8 @@ export function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePa
       {profile.visibility?.teams !== false && (
         <TeamList teams={(profile.teams ?? []).map((t) => ({ id: t.id, name: t.name, subtitle: t.subtitle }))} />
       )}
+      {/* Below the Teams card; the server decides what this viewer may see (signed-out visitors never get here). */}
+      <TeamHistory uid={uid} isMe={user?.uid === uid} />
       {user?.uid === uid && <RosterSpots uid={uid} />}
     </>
   );
