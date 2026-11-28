@@ -1,0 +1,72 @@
+{
+  "about": "seasonTotalsFor(spot, games): one roster spot's season totals from a team's games (the per-team sums of PlayerProfileViewModel._recompute). `games` are statsGames docs as stored (date ISO; the app reads them through StatsGame.fromMap). A game with no points is skipped; a spot with pointsPlayed 0 and touches 0 in a game has no line for it; otherwise the game adds games 1, points (pointsPlayed), goals, assists, blocks (handBlocks + breakups), completions, throwaways, catches (catches + goals) and drops to the season = the year of the game's date, in UTC. Each case lists the expected `seasons` for one `spot`; every total is present. Derived by hand from the Dart code; the app should assert it too.",
+  "games": [
+    {
+      "id": "g1", "opponent": "Rivals", "date": "2026-03-10T15:00:00.000Z", "gameTo": 15,
+      "points": [
+        { "line": ["a", "b"], "startedOn": "offense", "result": "weScored", "actions": [
+          { "kind": "pickup", "playerId": "a" },
+          { "kind": "catch_", "playerId": "b", "throwerId": "a" },
+          { "kind": "goal", "playerId": "a", "throwerId": "b" }
+        ] },
+        { "line": ["a", "b"], "startedOn": "defense", "result": "theyScored", "actions": [
+          { "kind": "handBlock", "playerId": "a" },
+          { "kind": "breakup", "playerId": "b" },
+          { "kind": "throwaway", "playerId": "a" }
+        ] }
+      ]
+    },
+    {
+      "id": "g2", "opponent": "Old Guys", "date": "2025-06-01T12:00:00.000Z", "gameTo": 15,
+      "points": [
+        { "line": ["a", "c"], "startedOn": "offense", "result": null, "actions": [
+          { "kind": "catch_", "playerId": "c", "throwerId": "a" },
+          { "kind": "drop", "playerId": "a", "throwerId": "c" },
+          { "kind": "breakup", "playerId": "a" }
+        ] }
+      ]
+    },
+    {
+      "id": "g3", "opponent": "Not on it", "date": "2026-05-02T12:00:00.000Z", "gameTo": 15,
+      "points": [
+        { "line": ["b", "c"], "startedOn": "offense", "result": "weScored", "actions": [ { "kind": "goal", "playerId": "b", "throwerId": "c" } ] }
+      ]
+    },
+    { "id": "g4", "opponent": "No points", "date": "2026-05-09T12:00:00.000Z", "gameTo": 15, "points": [] },
+    {
+      "id": "g5", "opponent": "Beat only", "date": "2026-07-01T12:00:00.000Z", "gameTo": 15,
+      "points": [
+        { "line": ["b", "c"], "startedOn": "defense", "result": "theyScored", "actions": [ { "kind": "beat", "playerId": "a" } ] }
+      ]
+    },
+    {
+      "id": "g6", "opponent": "Again", "date": "2026-08-15T12:00:00.000Z", "gameTo": 15,
+      "points": [
+        { "line": ["a"], "startedOn": "offense", "result": "weScored", "actions": [ { "kind": "goal", "playerId": "a", "throwerId": "c" } ] }
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "name": "sums each season; skips a game without points, a game without the spot, and a mention with no point or touch",
+      "spot": "a",
+      "seasons": {
+        "2025": { "games": 1, "points": 1, "goals": 0, "assists": 0, "blocks": 1, "completions": 1, "throwaways": 0, "catches": 0, "drops": 1 },
+        "2026": { "games": 2, "points": 3, "goals": 2, "assists": 0, "blocks": 1, "completions": 1, "throwaways": 1, "catches": 2, "drops": 0 }
+      }
+    },
+    {
+      "name": "a spot nobody tracked has no seasons",
+      "spot": "zz",
+      "seasons": {}
+    },
+    {
+      "name": "a thrower's assist and completion count only in games where they played a point or touched the disc",
+      "spot": "c",
+      "seasons": {
+        "2025": { "games": 1, "points": 1, "goals": 0, "assists": 0, "blocks": 0, "completions": 1, "throwaways": 0, "catches": 1, "drops": 0 },
+        "2026": { "games": 2, "points": 2, "goals": 0, "assists": 1, "blocks": 0, "completions": 1, "throwaways": 0, "catches": 0, "drops": 0 }
+      }
+    }
+  ]
+}

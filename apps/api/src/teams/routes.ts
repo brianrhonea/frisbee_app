@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 import { requireCaller } from "../auth.js";
 import type { MemoryRateLimiter } from "../limits/memory.js";
 import { readCaller } from "../limits/reads.js";
+import type { TeamHistoryService } from "./history.js";
 import type { RosterService } from "./roster.js";
 import type { TeamService } from "./service.js";
 
@@ -27,4 +28,14 @@ export function rosterRoutes(app: FastifyInstance, roster: RosterService, limite
     await roster.setLines(requireCaller(req), (req.params as { teamId?: unknown }).teamId, req.body);
     return reply.code(204).send();
   });
+}
+
+/** A player's roster history, for anyone signed in (TeamHistoryService decides what they see). */
+export function teamHistoryRoutes(app: FastifyInstance, history: TeamHistoryService, limiter?: MemoryRateLimiter) {
+  const caller = readCaller(limiter);
+  app.get("/v1/players/:uid/team-history", async (req, reply) =>
+    reply
+      .header("cache-control", "private, no-store")
+      .send(await history.history(caller(req, "teamHistory"), (req.params as { uid?: unknown }).uid)),
+  );
 }

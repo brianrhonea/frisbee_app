@@ -1,0 +1,114 @@
+// A player's roster history for their profile: every team an admin linked
+// them to, the ones they have left included, with their season totals from
+// each (`GET /v1/players/:uid/team-history`). The per-team season sums port
+// the app's PlayerProfileViewModel._recompute (apps/mobile/lib/ui/profile/
+// view_models/player_profile_viewmodel.dart); fixtures/team_history/totals.json
+// pins them for both sides.
+import { z } from "zod";
+import type { StatTotals } from "./browse.js";
+import { statsGameFrom, statSheet } from "./stats.js";
+
+/** Most linked roster spots one history returns. */
+export const teamHistoryMaxSpots = 50;
+/** Most games read per team (a stats game can be ~900 KB, so reads are bounded). */
+export const teamHistoryMaxGames = 100;
+
+export const teamHistoryKinds = ["team", "community", "organization"] as const;
+
+/** Every total present (StatTotals with no gaps). */
+export type SeasonTotals = Required<StatTotals>;
+
+export interface TeamHistoryEntry {
+  teamId: string;
+  teamName: string;
+  teamKind: (typeof teamHistoryKinds)[number];
+  /** Still a member of the team; false once they have left it. */
+  current: boolean;
+  spot: { id: string; name: string; number: number | null };
+  /** Season (the year of the game's date, UTC, e.g. "2026") to their totals; empty without games. */
+  seasons: Record<string, SeasonTotals>;
+}
+
+export interface TeamHistory {
+  teams: TeamHistoryEntry[];
+}
+
+const total = z.number().int().nonnegative();
+export const seasonTotalsSchema = z.strictObject({
+  games: total,
+  points: total,
+  goals: total,
+  assists: total,
+  blocks: total,
+  completions: total,
+  throwaways: total,
+  catches: total,
+  drops: total,
+});
+
+export const teamHistoryEntrySchema = z.strictObject({
+  teamId: z.string().min(1),
+  teamName: z.string(),
+  teamKind: z.enum(teamHistoryKinds),
+  current: z.boolean(),
+  spot: z.strictObject({ id: z.string().min(1), name: z.string(), number: z.number().int().nullable() }),
+  seasons: z.record(z.string().regex(/^\d{4}$/), seasonTotalsSchema),
+});
+
+export const teamHistorySchema = z.strictObject({ teams: z.array(teamHistoryEntrySchema).max(teamHistoryMaxSpots) });
+
+const empty = (): SeasonTotals => ({
+  games: 0,
+  points: 0,
+  goals: 0,
+  assists: 0,
+  blocks: 0,
+  completions: 0,
+  throwaways: 0,
+  catches: 0,
+  drops: 0,
+});
+
+/**
+ * One roster spot's season totals from a team's games (raw statsGames
+ * docs, dates ISO or Date). As the app does: a game with no points counts
+ * nothing; a spot that neither played a point nor touched the disc in a
+ * game (pointsPlayed 0 and touches 0) has no line for it; otherwise the
+ * game adds games 1, points, goals, assists, blocks (hand blocks and
+ * breakups), completions, throwaways, catches (goals included) and drops
+ * to the season of the game's date. The season is the UTC year (the app
+ * uses the phone's local year: they differ only for a game near New Year).
+ */
+export function seasonTotalsFor(spotId: string, games: ReadonlyArray<{ id?: string; [k: string]: unknown }>): Record<string, SeasonTotals> {
+  const seasons: Record<string, SeasonTotals> = {};
+  for (const raw of games) {
+    const g = statsGameFrom(raw.id ?? "", raw);
+    if (g.points.length === 0) continue;
+    const p = statSheet(g.points).players.get(spotId);
+    if (!p || (p.pointsPlayed === 0 && p.touches === 0)) continue;
+    const year = `${new Date(g.date).getUTCFullYear()}`;
+    const s = (seasons[year] ??= empty());
+    s.games += 1;
+    s.points += p.pointsPlayed;
+    s.goals += p.goals;
+    s.assists += p.assists;
+    s.blocks += p.handBlocks + p.breakups;
+    s.completions += p.completions;
+    s.throwaways += p.throwaways;
+    s.catches += p.catches + p.goals;
+    s.drops += p.drops;
+  }
+  return seasons;
+}
+
+/** Current teams first, then the most recent season, then team name (spot id breaks ties). */
+export function orderTeamHistory(entries: TeamHistoryEntry[]): TeamHistoryEntry[] {
+  const latest = (e: TeamHistoryEntry) => Math.max(-1, ...Object.keys(e.seasons).map(Number));
+  return [...entries].sort(
+    (a, b) =>
+      Number(b.current) - Number(a.current) ||
+      latest(b) - latest(a) ||
+      (a.teamName < b.teamName ? -1 : a.teamName > b.teamName ? 1 : 0) ||
+      (a.spot.id < b.spot.id ? -1 : a.spot.id > b.spot.id ? 1 : 0),
+  );
+}

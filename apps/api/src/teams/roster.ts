@@ -201,7 +201,7 @@ export class RosterService {
    * entry's division by the league's division summaries, or, without an
    * entry, any youth division of the league (refused to be safe).
    */
-  private async inYouthLeague(team: Data, teamId: string): Promise<boolean> {
+  async inYouthLeague(team: Data, teamId: string): Promise<boolean> {
     const leagueId = team.leagueId;
     if (typeof leagueId !== "string" || !leagueId) return false;
     if (!validId(leagueId)) return true;
