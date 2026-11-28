@@ -148,4 +148,6 @@ workflows:
         auth: integration
         submit_to_testflight: true
         submit_to_app_store: false
-        release_type: MANUAL
+        # Codemagic refuses the whole file (dev workflow included) when
+        # release_type is set without App Store submission. When turning
+        # submit_to_app_store back on, add `release_type: MANUAL` with it.
