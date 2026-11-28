@@ -220,11 +220,24 @@ describe("bounds", () => {
     expect(res.json().teams).toHaveLength(50);
   });
 
-  it("reads at most 100 games per team", async () => {
-    for (let i = 0; i < 120; i++) s.store.put(`teams/old/statsGames/h${String(i).padStart(3, "0")}`, game("q1", "2023-01-01T12:00:00Z"));
-    const old = (await s.get("pat", "pat")).json().teams.find((t: { teamId: string }) => t.teamId === "old");
-    // Ids in order: 100 of the 121 games are read.
-    expect(old.seasons["2023"].games + (old.seasons["2024"]?.games ?? 0)).toBe(100);
+  const seedGames = (n: number) => {
+    for (let i = 0; i < n; i++) s.store.put(`teams/old/statsGames/h${String(i).padStart(4, "0")}`, game("q1", "2023-01-01T12:00:00Z"));
+  };
+  const oldTeam = async () => (await s.get("pat", "pat")).json().teams.find((t: { teamId: string }) => t.teamId === "old");
+
+  it("pages through a team's games past one page, with no partial flag at exactly 1000", async () => {
+    seedGames(999); // plus g1 = 1000
+    const old = await oldTeam();
+    expect(old.seasons["2023"].games + old.seasons["2024"].games).toBe(1000);
+    expect(old).not.toHaveProperty("partial");
+  });
+
+  it("counts the first 1000 games and flags a team with more as partial", async () => {
+    seedGames(1000); // plus g1 = 1001
+    const old = await oldTeam();
+    expect(old.seasons["2024"].games).toBe(1);
+    expect(old.seasons["2023"].games).toBe(999);
+    expect(old.partial).toBe(true);
   });
 
   it("is rate limited per member", async () => {

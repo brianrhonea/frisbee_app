@@ -14,9 +14,11 @@
 //    private profile, or one hiding stats or teams, gives an empty history.
 // Nothing here names another person: no uids, no roster, no members.
 import {
+  addSeasonTotals,
   isYouthTeam,
   orderTeamHistory,
   publicPageOn,
+  type SeasonTotals,
   seasonTotalsFor,
   type TeamHistory,
   type TeamHistoryEntry,
@@ -35,6 +37,8 @@ import type { RosterService } from "./roster.js";
 
 /** Teams whose games are read at once. */
 const gameReads = 5;
+/** Games read per query. */
+const gamePage = 100;
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 
@@ -91,16 +95,29 @@ export class TeamHistoryService {
       shown.push({ teamId, team, spotId: s.parts[3]!, spot: s.data });
     }
 
-    const games = new Map<string, Data[]>();
+    const totals = new Map<string, { sums: Map<string, Record<string, SeasonTotals>>; partial: boolean }>();
     const need = [...new Set(shown.map((s) => s.teamId))];
     for (let i = 0; i < need.length; i += gameReads) {
       await Promise.all(
         need.slice(i, i + gameReads).map(async (teamId) => {
-          const docs = await this.queries.fields(`teams/${teamId}/statsGames`, ["date", "points"], teamHistoryMaxGames);
-          games.set(
-            teamId,
-            docs.map((d) => ({ ...d.data, id: d.id })),
-          );
+          const spotIds = shown.filter((s) => s.teamId === teamId).map((s) => s.spotId);
+          const sums = new Map(spotIds.map((id) => [id, {} as Record<string, SeasonTotals>]));
+          // Pages in id order; one game past the cap says there are more.
+          let read = 0;
+          let after: string | undefined;
+          let partial = false;
+          for (;;) {
+            const size = Math.min(gamePage, teamHistoryMaxGames + 1 - read);
+            const page = await this.queries.fields(`teams/${teamId}/statsGames`, ["date", "points"], size, undefined, after);
+            read += page.length;
+            partial = read > teamHistoryMaxGames;
+            if (page.length > 0) after = page[page.length - 1]!.id;
+            const counted = partial ? page.slice(0, page.length - 1) : page;
+            const games = counted.map((d) => ({ ...d.data, id: d.id }));
+            for (const [id, into] of sums) addSeasonTotals(into, seasonTotalsFor(id, games));
+            if (partial || page.length < size) break;
+          }
+          totals.set(teamId, { sums, partial });
         }),
       );
     }
@@ -115,7 +132,8 @@ export class TeamHistoryService {
         name: str(spot.name),
         number: typeof spot.number === "number" && Number.isInteger(spot.number) ? spot.number : null,
       },
-      seasons: seasonTotalsFor(spotId, games.get(teamId) ?? []),
+      seasons: totals.get(teamId)!.sums.get(spotId)!,
+      ...(totals.get(teamId)!.partial && { partial: true }),
     }));
     return { teams: orderTeamHistory(entries) };
   }

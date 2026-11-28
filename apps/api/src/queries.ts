@@ -4,7 +4,7 @@
 // filters only, so Firestore's single-field indexes serve them and no
 // composite index is needed. FirestoreDocQueries is the real one;
 // listDocQueries reads through a DocStore for tests (as listDraftQueries).
-import type { Firestore, Query } from "firebase-admin/firestore";
+import { FieldPath, type Firestore, type Query } from "firebase-admin/firestore";
 import { fromFirestore } from "./firestore_store.js";
 import type { Data, DocStore } from "./store.js";
 
@@ -14,8 +14,8 @@ export type Where = Record<string, string | boolean>;
 export interface DocQueries {
   /** Ids of up to [limit] documents of [collection] matching [where], in id order. */
   ids(collection: string, limit: number, where?: Where): Promise<string[]>;
-  /** Up to [limit] documents of [collection] matching [where], in id order, with only [fields]. */
-  fields(collection: string, fields: readonly string[], limit: number, where?: Where): Promise<Array<{ id: string; data: Data }>>;
+  /** Up to [limit] documents of [collection] matching [where], in id order (after id [after], to page), with only [fields]. */
+  fields(collection: string, fields: readonly string[], limit: number, where?: Where, after?: string): Promise<Array<{ id: string; data: Data }>>;
   /**
    * Up to [limit] documents of every collection named [collectionId]
    * matching [where], with their full paths (a collection group query;
@@ -40,8 +40,11 @@ export class FirestoreDocQueries implements DocQueries {
     return snap.docs.map((d) => d.id);
   }
 
-  async fields(collection: string, fields: readonly string[], limit: number, where?: Where) {
-    const snap = await this.query(collection, where)
+  async fields(collection: string, fields: readonly string[], limit: number, where?: Where, after?: string) {
+    let q = this.query(collection, where);
+    // Document-id order is the default: no index.
+    if (after !== undefined) q = q.orderBy(FieldPath.documentId()).startAfter(after);
+    const snap = await q
       .select(...fields)
       .limit(limit)
       .get();
@@ -67,9 +70,10 @@ export function listDocQueries(store: DocStore, cap = 5000): DocQueries {
         .slice(0, limit)
         .map((d) => d.id);
     },
-    async fields(collection, fields, limit, where = {}) {
-      const all = await store.list(collection, Object.keys(where).length ? cap : limit);
+    async fields(collection, fields, limit, where = {}, after) {
+      const all = await store.list(collection, Object.keys(where).length || after !== undefined ? cap : limit);
       return all
+        .filter((d) => after === undefined || d.id > after)
         .filter((d) => matches(d.data, where))
         .slice(0, limit)
         .map((d) => ({ id: d.id, data: Object.fromEntries(fields.filter((f) => f in d.data).map((f) => [f, d.data[f]])) }));

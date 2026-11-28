@@ -44,6 +44,12 @@
       "points": [
         { "line": ["a"], "startedOn": "offense", "result": "weScored", "actions": [ { "kind": "goal", "playerId": "a", "throwerId": "c" } ] }
       ]
+    },
+    {
+      "id": "g7", "opponent": "New Year", "date": "2026-12-31T23:30:00.000Z", "gameTo": 15,
+      "points": [
+        { "line": ["n"], "startedOn": "offense", "result": "weScored", "actions": [ { "kind": "goal", "playerId": "n", "throwerId": "c" } ] }
+      ]
     }
   ],
   "cases": [
@@ -53,6 +59,13 @@
       "seasons": {
         "2025": { "games": 1, "points": 1, "goals": 0, "assists": 0, "blocks": 1, "completions": 1, "throwaways": 0, "catches": 0, "drops": 1 },
         "2026": { "games": 2, "points": 3, "goals": 2, "assists": 0, "blocks": 1, "completions": 1, "throwaways": 1, "catches": 2, "drops": 0 }
+      }
+    },
+    {
+      "name": "near New Year: the season is the UTC year of the stored date (23:30Z on Dec 31 is 2026; the app's local year may be 2027 east of UTC, e.g. Dec 31 2026 23:30Z is already Jan 1 in UTC+1)",
+      "spot": "n",
+      "seasons": {
+        "2026": { "games": 1, "points": 1, "goals": 1, "assists": 0, "blocks": 0, "completions": 0, "throwaways": 0, "catches": 1, "drops": 0 }
       }
     },
     {

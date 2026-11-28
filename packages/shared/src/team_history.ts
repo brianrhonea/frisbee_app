@@ -10,8 +10,8 @@ import { statsGameFrom, statSheet } from "./stats.js";
 
 /** Most linked roster spots one history returns. */
 export const teamHistoryMaxSpots = 50;
-/** Most games read per team (a stats game can be ~900 KB, so reads are bounded). */
-export const teamHistoryMaxGames = 100;
+/** Most games read per team, in document-id order, a page at a time (a stats game can be ~900 KB). */
+export const teamHistoryMaxGames = 1000;
 
 export const teamHistoryKinds = ["team", "community", "organization"] as const;
 
@@ -27,6 +27,8 @@ export interface TeamHistoryEntry {
   spot: { id: string; name: string; number: number | null };
   /** Season (the year of the game's date, UTC, e.g. "2026") to their totals; empty without games. */
   seasons: Record<string, SeasonTotals>;
+  /** True when the team has more than teamHistoryMaxGames games: totals cover only the first of them. Absent otherwise. */
+  partial?: boolean;
 }
 
 export interface TeamHistory {
@@ -53,6 +55,7 @@ export const teamHistoryEntrySchema = z.strictObject({
   current: z.boolean(),
   spot: z.strictObject({ id: z.string().min(1), name: z.string(), number: z.number().int().nullable() }),
   seasons: z.record(z.string().regex(/^\d{4}$/), seasonTotalsSchema),
+  partial: z.boolean().optional(),
 });
 
 export const teamHistorySchema = z.strictObject({ teams: z.array(teamHistoryEntrySchema).max(teamHistoryMaxSpots) });
@@ -76,8 +79,9 @@ const empty = (): SeasonTotals => ({
  * game (pointsPlayed 0 and touches 0) has no line for it; otherwise the
  * game adds games 1, points, goals, assists, blocks (hand blocks and
  * breakups), completions, throwaways, catches (goals included) and drops
- * to the season of the game's date. The season is the UTC year (the app
- * uses the phone's local year: they differ only for a game near New Year).
+ * to the season of the game's date. The season is the UTC year: teams and
+ * games store no time zone, while the app uses the phone's local year, so a
+ * game within hours of New Year can differ (fixture case "near New Year").
  */
 export function seasonTotalsFor(spotId: string, games: ReadonlyArray<{ id?: string; [k: string]: unknown }>): Record<string, SeasonTotals> {
   const seasons: Record<string, SeasonTotals> = {};
@@ -99,6 +103,15 @@ export function seasonTotalsFor(spotId: string, games: ReadonlyArray<{ id?: stri
     s.drops += p.drops;
   }
   return seasons;
+}
+
+/** [into] plus [more], season by season (totals are sums, so games can be added a page at a time). */
+export function addSeasonTotals(into: Record<string, SeasonTotals>, more: Record<string, SeasonTotals>): Record<string, SeasonTotals> {
+  for (const [year, t] of Object.entries(more)) {
+    const s = (into[year] ??= empty());
+    for (const k of Object.keys(s) as Array<keyof SeasonTotals>) s[k] += t[k];
+  }
+  return into;
 }
 
 /** Current teams first, then the most recent season, then team name (spot id breaks ties). */
