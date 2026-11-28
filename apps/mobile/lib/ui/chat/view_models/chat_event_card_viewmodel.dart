@@ -74,7 +74,7 @@ class ChatEventCardViewModel extends ChangeNotifier {
     return end.isBefore(DateTime.now());
   }
 
-  /// Amber "RSVP needed": upcoming and unanswered.
+  /// Amber "Needs RSVP": upcoming and unanswered.
   bool get needsAnswer => _event != null && mine == null && !isOver;
 
   /// Sets the viewer's answer; picking the current one takes it back.

@@ -115,7 +115,7 @@ void main() {
       expect(inCard(find.text('Sunday pickup')), findsOneWidget);
       expect(inCard(find.text('Riverside Park')), findsOneWidget);
       expect(inCard(find.text('2 going')), findsOneWidget);
-      expect(inCard(find.text('RSVP needed')), findsOneWidget);
+      expect(inCard(find.text('Needs RSVP')), findsOneWidget);
       // The pickup card takes the dark Up next card's place.
       expect(find.text('View details'), findsNothing);
 
@@ -123,12 +123,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(events.events['e1']!.rsvpOf(testUser.uid), RsvpStatus.going);
       expect(inCard(find.text('3 going')), findsOneWidget);
-      expect(inCard(find.text('RSVP needed')), findsNothing);
+      expect(inCard(find.text('Needs RSVP')), findsNothing);
 
       await tester.tap(inCard(find.text('Going')));
       await tester.pumpAndSettle();
       expect(events.events['e1']!.rsvpOf(testUser.uid), isNull);
-      expect(inCard(find.text('RSVP needed')), findsOneWidget);
+      expect(inCard(find.text('Needs RSVP')), findsOneWidget);
     });
 
     test('answerNext swaps answers and clears the current one', () async {
@@ -159,7 +159,7 @@ void main() {
         size: const Size(400, 2400),
       );
       expect(find.byKey(const ValueKey('next-pickup')), findsOneWidget);
-      expect(find.text('RSVP needed'), findsOneWidget);
+      expect(find.text('Needs RSVP'), findsOneWidget);
     });
 
     testWidgets('with nothing ahead: a quiet empty state, New event for '
@@ -202,7 +202,7 @@ void main() {
       Finder inCard(Finder f) => find.descendant(of: card, matching: f);
       expect(inCard(find.text('Sunday pickup')), findsOneWidget);
       expect(inCard(find.textContaining('going')), findsNothing);
-      expect(inCard(find.text('RSVP needed')), findsNothing);
+      expect(inCard(find.text('Needs RSVP')), findsNothing);
       expect(inCard(find.text('Join the community to RSVP.')), findsOneWidget);
       // The card's Join is the page's only one.
       expect(find.widgetWithText(FilledButton, 'Join'), findsOneWidget);

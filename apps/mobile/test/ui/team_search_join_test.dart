@@ -152,7 +152,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(teams.teams['open']!.members.containsKey(testUser.uid), isTrue);
       expect(vm.isMine('open'), isTrue);
-      expect(find.text('Your community'), findsOneWidget);
+      expect(find.text('Joined'), findsOneWidget);
 
       // Approval group: a request is sent and the row says so.
       await tester.tap(joinIn('Approval Team Pickup'));
@@ -167,7 +167,7 @@ void main() {
       members: {'owner': TeamRole.owner, testUser.uid: TeamRole.player},
     );
     await pump(tester);
-    expect(find.text('Your team'), findsOneWidget);
+    expect(find.text('Joined'), findsOneWidget);
     expect(joinIn('Requests Team'), findsNothing);
   });
 

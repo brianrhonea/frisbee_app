@@ -207,7 +207,7 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
                 ? ErrorState(error: vm.error)
                 : const EmptyState(
                     icon: Icons.person_off_outlined,
-                    title: 'Profile not available',
+                    title: 'Player not found',
                   );
           }
           return PageScroll(
@@ -425,6 +425,7 @@ class _Hero extends StatelessWidget {
           title: vm.name,
           subtitle: handle.isEmpty ? null : handle,
           coverUrl: vm.headerUrl,
+          watermark: initialsOfName(vm.name),
           avatar: Avatar(
             name: vm.name,
             imageUrl: vm.photoUrl,
@@ -475,6 +476,8 @@ class _Hero extends StatelessWidget {
                 const SizedBox(height: AppSpace.md),
                 SummaryTiles(
                   tiles: [
+                    if (vm.postCountLabel case final n?)
+                      SummaryTile(value: n, label: vm.postCountCaption),
                     SummaryTile(
                       value: '${vm.followers}',
                       label: vm.followers == 1 ? 'Follower' : 'Followers',

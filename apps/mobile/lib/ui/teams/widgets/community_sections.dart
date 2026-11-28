@@ -19,7 +19,7 @@ import '../../schedule/widgets/rsvp_widgets.dart';
 /// The community's next event at the top of its page: date tile, title,
 /// time, place and the Going count, with Going / Maybe / Can't go for
 /// members (the event screen's control: tapping the picked answer takes it
-/// back) and an amber "RSVP needed" while they haven't answered. Outsiders
+/// back) and an amber "Needs RSVP" while they haven't answered. Outsiders
 /// see the event and [join] instead. With no [event], a quiet "No pickup
 /// scheduled" and, for those who add events, New event.
 class NextPickupCard extends StatelessWidget {
@@ -84,7 +84,7 @@ class NextPickupCard extends StatelessWidget {
     final going = count[RsvpStatus.going] ?? 0;
     return SectionCard(
       title: text.title,
-      action: needsRsvp ? const NeedsYouPill('RSVP needed') : null,
+      action: needsRsvp ? const NeedsYouPill('Needs RSVP') : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
