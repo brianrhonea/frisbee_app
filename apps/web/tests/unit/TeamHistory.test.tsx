@@ -73,7 +73,7 @@ describe("Team history card", () => {
   it("says totals are capped once, when any team is partial", async () => {
     callApi.mockResolvedValue({ teams: [entry({ partial: true }), entry({ teamId: "t2", partial: true })] });
     render(<TeamHistory uid="ada" isMe />);
-    expect(await screen.findAllByText("Totals cover up to 1000 games")).toHaveLength(1);
+    expect(await screen.findAllByText("Totals may not include every game")).toHaveLength(1);
   });
 
   it("has no caption when nothing is partial", async () => {

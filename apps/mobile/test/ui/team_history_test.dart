@@ -170,7 +170,7 @@ void main() {
         Result.ok([_entry('a', partial: true), _entry('b', partial: true)]),
       ]);
       await pumpInApp(t, _host(repo));
-      expect(find.text('Totals cover up to 1000 games'), findsOneWidget);
+      expect(find.text('Totals may not include every game'), findsOneWidget);
     });
 
     testWidgets('no partial, no note', (t) async {
@@ -182,7 +182,7 @@ void main() {
           ]),
         ),
       );
-      expect(find.text('Totals cover up to 1000 games'), findsNothing);
+      expect(find.text('Totals may not include every game'), findsNothing);
     });
 
     testWidgets('own and empty: a short empty state', (t) async {

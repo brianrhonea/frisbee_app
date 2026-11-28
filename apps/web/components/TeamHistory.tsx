@@ -11,7 +11,7 @@ import { EmptyState, ErrorState } from "./ui/States";
 import "./team_history.css";
 
 /** The note under the card when a team has more games than the server counts (teamHistoryMaxGames). */
-export const partialNote = "Totals cover up to 1000 games";
+export const partialNote = "Totals may not include every game";
 
 const count = (n: number, one: string) => `${n} ${n === 1 ? one : `${one}s`}`;
 

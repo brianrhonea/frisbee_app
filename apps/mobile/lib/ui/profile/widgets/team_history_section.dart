@@ -27,7 +27,7 @@ class TeamHistorySection extends StatelessWidget {
   final bool isMe;
 
   /// The most games the server counts per team.
-  static const partialNote = 'Totals cover up to 1000 games';
+  static const partialNote = 'Totals may not include every game';
 
   @override
   Widget build(BuildContext context) {
