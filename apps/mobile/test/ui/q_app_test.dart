@@ -362,6 +362,8 @@ void main() {
     });
 
     testWidgets('large text does not overflow', (tester) async {
+      // Real fonts at 200%, as on a phone (the test font is wider).
+      await loadAppFonts(tester);
       await expectNoOverflowWithLargeText(
         tester,
         screen(FakeUserPostRepository()),

@@ -143,6 +143,8 @@ void main() {
   });
 
   testWidgets('a few tabs share the width; many tabs scroll', (t) async {
+    // Real text widths decide whether the few tabs fit without scrolling.
+    await loadAppFonts(t);
     await pumpInApp(t, const _Tabs(labels: _few));
     expect(
       t.getSize(find.byType(SegmentedTabs)).width,

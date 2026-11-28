@@ -317,6 +317,10 @@ void main() {
         ],
         errorBuilder: (_, state) => Text('Went to ${state.uri.path}'),
       );
+      // Real fonts, as on a phone: with the wide test font the Media tab
+      // sits past the 360 px edge (and it only passed on Windows when an
+      // earlier golden had loaded the fonts).
+      await loadAppFonts(tester);
       tester.view.physicalSize = const Size(360, 900);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);

@@ -108,6 +108,8 @@ void main() {
 
   testWidgets('tapping reports the value; All reports null', (t) async {
     final got = <String?>[];
+    // Real text widths: with the test font 'Finished 5' sits past 360 px.
+    await loadAppFonts(t);
     await pumpInApp(t, _Host(initial: 'live', onChanged: got.add));
     await t.tap(find.text('Finished 5'));
     await t.pump();

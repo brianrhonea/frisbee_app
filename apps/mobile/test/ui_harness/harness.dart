@@ -36,6 +36,14 @@ bool _fontsLoaded = false;
 
 /// Loads Inter, Barlow Condensed and Material Icons so goldens show real
 /// text instead of test boxes. Safe to call more than once.
+///
+/// Once loaded, the fonts stay for the rest of the test file. expectGoldens
+/// calls this, but goldens are skipped off Windows, so a test that depends
+/// on real text widths (taps near an edge, overflow checks) must call it
+/// itself, or it passes on Windows and fails on the Codemagic Mac.
+/// Contrast checks (expectAccessible) are more reliable with the test font:
+/// with real glyphs, anti-aliasing on short words like "or" reads as low
+/// contrast.
 Future<void> loadAppFonts(WidgetTester tester) async {
   if (_fontsLoaded) return;
   await tester.runAsync(() async {

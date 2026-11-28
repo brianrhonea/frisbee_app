@@ -144,6 +144,8 @@ void main() {
 
   for (final theme in GoldenTheme.values) {
     testWidgets('meets accessibility guidelines, ${theme.name}', (t) async {
+      // Two dialogs fit in 640 px with real fonts, not the test font.
+      await loadAppFonts(t);
       await pumpInApp(
         t,
         Column(children: [_dialog(), _dialog(destructive: true)]),
