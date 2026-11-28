@@ -36,6 +36,12 @@ test("Q1 athlete profile: cover header, Follow and Message, quiet Report and Blo
   // Stats and teams stay beside the posts; with no games yet the stat card says so.
   await expect(page.getByText("No stats yet. Stats come from games kept in the app.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Posts" })).toBeVisible();
+  // The Posts count (a Firestore count of the posts this member may see): Ben has one.
+  const counts = head.getByRole("list", { name: "Activity" });
+  await expect(counts).toContainText("1", { timeout: 15_000 });
+  await expect(counts).toContainText("Post");
+  // No header photo: the designed default band with the initials.
+  await expect(head.locator(".ui-cover-default")).toHaveAttribute("data-initials", "BO");
   await noSideScroll(page);
   await axeBothThemes(page, "Q1 profile");
 });
@@ -65,6 +71,10 @@ test("Q2 Discover: search results are list rows, empty and hint states are the s
   await expect(page).toHaveTitle(/Discover/);
   await noSideScroll(page);
   await axeBothThemes(page, "Q2 discover results");
+  // Teams and communities Ada belongs to say Joined (a success pill with words, not colour alone).
+  await page.getByRole("searchbox", { name: "Search Stall 10" }).fill("seattle");
+  await expect(page.locator(".explore-rows .ui-row", { hasText: "Seattle Ultimate Community" }).getByText("Joined")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("Your group")).toHaveCount(0);
   await page.getByRole("searchbox", { name: "Search Stall 10" }).fill("zzzzqq");
   await expect(page.getByText("Nothing found")).toBeVisible({ timeout: 30_000 });
   await expect(page).toHaveTitle(/Discover/);

@@ -319,6 +319,7 @@
 .player-page .profile-about .bio { margin: 0; overflow-wrap: anywhere; line-height: 1.5; max-width: 62ch; }
 .player-page .profile-facts { display: flex; flex-wrap: wrap; gap: var(--space-xs) var(--space-lg); margin: 0; padding: 0; list-style: none; color: var(--muted); font-size: var(--text-secondary-size); }
 .player-page .profile-facts li { display: flex; align-items: center; gap: var(--space-sm); min-width: 0; overflow-wrap: anywhere; }
+.player-page .profile-counts { margin-top: var(--space-md); max-width: 180px; }
 .player-page .profile-secondary { margin-top: var(--space-xs); }
 .player-page .profile-safety { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-inline: calc(var(--space-md) * -1); }
 .player-page .profile-safety .btn-ghost { color: var(--muted); }

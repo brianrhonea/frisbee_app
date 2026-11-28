@@ -263,7 +263,7 @@ function SearchCard({
               leading={<Avatar name={t.name} size={40} />}
               title={t.name || "Team"}
               subtitle={group ? [sub, t.requiresApproval ? "Approval required" : "Open to join"].filter(Boolean).join(" · ") : sub}
-              trailing={myIds.has(t.id) ? <StatusPill tone="accent">{group ? "Your group" : "Your team"}</StatusPill> : undefined}
+              trailing={myIds.has(t.id) ? <StatusPill tone="success" icon="check">Joined</StatusPill> : undefined}
             />
           </li>
         );

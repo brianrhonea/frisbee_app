@@ -60,6 +60,25 @@ describe("Q1 athlete profile", () => {
     expect(document.querySelector(".ui-cover")).not.toBeNull();
   });
 
+  it("draws the default cover with the initials when there is no header photo, and the photo when there is", () => {
+    const { rerender } = render(<ProfileCard profile={profile} />);
+    const band = () => document.querySelector(".ui-cover-photo") as HTMLElement;
+    expect(band()).toHaveClass("ui-cover-default");
+    expect(band()).toHaveAttribute("data-initials", "JC");
+    // The watermark is a pseudo-element, so no text for assistive tech or a contrast check.
+    expect(band()).toHaveTextContent("");
+    rerender(<ProfileCard profile={{ ...profile, headerUrl: "https://example.test/h.jpg" }} />);
+    expect(band()).not.toHaveClass("ui-cover-default");
+    expect(band().querySelector("img")).toHaveAttribute("src", "https://example.test/h.jpg");
+  });
+
+  it("shows the Posts count tile under the details only when a count is given", () => {
+    const { rerender } = render(<ProfileCard profile={profile} />);
+    expect(document.querySelector(".profile-counts")).toBeNull();
+    rerender(<ProfileCard profile={profile} counts={<ul aria-label="Activity"><li>7 Posts</li></ul>} />);
+    expect(screen.getByRole("list", { name: "Activity" })).toHaveTextContent("7 Posts");
+  });
+
   it("keeps the actions beside the picture and the quieter safety actions under the details", () => {
     render(<ProfileCard profile={profile} actions={<button type="button">Follow</button>} secondary={<button type="button">Report</button>} />);
     expect(document.querySelector(".ui-cover-actions")).toContainElement(screen.getByRole("button", { name: "Follow" }));

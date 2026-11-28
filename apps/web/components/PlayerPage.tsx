@@ -1,6 +1,8 @@
 "use client";
 import { type MemberProfilePage, type ProfilePage, profileStatsChoice, type StatTotals } from "@stall10/shared";
-import { limit, orderBy, where } from "firebase/firestore";
+import { collection, getCountFromServer, limit, orderBy, query, where } from "firebase/firestore";
+import { firestoreDb } from "@/lib/firebase";
+import { SummaryTiles } from "@/components/ui/SummaryTiles";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ApiError, callApi, problem } from "@/lib/client";
@@ -124,6 +126,34 @@ export function LivePlayer({ uid }: { uid: string }) {
   return <PlayerView uid={uid} page={member} locked={member.locked} />;
 }
 
+/** The most posts the rules let one query list (capped(50)), so the most a count can say. */
+const postCountCap = 50;
+
+/**
+ * How many posts this member may see of [uid]'s: a Firestore count of the same query the posts list reads
+ * (no orderBy, so no index; the posts rule only lists up to 50, so the count stops there and the tile says "50+"), every post for their own page or a private profile they follow, else the
+ * public ones. Null until it is known (or when it can't be counted): the tile is then left out.
+ */
+function usePostCount(uid: string, all: boolean, enabled: boolean, refetchOn: string): number | null {
+  const [count, setCount] = useState<number | null>(null);
+  useEffect(() => {
+    const db = firestoreDb();
+    if (!enabled || !db) {
+      setCount(null);
+      return;
+    }
+    let live = true;
+    getCountFromServer(query(collection(db, "posts"), where("authorId", "==", uid), ...(all ? [] : [where("private", "==", false)]), limit(postCountCap))).then(
+      (snap) => live && setCount(snap.data().count),
+      () => live && setCount(null),
+    );
+    return () => {
+      live = false;
+    };
+  }, [uid, all, enabled, refetchOn]);
+  return count;
+}
+
 /** The page for one player once loaded (exported for the component tests). */
 export function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePage; locked: boolean }) {
   const askConfirm = useConfirm();
@@ -153,6 +183,7 @@ export function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePa
   const blocks = useBlocks(user);
   // The "Stall 10 staff" badge (written only by firebase/scripts/set-staff.mjs).
   const staff = useLiveDoc(user ? `staff/${uid}` : null).data != null;
+  const postCount = usePostCount(uid, user?.uid === uid || profile.private === true, !!user && !locked && !blocks.hides(uid), posts.map((p) => p.id).join(","));
   const follow = <FollowButton targetId={uid} isPrivate={profile.private === true} signUpNext={`/players/${uid}`} />;
   const someoneElse = !!user && user.uid !== uid;
   // Report and Block, for anyone else's profile (the app's ⋯ menu).
@@ -223,7 +254,13 @@ export function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePa
 
   return (
     <div className="page page-wide player-page">
-      <ProfileCard profile={profile} actions={actions} secondary={safety} staff={staff} />
+      <ProfileCard
+        profile={profile}
+        actions={actions}
+        secondary={safety}
+        staff={staff}
+        counts={postCount === null ? undefined : <SummaryTiles label="Activity" items={[{ id: "posts", label: postCount === 1 ? "Post" : "Posts", value: postCount >= postCountCap ? `${postCountCap}+` : postCount }]} />}
+      />
       <DashboardLayout side={side}>
         {seasons.length > 0 && profile.visibility?.stats !== false && (
           <div className="card">

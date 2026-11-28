@@ -1,6 +1,7 @@
 import type { PublicProfile, StatTotals } from "@stall10/shared";
 import type { ReactNode } from "react";
 import { Avatar } from "./Avatar";
+import { initials } from "@/lib/text";
 import { NavIcon, type NavIconName } from "./NavIcons";
 import "./member.css";
 import { CoverHeader } from "./ui/CoverHeader";
@@ -27,6 +28,7 @@ export function ProfileCard({
   profile,
   actions,
   secondary,
+  counts,
   staff = false,
 }: {
   profile: PublicProfile;
@@ -34,6 +36,8 @@ export function ProfileCard({
   actions?: ReactNode;
   /** Report, Block: quieter, under the details. */
   secondary?: ReactNode;
+  /** A row of SummaryTiles (Posts) under the details. */
+  counts?: ReactNode;
   /** Stall 10 staff (`staff/{uid}`): the badge under the name, as in the app. */
   staff?: boolean;
 }) {
@@ -50,7 +54,7 @@ export function ProfileCard({
   const handle = [profile.username && `@${profile.username}`, profile.pronouns].filter(Boolean).join(" · ");
   // The shared cover header (the app's CoverHeader): cover, picture on its edge, name, handle, actions.
   return (
-    <CoverHeader coverUrl={profile.headerUrl} avatar={<Avatar name={name} url={profile.photoUrl} size={96} />} title={name} subtitle={handle || undefined} actions={actions}>
+    <CoverHeader coverUrl={profile.headerUrl} watermark={initials(name, 2)} avatar={<Avatar name={name} url={profile.photoUrl} size={96} />} title={name} subtitle={handle || undefined} actions={actions}>
       {(staff || profile.private) && (
         <div className="profile-badges">
           {staff && (
@@ -76,6 +80,7 @@ export function ProfileCard({
           )}
         </div>
       )}
+      {counts && <div className="profile-counts">{counts}</div>}
       {secondary && <div className="profile-secondary">{secondary}</div>}
     </CoverHeader>
   );
